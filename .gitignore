@@ -40,3 +40,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# 작업용 문서 (커밋하지 않음)
+/workspace
