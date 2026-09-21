@@ -29,10 +29,10 @@ module.exports = defineConfig([
       "import/order": [
         "error",
         {
-          groups: ["builtin", "external", "internal", "parent", "sibling", "index"],
-          pathGroups: [{ pattern: "@/**", group: "internal" }],
+          "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
+          "pathGroups": [{ pattern: "@/**", group: "internal" }],
           "newlines-between": "always",
-          alphabetize: { order: "asc", caseInsensitive: true },
+          "alphabetize": { order: "asc", caseInsensitive: true },
         },
       ],
 
