@@ -4,15 +4,10 @@ const eslintConfigPrettier = require("eslint-config-prettier");
 
 module.exports = defineConfig([
   expoConfig,
-
-  // 포맷 관련 규칙은 끈다. 포맷은 Prettier가 담당한다.
   eslintConfigPrettier,
-
   {
     ignores: ["dist/*", ".expo/*", "ios/*", "android/*", "node_modules/*"],
   },
-
-  // 설정 파일은 CommonJS라 require()를 써야 한다.
   {
     files: ["*.config.{js,ts}", "eslint.config.js"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
