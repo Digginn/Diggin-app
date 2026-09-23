@@ -1,14 +1,10 @@
-import { Image } from "expo-image";
 import { Text, View } from "react-native";
 
 export default function Index() {
   return (
-    <View className="flex-1 items-center justify-center gap-4 bg-white">
-      <Image
-        source={require("@/assets/images/icon-black.png")}
-        style={{ width: 96, height: 96, borderRadius: 22 }}
-      />
-      <Text className="text-xl font-bold">Diggin</Text>
+    <View className="flex-1 justify-center gap-3 bg-gray-0 px-margin">
+      <Text className="text-gray-900 font-h1">Diggin</Text>
+      <Text className="text-gray-600 font-b1">디기디기딩 파이팅~</Text>
     </View>
   );
 }

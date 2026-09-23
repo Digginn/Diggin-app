@@ -1,10 +1,18 @@
-import type { Config } from 'tailwindcss';
+import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
+
+import { colors, fontFamily, layout, typographyUtilities } from "./src/theme";
 
 export default {
-  content: ['./src/**/*.{js,jsx,ts,tsx}'],
-  presets: [require('nativewind/preset')],
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
+  presets: [require("nativewind/preset")],
   theme: {
-    extend: {},
+    extend: {
+      colors,
+      fontFamily,
+      // Figma 그리드 스펙. px-margin(좌우 여백 24), gap-gutter(컬럼 간격 16)
+      spacing: layout,
+    },
   },
-  plugins: [],
+  plugins: [plugin(({ addUtilities }) => addUtilities(typographyUtilities()))],
 } satisfies Config;
