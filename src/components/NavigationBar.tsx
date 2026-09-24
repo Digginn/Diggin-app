@@ -3,12 +3,12 @@ import type { ComponentProps, FC } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { SvgProps } from "react-native-svg";
 
-import IconAllActive from "@/assets/images/nav/icon-nav-dig-active.svg";
-import IconAllInactive from "@/assets/images/nav/icon-nav-dig-inactive.svg";
+import IconAllActive from "@/assets/images/nav/icon-nav-all-active.svg";
+import IconAllInactive from "@/assets/images/nav/icon-nav-all-inactive.svg";
 import IconDiggleActive from "@/assets/images/nav/icon-nav-diggle-active.svg";
 import IconDiggleInactive from "@/assets/images/nav/icon-nav-diggle-inactive.svg";
-import IconFolderActive from "@/assets/images/nav/icon-nav-in-active.svg";
-import IconFolderInactive from "@/assets/images/nav/icon-nav-in-inactive.svg";
+import IconFolderActive from "@/assets/images/nav/icon-nav-folder-active.svg";
+import IconFolderInactive from "@/assets/images/nav/icon-nav-folder-inactive.svg";
 import IconMyActive from "@/assets/images/nav/icon-nav-my-active.svg";
 import IconMyInactive from "@/assets/images/nav/icon-nav-my-inactive.svg";
 import { colors } from "@/theme";
