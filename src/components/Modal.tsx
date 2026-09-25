@@ -117,7 +117,10 @@ export function Modal({
                   onPress={onClose}
                 >
                   <View className="size-4 items-center justify-center overflow-hidden">
-                    <StyledImage source={require("@/assets/images/icon-close.svg")} />
+                    <StyledImage
+                      className="size-3"
+                      source={require("@/assets/images/icon-close.svg")}
+                    />
                   </View>
                 </Pressable>
               </View>
