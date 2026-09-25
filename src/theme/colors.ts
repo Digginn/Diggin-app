@@ -13,4 +13,7 @@ export const colors = {
     900: "#1E1E1E",
     1000: "#000000",
   },
+  semantic: {
+    focus: "#2563EB",
+  },
 } as const;
