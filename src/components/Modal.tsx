@@ -15,6 +15,7 @@ type ModalProps = {
   title: string;
   description?: string;
   children?: ReactNode;
+  onClose?: () => void;
   primaryAction: ModalAction;
   secondaryAction?: ModalAction;
 };
@@ -48,7 +49,7 @@ export function ModalOverlay({ children, visible, onRequestClose }: ModalOverlay
   return (
     <NativeModal animationType="fade" onRequestClose={onRequestClose} transparent visible={visible}>
       <View className="flex-1 items-center justify-center px-margin">
-        <Pressable className="absolute inset-0 bg-black/40" onPress={onRequestClose} />
+        <View className="absolute inset-0 bg-black/40" />
         {children}
       </View>
     </NativeModal>
@@ -90,17 +91,39 @@ export function Modal({
   title,
   description,
   children,
+  onClose,
   primaryAction,
   secondaryAction,
 }: ModalProps) {
   const isTwoButton = type === "2Btn" && secondaryAction;
+  const hasCloseButton = type === "1Btn" && onClose !== undefined;
 
   return (
-    <View className="w-full max-w-[327px] items-center rounded-[5px] bg-gray-0 px-2.5 py-4 shadow-lg">
+    <View
+      className={`w-full max-w-[327px] items-center rounded-[5px] bg-gray-0 px-2.5 pb-4 shadow-lg ${hasCloseButton ? "pt-2" : "pt-4"}`}
+    >
       <View className="w-[295px] items-center gap-[25px]">
         <View className="w-[295px] items-center gap-[30px]">
           <View className="w-[295px] items-center gap-1">
-            <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>
+            {hasCloseButton ? (
+              <View className="w-[295px] flex-row items-center overflow-hidden">
+                <View className="size-12" />
+                <Text className="flex-1 text-center text-gray-900 font-label-16-semibold">
+                  {title}
+                </Text>
+                <Pressable
+                  accessibilityLabel="모달 닫기"
+                  className="size-12 items-center justify-center overflow-hidden"
+                  onPress={onClose}
+                >
+                  <View className="size-4 items-center justify-center overflow-hidden">
+                    <StyledImage source={require("@/assets/images/icon-close.svg")} />
+                  </View>
+                </Pressable>
+              </View>
+            ) : (
+              <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>
+            )}
             {description && (
               <Text className="text-center text-gray-700 font-b3">{description}</Text>
             )}
