@@ -1,0 +1,7 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="IconRadioButton">
+<rect x="0.5" y="0.5" width="19" height="19" rx="9.5" fill="white"/>
+<rect x="0.5" y="0.5" width="19" height="19" rx="9.5" stroke="#B9B9B9"/>
+<path id="Vector" d="M10 15C7.23867 15 5 12.761 5 10C5 7.23833 7.23867 5 10 5C12.7613 5 15 7.23833 15 10C15 12.761 12.7613 15 10 15Z" fill="#1E1E1E"/>
+</g>
+</svg>
