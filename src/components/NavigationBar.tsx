@@ -3,14 +3,16 @@ import type { ComponentProps, FC } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { SvgProps } from "react-native-svg";
 
-import IconAllActive from "@/assets/images/nav/icon-nav-all-active.svg";
-import IconAllInactive from "@/assets/images/nav/icon-nav-all-inactive.svg";
-import IconDiggleActive from "@/assets/images/nav/icon-nav-diggle-active.svg";
-import IconDiggleInactive from "@/assets/images/nav/icon-nav-diggle-inactive.svg";
-import IconFolderActive from "@/assets/images/nav/icon-nav-folder-active.svg";
-import IconFolderInactive from "@/assets/images/nav/icon-nav-folder-inactive.svg";
-import IconMyActive from "@/assets/images/nav/icon-nav-my-active.svg";
-import IconMyInactive from "@/assets/images/nav/icon-nav-my-inactive.svg";
+import {
+  IconAllActive,
+  IconAllInactive,
+  IconDiggleActive,
+  IconDiggleInactive,
+  IconFolderActive,
+  IconFolderInactive,
+  IconMyActive,
+  IconMyInactive,
+} from "@/assets/images/nav";
 import { colors } from "@/theme";
 
 type NavigationBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
@@ -32,7 +34,6 @@ const TABS: Record<string, TabConfig> = {
 };
 
 export function NavigationBar({ state, navigation }: NavigationBarProps) {
-
   return (
     <View
       className="flex-row items-center justify-center gap-gutter rounded-t-[20px] bg-gray-900 px-margin"
