@@ -76,7 +76,7 @@ function ModalButton({
         : "text-gray-500";
   return (
     <Pressable
-      className={`h-12 flex-1 items-center justify-center px-5 ${containerClassName}`}
+      className={`h-12 w-full items-center justify-center px-5 ${containerClassName}`}
       disabled={variant === "disabled"}
       onPress={action.onPress}
     >
@@ -109,8 +109,12 @@ export function Modal({
         </View>
         {isTwoButton ? (
           <View className="w-[295px] flex-row gap-[15px]">
-            <ModalButton action={secondaryAction} variant="secondary" />
-            <ModalButton action={primaryAction} />
+            <View className="w-[140px]">
+              <ModalButton action={secondaryAction} variant="secondary" />
+            </View>
+            <View className="w-[140px]">
+              <ModalButton action={primaryAction} />
+            </View>
           </View>
         ) : (
           <View className="w-[295px]">
@@ -158,8 +162,12 @@ export function FolderModal({ onBack, onLoad, onSave }: FolderModalProps) {
           </View>
         </View>
         <View className="w-[295px] flex-row gap-[15px]">
-          <ModalButton action={{ label: "돌아가기", onPress: onBack }} variant="secondary" />
-          <ModalButton action={{ label: "불러오기", onPress: onLoad }} />
+          <View className="w-[140px]">
+            <ModalButton action={{ label: "돌아가기", onPress: onBack }} variant="secondary" />
+          </View>
+          <View className="w-[140px]">
+            <ModalButton action={{ label: "불러오기", onPress: onLoad }} />
+          </View>
         </View>
         <Pressable
           className="h-12 w-[295px] items-center justify-center rounded-[5px] bg-gray-900"
@@ -229,10 +237,14 @@ export function ReportModal({ onCancel, onReport }: ReportModalProps) {
           )}
         </View>
         <View className="w-[295px] flex-row gap-[15px]">
-          <ModalButton action={{ label: "취소", onPress: onCancel }} variant="secondary" />
-          <ModalButton
-            action={{ label: "신고하기", onPress: () => onReport(reason ?? "", detail) }}
-          />
+          <View className="w-[140px]">
+            <ModalButton action={{ label: "취소", onPress: onCancel }} variant="secondary" />
+          </View>
+          <View className="w-[140px]">
+            <ModalButton
+              action={{ label: "신고하기", onPress: () => onReport(reason ?? "", detail) }}
+            />
+          </View>
         </View>
       </View>
     </View>
