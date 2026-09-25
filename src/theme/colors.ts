@@ -5,6 +5,7 @@ export const colors = {
     100: "#F4F4F4",
     200: "#ECECEC",
     300: "#DDDDDD",
+    350: "#D0D0D0",
     400: "#B9B9B9",
     500: "#9A9A9A",
     600: "#717171",
@@ -12,5 +13,10 @@ export const colors = {
     800: "#3F3F3F",
     900: "#1E1E1E",
     1000: "#000000",
+    placeholder: "#CCCCCC",
+  },
+  semantic: {
+    error: "#EB2525",
+    focus: "#2563EB",
   },
 } as const;
