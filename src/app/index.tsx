@@ -72,7 +72,7 @@ export default function Index() {
             description={`아이템을 담을 새 폴더를 만들어 주세요.
 공개 폴더는 외부 링크로 공유가 가능해요.`}
             primaryAction={{ label: "폴더 만들기", onPress: closeModal }}
-            secondaryAction={{ label: "폴더 만들기", onPress: closeModal }}
+            secondaryAction={{ label: "돌아가기", onPress: closeModal }}
           >
             <FolderNameField />
           </Modal>
