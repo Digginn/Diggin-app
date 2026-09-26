@@ -1,10 +1,32 @@
-import { Text, View } from "react-native";
+import { useState } from "react";
+import { View } from "react-native";
+
+import { Tooltip } from "@/components/Tooltip";
+
+const longTooltipMessage = "툴팁설명".repeat(10);
 
 export default function Index() {
+  const [isTopTooltipVisible, setIsTopTooltipVisible] = useState(true);
+  const [isLeftTooltipVisible, setIsLeftTooltipVisible] = useState(true);
+  const [isLongTooltipVisible, setIsLongTooltipVisible] = useState(true);
+
   return (
-    <View className="flex-1 justify-center gap-3 bg-gray-0 px-margin">
-      <Text className="text-gray-900 font-h1">Diggin</Text>
-      <Text className="text-gray-600 font-b1">디기디기딩 파이팅~</Text>
+    <View className="flex-1 items-center justify-center bg-gray-0">
+      <View className="w-[237px] gap-10 px-5 py-5">
+        {isTopTooltipVisible && (
+          <Tooltip message="툴팁 이름" onClose={() => setIsTopTooltipVisible(false)} />
+        )}
+        {isLeftTooltipVisible && (
+          <Tooltip
+            arrowPosition="left"
+            message="툴팁 설명"
+            onClose={() => setIsLeftTooltipVisible(false)}
+          />
+        )}
+        {isLongTooltipVisible && (
+          <Tooltip message={longTooltipMessage} onClose={() => setIsLongTooltipVisible(false)} />
+        )}
+      </View>
     </View>
   );
 }
