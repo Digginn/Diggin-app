@@ -75,7 +75,7 @@ export function TextField({
       {inputValue.length === 0 && (
         <Text
           pointerEvents="none"
-          className="absolute left-4 top-[10px] text-gray-placeholder font-label-16-medium"
+          className="absolute left-4 top-[10px] text-gray-400 font-label-16-medium"
         >
           {placeholder}
         </Text>
@@ -133,7 +133,7 @@ export function SearchField({
 
   return (
     <View
-      className={`h-12 w-full max-w-[268px] flex-row items-center rounded-full border-[1.5px] border-gray-300 bg-gray-0 pl-4 pr-1 ${className ?? ""}`}
+      className={`h-12 w-full flex-row items-center rounded-full border-[1.5px] border-gray-300 bg-gray-0 pl-4 pr-1 ${className ?? ""}`}
     >
       {!hasText && (
         <Text pointerEvents="none" className="absolute left-4 top-3 text-gray-placeholder font-b1">
