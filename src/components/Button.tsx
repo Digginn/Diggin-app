@@ -45,7 +45,7 @@ export function Button({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       className={clsx(
-        "h-12 self-stretch flex-row items-center justify-center gap-3 rounded-[5px] px-5",
+        "h-12 self-stretch flex-row items-center justify-center gap-3 rounded px-5",
         !disabled && "active:opacity-75",
         !bgColor && (disabled ? "bg-gray-200" : variant === "primary" ? "bg-gray-900" : "bg-gray-100"),
         className,
