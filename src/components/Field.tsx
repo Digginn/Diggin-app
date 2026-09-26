@@ -1,7 +1,8 @@
 import { Image } from "expo-image";
 import { cssInterop } from "nativewind";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, type TextInputProps, View } from "react-native";
+import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import { colors } from "@/theme";
 
@@ -10,11 +11,9 @@ type TextFieldProps = TextInputProps & {
   className?: string;
 };
 
-type FieldHelperTextStatus = "default" | "error-duplicate" | "error-special-character";
-
-type FieldHelperTextProps = {
-  status?: FieldHelperTextStatus;
-  message?: string;
+type HelperTextProps = {
+  status?: "default" | "error";
+  message: string;
   className?: string;
 };
 
@@ -23,13 +22,23 @@ type SearchFieldProps = TextInputProps & {
   className?: string;
 };
 
-const fieldHelperText = {
-  "default": "최대 10글자까지 입력 가능합니다.",
-  "error-duplicate": "이미 사용 중인 닉네임 입니다.",
-  "error-special-character": "특수문자는 사용이 불가능합니다.",
-} as const;
+type BodyTextFieldProps = Omit<TextInputProps, "multiline" | "placeholder"> & {
+  className?: string;
+  onValidityChange?: (isValid: boolean) => void;
+  placeholder: string;
+};
 
+const MIN_BODY_TEXT_LENGTH = 5;
 const StyledImage = cssInterop(Image, { className: "style" });
+function countBodyTextCharacters(value: string) {
+  let count = 0;
+
+  for (const grapheme of splitGraphemes(value)) {
+    if (!/^\s+$/u.test(grapheme)) count += 1;
+  }
+
+  return count;
+}
 
 function useInputValue(
   value: string | undefined,
@@ -55,7 +64,7 @@ export function TextField({
   onBlur,
   onChangeText,
   onFocus,
-  placeholder = "닉네임을 입력해 주세요.",
+  placeholder,
   value,
   ...props
 }: TextFieldProps) {
@@ -70,16 +79,8 @@ export function TextField({
 
   return (
     <View
-      className={`h-11 w-full flex-row items-center rounded-[5px] border bg-gray-0 px-4 ${borderClassName} ${className ?? ""}`}
+      className={`h-11 w-full flex-row items-center rounded-field border bg-gray-0 px-4 ${borderClassName} ${className ?? ""}`}
     >
-      {inputValue.length === 0 && (
-        <Text
-          pointerEvents="none"
-          className="absolute left-4 top-[10px] text-gray-400 font-label-16-medium"
-        >
-          {placeholder}
-        </Text>
-      )}
       <TextInput
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
@@ -94,7 +95,7 @@ export function TextField({
           setIsFocused(true);
           onFocus?.(event);
         }}
-        placeholder=""
+        placeholder={placeholder}
         placeholderTextColor={colors.gray.placeholder}
         value={inputValue}
       />
@@ -102,15 +103,63 @@ export function TextField({
   );
 }
 
-export function FieldHelperText({ status = "default", message, className }: FieldHelperTextProps) {
-  const isError = status !== "default";
+export function HelperText({ status = "default", message, className }: HelperTextProps) {
+  const isError = status === "error";
 
   return (
     <Text
       className={`font-note ${isError ? "text-semantic-error" : "text-gray-600"} ${className ?? ""}`}
     >
-      {message ?? fieldHelperText[status]}
+      {message}
     </Text>
+  );
+}
+
+export function BodyTextField({
+  className,
+  defaultValue,
+  onChangeText,
+  onValidityChange,
+  placeholder,
+  value,
+  ...props
+}: BodyTextFieldProps) {
+  const { inputValue, handleChangeText } = useInputValue(value, defaultValue, onChangeText);
+  const characterCount = countBodyTextCharacters(inputValue);
+  const isEmpty = inputValue.length === 0;
+  const isValid = characterCount >= MIN_BODY_TEXT_LENGTH;
+  const isError = !isEmpty && !isValid;
+  const borderClassName = isError
+    ? "border-semantic-error"
+    : isValid
+      ? "border-gray-600"
+      : "border-gray-300";
+
+  useEffect(() => {
+    onValidityChange?.(isValid);
+  }, [isValid, onValidityChange]);
+
+  return (
+    <View
+      className={`relative h-[200px] w-full rounded-field border-field bg-gray-0 p-4 ${borderClassName} ${className ?? ""}`}
+    >
+      <TextInput
+        {...props}
+        accessibilityLabel={props.accessibilityLabel ?? placeholder}
+        className={`flex-1 p-0 text-gray-900 ${isEmpty ? "font-label-16-medium" : "font-b1"}`}
+        multiline
+        onChangeText={handleChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.gray[400]}
+        textAlignVertical="top"
+        value={inputValue}
+      />
+      {isError && (
+        <Text className="absolute bottom-4 right-4 text-semantic-error font-note">
+          {characterCount}/{MIN_BODY_TEXT_LENGTH}자
+        </Text>
+      )}
+    </View>
   );
 }
 
@@ -119,7 +168,7 @@ export function SearchField({
   defaultValue,
   onChangeText,
   onClear,
-  placeholder = "찾고 싶은 아이템을 입력하세요.",
+  placeholder,
   value,
   ...props
 }: SearchFieldProps) {
@@ -133,19 +182,14 @@ export function SearchField({
 
   return (
     <View
-      className={`h-12 w-full flex-row items-center rounded-full border-[1.5px] border-gray-300 bg-gray-0 pl-4 pr-1 ${className ?? ""}`}
+      className={`h-12 w-full flex-row items-center rounded-full border-field border-gray-300 bg-gray-0 pl-4 pr-1 ${className ?? ""}`}
     >
-      {!hasText && (
-        <Text pointerEvents="none" className="absolute left-4 top-3 text-gray-placeholder font-b1">
-          {placeholder}
-        </Text>
-      )}
       <TextInput
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
         className="flex-1 p-0 text-gray-900 font-b1"
         onChangeText={handleChangeText}
-        placeholder=""
+        placeholder={placeholder}
         placeholderTextColor={colors.gray.placeholder}
         returnKeyType="search"
         value={inputValue}
