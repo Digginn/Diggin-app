@@ -1,8 +1,16 @@
+import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import { BodyTextField, HelperText, SearchField, TextField } from "@/components/Field";
+import { Tooltip } from "@/components/Tooltip";
+
+const longTooltipMessage = "툴팁설명".repeat(10);
 
 export default function Index() {
+  const [isTopTooltipVisible, setIsTopTooltipVisible] = useState(true);
+  const [isLeftTooltipVisible, setIsLeftTooltipVisible] = useState(true);
+  const [isLongTooltipVisible, setIsLongTooltipVisible] = useState(true);
+
   return (
     <ScrollView className="flex-1 bg-gray-0" contentContainerClassName="gap-8 px-margin py-16">
       <View className="gap-3">
@@ -51,6 +59,24 @@ export default function Index() {
             placeholder="저장한 아이템에 대해 다른 사람들과 의견을 나누어 보세요. (최소 5글자)"
             defaultValue="작성중입니다"
           />
+        </View>
+      </View>
+      <View className="gap-3">
+        <Text className="text-gray-900 font-h2">Tooltip</Text>
+        <View className="w-[237px] gap-10 px-5 py-5">
+          {isTopTooltipVisible && (
+            <Tooltip message="툴팁 이름" onClose={() => setIsTopTooltipVisible(false)} />
+          )}
+          {isLeftTooltipVisible && (
+            <Tooltip
+              arrowPosition="left"
+              message="툴팁 설명"
+              onClose={() => setIsLeftTooltipVisible(false)}
+            />
+          )}
+          {isLongTooltipVisible && (
+            <Tooltip message={longTooltipMessage} onClose={() => setIsLongTooltipVisible(false)} />
+          )}
         </View>
       </View>
     </ScrollView>
