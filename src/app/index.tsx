@@ -1,32 +1,33 @@
 import { useState } from "react";
 import { View } from "react-native";
 
-import { Tooltip } from "@/components/Tooltip";
+import { IconReport } from "@/assets/images/appbar";
+import { AppBar } from "@/components/AppBar";
+import { TopTab } from "@/components/TopTab";
 
-const longTooltipMessage = "툴팁설명".repeat(10);
+const TABS = [
+  { key: "all", label: "전체 게시글" },
+  { key: "vote", label: "투표" },
+];
 
 export default function Index() {
-  const [isTopTooltipVisible, setIsTopTooltipVisible] = useState(true);
-  const [isLeftTooltipVisible, setIsLeftTooltipVisible] = useState(true);
-  const [isLongTooltipVisible, setIsLongTooltipVisible] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
 
   return (
-    <View className="flex-1 items-center justify-center bg-gray-0">
-      <View className="w-[237px] gap-10 px-5 py-5">
-        {isTopTooltipVisible && (
-          <Tooltip message="툴팁 이름" onClose={() => setIsTopTooltipVisible(false)} />
-        )}
-        {isLeftTooltipVisible && (
-          <Tooltip
-            arrowPosition="left"
-            message="툴팁 설명"
-            onClose={() => setIsLeftTooltipVisible(false)}
+    <View className="flex-1 bg-gray-0">
+      <AppBar
+        left="back"
+        title="현재 페이지 명"
+        right={
+          <AppBar.IconButton
+            icon={IconReport}
+            accessibilityLabel="신고"
+            className="text-gray-400"
+            onPress={() => {}}
           />
-        )}
-        {isLongTooltipVisible && (
-          <Tooltip message={longTooltipMessage} onClose={() => setIsLongTooltipVisible(false)} />
-        )}
-      </View>
+        }
+      />
+      <TopTab items={TABS} activeKey={activeTab} onChange={setActiveTab} />
     </View>
   );
 }
