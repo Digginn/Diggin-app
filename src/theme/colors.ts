@@ -17,6 +17,6 @@ export const colors = {
   },
   semantic: {
     error: "#EB2525",
-    focus: "#2563EB",
+    focus: "#717171",
   },
 } as const;

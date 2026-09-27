@@ -16,7 +16,7 @@ export default function Index() {
           <TextField
             placeholder="닉네임을 입력해 주세요."
             defaultValue="닉네임을 입력해 주세요."
-            error
+            isError
           />
         </View>
       </View>

@@ -7,7 +7,7 @@ import { splitGraphemes } from "unicode-segmenter/grapheme";
 import { colors } from "@/theme";
 
 type TextFieldProps = TextInputProps & {
-  error?: boolean;
+  isError?: boolean;
   className?: string;
 };
 
@@ -58,7 +58,7 @@ function useInputValue(
 }
 
 export function TextField({
-  error = false,
+  isError = false,
   className,
   defaultValue,
   onBlur,
@@ -71,7 +71,7 @@ export function TextField({
   const [isFocused, setIsFocused] = useState(false);
   const { inputValue, handleChangeText } = useInputValue(value, defaultValue, onChangeText);
   const isActive = isFocused || inputValue.length > 0;
-  const borderClassName = error
+  const borderClassName = isError
     ? "border-semantic-error"
     : isActive
       ? "border-semantic-focus"
@@ -96,7 +96,7 @@ export function TextField({
           onFocus?.(event);
         }}
         placeholder={placeholder}
-        placeholderTextColor={colors.gray.placeholder}
+        placeholderTextColor={colors.gray[400]}
         value={inputValue}
       />
     </View>
