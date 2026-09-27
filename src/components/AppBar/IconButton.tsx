@@ -1,25 +1,18 @@
-import { Pressable } from "react-native";
+import { Pressable, type PressableProps } from "react-native";
 
 import type { SvgIcon } from "@/assets/images/appbar";
 
-type IconButtonProps = {
+type IconButtonProps = Omit<PressableProps, "children"> & {
   icon: SvgIcon;
   accessibilityLabel: string;
-  onPress: () => void;
   className?: string;
 };
 
-export function IconButton({
-  icon: Icon,
-  accessibilityLabel,
-  onPress,
-  className = "text-gray-900",
-}: IconButtonProps) {
+export function IconButton({ icon: Icon, className = "text-gray-900", ...rest }: IconButtonProps) {
   return (
     <Pressable
-      onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      {...rest}
       className="size-[48px] items-center justify-center"
     >
       <Icon width={48} height={48} className={className} />
