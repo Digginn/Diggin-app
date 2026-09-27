@@ -6,7 +6,7 @@ import { Tooltip } from "@/components/Tooltip";
 
 const longTooltipMessage = "툴팁설명".repeat(10);
 
-export default function Index() {
+export default function FieldPreview() {
   const [isTopTooltipVisible, setIsTopTooltipVisible] = useState(true);
   const [isLeftTooltipVisible, setIsLeftTooltipVisible] = useState(true);
   const [isLongTooltipVisible, setIsLongTooltipVisible] = useState(true);
