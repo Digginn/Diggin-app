@@ -1,14 +1,7 @@
 import { Image } from "expo-image";
 import { useState } from "react";
-import {
-  FlatList,
-  Pressable,
-  Text,
-  View,
-  type ViewStyle,
-} from "react-native";
+import { FlatList, Pressable, Text, View, type ViewStyle } from "react-native";
 
-import chevronDownIcon from "../../assets/images/icon-chevron-down.svg";
 import { colors } from "@/theme";
 
 export type DropdownOption = {
@@ -36,15 +29,14 @@ export function Dropdown({
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
-  const selectedLabel =
-    options.find((option) => option.value === value)?.label ?? placeholder;
+  const selectedLabel = options.find((option) => option.value === value)?.label ?? placeholder;
   const visibleOptions = options.filter((option) => option.value !== value);
   const contentHeight = visibleOptions.length * ROW_HEIGHT;
   const listHeight = Math.min(contentHeight, MAX_VISIBLE_ROWS * ROW_HEIGHT);
   // 커스텀 스크롤바: 전체 콘텐츠 높이 대비 보이는 영역 비율로 thumb 크기와 위치 계산
   const trackHeight = listHeight - 8;
   const thumbHeight =
-    contentHeight > listHeight ? (trackHeight * listHeight) / contentHeight : 0;
+    contentHeight > listHeight ? Math.max(24, (trackHeight * listHeight) / contentHeight) : 0;
   const maxScrollOffset = Math.max(0, contentHeight - listHeight);
   const clampedScrollOffset = Math.max(0, Math.min(scrollOffset, maxScrollOffset));
   const thumbTop = maxScrollOffset
@@ -89,20 +81,18 @@ export function Dropdown({
                   }
                 : {
                     borderWidth: 1,
+                    borderBottomWidth: 1,
                     borderColor: colors.gray[300],
                     borderRadius: 5,
                   }
             }
           >
-            <Text
-              numberOfLines={1}
-              className="flex-1 font-label-16-medium text-gray-900"
-            >
+            <Text numberOfLines={1} className="flex-1 text-gray-900 font-label-16-medium">
               {selectedLabel}
             </Text>
             <View className="h-6 w-6 items-center justify-center">
               <Image
-                source={chevronDownIcon}
+                source={require("@/assets/images/icon-chevron-down.svg")}
                 style={{
                   width: 18,
                   height: 18,
@@ -122,12 +112,10 @@ export function Dropdown({
                     onPress={() => handleSelect(item.value)}
                     accessibilityRole="menuitem"
                     accessibilityLabel={item.label}
-                    className="h-11 justify-center bg-gray-0 px-4 active:opacity-75"
+                    className="justify-center bg-gray-0 px-4 active:opacity-75"
+                    style={{ height: ROW_HEIGHT }}
                   >
-                    <Text
-                      numberOfLines={1}
-                      className="font-label-16-medium text-gray-900"
-                    >
+                    <Text numberOfLines={1} className="text-gray-900 font-label-16-medium">
                       {item.label}
                     </Text>
                     {index < visibleOptions.length - 1 && (
@@ -138,9 +126,7 @@ export function Dropdown({
                 nestedScrollEnabled
                 showsVerticalScrollIndicator={false}
                 scrollEventThrottle={16}
-                onScroll={(event) =>
-                  setScrollOffset(event.nativeEvent.contentOffset.y)
-                }
+                onScroll={(event) => setScrollOffset(event.nativeEvent.contentOffset.y)}
               />
               {thumbHeight > 0 && (
                 <View
@@ -150,7 +136,7 @@ export function Dropdown({
                     right: 4,
                     top: thumbTop + 4,
                     width: 2,
-                    height: Math.max(24, thumbHeight),
+                    height: thumbHeight,
                     borderRadius: 10,
                     backgroundColor: colors.gray[500],
                   }}
