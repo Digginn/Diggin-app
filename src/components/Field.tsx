@@ -84,7 +84,7 @@ export function TextField({
       <TextInput
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
-        className="flex-1 p-0 text-gray-900 font-label-16-medium"
+        className="flex-1 p-0 text-gray-900 font-label-16-medium-input"
         cursorColor={colors.semantic.focus}
         onBlur={(event) => {
           setIsFocused(false);
@@ -146,7 +146,7 @@ export function BodyTextField({
       <TextInput
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
-        className={`flex-1 p-0 text-gray-900 ${isEmpty ? "font-label-16-medium" : "font-b1"}`}
+        className={`flex-1 p-0 text-gray-900 ${isEmpty ? "font-label-16-medium-input" : "font-b1"}`}
         multiline
         onChangeText={handleChangeText}
         placeholder={placeholder}
@@ -187,7 +187,7 @@ export function SearchField({
       <TextInput
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
-        className="flex-1 p-0 text-gray-900 font-b1"
+        className="font-b1-input flex-1 p-0 text-gray-900"
         onChangeText={handleChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.gray.placeholder}

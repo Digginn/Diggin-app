@@ -48,15 +48,20 @@ export const fontFamily = {
 };
 
 export function typographyUtilities() {
+  const entries = Object.entries(typography) as [string, Token][];
+
   return Object.fromEntries(
-    (Object.entries(typography) as [string, Token][]).map(([name, t]) => [
-      `.font-${name}`,
-      {
+    entries.flatMap(([name, t]) => {
+      const base = {
         fontFamily: `Pretendard-${t.weight}`,
         fontSize: `${t.size}px`,
-        lineHeight: `${+(t.size * t.ratio).toFixed(2)}px`,
         letterSpacing: `${+((t.size * (t.tracking ?? 0)) / 100).toFixed(2)}px`,
-      },
-    ]),
+      };
+
+      return [
+        [`.font-${name}`, { ...base, lineHeight: `${+(t.size * t.ratio).toFixed(2)}px` }],
+        [`.font-${name}-input`, base],
+      ];
+    }),
   );
 }
