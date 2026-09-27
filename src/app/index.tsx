@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
-import { FolderModal, Modal, ModalOverlay, ReportModal } from "@/components/Modal";
+import { ActionModal, FolderModal, ReportModal } from "@/components/Modal";
 
 type PreviewModal = "folder" | "folderWithActions" | "link" | "report" | null;
 
@@ -52,36 +52,51 @@ export default function Index() {
           <Text className="text-gray-0 font-label-16-semibold">ModalReport 열기</Text>
         </Pressable>
       </ScrollView>
-      <ModalOverlay visible={previewModal !== null} onRequestClose={closeModal}>
-        {previewModal === "folder" && (
-          <Modal
-            type="1Btn"
-            title="새 폴더 만들기"
-            description={`아이템을 담을 새 폴더를 만들어 주세요.
+      {previewModal === "folder" && (
+        <ActionModal
+          visible
+          onRequestClose={closeModal}
+          type="1Btn"
+          title="새 폴더 만들기"
+          description={`아이템을 담을 새 폴더를 만들어 주세요.
 공개 폴더는 외부 링크로 공유가 가능해요.`}
-            onClose={closeModal}
-            primaryAction={{ label: "폴더 만들기", onPress: closeModal }}
-          >
-            <FolderNameField />
-          </Modal>
-        )}
-        {previewModal === "folderWithActions" && (
-          <Modal
-            type="2Btn"
-            title="새 폴더 만들기"
-            description={`아이템을 담을 새 폴더를 만들어 주세요.
+          onClose={closeModal}
+          primaryAction={{ label: "폴더 만들기", onPress: closeModal }}
+        >
+          <FolderNameField />
+        </ActionModal>
+      )}
+      {previewModal === "folderWithActions" && (
+        <ActionModal
+          visible
+          onRequestClose={closeModal}
+          type="2Btn"
+          title="새 폴더 만들기"
+          description={`아이템을 담을 새 폴더를 만들어 주세요.
 공개 폴더는 외부 링크로 공유가 가능해요.`}
-            primaryAction={{ label: "폴더 만들기", onPress: closeModal }}
-            secondaryAction={{ label: "돌아가기", onPress: closeModal }}
-          >
-            <FolderNameField />
-          </Modal>
-        )}
-        {previewModal === "link" && (
-          <FolderModal onBack={closeModal} onLoad={closeModal} onSave={closeModal} />
-        )}
-        {previewModal === "report" && <ReportModal onCancel={closeModal} onReport={closeModal} />}
-      </ModalOverlay>
+          primaryAction={{ label: "폴더 만들기", onPress: closeModal }}
+          secondaryAction={{ label: "돌아가기", onPress: closeModal }}
+        >
+          <FolderNameField />
+        </ActionModal>
+      )}
+      {previewModal === "link" && (
+        <FolderModal
+          visible
+          onRequestClose={closeModal}
+          onBack={closeModal}
+          onLoad={closeModal}
+          onSave={closeModal}
+        />
+      )}
+      {previewModal === "report" && (
+        <ReportModal
+          visible
+          onRequestClose={closeModal}
+          onCancel={closeModal}
+          onReport={closeModal}
+        />
+      )}
     </View>
   );
 }
