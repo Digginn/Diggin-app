@@ -1,9 +1,10 @@
-import { Image } from "expo-image";
-import { cssInterop } from "nativewind";
 import { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, type TextInputProps, View } from "react-native";
 import { splitGraphemes } from "unicode-segmenter/grapheme";
 
+import IconClearArea from "@/assets/images/icon-btn-mini-close-white-live-area.svg";
+import IconClearMark from "@/assets/images/icon-btn-mini-close-white-vector.svg";
+import IconSearch from "@/assets/images/icon-search.svg";
 import { colors } from "@/theme";
 
 type TextFieldProps = TextInputProps & {
@@ -29,7 +30,9 @@ type BodyTextFieldProps = Omit<TextInputProps, "multiline" | "placeholder"> & {
 };
 
 const MIN_BODY_TEXT_LENGTH = 5;
-const StyledImage = cssInterop(Image, { className: "style" });
+const SEARCH_ICON_SIZE = 21;
+const CLEAR_AREA_SIZE = 20;
+const CLEAR_MARK_SIZE = 7.5;
 function countBodyTextCharacters(value: string) {
   let count = 0;
 
@@ -187,7 +190,7 @@ export function SearchField({
       <TextInput
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
-        className="font-b1-input flex-1 p-0 text-gray-900"
+        className="flex-1 p-0 text-gray-900 font-b1-input"
         onChangeText={handleChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.gray.placeholder}
@@ -203,22 +206,15 @@ export function SearchField({
           onPress={handleClear}
         >
           <View className="size-5 items-center justify-center">
-            <StyledImage
-              source={require("@/assets/images/icon-btn-mini-close-white-live-area.svg")}
-              className="absolute size-5"
-            />
-            <StyledImage
-              source={require("@/assets/images/icon-btn-mini-close-white-vector.svg")}
-              className="size-[7.5px]"
-            />
+            <View className="absolute">
+              <IconClearArea width={CLEAR_AREA_SIZE} height={CLEAR_AREA_SIZE} />
+            </View>
+            <IconClearMark width={CLEAR_MARK_SIZE} height={CLEAR_MARK_SIZE} />
           </View>
         </Pressable>
       ) : (
         <View className="size-12 items-center justify-center">
-          <StyledImage
-            source={require("@/assets/images/icon-search.svg")}
-            className="size-[21px]"
-          />
+          <IconSearch width={SEARCH_ICON_SIZE} height={SEARCH_ICON_SIZE} />
         </View>
       )}
     </View>
