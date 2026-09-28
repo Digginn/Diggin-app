@@ -87,11 +87,14 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
       Alert: { alert: (...args) => alerts.push(args) },
     },
     "@/components/app-bar": { AppBar: "AppBar" },
+    "@/components/ToastText": { ToastText: "ToastText" },
     "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
   });
   const tree = nodes(LoginScreen());
   const bar = tree.find((node) => node.type === "AppBar");
   assert.equal(bar.props.backIconSize, 24);
+  assert.equal(bar.props.left, "back");
+  assert.ok(!tree.some((node) => node.type === "ToastText"));
   bar.props.onBack();
   assert.equal(routes.at(-1), "/");
   canGoBack = true;
@@ -112,6 +115,23 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
   buttons[2].props.onPress();
   assert.equal(alerts.at(-2)[0], "이용약관");
   assert.equal(alerts.at(-1)[0], "개인정보 처리방침");
+  const errorTree = nodes(LoginScreen({ isLoginError: true }));
+  const toast = errorTree.find((node) => node.type === "ToastText");
+  assert.equal(toast.props.message, "로그인에 실패했습니다. 다시 시도해 주세요.");
+  assert.equal(errorTree.find((node) => node.type === "AppBar").props.left, "none");
+  assert.equal(errorTree.filter((node) => node.type === "SocialLoginButton").length, 3);
+  assert.ok(errorTree.some((node) => node.props.className?.includes("top-[-54px]")));
+});
+
+test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
+  const { ToastText } = load("components/ToastText.tsx");
+  const toast = ToastText({ message: "로그인 실패" });
+  assert.equal(toast.props.pointerEvents, "none");
+  assert.equal(toast.props.accessibilityRole, "alert");
+  assert.equal(toast.props.accessibilityLiveRegion, "polite");
+  assert.ok(toast.props.className.includes("border-gray-800 bg-gray-700 p-3"));
+  assert.ok(toast.props.children.props.className.includes("text-gray-200 font-label-14"));
+  assert.equal(toast.props.children.props.children, "로그인 실패");
 });
 
 test("공통 아이콘 버튼의 기존 48px 기본값과 로그인용 24px 옵션을 유지한다", () => {

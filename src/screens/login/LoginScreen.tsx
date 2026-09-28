@@ -6,12 +6,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BackIcon from "@/assets/images/icon-login-back.svg";
 import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
+import { ToastText } from "@/components/ToastText";
 
 import { SocialLoginButton, type LoginProvider } from "./components/SocialLoginButton";
 
 const LOGIN_PROVIDERS: LoginProvider[] = ["google", "kakao", "apple"];
 
-export function LoginScreen() {
+type LoginScreenProps = {
+  isLoginError?: boolean;
+};
+
+export function LoginScreen({ isLoginError = false }: LoginScreenProps = {}) {
   const router = useRouter();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -31,6 +36,7 @@ export function LoginScreen() {
     <View className="flex-1 bg-gray-0">
       <StatusBar style="dark" />
       <AppBar
+        left={isLoginError ? "none" : "back"}
         backIcon={BackIcon}
         backIconSize={24}
         onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
@@ -63,6 +69,14 @@ export function LoginScreen() {
           </Text>
         </View>
         <View className="mt-[60px] w-full gap-[10px] px-margin">
+          {isLoginError && (
+            <View
+              pointerEvents="none"
+              className="absolute inset-x-0 top-[-54px] items-center px-margin"
+            >
+              <ToastText message="로그인에 실패했습니다. 다시 시도해 주세요." />
+            </View>
+          )}
           {LOGIN_PROVIDERS.map((provider) => (
             <SocialLoginButton key={provider} provider={provider} onPress={handleLogin} />
           ))}
