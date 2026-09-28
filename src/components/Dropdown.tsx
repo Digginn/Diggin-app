@@ -1,8 +1,13 @@
-import { Image } from "expo-image";
+import { cssInterop } from "nativewind";
 import { useState } from "react";
-import { FlatList, Pressable, Text, View, type ViewStyle } from "react-native";
+import { Pressable, ScrollView, Text, View, type ViewStyle } from "react-native";
 
+import ChevronSvg from "@/assets/images/icon-chevron-down.svg";
 import { colors } from "@/theme";
+
+const ChevronIcon = cssInterop(ChevronSvg, {
+  className: { target: "style", nativeStyleToProp: { width: true, height: true } },
+});
 
 export type DropdownOption = {
   value: string;
@@ -90,44 +95,40 @@ export function Dropdown({
             <Text numberOfLines={1} className="flex-1 text-gray-900 font-label-16-medium">
               {selectedLabel}
             </Text>
-            <View className="h-6 w-6 items-center justify-center">
-              <Image
-                source={require("@/assets/images/icon-chevron-down.svg")}
-                style={{
-                  width: 18,
-                  height: 18,
-                  transform: [{ rotate: isOpen ? "180deg" : "0deg" }],
-                }}
-              />
+            <View
+              className="size-6 items-center justify-center"
+              style={{ transform: [{ rotate: isOpen ? "180deg" : "0deg" }] }}
+            >
+              <ChevronIcon className="size-[18px]" />
             </View>
           </Pressable>
 
           {isOpen && visibleOptions.length > 0 && (
             <View style={{ height: listHeight }}>
-              <FlatList
-                data={visibleOptions}
-                keyExtractor={(item) => item.value}
-                renderItem={({ item, index }) => (
+              <ScrollView
+                nestedScrollEnabled
+                onScroll={(event) => setScrollOffset(event.nativeEvent.contentOffset.y)}
+                scrollEventThrottle={16}
+                showsVerticalScrollIndicator={false}
+              >
+                {visibleOptions.map((option, index) => (
                   <Pressable
-                    onPress={() => handleSelect(item.value)}
+                    key={option.value}
+                    onPress={() => handleSelect(option.value)}
                     accessibilityRole="menuitem"
-                    accessibilityLabel={item.label}
+                    accessibilityLabel={option.label}
                     className="justify-center bg-gray-0 px-4 active:opacity-75"
                     style={{ height: ROW_HEIGHT }}
                   >
                     <Text numberOfLines={1} className="text-gray-900 font-label-16-medium">
-                      {item.label}
+                      {option.label}
                     </Text>
                     {index < visibleOptions.length - 1 && (
                       <View className="absolute bottom-0 left-0 right-0 h-px bg-gray-200 opacity-20" />
                     )}
                   </Pressable>
-                )}
-                nestedScrollEnabled
-                showsVerticalScrollIndicator={false}
-                scrollEventThrottle={16}
-                onScroll={(event) => setScrollOffset(event.nativeEvent.contentOffset.y)}
-              />
+                ))}
+              </ScrollView>
               {thumbHeight > 0 && (
                 <View
                   pointerEvents="none"
