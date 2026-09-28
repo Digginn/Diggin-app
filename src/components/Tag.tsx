@@ -1,9 +1,9 @@
 import { clsx } from "clsx";
-import { Image } from "expo-image";
 import { Pressable, Text } from "react-native";
 
-import closeIcon from "@/assets/images/icon-close.svg";
-import { colors } from "@/theme";
+import IconClose from "@/assets/images/icon-close.svg";
+
+const CLOSE_SIZE = 16;
 
 type TagProps = {
   label: string;
@@ -38,11 +38,7 @@ export function Tag({ label, isActive = false, onClose, onPress, accessibilityLa
           accessibilityLabel={`${label} 삭제`}
           className="justify-center self-stretch pl-1 pr-2 active:opacity-75"
         >
-          <Image
-            source={closeIcon}
-            style={{ width: 16, height: 16 }}
-            tintColor={colors.gray[500]}
-          />
+          <IconClose width={CLOSE_SIZE} height={CLOSE_SIZE} />
         </Pressable>
       )}
     </Pressable>
