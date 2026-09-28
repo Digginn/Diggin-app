@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
 
 import { Chip } from "@/components/Chip";
 import { colors } from "@/theme";
@@ -117,7 +117,7 @@ export function WishLevel({ levels }: WishLevelProps) {
         animationType="none"
         onRequestClose={() => setIsOpen(false)}
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsOpen(false)} />
+        <Pressable className="absolute inset-0" onPress={() => setIsOpen(false)} />
         <View style={[{ position: "absolute" }, listPosition]}>
           <LevelList levels={levels} onLayout={setListHeight} />
         </View>
