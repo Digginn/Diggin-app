@@ -24,6 +24,7 @@ export const typography = {
   "label-16-medium": { weight: "Medium", size: 16, ratio: 1.4, tracking: -2 },
   "label-16-regular": { weight: "Regular", size: 16, ratio: 1.6, tracking: -2 },
   "label-14": { weight: "SemiBold", size: 14, ratio: 1.5, tracking: -1 },
+  "label-12-semibold": { weight: "SemiBold", size: 12, ratio: 1.2, tracking: -1 },
   "label-12-regular": { weight: "Regular", size: 12, ratio: 1.2, tracking: -1 },
 
   "price-detail": { weight: "Bold", size: 20, ratio: 1.4, tracking: -2 },
@@ -48,15 +49,20 @@ export const fontFamily = {
 };
 
 export function typographyUtilities() {
+  const entries = Object.entries(typography) as [string, Token][];
+
   return Object.fromEntries(
-    (Object.entries(typography) as [string, Token][]).map(([name, t]) => [
-      `.font-${name}`,
-      {
+    entries.flatMap(([name, t]) => {
+      const base = {
         fontFamily: `Pretendard-${t.weight}`,
         fontSize: `${t.size}px`,
-        lineHeight: `${+(t.size * t.ratio).toFixed(2)}px`,
         letterSpacing: `${+((t.size * (t.tracking ?? 0)) / 100).toFixed(2)}px`,
-      },
-    ]),
+      };
+
+      return [
+        [`.font-${name}`, { ...base, lineHeight: `${+(t.size * t.ratio).toFixed(2)}px` }],
+        [`.font-${name}-input`, base],
+      ];
+    }),
   );
 }
