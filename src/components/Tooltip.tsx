@@ -35,10 +35,9 @@ export function Tooltip({ message, onClose, arrowPosition = "top", className }: 
       <View
         pointerEvents="none"
         className={
-          arrowPosition === "top"
-            ? "absolute -top-2.5 right-[25px]"
-            : "absolute left-[-10px] top-3 -rotate-90"
+          arrowPosition === "top" ? "absolute -top-2.5 right-[25px]" : "absolute left-[-10px] top-3"
         }
+        style={arrowPosition === "left" ? { transform: [{ rotate: "-90deg" }] } : undefined}
       >
         <Arrow width={ARROW_WIDTH} height={ARROW_HEIGHT} />
       </View>
