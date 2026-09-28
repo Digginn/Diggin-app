@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { IconBack } from "@/assets/images/appbar";
+import { IconBack, type SvgIcon } from "@/assets/images/appbar";
 import LogoWordmark from "@/assets/images/logo-black.svg";
 
 import { IconButton } from "./IconButton";
@@ -22,9 +22,19 @@ type AppBarProps = {
   progress?: number;
   right?: ReactNode;
   onBack?: () => void;
+  backIcon?: SvgIcon;
+  backIconSize?: number;
 };
 
-function AppBarRoot({ left = "back", title, progress, right, onBack }: AppBarProps) {
+function AppBarRoot({
+  left = "back",
+  title,
+  progress,
+  right,
+  onBack,
+  backIcon = IconBack,
+  backIconSize = 48,
+}: AppBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -35,7 +45,12 @@ function AppBarRoot({ left = "back", title, progress, right, onBack }: AppBarPro
       <View className="relative flex-row items-center" style={{ height: BAR_HEIGHT }}>
         <View className="absolute left-0 h-full justify-center">
           {left === "back" && (
-            <IconButton icon={IconBack} accessibilityLabel="뒤로 가기" onPress={handleBack} />
+            <IconButton
+              icon={backIcon}
+              iconSize={backIconSize}
+              accessibilityLabel="뒤로 가기"
+              onPress={handleBack}
+            />
           )}
           {left === "logo" && (
             <View className="pl-5">

@@ -19,4 +19,7 @@ export const colors = {
     error: "#EB2525",
     focus: "#717171",
   },
+  brand: {
+    kakao: "#FBE300",
+  },
 } as const;
