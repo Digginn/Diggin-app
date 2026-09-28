@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
-import { ActionModal, FolderModal, ReportModal } from "@/components/Modal";
+import { ActionModal, FolderModal, ReportModal } from "@/components/modal";
 
 type PreviewModal = "folder" | "folderWithActions" | "link" | "report" | null;
 
@@ -84,6 +84,11 @@ export default function ModalPreview() {
         <FolderModal
           visible
           onRequestClose={closeModal}
+          title="제목"
+          productName="상품명"
+          description="소제목 혹은 설명글이 들어갑니다. 1줄만 노출"
+          selectedFolderName="기본 폴더"
+          onPressFolderSelect={() => Alert.alert("폴더 선택", "목록 UI는 추후 연결 예정입니다.")}
           onBack={closeModal}
           onLoad={closeModal}
           onSave={closeModal}
