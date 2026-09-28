@@ -1,8 +1,8 @@
-import clsx from "clsx";
+import { clsx } from "clsx";
 import { Image } from "expo-image";
 import { Pressable, Text } from "react-native";
 
-import chevronIcon from "../../assets/images/icon-chevron.svg";
+import chevronIcon from "@/assets/images/icon-chevron.svg";
 import { colors } from "@/theme";
 
 export type ChipColor = "black" | "white";
@@ -32,17 +32,12 @@ export function Chip({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ expanded: isOpen }}
       className={clsx(
-        "flex-row items-center h-7 px-3 rounded-full gap-2 active:opacity-75",
+        "h-7 flex-row items-center gap-2 rounded-full px-3 active:opacity-75",
         isBlack ? "bg-gray-900" : "bg-gray-0",
         className,
       )}
     >
-      <Text
-        className={clsx(
-          "font-label-12-semibold",
-          isBlack ? "text-gray-0" : "text-gray-900",
-        )}
-      >
+      <Text className={clsx("font-label-12-semibold", isBlack ? "text-gray-0" : "text-gray-900")}>
         {label}
       </Text>
       <Image

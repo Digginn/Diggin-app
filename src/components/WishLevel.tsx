@@ -6,28 +6,31 @@ import { colors } from "@/theme";
 
 type Levels = { high: number; medium: number; low: number };
 
+type ChipLayout = { x: number; y: number; height: number };
+
 type WishLevelProps = {
   levels: Levels;
 };
 
 const LEVEL_CONFIG = [
-  { key: "high" as const, label: "높음", dotColor: colors.gray[600] },
-  { key: "medium" as const, label: "중간", dotColor: colors.gray[500] },
-  { key: "low" as const, label: "낮음", dotColor: colors.gray[400] },
+  { key: "high" as const, label: "높음", dotClassName: "bg-gray-600" },
+  { key: "medium" as const, label: "중간", dotClassName: "bg-gray-500" },
+  { key: "low" as const, label: "낮음", dotClassName: "bg-gray-400" },
 ];
 
 function LevelItem({
   label,
-  dotColor,
+  dotClassName,
   count,
 }: {
   label: string;
-  dotColor: string;
+  dotClassName: string;
   count: number;
 }) {
   return (
     <View
-      className="flex-row items-center px-3 py-2 rounded-full bg-gray-0 border border-gray-200"
+      className="flex-row items-center rounded-full border border-gray-200 bg-gray-0 px-3 py-2"
+
       style={{
         shadowColor: colors.gray[1000],
         shadowOffset: { width: 0, height: 4 },
@@ -37,13 +40,10 @@ function LevelItem({
       }}
     >
       <View className="flex-row items-center gap-2">
-        <View
-          className="w-2 h-2 rounded-full"
-          style={{ backgroundColor: dotColor }}
-        />
+        <View className={`size-2 rounded-full ${dotClassName}`} />
         <View className="flex-row items-center gap-1">
-          <Text className="font-b3 text-gray-900">{label}</Text>
-          <Text className="font-label-14 text-gray-900">
+          <Text className="text-gray-900 font-b3">{label}</Text>
+          <Text className="text-gray-900 font-label-14">
             {count >= 999 ? "999+" : String(count)}
           </Text>
         </View>
@@ -52,25 +52,14 @@ function LevelItem({
   );
 }
 
-function LevelList({
-  levels,
-  onLayout,
-}: {
-  levels: Levels;
-  onLayout: (height: number) => void;
-}) {
+function LevelList({ levels, onLayout }: { levels: Levels; onLayout: (height: number) => void }) {
   return (
     <View
       className="items-start gap-2 py-2.5"
-      onLayout={(e) => onLayout(e.nativeEvent.layout.height)}
+      onLayout={(event) => onLayout(event.nativeEvent.layout.height)}
     >
-      {LEVEL_CONFIG.map(({ key, label, dotColor }) => (
-        <LevelItem
-          key={key}
-          label={label}
-          dotColor={dotColor}
-          count={levels[key]}
-        />
+      {LEVEL_CONFIG.map(({ key, label, dotClassName }) => (
+        <LevelItem key={key} label={label} dotClassName={dotClassName} count={levels[key]} />
       ))}
     </View>
   );
@@ -79,7 +68,7 @@ function LevelList({
 export function WishLevel({ levels }: WishLevelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isUp, setIsUp] = useState(false);
-  const [chipLayout, setChipLayout] = useState<{ x: number; y: number; height: number }>({ x: 0, y: 0, height: 0 });
+  const [chipLayout, setChipLayout] = useState<ChipLayout>({ x: 0, y: 0, height: 0 });
   const [listHeight, setListHeight] = useState(140);
   const chipRef = useRef<View>(null);
   const { height: screenHeight } = useWindowDimensions();
@@ -119,7 +108,7 @@ export function WishLevel({ levels }: WishLevelProps) {
         onRequestClose={() => setIsOpen(false)}
       >
         <Pressable className="absolute inset-0" onPress={() => setIsOpen(false)} />
-        <View style={[{ position: "absolute" }, listPosition]}>
+        <View className="absolute" style={listPosition}>
           <LevelList levels={levels} onLayout={setListHeight} />
         </View>
       </Modal>
