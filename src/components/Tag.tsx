@@ -1,9 +1,12 @@
 import { clsx } from "clsx";
-import { Image } from "expo-image";
+import { cssInterop } from "nativewind";
 import { Pressable, Text } from "react-native";
 
-import closeIcon from "@/assets/images/icon-close.svg";
-import { colors } from "@/theme";
+import CloseSvg from "@/assets/images/icon-close.svg";
+
+const CloseIcon = cssInterop(CloseSvg, {
+  className: { target: "style", nativeStyleToProp: { width: true, height: true } },
+});
 
 type TagProps = {
   label: string;
@@ -38,11 +41,7 @@ export function Tag({ label, isActive = false, onClose, onPress, accessibilityLa
           accessibilityLabel={`${label} 삭제`}
           className="justify-center self-stretch pl-1 pr-2 active:opacity-75"
         >
-          <Image
-            source={closeIcon}
-            style={{ width: 16, height: 16 }}
-            tintColor={colors.gray[500]}
-          />
+          <CloseIcon className="size-4" />
         </Pressable>
       )}
     </Pressable>
