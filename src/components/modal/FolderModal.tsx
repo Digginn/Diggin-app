@@ -64,7 +64,9 @@ export function FolderModal({
           onPress={onPressFolderSelect}
         >
           <Text className="flex-1 text-gray-900 font-label-16-medium">{selectedFolderName}</Text>
-          <View className="size-[18px] -rotate-90">
+          {/* rotate-* className은 --tw-* 변수 기본값이 유니버설 셀렉터에만 있어
+              네이티브에서 적용되지 않는다. 회전은 style로 준다. */}
+          <View className="size-[18px]" style={{ transform: [{ rotate: "-90deg" }] }}>
             <ChevronIcon className="size-[18px]" />
           </View>
         </Pressable>
