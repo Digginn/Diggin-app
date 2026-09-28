@@ -89,9 +89,10 @@ export function WishLevel({ levels }: WishLevelProps) {
       setIsOpen(false);
       return;
     }
-    chipRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
-      const spaceBelow = screenHeight - pageY - h;
-      setChipLayout({ x: pageX, y: pageY, height: h });
+    // Modal과 같은 창 기준 좌표를 사용해 상태바 높이가 중복 반영되지 않게 합니다.
+    chipRef.current?.measureInWindow((x, y, _width, height) => {
+      const spaceBelow = screenHeight - y - height;
+      setChipLayout({ x, y, height });
       setIsUp(spaceBelow < listHeight);
       setIsOpen(true);
     });
