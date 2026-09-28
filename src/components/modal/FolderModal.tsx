@@ -66,7 +66,9 @@ export function FolderModal({
           onPress={onPressFolderSelect}
         >
           <Text className="flex-1 text-gray-900 font-label-16-medium">{selectedFolderName}</Text>
-          <ChevronIcon className="size-[18px] rotate-90 -scale-y-100" />
+          <View className="size-[18px] -rotate-90">
+            <ChevronIcon className="size-[18px]" />
+          </View>
         </Pressable>
       </View>
       <View className="w-[295px] flex-row gap-[15px]">
