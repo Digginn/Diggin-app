@@ -27,7 +27,7 @@ const ICON_SIZE = 28;
 
 // 라우트 파일명 → 탭에 표시할 라벨과 아이콘
 const TABS: Record<string, TabConfig> = {
-  index: { label: "ALL", ActiveIcon: IconAllActive, InactiveIcon: IconAllInactive },
+  all: { label: "ALL", ActiveIcon: IconAllActive, InactiveIcon: IconAllInactive },
   folder: { label: "FOLDER", ActiveIcon: IconFolderActive, InactiveIcon: IconFolderInactive },
   diggle: { label: "DIGGLE", ActiveIcon: IconDiggleActive, InactiveIcon: IconDiggleInactive },
   my: { label: "MY", ActiveIcon: IconMyActive, InactiveIcon: IconMyInactive },
