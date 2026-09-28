@@ -1,14 +1,12 @@
 import { clsx } from "clsx";
 import { cssInterop } from "nativewind";
-import { Pressable, Text } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
-import IconChevronRaw from "@/assets/images/icon-chevron.svg";
+import ChevronSvg from "@/assets/images/icon-chevron.svg";
 
-const IconChevron = cssInterop(IconChevronRaw, {
-  className: { target: false, nativeStyleToProp: { color: true } },
+const ChevronIcon = cssInterop(ChevronSvg, {
+  className: { target: "style", nativeStyleToProp: { width: true, height: true, color: true } },
 });
-
-const CHEVRON_SIZE = 8;
 
 export type ChipColor = "black" | "white";
 
@@ -45,12 +43,9 @@ export function Chip({
       <Text className={clsx("font-label-12-semibold", isBlack ? "text-gray-0" : "text-gray-900")}>
         {label}
       </Text>
-      <IconChevron
-        width={CHEVRON_SIZE}
-        height={CHEVRON_SIZE}
-        className={isBlack ? "text-gray-0" : "text-gray-900"}
-        style={{ transform: [{ rotate: isOpen ? "180deg" : "0deg" }] }}
-      />
+      <View className="size-2" style={{ transform: [{ rotate: isOpen ? "180deg" : "0deg" }] }}>
+        <ChevronIcon className={clsx("size-2", isBlack ? "text-gray-0" : "text-gray-900")} />
+      </View>
     </Pressable>
   );
 }
