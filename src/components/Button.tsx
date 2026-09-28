@@ -1,7 +1,6 @@
-import { type ReactNode } from "react";
-import clsx from "clsx";
+import { clsx } from "clsx";
+import { Children, cloneElement, Fragment, isValidElement, type ReactNode } from "react";
 import { Pressable, Text } from "react-native";
-
 
 export type ButtonVariant = "primary" | "secondary";
 export type ButtonSize = "regular" | "large";
@@ -11,7 +10,7 @@ type ButtonProps = {
   onPress: () => void;
   variant?: ButtonVariant;
   size?: ButtonSize;
-  disabled?: boolean;
+  isDisabled?: boolean;
   bgColor?: string;
   accessibilityLabel?: string;
   className?: string;
@@ -22,7 +21,7 @@ export function Button({
   onPress,
   variant = "primary",
   size = "regular",
-  disabled = false,
+  isDisabled = false,
   bgColor,
   accessibilityLabel,
   className,
@@ -30,38 +29,42 @@ export function Button({
   const textClassName = clsx(
     "text-center",
     size === "large" ? "font-label-18-semibold" : "font-label-16-semibold",
-    disabled
-      ? "text-gray-500"
-      : variant === "primary"
-        ? "text-gray-0"
-        : "text-gray-900",
+    isDisabled ? "text-gray-500" : variant === "primary" ? "text-gray-0" : "text-gray-900",
   );
+
+  function renderChildren(nodes: ReactNode): ReactNode {
+    return Children.map(nodes, (child) => {
+      if (typeof child === "string" || typeof child === "number") {
+        return (
+          <Text numberOfLines={1} className={textClassName}>
+            {child}
+          </Text>
+        );
+      }
+      if (isValidElement<{ children?: ReactNode }>(child) && child.type === Fragment) {
+        return cloneElement(child, {}, renderChildren(child.props.children));
+      }
+      return child;
+    });
+  }
 
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: isDisabled }}
       className={clsx(
-        "h-12 self-stretch flex-row items-center justify-center gap-3 rounded px-5",
-        !disabled && "active:opacity-75",
-        !bgColor && (disabled ? "bg-gray-200" : variant === "primary" ? "bg-gray-900" : "bg-gray-100"),
+        "h-12 flex-row items-center justify-center gap-3 self-stretch rounded px-5",
+        !isDisabled && "active:opacity-75",
+        !bgColor &&
+          (isDisabled ? "bg-gray-200" : variant === "primary" ? "bg-gray-900" : "bg-gray-100"),
         className,
       )}
       style={bgColor ? { backgroundColor: bgColor } : undefined}
     >
-      {typeof children === "string" || typeof children === "number" ? (
-        <Text
-          numberOfLines={1}
-          className={textClassName}
-        >
-          {children}
-        </Text>
-      ) : (
-        children
-      )}
+      {renderChildren(children)}
     </Pressable>
   );
 }
