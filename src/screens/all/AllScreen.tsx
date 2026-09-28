@@ -1,8 +1,7 @@
 import { FlatList, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Card } from "@/components/card/Card";
-import { CardSkeleton } from "@/components/card/CardSkeleton";
+import { Card, CardSkeleton } from "@/components/card";
 
 // 임시 확인 화면. Card / FallbackImg / 3열 그리드를 검증한다.
 
