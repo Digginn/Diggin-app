@@ -3,4 +3,13 @@ const { withNativeWind } = require("nativewind/metro");
 
 const config = getDefaultConfig(__dirname);
 
-module.exports = withNativeWind(config, { input: "./src/global.css" });
+// .svg 파일을 컴포넌트로 import 하기 위한 설정 : 기본적으로 svg는 이미지(asset)로 취급되는데 이를 소스 코드로 넘겨 transformer가 처리하도록 함
+config.transformer.babelTransformerPath = require.resolve("react-native-svg-transformer/expo");
+config.resolver.assetExts = config.resolver.assetExts.filter((ext) => ext !== "svg");
+config.resolver.sourceExts = [...config.resolver.sourceExts, "svg"];
+
+// NativeWind의 rem 기본값은 14라서 Tailwind 기본 스케일이 4의 배수로 안 떨어진다 - (h-11 = 2.75rem -> 38.5px) 디자인이 px 기준이므로 16으로 맞춘다.
+module.exports = withNativeWind(config, {
+  input: "./src/global.css",
+  inlineRem: 16,
+});

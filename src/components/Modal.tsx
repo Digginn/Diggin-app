@@ -120,7 +120,7 @@ export function ActionModal({
                 <View className="size-4 items-center justify-center overflow-hidden">
                   <StyledImage
                     className="size-3"
-                    source={require("@/assets/images/icon-close.svg")}
+                    source={require("@/assets/images/icon-modal-close.svg")}
                   />
                 </View>
               </Pressable>

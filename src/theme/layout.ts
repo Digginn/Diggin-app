@@ -12,6 +12,10 @@ export const layout = {
   gutter: "16px",
 };
 
+export const fieldShape = {
+  borderRadius: "5px",
+  borderWidth: "1.5px",
+} as const;
 
 export const baseFrame = { width: 375, height: 812 } as const;
 export const columns = 3;

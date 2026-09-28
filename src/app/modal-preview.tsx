@@ -18,7 +18,7 @@ function FolderNameField() {
   );
 }
 
-export default function Index() {
+export default function ModalPreview() {
   const [previewModal, setPreviewModal] = useState<PreviewModal>(null);
   const closeModal = () => setPreviewModal(null);
 
