@@ -51,7 +51,7 @@ export function ActionModal({
                 onPress={onClose}
               >
                 <View className="size-4 items-center justify-center overflow-hidden">
-                  <CloseIcon className="size-3" />
+                  <CloseIcon className="size-4" />
                 </View>
               </Pressable>
             </View>

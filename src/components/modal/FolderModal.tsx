@@ -42,9 +42,7 @@ export function FolderModal({
       <View className="items-center gap-1">
         <View className="flex-row items-center gap-1">
           <View className="size-6 items-center justify-center overflow-hidden">
-            <View className="-rotate-45">
-              <LinkIcon className="h-[10.5px] w-[21.3px]" />
-            </View>
+            <LinkIcon className="size-6" />
           </View>
           <Text className="text-gray-900 font-label-16-semibold">{title}</Text>
         </View>
