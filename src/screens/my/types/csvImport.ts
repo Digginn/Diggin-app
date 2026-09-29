@@ -11,3 +11,5 @@ export type CsvImportResult = {
   importedCount: number;
   excludedProducts: CsvExcludedProduct[];
 };
+
+export type CsvImportFailure = { error: "missing-product-info" };

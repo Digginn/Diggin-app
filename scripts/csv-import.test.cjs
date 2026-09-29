@@ -9,6 +9,8 @@ const ts = require("typescript");
 
 function setup(pick) {
   const alerts = [];
+  const toasts = [];
+  const showToast = (...args) => toasts.push(args);
   const selecting = [];
   const refs = [];
   const states = [];
@@ -58,6 +60,7 @@ function setup(pick) {
           return { useSafeAreaInsets: () => ({ bottom: 34 }) };
         if (name === "@/components/app-bar") return { AppBar: "AppBar" };
         if (name === "@/components/Button") return { Button: "Button" };
+        if (name === "@/hooks/useToast") return { useToast: () => showToast };
         if (name === "@/theme") return { colors: { gray: { 0: "#FFFFFF" } } };
         if (name === "./components/CsvImportIllustration")
           return { CsvImportIllustration: "CsvImportIllustration" };
@@ -84,7 +87,7 @@ function setup(pick) {
   const select = (props) => {
     return find(render(props), "Button").props.onPress();
   };
-  return { render, select, alerts, selecting, find };
+  return { render, select, alerts, toasts, selecting, find };
 }
 
 test("CSV 소개 화면에 밝은 상태바·어두운 AppBar·safe area·공통 버튼을 적용한다", () => {
@@ -163,6 +166,20 @@ test("버튼 연타로 시스템 선택기를 중복 실행하지 않는다", as
   assert.equal(calls, 2);
   finish({ canceled: true, assets: null });
   await next;
+});
+
+test("상품 정보가 없는 처리 결과는 에러 토스트를 표시하고 다시 파일을 선택할 수 있다", async () => {
+  const { select, render, find, toasts, alerts } = setup(async () => ({
+    canceled: false,
+    assets: [{ name: "wishlist.csv" }],
+  }));
+  await select({ onSelectCsv: async () => ({ error: "missing-product-info" }) });
+  assert.deepEqual(toasts, [["파일에서 상품 정보를 찾을 수 없습니다.", "error"]]);
+  assert.equal(alerts.length, 0);
+  assert.equal(find(render(), "CsvImportResultModal").props.result, null);
+  assert.equal(find(render(), "Button").props.isDisabled, false);
+  await select({ onSelectCsv: async () => ({ error: "missing-product-info" }) });
+  assert.equal(toasts.length, 2);
 });
 
 test("불러오기 콜백의 진행 개수와 결과를 표시하고 확인으로 초기화한다", async () => {

@@ -6,20 +6,24 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
+import { useToast } from "@/hooks/useToast";
 import { colors } from "@/theme";
 
 import { CsvImportIllustration } from "./components/CsvImportIllustration";
 import { CsvImportLoading } from "./components/CsvImportLoading";
 import { CsvImportResultModal } from "./components/CsvImportResultModal";
-import type { CsvImportProgress, CsvImportResult } from "./types/csvImport";
+import type { CsvImportFailure, CsvImportProgress, CsvImportResult } from "./types/csvImport";
+
+const MISSING_PRODUCT_MESSAGE = "파일에서 상품 정보를 찾을 수 없습니다.";
 
 type CsvImportScreenProps = {
   onSelectCsv?: (
     file: DocumentPicker.DocumentPickerAsset,
     onProgress: (progress: CsvImportProgress) => void,
-  ) => void | Promise<CsvImportResult | void>;
+  ) => void | Promise<CsvImportResult | CsvImportFailure | void>;
   progress?: CsvImportProgress;
   result?: CsvImportResult;
+  error?: CsvImportFailure["error"];
   onDismissResult?: () => void;
   onBack?: () => void;
 };
@@ -28,10 +32,12 @@ export function CsvImportScreen({
   onSelectCsv,
   progress: suppliedProgress,
   result: suppliedResult,
+  error,
   onDismissResult,
   onBack,
 }: CsvImportScreenProps = {}) {
   const insets = useSafeAreaInsets();
+  const showToast = useToast();
   const window = useWindowDimensions();
   const [size, setSize] = useState({ width: window.width, height: window.height });
   const [isSelecting, setIsSelecting] = useState(false);
@@ -46,6 +52,9 @@ export function CsvImportScreen({
   const handleLoadingBack = () =>
     Alert.alert("불러오는 중", "불러오기가 완료될 때까지 기다려 주세요.");
 
+  useEffect(() => {
+    if (error) showToast(MISSING_PRODUCT_MESSAGE, "error");
+  }, [error, showToast]);
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -90,7 +99,10 @@ export function CsvImportScreen({
         const imported = await onSelectCsv(file, (value) => {
           if (isMounted.current) setProgress(value);
         });
-        if (isMounted.current && imported) setResult(imported);
+        if (isMounted.current && imported && typeof imported === "object") {
+          if ("error" in imported) showToast(MISSING_PRODUCT_MESSAGE, "error");
+          else setResult(imported);
+        }
       } else {
         Alert.alert("CSV 파일 선택", `${file.name}\n상품 불러오기 API는 아직 연결되지 않았습니다.`);
       }
@@ -139,7 +151,7 @@ export function CsvImportScreen({
             contentContainerClassName={`items-center px-margin ${activeResult ? "pt-[65px]" : "pt-10"}`}
           >
             <View className="items-center gap-6">
-              <Text className="text-center text-gray-0 font-h2-bold">
+              <Text className="text-center text-gray-0 font-h1">
                 {"모아둔 취향,\nDiggin에서 이어갑니다"}
               </Text>
               <Text className="text-center text-gray-400 font-label-16-medium">

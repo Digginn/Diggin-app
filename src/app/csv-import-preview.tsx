@@ -39,7 +39,9 @@ const SCENARIOS: { label: string; result: CsvImportResult }[] = [
 ];
 
 export default function CsvImportPreview() {
-  const [scenario, setScenario] = useState<number | "loading" | "animation" | null>(null);
+  const [scenario, setScenario] = useState<number | "loading" | "animation" | "error" | null>(null);
+  if (scenario === "error")
+    return <CsvImportScreen error="missing-product-info" onBack={() => setScenario(null)} />;
   if (scenario === "animation")
     return (
       <View className="flex-1 bg-gray-1000">
@@ -73,6 +75,7 @@ export default function CsvImportPreview() {
             {label}
           </Button>
         ))}
+        <Button onPress={() => setScenario("error")}>상품 정보 없음 (에러 토스트)</Button>
       </ScrollView>
     </View>
   );

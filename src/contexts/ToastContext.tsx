@@ -1,19 +1,25 @@
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 
-import { ToastText } from "@/components/ToastText";
+import { ToastText, type ToastVariant } from "@/components/ToastText";
 
 const TOAST_DURATION_MS = 2000;
-export const ToastContext = createContext<((message: string) => void) | undefined>(undefined);
+const ERROR_TOAST_DURATION_MS = 4000;
+export const ToastContext = createContext<
+  ((message: string, variant?: ToastVariant) => void) | undefined
+>(undefined);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [message, setMessage] = useState<string>();
+  const [message, setMessage] = useState<{ text: string; variant: ToastVariant }>();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const showToast = useCallback((text: string) => {
+  const showToast = useCallback((text: string, variant: ToastVariant = "default") => {
     clearTimeout(timer.current);
-    setMessage(text);
-    timer.current = setTimeout(() => setMessage(undefined), TOAST_DURATION_MS);
+    setMessage({ text, variant });
+    timer.current = setTimeout(
+      () => setMessage(undefined),
+      variant === "error" ? ERROR_TOAST_DURATION_MS : TOAST_DURATION_MS,
+    );
   }, []);
 
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -28,7 +34,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             className="absolute inset-x-0 bottom-[160px] items-center px-margin"
           >
             <View className="w-full max-w-[327px] items-center">
-              <ToastText message={message} />
+              <ToastText message={message.text} variant={message.variant} />
             </View>
           </View>
         )}
