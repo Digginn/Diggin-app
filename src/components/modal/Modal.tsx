@@ -8,6 +8,7 @@ export type ModalProps = {
   className?: string;
   contentClassName?: string;
   scrimOpacity?: number;
+  backdropClassName?: string;
 };
 
 export function Modal({
@@ -17,10 +18,11 @@ export function Modal({
   className,
   contentClassName,
   scrimOpacity = 0.4,
+  backdropClassName,
 }: ModalProps) {
   return (
     <NativeModal animationType="fade" onRequestClose={onRequestClose} transparent visible={visible}>
-      <View className="flex-1 items-center justify-center px-margin">
+      <View className={`flex-1 items-center justify-center px-margin ${backdropClassName ?? ""}`}>
         <View className="absolute inset-0 bg-gray-1000" style={{ opacity: scrimOpacity }} />
         <View
           className={`w-full max-w-[327px] items-center rounded-[5px] bg-gray-0 shadow-lg ${className ?? "px-2.5 py-4"}`}

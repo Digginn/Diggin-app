@@ -19,6 +19,7 @@ const WORDMARK_HEIGHT = 26;
 type AppBarProps = {
   left?: "back" | "logo" | "none";
   title?: string;
+  titleClassName?: string;
   progress?: number;
   right?: ReactNode;
   onBack?: () => void;
@@ -28,6 +29,7 @@ type AppBarProps = {
 function AppBarRoot({
   left = "back",
   title,
+  titleClassName,
   progress,
   right,
   onBack,
@@ -67,9 +69,7 @@ function AppBarRoot({
             title ? (
               <Text
                 numberOfLines={1}
-                className={
-                  isDark ? "text-gray-0 font-label-20-medium" : "text-gray-900 font-label-20"
-                }
+                className={`${isDark ? "text-gray-0" : "text-gray-900"} ${titleClassName ?? (isDark ? "font-label-20-medium" : "font-label-20")}`}
               >
                 {title}
               </Text>

@@ -1,6 +1,6 @@
 import { useRouter, type Href } from "expo-router";
-import type { FC } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useRef, useState, type FC } from "react";
+import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import type { SvgProps } from "react-native-svg";
 
 import {
@@ -11,6 +11,11 @@ import {
   IconMySupport,
 } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
+import { useToast } from "@/hooks/useToast";
+
+import { AccountWithdrawalModal } from "./components/AccountWithdrawalModal";
+import { LogoutModal } from "./components/LogoutModal";
+import { SUPPORT_CHANNEL_URL } from "./constants/supportChannel";
 
 type MyMenuRow = {
   label: string;
@@ -26,18 +31,6 @@ type MySectionProps = {
   Icon: FC<SvgProps>;
   rows: MyMenuRow[];
 };
-
-const SUPPORT_ROWS: MyMenuRow[] = [
-  { label: "1:1 문의" },
-  { label: "이용약관" },
-  { label: "앱 정보", value: "버전명", hasChevron: false, hasDivider: false },
-];
-
-const SETTINGS_ROWS: MyMenuRow[] = [
-  { label: "알림 설정" },
-  { label: "로그아웃" },
-  { label: "회원 탈퇴" },
-];
 
 function MySection({ title, Icon, rows }: MySectionProps) {
   return (
@@ -85,8 +78,71 @@ function MySection({ title, Icon, rows }: MySectionProps) {
   );
 }
 
-export function MyScreen() {
+type MyScreenProps = {
+  onLogout?: () => Promise<void>;
+  onWithdraw?: () => Promise<void>;
+};
+
+export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
   const router = useRouter();
+  const showToast = useToast();
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isLoggingOutRef = useRef(false);
+  const handleCloseLogout = () => {
+    if (!isLoggingOutRef.current) setIsLogoutOpen(false);
+  };
+  const handleLogout = async () => {
+    if (isLoggingOutRef.current) return;
+    if (!onLogout) {
+      showToast("로그아웃 기능은 준비 중입니다.");
+      return;
+    }
+    isLoggingOutRef.current = true;
+    setIsLoggingOut(true);
+    try {
+      await onLogout();
+      setIsLogoutOpen(false);
+    } catch {
+      showToast("로그아웃하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      isLoggingOutRef.current = false;
+      setIsLoggingOut(false);
+    }
+  };
+  const handleContactSupport = async () => {
+    try {
+      await Linking.openURL(SUPPORT_CHANNEL_URL);
+    } catch {
+      router.push("/customer-support" as Href);
+    }
+  };
+  const supportRows: MyMenuRow[] = [
+    {
+      label: "1:1 문의",
+      onPress: handleContactSupport,
+      // 개발 중에는 길게 눌러 채널 이동 실패 화면을 확인합니다.
+      onLongPress: __DEV__ ? () => router.push("/customer-support" as Href) : undefined,
+    },
+    { label: "이용약관", onPress: () => router.push("/terms" as Href) },
+    { label: "앱 정보", value: "버전명", hasChevron: false, hasDivider: false },
+  ];
+  const settingsRows: MyMenuRow[] = [
+    {
+      label: "알림 설정",
+      onPress: () => router.push("/notification-settings" as Href),
+      onLongPress: __DEV__
+        ? () => router.push("/notification-settings-preview" as Href)
+        : undefined,
+    },
+    { label: "로그아웃", onPress: () => setIsLogoutOpen(true) },
+    {
+      label: "회원 탈퇴",
+      onPress: () => setIsWithdrawalOpen(true),
+      onLongPress: __DEV__ ? () => router.push("/account-withdrawal-preview" as Href) : undefined,
+    },
+  ];
   const activityRows: MyMenuRow[] = [
     { label: "내가 쓴 글", onPress: () => router.push("/my-posts" as Href) },
     { label: "내가 투표한 글", onPress: () => router.push("/my-voted-posts" as Href) },
@@ -112,9 +168,20 @@ export function MyScreen() {
           rows={[{ label: "프로필 수정", onPress: () => router.push("/profile-edit" as Href) }]}
         />
         <MySection title="활동" Icon={IconMyActivity} rows={activityRows} />
-        <MySection title="고객지원" Icon={IconMySupport} rows={SUPPORT_ROWS} />
-        <MySection title="설정" Icon={IconMySettings} rows={SETTINGS_ROWS} />
+        <MySection title="고객지원" Icon={IconMySupport} rows={supportRows} />
+        <MySection title="설정" Icon={IconMySettings} rows={settingsRows} />
       </ScrollView>
+      <LogoutModal
+        isVisible={isLogoutOpen}
+        isLoggingOut={isLoggingOut}
+        onClose={handleCloseLogout}
+        onConfirm={handleLogout}
+      />
+      <AccountWithdrawalModal
+        isVisible={isWithdrawalOpen}
+        onClose={() => setIsWithdrawalOpen(false)}
+        onWithdraw={onWithdraw}
+      />
     </View>
   );
 }
