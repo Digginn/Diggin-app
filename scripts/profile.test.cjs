@@ -22,21 +22,20 @@ test("닉네임의 10글자 경계와 특수문자 오류를 검사한다", () =
 
 function renderProfile(platform = "android", isCameraGranted = true) {
   const calls = { library: 0, camera: 0, permission: 0, choices: [], images: [] };
+  const states = [];
+  let stateIndex = 0;
+  const pendingPhotoSource = { current: undefined };
   const native = {
     View: "View",
     Text: "Text",
     Pressable: "Pressable",
     ScrollView: "ScrollView",
+    Modal: "Modal",
     Keyboard: { dismiss() {} },
     Platform: { OS: platform },
     Alert: {
       alert: (...args) => {
         calls.choices.push(args);
-      },
-    },
-    ActionSheetIOS: {
-      showActionSheetWithOptions: (options, callback) => {
-        calls.sheet = { options, callback };
       },
     },
   };
@@ -67,7 +66,21 @@ function renderProfile(platform = "android", isCameraGranted = true) {
     module: screen,
     require: (name) => {
       if (name === "react")
-        return { ...React, useState: (initial) => [initial, (value) => calls.images.push(value)] };
+        return {
+          ...React,
+          useRef: () => pendingPhotoSource,
+          useState: (initial) => {
+            const index = stateIndex++;
+            if (!(index in states)) states[index] = initial;
+            return [
+              states[index],
+              (value) => {
+                states[index] = value;
+                if (index === 1) calls.images.push(value);
+              },
+            ];
+          },
+        };
       if (name === "react-native") return native;
       if (name === "expo-image-picker") return picker;
       if (name === "expo-image") return { Image: "Image" };
@@ -87,34 +100,40 @@ function renderProfile(platform = "android", isCameraGranted = true) {
       return require(name);
     },
   });
-  function findCamera(node) {
+  function find(node, predicate) {
     if (!React.isValidElement(node)) return undefined;
-    if (node.props.accessibilityLabel === "프로필 사진 변경") return node;
-    return React.Children.toArray(node.props.children).map(findCamera).find(Boolean);
+    if (predicate(node)) return node;
+    return React.Children.toArray(node.props.children)
+      .map((child) => find(child, predicate))
+      .find(Boolean);
   }
-  return { calls, button: findCamera(screen.exports.ProfileEditScreen()) };
+  const render = () => {
+    stateIndex = 0;
+    return screen.exports.ProfileEditScreen();
+  };
+  const button = (label) => find(render(), (node) => node.props.accessibilityLabel === label);
+  return { calls, button, modal: () => find(render(), (node) => node.type === "Modal") };
 }
 
 test("카메라 버튼은 먼저 선택 메뉴를 열고 선택한 경로만 실행한다", async () => {
-  const { calls, button } = renderProfile();
-  await button.props.onPress();
+  const { calls, button, modal } = renderProfile();
+  assert.equal(modal().props.visible, false);
+  button("프로필 사진 변경").props.onPress();
+  assert.equal(modal().props.visible, true);
   assert.equal(calls.library, 0, "버튼을 누르자마자 앨범을 열면 안 됩니다");
-  const options = calls.choices[0][2];
-  assert.deepEqual(
-    Array.from(options, (option) => option.text),
-    ["사진 찍기", "앨범에서 선택", "취소"],
-  );
-  await options[0].onPress();
+  await button("사진찍기").props.onPress();
+  assert.equal(modal().props.visible, false);
   assert.equal(calls.permission, 1);
   assert.equal(calls.camera, 1);
   assert.equal(calls.library, 0);
-  await options[1].onPress();
+  button("프로필 사진 변경").props.onPress();
+  await button("앨범에서 선택").props.onPress();
   assert.equal(calls.library, 1);
   assert.deepEqual(calls.images, ["camera.jpg", "album.jpg"]);
 });
 
 test("카메라 버튼은 배경이 포함된 PNG 대신 Figma SVG를 렌더링한다", () => {
-  const { button } = renderProfile();
+  const button = renderProfile().button("프로필 사진 변경");
   assert.equal(button.props.children.props.children?.type, "CameraSvg");
   assert.ok(button.props.className.includes("h-6 w-6"));
   assert.ok(button.props.children.props.className.includes("-left-5 -top-4"));
@@ -128,17 +147,34 @@ test("카메라 버튼은 배경이 포함된 PNG 대신 Figma SVG를 렌더링�
 
 test("카메라 권한 거부 시 촬영하지 않고 안내한다", async () => {
   const { calls, button } = renderProfile("android", false);
-  button.props.onPress();
-  await calls.choices[0][2][0].onPress();
+  button("프로필 사진 변경").props.onPress();
+  await button("사진찍기").props.onPress();
   assert.equal(calls.camera, 0);
-  assert.equal(calls.choices[1][0], "카메라 권한 필요");
+  assert.equal(calls.choices[0][0], "카메라 권한 필요");
 });
 
-test("iOS 선택 메뉴에서 취소하면 사진 선택기를 실행하지 않는다", () => {
-  const { calls, button } = renderProfile("ios");
-  button.props.onPress();
-  assert.deepEqual(Array.from(calls.sheet.options.options), ["사진 찍기", "앨범에서 선택", "취소"]);
-  calls.sheet.callback(2);
+test("선택 메뉴 취소·배경 탭·뒤로 가기는 사진 선택기를 실행하지 않는다", () => {
+  const { calls, button, modal } = renderProfile("ios");
+  for (const close of [
+    () => button("취소").props.onPress(),
+    () => button("사진 선택 메뉴 닫기").props.onPress(),
+    () => modal().props.onRequestClose(),
+  ]) {
+    button("프로필 사진 변경").props.onPress();
+    close();
+    assert.equal(modal().props.visible, false);
+  }
   assert.equal(calls.library, 0);
   assert.equal(calls.camera, 0);
+});
+
+test("iOS에서는 모달이 닫힌 뒤 시스템 사진 선택기를 실행한다", async () => {
+  const { calls, button, modal } = renderProfile("ios");
+  button("프로필 사진 변경").props.onPress();
+  button("앨범에서 선택").props.onPress();
+  assert.equal(calls.library, 0);
+  await modal().props.onDismiss();
+  assert.equal(calls.library, 1);
+  await modal().props.onDismiss();
+  assert.equal(calls.library, 1);
 });

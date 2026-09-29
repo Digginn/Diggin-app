@@ -19,4 +19,8 @@ export const colors = {
     error: "#EB2525",
     focus: "#717171",
   },
+  accent: {
+    blue: "#0088FF",
+    pink: "#FF2D55",
+  },
 } as const;

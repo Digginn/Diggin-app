@@ -2,17 +2,8 @@ import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
-import { useState } from "react";
-import {
-  ActionSheetIOS,
-  Alert,
-  Keyboard,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { useRef, useState } from "react";
+import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconProfileCamera, IconProfileKakao, ImageProfilePlaceholder } from "@/assets/images/my";
@@ -31,6 +22,8 @@ export function ProfileEditScreen() {
   const [profileImageUri, setProfileImageUri] = useState<string>();
   const [helperStatus, setHelperStatus] = useState<"default" | "error">("default");
   const [helperMessage, setHelperMessage] = useState(NICKNAME_HELPER_MESSAGE);
+  const [isPhotoMenuOpen, setIsPhotoMenuOpen] = useState(false);
+  const pendingPhotoSource = useRef<"camera" | "library" | undefined>(undefined);
 
   const handlePickImage = async (source: "camera" | "library") => {
     try {
@@ -63,21 +56,23 @@ export function ProfileEditScreen() {
 
   const handlePhotoMenu = () => {
     Keyboard.dismiss();
+    setIsPhotoMenuOpen(true);
+  };
+
+  const handlePhotoSelection = (source: "camera" | "library") => {
+    setIsPhotoMenuOpen(false);
     if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ["사진 찍기", "앨범에서 선택", "취소"], cancelButtonIndex: 2 },
-        (index) => {
-          if (index === 0) void handlePickImage("camera");
-          if (index === 1) void handlePickImage("library");
-        },
-      );
+      pendingPhotoSource.current = source;
       return;
     }
-    Alert.alert("프로필 사진 변경", undefined, [
-      { text: "사진 찍기", onPress: () => handlePickImage("camera") },
-      { text: "앨범에서 선택", onPress: () => handlePickImage("library") },
-      { text: "취소", style: "cancel" },
-    ]);
+    return handlePickImage(source);
+  };
+
+  const handlePhotoDismiss = () => {
+    const source = pendingPhotoSource.current;
+    pendingPhotoSource.current = undefined;
+    // iOS는 메뉴 모달이 닫힌 뒤에 시스템 사진 선택기를 표시해야 한다.
+    if (source) return handlePickImage(source);
   };
 
   const handleSave = () => {
@@ -157,6 +152,56 @@ export function ProfileEditScreen() {
           저장
         </Button>
       </View>
+
+      <Modal
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        navigationBarTranslucent
+        visible={isPhotoMenuOpen}
+        onRequestClose={() => setIsPhotoMenuOpen(false)}
+        onDismiss={handlePhotoDismiss}
+      >
+        <View
+          className="flex-1 justify-end px-margin"
+          style={{ paddingBottom: insets.bottom + 10 }}
+        >
+          <Pressable
+            accessibilityLabel="사진 선택 메뉴 닫기"
+            accessibilityRole="button"
+            className="absolute inset-0 bg-gray-1000/50"
+            onPress={() => setIsPhotoMenuOpen(false)}
+          />
+          <View accessibilityViewIsModal className="gap-3 shadow-[0_4px_10px_rgba(0,0,0,0.1)]">
+            <View className="overflow-hidden rounded-[5px] bg-gray-0">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="사진찍기"
+                className="h-[54px] items-center justify-center border-b border-gray-300"
+                onPress={() => handlePhotoSelection("camera")}
+              >
+                <Text className="text-accent-blue font-label-18-medium">사진찍기</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="앨범에서 선택"
+                className="h-[54px] items-center justify-center"
+                onPress={() => handlePhotoSelection("library")}
+              >
+                <Text className="text-accent-blue font-label-18-medium">앨범에서 선택</Text>
+              </Pressable>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="취소"
+              className="h-[54px] items-center justify-center rounded-[5px] bg-gray-0"
+              onPress={() => setIsPhotoMenuOpen(false)}
+            >
+              <Text className="text-accent-pink font-label-18-medium">취소</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
