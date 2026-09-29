@@ -9,7 +9,7 @@ type Token = {
 
 export const typography = {
   "h1": { weight: "SemiBold", size: 28, ratio: 1.4 },
-  "h2": { weight: "SemiBold", size: 24, ratio: 1.5 },
+  "h2": { weight: "Bold", size: 24, ratio: 1.4, tracking: -2 },
   "h2-bold": { weight: "Bold", size: 24, ratio: 1.4, tracking: -2 },
 
   "b1": { weight: "Regular", size: 16, ratio: 1.45 },
