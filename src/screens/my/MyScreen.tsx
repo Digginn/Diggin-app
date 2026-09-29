@@ -26,12 +26,6 @@ type MySectionProps = {
   rows: MyMenuRow[];
 };
 
-const ACTIVITY_ROWS: MyMenuRow[] = [
-  { label: "내가 쓴 글" },
-  { label: "내가 투표한 글" },
-  { label: "CSV 파일로 관심 상품 불러오기" },
-];
-
 const SUPPORT_ROWS: MyMenuRow[] = [
   { label: "1:1 문의" },
   { label: "이용약관" },
@@ -91,6 +85,11 @@ function MySection({ title, Icon, rows }: MySectionProps) {
 
 export function MyScreen() {
   const router = useRouter();
+  const activityRows: MyMenuRow[] = [
+    { label: "내가 쓴 글", onPress: () => router.push("/my-posts" as Href) },
+    { label: "내가 투표한 글" },
+    { label: "CSV 파일로 관심 상품 불러오기" },
+  ];
 
   return (
     <View className="flex-1 bg-gray-0">
@@ -105,7 +104,7 @@ export function MyScreen() {
           Icon={IconMyProfile}
           rows={[{ label: "프로필 수정", onPress: () => router.push("/profile-edit" as Href) }]}
         />
-        <MySection title="활동" Icon={IconMyActivity} rows={ACTIVITY_ROWS} />
+        <MySection title="활동" Icon={IconMyActivity} rows={activityRows} />
         <MySection title="고객지원" Icon={IconMySupport} rows={SUPPORT_ROWS} />
         <MySection title="설정" Icon={IconMySettings} rows={SETTINGS_ROWS} />
       </ScrollView>
