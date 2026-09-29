@@ -76,7 +76,7 @@ function MySection({ title, Icon, rows }: MySectionProps) {
                 <Text className="text-gray-800 font-meta">{row.value}</Text>
               ) : row.hasChevron !== false ? (
                 <View className="h-6 w-6 items-center justify-center">
-                  <View className="scale-x-[-1]">
+                  <View style={{ transform: [{ scaleX: -1 }] }}>
                     <IconMyChevron width={18} height={18} />
                   </View>
                 </View>
