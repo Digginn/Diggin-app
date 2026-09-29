@@ -102,24 +102,24 @@ export function ProfileEditScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="items-center">
-          <View className="relative h-[93px] w-[93px]">
+          <Pressable
+            accessibilityLabel="프로필 사진 변경"
+            accessibilityRole="button"
+            className="relative h-[93px] w-[93px]"
+            hitSlop={12}
+            onPress={handlePhotoMenu}
+          >
             <Image
               source={profileImageUri ? { uri: profileImageUri } : ImageProfilePlaceholder}
               contentFit="cover"
               className="h-full w-full"
             />
-            <Pressable
-              accessibilityLabel="프로필 사진 변경"
-              accessibilityRole="button"
-              className="absolute left-[72px] top-[73px] h-6 w-6"
-              hitSlop={12}
-              onPress={handlePhotoMenu}
-            >
+            <View pointerEvents="none" className="absolute left-[72px] top-[73px] h-6 w-6">
               <View pointerEvents="none" className="absolute -left-5 -top-4">
                 <IconProfileCamera />
               </View>
-            </Pressable>
-          </View>
+            </View>
+          </Pressable>
         </View>
 
         <View className="mt-6">

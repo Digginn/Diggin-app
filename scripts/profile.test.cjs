@@ -132,11 +132,16 @@ test("카메라 버튼은 먼저 선택 메뉴를 열고 선택한 경로만 실
   assert.deepEqual(calls.images, ["camera.jpg", "album.jpg"]);
 });
 
-test("카메라 버튼은 배경이 포함된 PNG 대신 Figma SVG를 렌더링한다", () => {
+test("프로필 영역 전체가 터치 가능하며 카메라 SVG 크기와 위치는 유지한다", () => {
   const button = renderProfile().button("프로필 사진 변경");
-  assert.equal(button.props.children.props.children?.type, "CameraSvg");
-  assert.ok(button.props.className.includes("h-6 w-6"));
-  assert.ok(button.props.children.props.className.includes("-left-5 -top-4"));
+  assert.equal(button.type, "Pressable");
+  assert.ok(button.props.className.includes("h-[93px] w-[93px]"));
+  const cameraSlot = React.Children.toArray(button.props.children)[1];
+  assert.equal(cameraSlot.props.pointerEvents, "none");
+  assert.ok(cameraSlot.props.className.includes("left-[72px] top-[73px] h-6 w-6"));
+  const cameraAsset = cameraSlot.props.children;
+  assert.ok(cameraAsset.props.className.includes("-left-5 -top-4"));
+  assert.equal(cameraAsset.props.children.type, "CameraSvg");
   const asset = readFileSync(
     path.join(__dirname, "../assets/images/my/icon-profile-camera.svg"),
     "utf8",
