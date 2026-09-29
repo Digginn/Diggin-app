@@ -3,7 +3,16 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useState } from "react";
-import { Alert, Keyboard, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActionSheetIOS,
+  Alert,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconProfileCamera, IconProfileKakao, ImageProfilePlaceholder } from "@/assets/images/my";
@@ -23,14 +32,26 @@ export function ProfileEditScreen() {
   const [helperStatus, setHelperStatus] = useState<"default" | "error">("default");
   const [helperMessage, setHelperMessage] = useState(NICKNAME_HELPER_MESSAGE);
 
-  const handlePickImage = async () => {
+  const handlePickImage = async (source: "camera" | "library") => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
+      if (source === "camera") {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert("카메라 권한 필요", "사진을 찍으려면 설정에서 카메라 접근을 허용해 주세요.");
+          return;
+        }
+      }
+
+      const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 1,
-      });
+      };
+      const result =
+        source === "camera"
+          ? await ImagePicker.launchCameraAsync(options)
+          : await ImagePicker.launchImageLibraryAsync(options);
 
       if (!result.canceled && result.assets[0]) {
         setProfileImageUri(result.assets[0].uri);
@@ -38,6 +59,25 @@ export function ProfileEditScreen() {
     } catch {
       Alert.alert("사진 선택 실패", "사진을 불러오지 못했습니다. 다시 시도해 주세요.");
     }
+  };
+
+  const handlePhotoMenu = () => {
+    Keyboard.dismiss();
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ["사진 찍기", "앨범에서 선택", "취소"], cancelButtonIndex: 2 },
+        (index) => {
+          if (index === 0) void handlePickImage("camera");
+          if (index === 1) void handlePickImage("library");
+        },
+      );
+      return;
+    }
+    Alert.alert("프로필 사진 변경", undefined, [
+      { text: "사진 찍기", onPress: () => handlePickImage("camera") },
+      { text: "앨범에서 선택", onPress: () => handlePickImage("library") },
+      { text: "취소", style: "cancel" },
+    ]);
   };
 
   const handleSave = () => {
@@ -78,13 +118,11 @@ export function ProfileEditScreen() {
               accessibilityRole="button"
               className="absolute left-[72px] top-[73px] h-6 w-6"
               hitSlop={12}
-              onPress={handlePickImage}
+              onPress={handlePhotoMenu}
             >
-              <Image
-                source={IconProfileCamera}
-                contentFit="contain"
-                className="absolute -left-5 -top-4 h-16 w-16"
-              />
+              <View pointerEvents="none" className="absolute -left-5 -top-4">
+                <IconProfileCamera />
+              </View>
             </Pressable>
           </View>
         </View>
