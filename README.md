@@ -1,9 +1,5 @@
 # Welcome to your Expo app 👋
 
-## MY 페이지 UI
-
-구현한 화면, API 미연결 범위와 테스트 방법은 [MY 페이지 UI 구현 현황](docs/my-page-ui.md)에 정리되어 있습니다. 관련 이슈는 [#41](https://github.com/Digginn/Diggin-app/issues/41)입니다.
-
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
