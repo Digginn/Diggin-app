@@ -64,6 +64,8 @@ export function useCsvIllustrationMotion(isEnabled: boolean) {
         });
       animation = Animated.loop(
         Animated.sequence([
+          // delay만 첫 자식이면 loop가 상품 Value를 초기화하지 않아 5→1로 역주행합니다.
+          move(0, 0, false),
           Animated.delay(800),
           move(1, 550, true),
           Animated.delay(1),

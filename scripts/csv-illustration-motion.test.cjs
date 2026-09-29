@@ -94,16 +94,16 @@ test("Figma의 5단계 대기/전환 시간과 네이티브 드라이버를 유�
   assert.equal(loops[0].starts, 1);
   assert.deepEqual(
     Array.from(loops[0].steps, (step) => step.duration),
-    [800, 550, 1, 300, 1, 350, 500, 0, 1, 600],
+    [0, 800, 550, 1, 300, 1, 350, 500, 0, 1, 600],
   );
   const moves = loops[0].steps.filter((step) => !step.isDelay);
   assert.deepEqual(
     Array.from(moves, (step) => step.toValue),
-    [1, 2, 3, 4, 5],
+    [0, 1, 2, 3, 4, 5],
   );
   assert.ok(moves.every((step) => step.useNativeDriver && !step.isInteraction));
-  assert.deepEqual(Array.from(moves[0].easing), [0.42, 0, 1, 1]);
-  assert.deepEqual(Array.from(moves[2].easing), [0, 0, 0.58, 1]);
+  assert.deepEqual(Array.from(moves[1].easing), [0.42, 0, 1, 1]);
+  assert.deepEqual(Array.from(moves[3].easing), [0, 0, 0.58, 1]);
   cleanup();
 });
 
@@ -133,6 +133,26 @@ test("결과 화면과 동작 줄이기에서는 반복하지 않는다", async 
     assert.equal(loops.length, 0);
     cleanup?.();
   }
+});
+
+test("두 번째 반복도 첫 흡수 전에 Step 1에서 시작하며 이전 단계를 역주행하지 않는다", async () => {
+  const { loops, cleanup } = await setup();
+  const steps = loops[0].steps;
+  const value = steps.find((step) => !step.isDelay).value;
+  // RN sequence는 완료 시 current=0으로 돌아갑니다. loop의 reset은 첫 자식만 초기화하므로
+  // 첫 자식이 delay이면 상품의 Value는 이전 반복 마지막 값(5)에 남습니다.
+  for (let iteration = 0; iteration < 2; iteration++) {
+    let hasStartedAbsorption = false;
+    for (const step of steps) {
+      if (step.isDelay) continue;
+      if (!hasStartedAbsorption && step.duration > 0) {
+        assert.equal(value.value, 0, `${iteration + 1}번째 흡수 시작 값`);
+        hasStartedAbsorption = true;
+      }
+      value.setValue(step.toValue);
+    }
+  }
+  cleanup();
 });
 
 test("백그라운드 및 동작 줄이기 변경에 정지하고 활성화 시 재시작한다", async () => {
