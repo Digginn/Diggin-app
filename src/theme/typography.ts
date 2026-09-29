@@ -10,6 +10,7 @@ type Token = {
 export const typography = {
   "h1": { weight: "SemiBold", size: 28, ratio: 1.4 },
   "h2": { weight: "SemiBold", size: 24, ratio: 1.5 },
+  "h2-bold": { weight: "Bold", size: 24, ratio: 1.4, tracking: -2 },
 
   "b1": { weight: "Regular", size: 16, ratio: 1.45 },
   "b2": { weight: "Medium", size: 15, ratio: 1.4 },
@@ -17,6 +18,7 @@ export const typography = {
   "b4": { weight: "Regular", size: 13, ratio: 1.5, tracking: -1 },
 
   "label-20": { weight: "SemiBold", size: 20, ratio: 1.5 },
+  "label-20-medium": { weight: "Medium", size: 20, ratio: 1.5 },
   "label-18-semibold": { weight: "SemiBold", size: 18, ratio: 1.35 },
   "label-18-medium": { weight: "Medium", size: 18, ratio: 1.35 },
   "label-16-bold": { weight: "Bold", size: 16, ratio: 1.2, tracking: -2 },

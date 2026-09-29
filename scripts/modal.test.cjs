@@ -65,9 +65,10 @@ test("공개 모달만 export하고 공용 껍데기의 바깥 영역은 닫힘 
   assert.equal(shell.props.visible, true);
   assert.equal(shell.props.onRequestClose, close);
   const nodes = flatten(shell);
-  const scrim = nodes.find((node) => node.props.className?.includes("bg-black/40"));
+  const scrim = nodes.find((node) => node.props.className === "absolute inset-0 bg-gray-1000");
   assert.equal(scrim.type, "View");
   assert.equal(scrim.props.onPress, undefined);
+  assert.equal(scrim.props.style.opacity, 0.4);
 });
 
 test("FolderModal 문구와 폴더 이름은 사용처 props를 표시하고 콜백을 전달한다", () => {
