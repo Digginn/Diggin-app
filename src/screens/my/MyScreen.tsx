@@ -87,7 +87,7 @@ export function MyScreen() {
   const router = useRouter();
   const activityRows: MyMenuRow[] = [
     { label: "내가 쓴 글", onPress: () => router.push("/my-posts" as Href) },
-    { label: "내가 투표한 글" },
+    { label: "내가 투표한 글", onPress: () => router.push("/my-voted-posts" as Href) },
     { label: "CSV 파일로 관심 상품 불러오기" },
   ];
 

@@ -1,6 +1,7 @@
 export { default as IconMyActivity } from "./icon-my-activity.svg";
 export { default as IconMyChevron } from "./icon-my-chevron.svg";
 export { default as IconMyComments } from "./icon-my-comments.svg";
+export { default as IconMyReport } from "./icon-my-report.svg";
 export { default as IconMyProfile } from "./icon-my-profile.svg";
 export { default as IconMySettings } from "./icon-my-settings.svg";
 export { default as IconMySupport } from "./icon-my-support.svg";

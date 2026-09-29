@@ -7,37 +7,43 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
-function loadScreen() {
+function loadScreen(screenName = "MyPostsScreen") {
   let activeKey = "posts";
-  const screenModule = { exports: {} };
-  const source = readFileSync(path.join(__dirname, "../src/screens/my/MyPostsScreen.tsx"), "utf8");
-  runInNewContext(
-    ts.transpileModule(source, {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
-    }).outputText,
-    {
-      exports: screenModule.exports,
-      module: screenModule,
-      require: (name) => {
-        if (name === "react")
-          return {
-            ...React,
-            useState: () => [activeKey, (key) => (activeKey = key)],
-          };
-        if (name === "react-native")
-          return { FlatList: "FlatList", Pressable: "Pressable", Text: "Text", View: "View" };
-        if (name === "expo-image") return { Image: "Image" };
-        if (name === "nativewind") return { cssInterop: (component) => component };
-        if (name === "react-native-safe-area-context")
-          return { useSafeAreaInsets: () => ({ bottom: 34 }) };
-        if (name === "@/assets/images/my") return { IconMyComments: "IconMyComments" };
-        if (name === "@/components/app-bar") return { AppBar: "AppBar" };
-        if (name === "@/components/TopTab") return { TopTab: "TopTab" };
-        return require(name);
+  function load(relativePath) {
+    const screenModule = { exports: {} };
+    const source = readFileSync(path.join(__dirname, relativePath), "utf8");
+    runInNewContext(
+      ts.transpileModule(source, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+      }).outputText,
+      {
+        exports: screenModule.exports,
+        module: screenModule,
+        require: (name) => {
+          if (name === "react")
+            return {
+              ...React,
+              useState: () => [activeKey, (key) => (activeKey = key)],
+            };
+          if (name === "react-native")
+            return { FlatList: "FlatList", Pressable: "Pressable", Text: "Text", View: "View" };
+          if (name === "expo-image") return { Image: "Image" };
+          if (name === "nativewind") return { cssInterop: (component) => component };
+          if (name === "react-native-safe-area-context")
+            return { useSafeAreaInsets: () => ({ bottom: 34 }) };
+          if (name === "@/assets/images/my")
+            return { IconMyComments: "IconMyComments", IconMyReport: "IconMyReport" };
+          if (name === "@/components/app-bar") return { AppBar: "AppBar" };
+          if (name === "@/components/TopTab") return { TopTab: "TopTab" };
+          if (name === "./components/VoteListItem")
+            return load("../src/screens/my/components/VoteListItem.tsx");
+          return require(name);
+        },
       },
-    },
-  );
-  return screenModule.exports.MyPostsScreen;
+    );
+    return screenModule.exports;
+  }
+  return load(`../src/screens/my/${screenName}.tsx`)[screenName];
 }
 
 function descendants(element) {
@@ -112,4 +118,45 @@ test("빈 목록도 탭 전환이 가능하고 상세 연결 전에는 행을 �
   assert.equal(children[2].props.data.length, 0);
   const element = children[2].props.renderItem({ item: { id: "vote-1" } });
   assert.equal(element.type(element.props).props.disabled, true);
+});
+
+test("내가 투표한 글은 탭 없이 참여 목록을 렌더링하고 신고·상세 동작을 분리한다", () => {
+  const Screen = loadScreen("MyVotedPostsScreen");
+  const selected = [];
+  const reports = [];
+  const item = { id: "participated-vote-1", nickname: "디기", commentCount: 1 };
+  const votes = [item];
+  const children = React.Children.toArray(
+    Screen({
+      votes,
+      onPressVote: (id) => selected.push(id),
+      onReportVote: (id) => reports.push(id),
+    }).props.children,
+  );
+  assert.equal(children.length, 2);
+  assert.equal(children[0].props.title, "내가 투표한 글");
+  assert.equal(children[1].props.data, votes);
+  assert.equal(children[1].props.contentContainerStyle.paddingBottom, 34);
+  const element = children[1].props.renderItem({ item });
+  const row = element.type(element.props);
+  const report = descendants(row).find(
+    (node) => node.props.accessibilityLabel === "디기님의 투표글 신고",
+  );
+  let hasStoppedPropagation = false;
+  report.props.onPress({ stopPropagation: () => (hasStoppedPropagation = true) });
+  assert.equal(hasStoppedPropagation, true);
+  assert.deepEqual(reports, [item.id]);
+  assert.deepEqual(selected, []);
+  assert.ok(report.props.className.includes("h-12 w-12"));
+  row.props.onPress();
+  assert.deepEqual(selected, [item.id]);
+});
+
+test("상세 화면 연결 전에도 참여 목록의 신고 버튼은 활성화된다", () => {
+  const Screen = loadScreen("MyVotedPostsScreen");
+  const children = React.Children.toArray(
+    Screen({ votes: [], onReportVote: () => {} }).props.children,
+  );
+  const element = children[1].props.renderItem({ item: { id: "vote-1" } });
+  assert.equal(element.type(element.props).props.disabled, false);
 });
