@@ -20,8 +20,21 @@ test("닉네임의 10글자 경계와 특수문자 오류를 검사한다", () =
   }
 });
 
-function renderProfile(platform = "android", isCameraGranted = true) {
-  const calls = { library: 0, camera: 0, permission: 0, choices: [], images: [] };
+function renderProfile(
+  platform = "android",
+  isCameraGranted = true,
+  screenProps = {},
+  isPickerFailure = false,
+) {
+  const calls = {
+    library: 0,
+    camera: 0,
+    permission: 0,
+    choices: [],
+    images: [],
+    toasts: [],
+    dismissed: [],
+  };
   const states = [];
   let stateIndex = 0;
   const pendingPhotoSource = { current: undefined };
@@ -50,6 +63,7 @@ function renderProfile(platform = "android", isCameraGranted = true) {
     },
     launchImageLibraryAsync: async () => {
       calls.library += 1;
+      if (isPickerFailure) throw new Error("사진 선택 실패");
       return { canceled: false, assets: [{ uri: "album.jpg" }] };
     },
   };
@@ -85,7 +99,10 @@ function renderProfile(platform = "android", isCameraGranted = true) {
       if (name === "expo-image-picker") return picker;
       if (name === "expo-image") return { Image: "Image" };
       if (name === "nativewind") return { cssInterop: (component) => component };
-      if (name === "expo-router") return { useRouter: () => ({ back() {} }) };
+      if (name === "expo-router")
+        return { useRouter: () => ({ dismissTo: (path) => calls.dismissed.push(path) }) };
+      if (name === "@/hooks/useToast")
+        return { useToast: () => (message) => calls.toasts.push(message) };
       if (name === "react-native-safe-area-context")
         return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === "@/assets/images/my") return { IconProfileCamera: "CameraSvg" };
@@ -97,6 +114,8 @@ function renderProfile(platform = "android", isCameraGranted = true) {
           TextField: "TextField",
         };
       if (name === "./utils/validateNickname") return { NICKNAME_HELPER_MESSAGE, validateNickname };
+      if (name === "./constants/profileMessages")
+        return require("../src/screens/my/constants/profileMessages.ts");
       return require(name);
     },
   });
@@ -109,10 +128,15 @@ function renderProfile(platform = "android", isCameraGranted = true) {
   }
   const render = () => {
     stateIndex = 0;
-    return screen.exports.ProfileEditScreen();
+    return screen.exports.ProfileEditScreen(screenProps);
   };
   const button = (label) => find(render(), (node) => node.props.accessibilityLabel === label);
-  return { calls, button, modal: () => find(render(), (node) => node.type === "Modal") };
+  return {
+    calls,
+    button,
+    modal: () => find(render(), (node) => node.type === "Modal"),
+    save: () => find(render(), (node) => node.type === "Button").props.onPress(),
+  };
 }
 
 test("카메라 버튼은 먼저 선택 메뉴를 열고 선택한 경로만 실행한다", async () => {
@@ -182,4 +206,63 @@ test("iOS에서는 모달이 닫힌 뒤 시스템 사진 선택기를 실행한�
   assert.equal(calls.library, 1);
   await modal().props.onDismiss();
   assert.equal(calls.library, 1);
+});
+
+test("유효한 닉네임 저장 성공 시 MY로 이동하고 성공 토스트를 표시한다", async () => {
+  let savedNickname;
+  const { calls, button, save } = renderProfile("android", true, {
+    onSaveNickname: async (nickname) => {
+      savedNickname = nickname;
+    },
+  });
+  button("닉네임").props.onChangeText("변경닉네임");
+  await save();
+  assert.equal(savedNickname, "변경닉네임");
+  assert.deepEqual(calls.dismissed, ["/(tabs)/my"]);
+  assert.deepEqual(calls.toasts, ["닉네임이 변경되었습니다."]);
+});
+
+test("닉네임 저장 실패 시 입력을 유지하고 이동하지 않는다", async () => {
+  const { calls, button, save } = renderProfile("android", true, {
+    onSaveNickname: async () => {
+      throw new Error("저장 실패");
+    },
+  });
+  button("닉네임").props.onChangeText("변경닉네임");
+  await save();
+  assert.equal(button("닉네임").props.value, "변경닉네임");
+  assert.deepEqual(calls.dismissed, []);
+  assert.deepEqual(calls.toasts, ["닉네임을 변경하지 못했습니다. 다시 시도해 주세요."]);
+});
+
+test("프로필 사진 저장 실패와 선택기 오류에 사진 실패 토스트를 표시한다", async () => {
+  const saving = renderProfile("android", true, {
+    onSavePhoto: async () => {
+      throw new Error("사진 저장 실패");
+    },
+  });
+  saving.button("프로필 사진 변경").props.onPress();
+  await saving.button("앨범에서 선택").props.onPress();
+  await saving.save();
+  assert.deepEqual(saving.calls.dismissed, []);
+  assert.deepEqual(saving.calls.toasts, ["프로필 사진을 변경하지 못했습니다. 다시 시도해 주세요."]);
+
+  const picking = renderProfile("android", true, {}, true);
+  picking.button("프로필 사진 변경").props.onPress();
+  await picking.button("앨범에서 선택").props.onPress();
+  assert.deepEqual(picking.calls.toasts, saving.calls.toasts);
+});
+
+test("닉네임 검증 오류는 저장 콜백이나 성공 토스트를 실행하지 않는다", async () => {
+  let saveCount = 0;
+  const { calls, button, save } = renderProfile("android", true, {
+    onSaveNickname: async () => {
+      saveCount += 1;
+    },
+  });
+  button("닉네임").props.onChangeText("닉네임!");
+  await save();
+  assert.equal(saveCount, 0);
+  assert.deepEqual(calls.toasts, []);
+  assert.deepEqual(calls.dismissed, []);
 });

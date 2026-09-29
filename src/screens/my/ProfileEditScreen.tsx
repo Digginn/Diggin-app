@@ -1,6 +1,6 @@
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
 import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
@@ -10,19 +10,28 @@ import { IconProfileCamera, IconProfileKakao, ImageProfilePlaceholder } from "@/
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { HelperText, TextField } from "@/components/Field";
+import { useToast } from "@/hooks/useToast";
 
+import { profileMessages } from "./constants/profileMessages";
 import { NICKNAME_HELPER_MESSAGE, validateNickname } from "./utils/validateNickname";
 
 const Image = cssInterop(ExpoImage, { className: "style" });
 
-export function ProfileEditScreen() {
+type ProfileEditScreenProps = {
+  onSaveNickname?: (nickname: string) => Promise<void>;
+  onSavePhoto?: (uri: string) => Promise<void>;
+};
+
+export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditScreenProps = {}) {
   const router = useRouter();
+  const showToast = useToast();
   const insets = useSafeAreaInsets();
   const [nickname, setNickname] = useState("");
   const [profileImageUri, setProfileImageUri] = useState<string>();
   const [helperStatus, setHelperStatus] = useState<"default" | "error">("default");
   const [helperMessage, setHelperMessage] = useState(NICKNAME_HELPER_MESSAGE);
   const [isPhotoMenuOpen, setIsPhotoMenuOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const pendingPhotoSource = useRef<"camera" | "library" | undefined>(undefined);
 
   const handlePickImage = async (source: "camera" | "library") => {
@@ -50,7 +59,7 @@ export function ProfileEditScreen() {
         setProfileImageUri(result.assets[0].uri);
       }
     } catch {
-      Alert.alert("사진 선택 실패", "사진을 불러오지 못했습니다. 다시 시도해 주세요.");
+      showToast(profileMessages.photoFailure);
     }
   };
 
@@ -75,12 +84,9 @@ export function ProfileEditScreen() {
     if (source) return handlePickImage(source);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     Keyboard.dismiss();
-    if (!nickname) {
-      if (profileImageUri) router.back();
-      return;
-    }
+    if (isSaving || (!nickname && !profileImageUri)) return;
 
     const errorMessage = validateNickname(nickname);
     if (errorMessage) {
@@ -89,7 +95,20 @@ export function ProfileEditScreen() {
       return;
     }
 
-    router.back();
+    setIsSaving(true);
+    let failureMessage: string = profileMessages.photoFailure;
+    try {
+      // 저장 콜백이 없으면 UI 미리보기만 수행한다. 실제 저장 API는 사용처에서 연결한다.
+      if (profileImageUri) await onSavePhoto?.(profileImageUri);
+      failureMessage = profileMessages.nicknameFailure;
+      if (nickname) await onSaveNickname?.(nickname);
+      router.dismissTo("/(tabs)/my" as Href);
+      if (nickname) showToast(profileMessages.nicknameSuccess);
+    } catch {
+      showToast(failureMessage);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -113,6 +132,11 @@ export function ProfileEditScreen() {
               source={profileImageUri ? { uri: profileImageUri } : ImageProfilePlaceholder}
               contentFit="cover"
               className="h-full w-full"
+              onError={() => {
+                if (!profileImageUri) return;
+                setProfileImageUri(undefined);
+                showToast(profileMessages.photoFailure);
+              }}
             />
             <View pointerEvents="none" className="absolute left-[72px] top-[73px] h-6 w-6">
               <View pointerEvents="none" className="absolute -left-5 -top-4">
@@ -148,7 +172,7 @@ export function ProfileEditScreen() {
       </ScrollView>
 
       <View className="absolute left-6 right-6" style={{ bottom: insets.bottom + 10 }}>
-        <Button size="large" onPress={handleSave}>
+        <Button size="large" isDisabled={isSaving} onPress={handleSave}>
           저장
         </Button>
       </View>

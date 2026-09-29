@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 
 import "@/global.css";
+import { ToastProvider } from "@/contexts/ToastContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,5 +22,9 @@ export default function RootLayout() {
 
   if (!loaded && !error) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <ToastProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ToastProvider>
+  );
 }
