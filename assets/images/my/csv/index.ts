@@ -1,6 +1,8 @@
 export { default as ImageCsvBag } from "./image-csv-bag.png";
 export { default as ImageCsvBasket } from "./image-csv-basket.png";
 export { default as ImageCsvDecor } from "./image-csv-decor.png";
+export { default as ImageCsvBeam } from "./image-csv-beam.png";
+export { default as ImageCsvGlow } from "./image-csv-glow.png";
 export { default as ImageCsvFolderBack } from "./image-csv-folder-back.png";
 export { default as ImageCsvFolderFront } from "./image-csv-folder-front.svg";
 export { default as ImageCsvJacket } from "./image-csv-jacket.png";
