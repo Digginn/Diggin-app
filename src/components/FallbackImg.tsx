@@ -22,7 +22,7 @@ export function FallbackImg({ size = "card", className }: FallbackImgProps) {
     <View
       className={clsx(
         "w-full items-center justify-center overflow-hidden bg-gray-100",
-        size === "card" ? "h-[106px] rounded-lg" : "h-[440px] gap-5 pt-[50px]",
+        size === "detail" && "h-[440px] gap-5 pt-[50px]",
         className,
       )}
     >

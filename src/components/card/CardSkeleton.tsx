@@ -7,6 +7,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { CARD_IMAGE_FRAME } from "@/components/card/Card";
+
 type CardSkeletonProps = {
   className?: string;
 };
@@ -26,7 +28,7 @@ export function CardSkeleton({ className }: CardSkeletonProps) {
   return (
     <View className={className}>
       <Animated.View style={[{ gap: 8 }, fadeStyle]}>
-        <View className="h-[106px] w-full rounded-lg bg-gray-100" />
+        <View className={CARD_IMAGE_FRAME} />
         <View className="w-full gap-1.5 overflow-hidden">
           <View className="h-3 w-[72px] rounded bg-gray-100" />
           <View className="h-2.5 w-24 rounded bg-gray-100" />

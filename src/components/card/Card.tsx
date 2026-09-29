@@ -8,6 +8,8 @@ import { FallbackImg } from "@/components/FallbackImg";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 
+export const CARD_IMAGE_FRAME = "h-[106px] w-full rounded-lg bg-gray-100";
+
 type CardProps = {
   name: string;
   price: number;
@@ -32,13 +34,13 @@ export function Card({ name, price, thumbnailUrl, brand, onPress, className }: C
     >
       {thumbnail ? (
         <StyledImage
-          className="h-[106px] w-full rounded-lg bg-gray-100"
+          className={CARD_IMAGE_FRAME}
           contentFit="cover"
           onError={() => setFailedUrl(thumbnail)}
           source={thumbnail}
         />
       ) : (
-        <FallbackImg size="card" />
+        <FallbackImg className={CARD_IMAGE_FRAME} />
       )}
       <View className="w-full gap-1.5">
         <View className="w-full gap-0.5">
