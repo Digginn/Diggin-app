@@ -15,6 +15,8 @@ import { CsvImportResultModal } from "./components/CsvImportResultModal";
 import type { CsvImportFailure, CsvImportProgress, CsvImportResult } from "./types/csvImport";
 
 const MISSING_PRODUCT_MESSAGE = "파일에서 상품 정보를 찾을 수 없습니다.";
+// Figma: 화면 812 - 버튼 top 720 - 버튼 높이 48.
+const MIN_BUTTON_BOTTOM_SPACING = 44;
 
 type CsvImportScreenProps = {
   onSelectCsv?: (
@@ -161,7 +163,10 @@ export function CsvImportScreen({
               </Text>
             </View>
           </ScrollView>
-          <View className="px-margin pt-4" style={{ paddingBottom: insets.bottom + 10 }}>
+          <View
+            className="px-margin pt-4"
+            style={{ paddingBottom: Math.max(MIN_BUTTON_BOTTOM_SPACING, insets.bottom + 10) }}
+          >
             <Button
               variant="secondary"
               size="large"

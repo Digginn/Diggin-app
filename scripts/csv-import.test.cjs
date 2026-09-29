@@ -7,7 +7,7 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
-function setup(pick) {
+function setup(pick, bottomInset = 34) {
   const alerts = [];
   const toasts = [];
   const showToast = (...args) => toasts.push(args);
@@ -57,7 +57,7 @@ function setup(pick) {
         if (name === "expo-document-picker") return { getDocumentAsync: pick };
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
         if (name === "react-native-safe-area-context")
-          return { useSafeAreaInsets: () => ({ bottom: 34 }) };
+          return { useSafeAreaInsets: () => ({ bottom: bottomInset }) };
         if (name === "@/components/app-bar") return { AppBar: "AppBar" };
         if (name === "@/components/Button") return { Button: "Button" };
         if (name === "@/hooks/useToast") return { useToast: () => showToast };
@@ -98,10 +98,22 @@ test("CSV 소개 화면에 밝은 상태바·어두운 AppBar·safe area·공통
   assert.equal(children[2].props.colorScheme, "dark");
   const button = find(render(), "Button");
   assert.equal(button.props.children, "CSV 파일로 데이터 불러오기");
-  assert.match(
-    readFileSync(path.join(__dirname, "../src/screens/my/CsvImportScreen.tsx"), "utf8"),
-    /paddingBottom: insets.bottom \+ 10/,
-  );
+  assert.equal(button.props.size, "large");
+});
+
+test("CSV 버튼 아래에 Figma의 최소 44dp 간격을 확보하고 큰 safe area도 보호한다", () => {
+  for (const bottomInset of [0, 14, 34, 60]) {
+    const { render } = setup(undefined, bottomInset);
+    const content = React.Children.toArray(render().props.children).find(
+      (node) => node.type === React.Fragment,
+    );
+    const footer = React.Children.toArray(content.props.children).at(-1);
+    assert.equal(
+      footer.props.style.paddingBottom,
+      Math.max(44, bottomInset + 10),
+      `bottom inset ${bottomInset}: 버튼이 화면 아래에 붙으면 안 됩니다`,
+    );
+  }
 });
 
 test("CSV 대문자 확장자를 허용하고 선택한 파일을 부모 콜백에 전달한다", async () => {
