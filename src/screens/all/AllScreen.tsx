@@ -1,85 +1,73 @@
-import { FlatList, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Text, View } from "react-native";
 
-import { Card, CardSkeleton } from "@/components/card";
+import { IconNotification, IconSearch } from "@/assets/images/appbar";
+import { AppBar } from "@/components/app-bar";
+import { WishItemGrid } from "@/components/WishItemGrid";
+import { WishLevel } from "@/components/WishLevel";
+import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
-// 임시 확인 화면. Card / FallbackImg / 3열 그리드를 검증한다.
+import { AllEmpty } from "./components/AllEmpty";
+import { SortLabel, type SortOrder } from "./components/SortLabel";
 
-type SampleItem = {
-  id: string;
-  name: string;
-  price: number;
-  thumbnailUrl?: string | null;
-  brand?: string | null;
-};
+// TODO: API 연결 전까지 쓰는 임시 데이터. 연결 시 TanStack Query 로 교체한다.
+const MOCK_ITEMS: WishItem[] = Array.from({ length: 11 }, (_, index) => ({
+  id: String(index),
+  name: "아이템명",
+  price: 0,
+  brand: "브랜드명",
+  thumbnailUrl: null,
+}));
 
-const ITEMS: SampleItem[] = [
-  {
-    id: "1",
-    name: "정상 이미지",
-    price: 129000,
-    brand: "COS",
-    thumbnailUrl: "https://picsum.photos/id/1027/214/212",
-  },
-  { id: "2", name: "이미지 없음 (null)", price: 8900, brand: "Uniqlo", thumbnailUrl: null },
-  {
-    id: "3",
-    name: "로드 실패 (깨진 URL)",
-    price: 249000,
-    brand: "Acne Studios",
-    thumbnailUrl: "https://example.invalid/none.png",
-  },
-  { id: "4", name: "브랜드명 null", price: 89000, brand: null },
-  {
-    id: "5",
-    name: "아주 긴 상품명이 들어가면 한 줄에서 잘려야 합니다",
-    price: 1290000,
-    brand: "매우 긴 브랜드명도 한 줄에서 잘립니다",
-  },
-  { id: "6", name: "레더 스니커즈", price: 320000, brand: "Common Projects" },
-];
-
-const COLUMN_COUNT = 3;
+const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
 
 export function AllScreen() {
-  const fillerCount = (COLUMN_COUNT - (ITEMS.length % COLUMN_COUNT)) % COLUMN_COUNT;
-  const rows: (SampleItem | null)[] = [
-    ...ITEMS,
-    ...Array.from({ length: fillerCount }, () => null),
-  ];
+  const router = useRouter();
+  const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
+
+  const items = MOCK_ITEMS;
 
   return (
-    // AppBar(#7)가 머지되기 전까지 상단 여백을 SafeAreaView가 대신 잡는다- AppBar는 자체적으로 insets.top을 처리하므로 머지 후에는 edges에서 top을 뺀다.
-    <SafeAreaView className="flex-1 bg-gray-0" edges={["top"]}>
-      <FlatList
-        className="flex-1"
-        columnWrapperClassName="gap-3"
-        contentContainerClassName="gap-5 px-4 pb-10"
-        data={rows}
-        keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
-        ListFooterComponent={
-          <View className="flex-row gap-3 pt-8">
-            <CardSkeleton className="flex-1" />
-            <CardSkeleton className="flex-1" />
-            <CardSkeleton className="flex-1" />
-          </View>
-        }
-        numColumns={COLUMN_COUNT}
-        renderItem={({ item }) =>
-          item ? (
-            <Card
-              brand={item.brand}
-              className="flex-1"
-              name={item.name}
-              onPress={() => {}}
-              price={item.price}
-              thumbnailUrl={item.thumbnailUrl}
+    <View className="flex-1 bg-gray-0">
+      <AppBar
+        left="logo"
+        right={
+          <>
+            <AppBar.IconButton
+              icon={IconSearch}
+              accessibilityLabel="검색"
+              onPress={() => router.push("/search")}
             />
-          ) : (
-            <View className="flex-1" />
-          )
+            <AppBar.IconButton icon={IconNotification} accessibilityLabel="알림" />
+          </>
         }
       />
-    </SafeAreaView>
+
+      {items.length === 0 ? (
+        <AllEmpty />
+      ) : (
+        <WishItemGrid
+          items={items}
+          onItemPress={(item) => router.push(`/items/${item.id}`)}
+          header={
+            <View className="gap-2 pt-4">
+              <Text className="text-gray-1000 font-label-12-semibold">
+                저장한 아이템 {items.length}개
+              </Text>
+              <View className="h-12 flex-row items-center justify-between">
+                <View>
+                  <WishLevel
+                    levels={MOCK_LEVELS}
+                    hint="아이템 상세 화면에서 얼마나 사고 싶은지를 3단계로 기록해두어 구매 고민을 빠르게 마칠 수 있습니다."
+                  />
+                </View>
+                <SortLabel value={sortOrder} onChange={setSortOrder} />
+              </View>
+            </View>
+          }
+        />
+      )}
+    </View>
   );
 }
