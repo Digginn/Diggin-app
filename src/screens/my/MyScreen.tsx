@@ -11,7 +11,6 @@ import {
   IconMySupport,
 } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
-import { useToast } from "@/hooks/useToast";
 
 import { AccountWithdrawalModal } from "./components/AccountWithdrawalModal";
 import { LogoutModal } from "./components/LogoutModal";
@@ -85,18 +84,21 @@ type MyScreenProps = {
 
 export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
   const router = useRouter();
-  const showToast = useToast();
+  const [modalToast, setModalToast] = useState<string>();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isLoggingOutRef = useRef(false);
   const handleCloseLogout = () => {
-    if (!isLoggingOutRef.current) setIsLogoutOpen(false);
+    if (!isLoggingOutRef.current) {
+      setIsLogoutOpen(false);
+      setModalToast(undefined);
+    }
   };
   const handleLogout = async () => {
     if (isLoggingOutRef.current) return;
     if (!onLogout) {
-      showToast("로그아웃 기능은 준비 중입니다.");
+      setModalToast("로그아웃 기능은 준비 중입니다.");
       return;
     }
     isLoggingOutRef.current = true;
@@ -104,8 +106,9 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
     try {
       await onLogout();
       setIsLogoutOpen(false);
+      setModalToast(undefined);
     } catch {
-      showToast("로그아웃하지 못했습니다. 다시 시도해 주세요.");
+      setModalToast("로그아웃하지 못했습니다. 다시 시도해 주세요.");
     } finally {
       isLoggingOutRef.current = false;
       setIsLoggingOut(false);
@@ -176,6 +179,8 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
         isLoggingOut={isLoggingOut}
         onClose={handleCloseLogout}
         onConfirm={handleLogout}
+        toastMessage={modalToast}
+        onToastDismiss={() => setModalToast(undefined)}
       />
       <AccountWithdrawalModal
         isVisible={isWithdrawalOpen}

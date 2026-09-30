@@ -8,14 +8,25 @@ type LogoutModalProps = {
   isLoggingOut: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  toastMessage?: string;
+  onToastDismiss?: () => void;
 };
 
-export function LogoutModal({ isVisible, isLoggingOut, onClose, onConfirm }: LogoutModalProps) {
+export function LogoutModal({
+  isVisible,
+  isLoggingOut,
+  onClose,
+  onConfirm,
+  toastMessage,
+  onToastDismiss,
+}: LogoutModalProps) {
   return (
     <Modal
       visible={isVisible}
       onRequestClose={onClose}
       scrimOpacity={0.36}
+      toastMessage={toastMessage}
+      onToastDismiss={onToastDismiss}
       className="px-4 pb-4 pt-2"
     >
       <View className="w-full items-center gap-1">
@@ -28,7 +39,7 @@ export function LogoutModal({ isVisible, isLoggingOut, onClose, onConfirm }: Log
           저장된 정보는 안전하게 보관됩니다.
         </Text>
       </View>
-      <View className="w-full flex-row gap-[15px]">
+      <View className="w-full flex-row gap-modal-action">
         <View className="flex-1">
           <Button variant="secondary" isDisabled={isLoggingOut} onPress={onClose}>
             돌아가기

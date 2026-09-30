@@ -154,10 +154,11 @@ test("로그아웃 확인 창을 열고 취소하며, 콜백 성공 때만 닫�
     assert.equal(calls, 1);
     assert.equal(modal().isVisible, hasFailure);
     assert.equal(modal().isLoggingOut, false);
-    assert.deepEqual(
-      context.toasts,
-      hasFailure ? ["로그아웃하지 못했습니다. 다시 시도해 주세요."] : [],
+    assert.equal(
+      modal().toastMessage,
+      hasFailure ? "로그아웃하지 못했습니다. 다시 시도해 주세요." : undefined,
     );
+    assert.deepEqual(context.toasts, []);
   }
 });
 
@@ -166,7 +167,8 @@ test("로그아웃 미연결은 성공을 가장하지 않고, 진행 중 연타
   const modal = (props) =>
     descendants(context.Screen(props)).find((node) => node.type === "LogoutModal").props;
   await modal().onConfirm();
-  assert.deepEqual(context.toasts, ["로그아웃 기능은 준비 중입니다."]);
+  assert.equal(modal().toastMessage, "로그아웃 기능은 준비 중입니다.");
+  assert.deepEqual(context.toasts, []);
   let finish,
     calls = 0;
   const props = {
@@ -306,10 +308,11 @@ test("탈퇴 확인 → 완료 확인에서만 요청하며 실패 시 원래 �
     assert.equal(calls, 1);
     assert.equal(closes, hasFailure ? 0 : 1);
     assert.equal(buttons()[0].props.children, "동의 후 탈퇴");
-    assert.deepEqual(
-      toasts,
-      hasFailure ? ["회원탈퇴를 완료하지 못했습니다. 다시 시도해 주세요."] : [],
+    assert.equal(
+      tree().props.toastMessage,
+      hasFailure ? "회원탈퇴를 완료하지 못했습니다. 다시 시도해 주세요." : undefined,
     );
+    assert.deepEqual(toasts, []);
   }
 });
 
@@ -322,7 +325,8 @@ test("미연결 탈퇴는 실행하지 않고, 완료 X는 삭제 없이 취소�
   const tree = () => Screen(props);
   const buttons = () => descendants(tree()).filter((node) => node.type === "Button");
   buttons()[0].props.onPress();
-  assert.deepEqual(toasts, ["회원탈퇴 기능은 준비 중입니다."]);
+  assert.equal(tree().props.toastMessage, "회원탈퇴 기능은 준비 중입니다.");
+  assert.deepEqual(toasts, []);
   assert.equal(buttons().length, 2);
   props.onWithdraw = () => {
     calls++;

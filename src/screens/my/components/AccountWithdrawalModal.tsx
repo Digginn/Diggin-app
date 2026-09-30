@@ -4,7 +4,6 @@ import { Pressable, Text, View } from "react-native";
 import { IconWithdrawalClose } from "@/assets/images/my";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/modal";
-import { useToast } from "@/hooks/useToast";
 
 type AccountWithdrawalModalProps = {
   isVisible: boolean;
@@ -18,7 +17,7 @@ export function AccountWithdrawalModal({
   onClose,
   onWithdraw,
 }: AccountWithdrawalModalProps) {
-  const showToast = useToast();
+  const [modalToast, setModalToast] = useState<string>();
   const [isCompletionOpen, setIsCompletionOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const isWithdrawingRef = useRef(false);
@@ -26,11 +25,12 @@ export function AccountWithdrawalModal({
   const handleClose = () => {
     if (isWithdrawingRef.current) return;
     setIsCompletionOpen(false);
+    setModalToast(undefined);
     onClose();
   };
   const handleAgree = () => {
     if (!onWithdraw) {
-      showToast("회원탈퇴 기능은 준비 중입니다.");
+      setModalToast("회원탈퇴 기능은 준비 중입니다.");
       return;
     }
     setIsCompletionOpen(true);
@@ -42,10 +42,11 @@ export function AccountWithdrawalModal({
     try {
       await onWithdraw();
       setIsCompletionOpen(false);
+      setModalToast(undefined);
       onClose();
     } catch {
       setIsCompletionOpen(false);
-      showToast("회원탈퇴를 완료하지 못했습니다. 다시 시도해 주세요.");
+      setModalToast("회원탈퇴를 완료하지 못했습니다. 다시 시도해 주세요.");
     } finally {
       isWithdrawingRef.current = false;
       setIsWithdrawing(false);
@@ -58,6 +59,8 @@ export function AccountWithdrawalModal({
       onRequestClose={handleClose}
       scrimOpacity={0.36}
       backdropClassName={isCompletionOpen ? "bg-gray-0" : undefined}
+      toastMessage={modalToast}
+      onToastDismiss={() => setModalToast(undefined)}
       className="px-4 pb-4 pt-2"
     >
       <View className="w-full items-center gap-1">
@@ -93,7 +96,7 @@ export function AccountWithdrawalModal({
           </Button>
         </View>
       ) : (
-        <View className="w-full flex-row gap-[15px]">
+        <View className="w-full flex-row gap-modal-action">
           <View className="flex-1">
             <Button variant="secondary" isDisabled={isWithdrawing} onPress={handleAgree}>
               동의 후 탈퇴
