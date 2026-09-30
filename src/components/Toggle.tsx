@@ -18,7 +18,7 @@ const DURATION = 200;
 const TRACK_OFF = colors.gray[500];
 const TRACK_ON = colors.gray[900];
 
-// 토글 
+// 토글
 const trackBase = {
   width: TRACK_WIDTH,
   height: TRACK_HEIGHT,
