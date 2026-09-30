@@ -117,7 +117,7 @@ export function CsvImportResultModal({
               )}
             </Text>
           </View>
-          <View className="flex-row gap-[15px]">
+          <View className="flex-row gap-modal-action">
             {hasExcluded && (
               <View className="flex-1">
                 <Button variant="secondary" className="!px-2" onPress={onShowExcluded}>

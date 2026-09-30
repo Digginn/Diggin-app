@@ -46,7 +46,7 @@ export function CustomerSupportScreen() {
           <ImageSupportApp accessibilityLabel="디긴 로고" />
           <Text className="text-center text-gray-900 font-label-16-medium">디긴 - diggin</Text>
         </View>
-        <View className="mt-6 h-10 w-[280px] max-w-full flex-row items-center rounded-[5px] bg-gray-100 p-1">
+        <View className="mt-6 h-10 w-[280px] max-w-full flex-row items-center rounded-field bg-gray-100 p-1">
           <Pressable
             accessibilityRole="link"
             accessibilityLabel="카카오 고객지원 채널 열기"
@@ -63,7 +63,7 @@ export function CustomerSupportScreen() {
             accessibilityLabel="고객지원 링크 복사"
             onPress={handleCopyLink}
             hitSlop={{ top: 8, bottom: 8 }}
-            className="rounded-[5px] bg-gray-900 px-2.5 py-1.5"
+            className="rounded-field bg-gray-900 px-2.5 py-1.5"
           >
             <Text className="text-gray-0 font-b3">링크 복사</Text>
           </Pressable>
