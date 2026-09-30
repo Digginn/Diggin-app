@@ -10,6 +10,7 @@ const ts = require("typescript");
 test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·접근성 이동을 처리한다", () => {
   let activeIndex = 0;
   const scrollCalls = [];
+  const pageChanges = [];
   const source = readFileSync(
     path.join(__dirname, "../src/components/carousel/SwipeCarousel.tsx"),
     "utf8",
@@ -46,20 +47,24 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
     const root = componentModule.exports.SwipeCarousel({
       children: ["1", "2", "3"].map((key) => React.createElement("CardCarousel", { key })),
       accessibilityLabel: "서비스 소개",
+      onPageChange: (index) => pageChanges.push(index),
     });
     const [scroll, indicators] = React.Children.toArray(root.props.children);
     return { root, scroll, dots: React.Children.toArray(indicators.props.children) };
   }
   let tree = render();
   assert.ok(tree.root.props.className.includes("w-[295px]"));
+  assert.ok(tree.root.props.className.includes("h-[584px]"));
   assert.equal(Array.from(tree.scroll.props.snapToOffsets).join(","), "0,296,592");
   assert.equal(React.Children.count(tree.scroll.props.children), 3);
   assert.equal(tree.dots[0].props.isActive, true);
   tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
+  assert.equal(pageChanges.at(-1), 1);
   tree = render();
   assert.equal(tree.dots[1].props.isActive, true);
   tree.dots[2].props.onPress();
   assert.equal(activeIndex, 2);
+  assert.equal(pageChanges.at(-1), 2);
   assert.equal(scrollCalls.at(-1).x, 592);
   tree = render();
   tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
@@ -118,6 +123,59 @@ test("카드 문구·이미지를 사용처에서 받고, 페이지 버튼의 �
   assert.equal(dot.props.accessibilityState.selected, true);
   assert.equal(dot.props.hitSlop, undefined);
   assert.ok(dot.props.className.includes("h-12 w-4"));
+});
+
+test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그인으로 이동한다", () => {
+  let activeIndex = 0;
+  const routes = [];
+  const source = readFileSync(
+    path.join(__dirname, "../src/screens/onboarding/OnboardingScreen.tsx"),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const componentModule = { exports: {} };
+  runInNewContext(compiled, {
+    exports: componentModule.exports,
+    module: componentModule,
+    require: (name) => {
+      if (name === "react")
+        return { useState: () => [activeIndex, (index) => (activeIndex = index)] };
+      if (name === "expo-router")
+        return { useRouter: () => ({ replace: (route) => routes.push(route) }) };
+      if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
+      if (name === "react-native-safe-area-context")
+        return { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) };
+      if (name === "react-native")
+        return {
+          ScrollView: "ScrollView",
+          View: "View",
+          useWindowDimensions: () => ({ height: 812 }),
+        };
+      if (name === "@/components/Button") return { Button: "Button" };
+      if (name === "@/components/carousel")
+        return { CardCarousel: "CardCarousel", SwipeCarousel: "SwipeCarousel" };
+      if (name === "@/theme") return { baseFrame: { height: 812 } };
+      return require(name);
+    },
+  });
+
+  function render() {
+    const root = componentModule.exports.OnboardingScreen();
+    const scroll = React.Children.toArray(root.props.children)[1];
+    return React.Children.toArray(scroll.props.children);
+  }
+
+  const firstPage = render();
+  assert.equal(firstPage.length, 1);
+  firstPage[0].props.onPageChange(2);
+  const lastPage = render();
+  assert.equal(lastPage.length, 2);
+  const button = lastPage[1].props.children;
+  assert.equal(button.props.children, "시작하기");
+  button.props.onPress();
+  assert.equal(routes.at(-1), "/login");
 });
 
 test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰고 각 버튼이 올바르게 이동한다", () => {

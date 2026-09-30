@@ -1,8 +1,12 @@
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
 import { ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Button } from "@/components/Button";
 import { CardCarousel, SwipeCarousel } from "@/components/carousel";
+import { baseFrame } from "@/theme";
 
 const PAGES = [
   {
@@ -29,8 +33,11 @@ const PAGES = [
 ] as const;
 
 export function OnboardingScreen() {
+  const router = useRouter();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const frameHeight = Math.max(height, baseFrame.height);
 
   return (
     <>
@@ -41,12 +48,12 @@ export function OnboardingScreen() {
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          minHeight: height,
-          paddingTop: Math.max(insets.top, (height - 600) / 2 + 30),
-          paddingBottom: insets.bottom,
+          minHeight: frameHeight,
+          paddingTop: Math.max(insets.top + 41, (frameHeight - baseFrame.height) / 2 + 100),
+          paddingBottom: Math.max(insets.bottom + 10, 44),
         }}
       >
-        <SwipeCarousel accessibilityLabel="서비스 소개">
+        <SwipeCarousel accessibilityLabel="서비스 소개" onPageChange={setActiveIndex}>
           {PAGES.map((page) => (
             <CardCarousel
               key={page.mainCopy}
@@ -61,6 +68,11 @@ export function OnboardingScreen() {
             </CardCarousel>
           ))}
         </SwipeCarousel>
+        {activeIndex === PAGES.length - 1 && (
+          <View className="w-[295px] pt-9">
+            <Button onPress={() => router.replace("/login")}>시작하기</Button>
+          </View>
+        )}
       </ScrollView>
     </>
   );

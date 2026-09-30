@@ -6,25 +6,35 @@ import { BtnCarousel } from "./BtnCarousel";
 type SwipeCarouselProps = {
   children: ReactNode;
   accessibilityLabel?: string;
+  onPageChange?: (index: number) => void;
 };
 
 const CARD_WIDTH = 296;
 
-export function SwipeCarousel({ children, accessibilityLabel = "캐러셀" }: SwipeCarouselProps) {
+export function SwipeCarousel({
+  children,
+  accessibilityLabel = "캐러셀",
+  onPageChange,
+}: SwipeCarouselProps) {
   const pages = Children.toArray(children).filter(isValidElement);
   const scrollRef = useRef<ScrollView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
+  function updatePage(index: number) {
+    setActiveIndex(index);
+    onPageChange?.(index);
+  }
+
   function goToPage(index: number) {
     const nextIndex = Math.max(0, Math.min(pages.length - 1, index));
     scrollRef.current?.scrollTo({ x: nextIndex * CARD_WIDTH, animated: true });
-    setActiveIndex(nextIndex);
+    updatePage(nextIndex);
   }
 
   if (pages.length === 0) return null;
 
   return (
-    <View className="h-[600px] w-[295px]">
+    <View className="h-[584px] w-[295px]">
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -38,7 +48,7 @@ export function SwipeCarousel({ children, accessibilityLabel = "캐러셀" }: Sw
           scrollRef.current?.scrollTo({ x: activeIndex * CARD_WIDTH, animated: false })
         }
         onMomentumScrollEnd={({ nativeEvent }) =>
-          setActiveIndex(
+          updatePage(
             Math.max(
               0,
               Math.min(pages.length - 1, Math.round(nativeEvent.contentOffset.x / CARD_WIDTH)),
