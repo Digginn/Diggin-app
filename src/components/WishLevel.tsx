@@ -1,15 +1,28 @@
+import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
 import { Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
 
+import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { Chip } from "@/components/Chip";
+import { Tooltip } from "@/components/Tooltip";
 import { colors } from "@/theme";
+
+const HINT_BUTTON_SIZE = 48;
+
+const HintIcon = cssInterop(TooltipSvg, {
+  className: { target: "style", nativeStyleToProp: { width: true, height: true } },
+});
 
 type Levels = { high: number; medium: number; low: number };
 
-type ChipLayout = { x: number; y: number; height: number };
+type ChipLayout = { x: number; y: number; width: number; height: number };
+
+type OpenDirection = "auto" | "up" | "down";
 
 type WishLevelProps = {
   levels: Levels;
+  openDirection?: OpenDirection;
+  hint?: string;
 };
 
 const LEVEL_CONFIG = [
@@ -34,7 +47,7 @@ function LevelItem({
       style={{
         shadowColor: colors.gray[1000],
         shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 20,
+        shadowRadius: 10,
         shadowOpacity: 0.1,
         elevation: 4,
       }}
@@ -42,7 +55,7 @@ function LevelItem({
       <View className="flex-row items-center gap-2">
         <View className={`size-2 rounded-full ${dotClassName}`} />
         <View className="flex-row items-center gap-1">
-          <Text className="text-gray-900 font-b3">{label}</Text>
+          <Text className="text-gray-1000 font-b3">{label}</Text>
           <Text className="text-gray-900 font-label-14">
             {count >= 999 ? "999+" : String(count)}
           </Text>
@@ -65,24 +78,29 @@ function LevelList({ levels, onLayout }: { levels: Levels; onLayout: (height: nu
   );
 }
 
-export function WishLevel({ levels }: WishLevelProps) {
+export function WishLevel({ levels, openDirection = "auto", hint }: WishLevelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isUp, setIsUp] = useState(false);
-  const [chipLayout, setChipLayout] = useState<ChipLayout>({ x: 0, y: 0, height: 0 });
+  const [chipLayout, setChipLayout] = useState<ChipLayout>({ x: 0, y: 0, width: 0, height: 0 });
   const [listHeight, setListHeight] = useState(140);
+  const [isHintOpen, setHintOpen] = useState(false);
   const chipRef = useRef<View>(null);
   const { height: screenHeight } = useWindowDimensions();
 
+  function handleClose() {
+    setIsOpen(false);
+    setHintOpen(false);
+  }
+
   function handlePress() {
     if (isOpen) {
-      setIsOpen(false);
+      handleClose();
       return;
     }
-    // Modal과 같은 창 기준 좌표를 사용해 상태바 높이가 중복 반영되지 않게 합니다.
-    chipRef.current?.measureInWindow((x, y, _width, height) => {
+    chipRef.current?.measureInWindow((x, y, width, height) => {
       const spaceBelow = screenHeight - y - height;
-      setChipLayout({ x, y, height });
-      setIsUp(spaceBelow < listHeight);
+      setChipLayout({ x, y, width, height });
+      setIsUp(openDirection === "auto" ? spaceBelow < listHeight : openDirection === "up");
       setIsOpen(true);
     });
   }
@@ -101,16 +119,35 @@ export function WishLevel({ levels }: WishLevelProps) {
         accessibilityLabel="위시 레벨 필터"
       />
 
-      <Modal
-        visible={isOpen}
-        transparent
-        animationType="none"
-        onRequestClose={() => setIsOpen(false)}
-      >
-        <Pressable className="absolute inset-0" onPress={() => setIsOpen(false)} />
+      <Modal visible={isOpen} transparent animationType="none" onRequestClose={handleClose}>
+        <Pressable className="absolute inset-0" onPress={handleClose} />
         <View className="absolute" style={listPosition}>
           <LevelList levels={levels} onLayout={setListHeight} />
         </View>
+
+        {hint ? (
+          <View
+            className="absolute flex-row items-start"
+            style={{
+              top: chipLayout.y + chipLayout.height / 2 - HINT_BUTTON_SIZE / 2,
+              left: chipLayout.x + chipLayout.width,
+            }}
+          >
+            <Pressable
+              accessibilityLabel="위시 레벨 설명"
+              accessibilityRole="button"
+              className="size-12 items-center justify-center active:opacity-75"
+              onPress={() => setHintOpen((prev) => !prev)}
+            >
+              <HintIcon className="size-6" />
+            </Pressable>
+            {isHintOpen ? (
+              <View className="pl-2.5 pt-1">
+                <Tooltip arrowPosition="left" message={hint} onClose={() => setHintOpen(false)} />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </Modal>
     </View>
   );
