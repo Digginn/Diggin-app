@@ -87,6 +87,7 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
       Alert: { alert: (...args) => alerts.push(args) },
     },
     "@/components/app-bar": { AppBar: "AppBar" },
+    "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
     "@/components/ToastText": { ToastText: "ToastText" },
     "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
   });
@@ -121,6 +122,11 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
   assert.equal(errorTree.find((node) => node.type === "AppBar").props.left, "none");
   assert.equal(errorTree.filter((node) => node.type === "SocialLoginButton").length, 3);
   assert.ok(errorTree.some((node) => node.props.className?.includes("top-[-54px]")));
+  const loadingTree = nodes(LoginScreen({ isLoginLoading: true }));
+  const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
+  assert.equal(loadingDialog.props.message, "로그인 중입니다.");
+  loadingDialog.props.onRequestClose();
+  assert.equal(routes.at(-1), "/login");
 });
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
@@ -142,4 +148,12 @@ test("공통 아이콘 버튼의 기존 48px 기본값과 로그인용 24px 옵�
   assert.equal(button.props.children.props.width, 24);
   assert.equal(button.props.children.props.height, 24);
   assert.ok(button.props.className.includes("size-[48px]"));
+});
+
+test("로그인 로딩 스피너는 한 바퀴에 약 0.8초가 걸린다", () => {
+  const source = readFileSync(path.join(__dirname, "../src/components/LoadingDialog.tsx"), "utf8");
+  assert.match(source, /withRepeat\(\s*withTiming\(360/);
+  const duration = Number(source.match(/duration:\s*(\d+)/)?.[1]);
+  const degrees = Number(source.match(/withTiming\((\d+)/)?.[1]);
+  assert.equal((duration * 360) / degrees, 800);
 });

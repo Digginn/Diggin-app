@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BackIcon from "@/assets/images/icon-login-back.svg";
 import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
+import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
 
 import { SocialLoginButton, type LoginProvider } from "./components/SocialLoginButton";
@@ -14,9 +15,13 @@ const LOGIN_PROVIDERS: LoginProvider[] = ["google", "kakao", "apple"];
 
 type LoginScreenProps = {
   isLoginError?: boolean;
+  isLoginLoading?: boolean;
 };
 
-export function LoginScreen({ isLoginError = false }: LoginScreenProps = {}) {
+export function LoginScreen({
+  isLoginError = false,
+  isLoginLoading = false,
+}: LoginScreenProps = {}) {
   const router = useRouter();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -114,6 +119,9 @@ export function LoginScreen({ isLoginError = false }: LoginScreenProps = {}) {
           </View>
         </View>
       </ScrollView>
+      {isLoginLoading && (
+        <LoadingDialog message="로그인 중입니다." onRequestClose={() => router.replace("/login")} />
+      )}
     </View>
   );
 }
