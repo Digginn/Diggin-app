@@ -110,7 +110,7 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
   assert.ok(alerts.every((args) => args[0] === "로그인 연동 준비 중"));
   const buttons = tree.filter((node) => node.type === "Pressable");
   buttons[0].props.onPress();
-  assert.equal(routes.at(-1), "/(tabs)/all");
+  assert.equal(routes.at(-1), "/browse");
   buttons[1].props.onPress();
   buttons[2].props.onPress();
   assert.equal(alerts.at(-2)[0], "이용약관");

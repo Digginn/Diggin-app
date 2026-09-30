@@ -82,7 +82,7 @@ export function LoginScreen({ isLoginError = false }: LoginScreenProps = {}) {
           ))}
         </View>
         <Pressable
-          onPress={() => router.replace("/(tabs)/all")}
+          onPress={() => router.replace("/browse")}
           accessibilityRole="button"
           className="mt-6 h-12 min-w-12 items-center justify-center"
         >
