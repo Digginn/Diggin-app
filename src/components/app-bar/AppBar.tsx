@@ -13,7 +13,7 @@ const BAR_HEIGHT = 56;
 const SIDE_SLOT = 56;
 const PROGRESS_WIDTH = 200;
 const PROGRESS_MAX = 100;
-const WORDMARK_WIDTH = 76;
+const WORDMARK_WIDTH = 81.25;
 const WORDMARK_HEIGHT = 26;
 
 type AppBarProps = {
