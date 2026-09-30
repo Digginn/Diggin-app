@@ -12,7 +12,7 @@ import { Button } from "@/components/Button";
 import { HelperText, TextField } from "@/components/Field";
 import { useToast } from "@/hooks/useToast";
 
-import { profileMessages } from "./constants/profileMessages";
+import { PROFILE_MESSAGES } from "./constants/profileMessages";
 import { NICKNAME_HELPER_MESSAGE, validateNickname } from "./utils/validateNickname";
 
 const Image = cssInterop(ExpoImage, { className: "style" });
@@ -59,7 +59,7 @@ export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditSc
         setProfileImageUri(result.assets[0].uri);
       }
     } catch {
-      showToast(profileMessages.photoFailure);
+      showToast(PROFILE_MESSAGES.photoFailure);
     }
   };
 
@@ -95,15 +95,19 @@ export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditSc
       return;
     }
 
+    if ((nickname && !onSaveNickname) || (profileImageUri && !onSavePhoto)) {
+      showToast("저장 기능은 준비 중입니다.");
+      return;
+    }
+
     setIsSaving(true);
-    let failureMessage: string = profileMessages.photoFailure;
+    let failureMessage: string = PROFILE_MESSAGES.photoFailure;
     try {
-      // 저장 콜백이 없으면 UI 미리보기만 수행한다. 실제 저장 API는 사용처에서 연결한다.
       if (profileImageUri) await onSavePhoto?.(profileImageUri);
-      failureMessage = profileMessages.nicknameFailure;
+      failureMessage = PROFILE_MESSAGES.nicknameFailure;
       if (nickname) await onSaveNickname?.(nickname);
       router.dismissTo("/(tabs)/my" as Href);
-      if (nickname) showToast(profileMessages.nicknameSuccess);
+      showToast(nickname ? PROFILE_MESSAGES.nicknameSuccess : PROFILE_MESSAGES.photoSuccess);
     } catch {
       showToast(failureMessage);
     } finally {
@@ -135,7 +139,7 @@ export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditSc
               onError={() => {
                 if (!profileImageUri) return;
                 setProfileImageUri(undefined);
-                showToast(profileMessages.photoFailure);
+                showToast(PROFILE_MESSAGES.photoFailure);
               }}
             />
             <View pointerEvents="none" className="absolute left-[72px] top-[73px] h-6 w-6">
@@ -197,11 +201,11 @@ export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditSc
             onPress={() => setIsPhotoMenuOpen(false)}
           />
           <View accessibilityViewIsModal className="gap-3 shadow-[0_4px_10px_rgba(0,0,0,0.1)]">
-            <View className="overflow-hidden rounded-[5px] bg-gray-0">
+            <View className="overflow-hidden rounded-field bg-gray-0">
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="사진찍기"
-                className="h-[54px] items-center justify-center border-b border-gray-300"
+                className="h-photo-menu-row items-center justify-center border-b border-gray-300"
                 onPress={() => handlePhotoSelection("camera")}
               >
                 <Text className="text-accent-blue font-label-18-medium">사진찍기</Text>
@@ -209,7 +213,7 @@ export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditSc
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="앨범에서 선택"
-                className="h-[54px] items-center justify-center"
+                className="h-photo-menu-row items-center justify-center"
                 onPress={() => handlePhotoSelection("library")}
               >
                 <Text className="text-accent-blue font-label-18-medium">앨범에서 선택</Text>
@@ -218,7 +222,7 @@ export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditSc
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="취소"
-              className="h-[54px] items-center justify-center rounded-[5px] bg-gray-0"
+              className="h-photo-menu-row items-center justify-center rounded-field bg-gray-0"
               onPress={() => setIsPhotoMenuOpen(false)}
             >
               <Text className="text-accent-pink font-label-18-medium">취소</Text>

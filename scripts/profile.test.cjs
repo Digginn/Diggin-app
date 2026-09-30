@@ -222,6 +222,41 @@ test("유효한 닉네임 저장 성공 시 MY로 이동하고 성공 토스트�
   assert.deepEqual(calls.toasts, ["닉네임이 변경되었습니다."]);
 });
 
+test("저장 콜백이 없는 실제 화면은 저장 성공을 표시하지 않는다", async () => {
+  const { calls, button, save } = renderProfile();
+  button("닉네임").props.onChangeText("변경닉네임");
+  await save();
+  assert.deepEqual(calls.dismissed, []);
+  assert.deepEqual(calls.toasts, ["저장 기능은 준비 중입니다."]);
+});
+
+test("사진만 저장한 경우 성공을 안내하고, 일부 저장 콜백이 없으면 실행하지 않는다", async () => {
+  let photoSaves = 0;
+  const saved = renderProfile("android", true, {
+    onSavePhoto: async () => {
+      photoSaves++;
+    },
+  });
+  saved.button("프로필 사진 변경").props.onPress();
+  await saved.button("앨범에서 선택").props.onPress();
+  await saved.save();
+  assert.equal(photoSaves, 1);
+  assert.deepEqual(saved.calls.toasts, ["프로필 사진이 변경되었습니다."]);
+
+  const partial = renderProfile("android", true, {
+    onSavePhoto: async () => {
+      photoSaves++;
+    },
+  });
+  partial.button("닉네임").props.onChangeText("변경닉네임");
+  partial.button("프로필 사진 변경").props.onPress();
+  await partial.button("앨범에서 선택").props.onPress();
+  await partial.save();
+  assert.equal(photoSaves, 1);
+  assert.deepEqual(partial.calls.dismissed, []);
+  assert.deepEqual(partial.calls.toasts, ["저장 기능은 준비 중입니다."]);
+});
+
 test("닉네임 저장 실패 시 입력을 유지하고 이동하지 않는다", async () => {
   const { calls, button, save } = renderProfile("android", true, {
     onSaveNickname: async () => {
