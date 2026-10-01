@@ -70,7 +70,7 @@ export function LoginScreen({
             className="px-margin text-center text-gray-500 font-b2"
             style={{ includeFontPadding: false }}
           >
-            {"여러 쇼핑 플랫폼에서 따로 찜해뒀던 상품들,\n찾기 쉽게 한 곳에서 관리하세요."}
+            {"여러 쇼핑 플랫폼에서 따로 찜해뒀던 아이템들,\n찾기 쉽게 한 곳에서 관리하세요."}
           </Text>
         </View>
         <View className="mt-[60px] w-full gap-[10px] px-margin">

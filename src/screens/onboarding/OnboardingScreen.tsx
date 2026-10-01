@@ -18,7 +18,7 @@ const PAGES = [
   },
   {
     mainCopy: "흩어진 취향을, Diggin.\n한곳에 모아보세요.",
-    subCopy: "여러 쇼핑몰의 관심 아이템을 한곳에 모아\n편하게 다시 찾아보세요.",
+    subCopy: "여러 쇼핑몰의 위시 아이템을 한곳에 모아\n편하게 다시 찾아보세요.",
     sampleClassName: "bg-[#FFCC00]",
     imageClassName: "left-px top-px",
     mainCopyClassName: "font-h2",
