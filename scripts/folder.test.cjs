@@ -61,6 +61,7 @@ runInNewContext(compiled, {
     if (name.endsWith("FolderNameModal")) return { FolderNameModal: "FolderNameModal" };
     if (name.endsWith("FolderMenu")) return { FolderMenu: "FolderMenu" };
     if (name.endsWith("FolderToast")) return { FolderToast: "FolderToast" };
+    if (name.endsWith("FolderSortFilter")) return { FolderSortFilter: "FolderSortFilter" };
     if (name.endsWith("/modal")) return { ActionModal: "ActionModal" };
     if (name.endsWith("/Chip")) return { Chip: "Chip" };
     if (name.endsWith("/Button")) return { Button: "Button" };
@@ -389,6 +390,59 @@ test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7
   );
 });
 
+test("보기 순은 생성일·가나다·아이템 개수로 정렬하고 선택 및 바깥 탭 시 닫힌다", () => {
+  screenState = [];
+  const folders = [
+    { id: "a", name: "가방", itemCount: 2, createdAt: 10 },
+    { id: "b", name: "바지", itemCount: 9, createdAt: 30 },
+    { id: "c", name: "나무", itemCount: 1, createdAt: 20 },
+  ];
+  let selected;
+  const render = () => {
+    screenCursor = 0;
+    return screenModule.exports.FolderScreen({
+      folders,
+      onSort: (value) => {
+        selected = value;
+      },
+    });
+  };
+  const ids = (tree) => findAll(tree, "FolderCard").map((card) => card.props.folder.id);
+  try {
+    let tree = render();
+    assert.deepEqual(ids(tree), ["b", "c", "a"]);
+    let filter = findAll(tree, "FolderSortFilter")[0];
+    assert.equal(filter.props.value, null);
+    assert.equal(filter.props.count, 12);
+    filter.props.onToggle();
+    tree = render();
+    assert.equal(findAll(tree, "FolderSortFilter")[0].props.isOpen, true);
+    findAll(tree, "Pressable")
+      .find((node) => node.props.accessibilityLabel === "보기 순 필터 닫기")
+      .props.onPress();
+    assert.equal(findAll(render(), "FolderSortFilter")[0].props.isOpen, false);
+    for (const [order, expected] of [
+      ["name", ["a", "c", "b"]],
+      ["item-count", ["b", "a", "c"]],
+      ["latest", ["b", "c", "a"]],
+    ]) {
+      filter = findAll(render(), "FolderSortFilter")[0];
+      filter.props.onToggle();
+      findAll(render(), "FolderSortFilter")[0].props.onChange(order);
+      tree = render();
+      assert.deepEqual(ids(tree), expected);
+      assert.equal(selected, order);
+      assert.equal(findAll(tree, "FolderSortFilter")[0].props.isOpen, false);
+    }
+    assert.deepEqual(
+      folders.map((folder) => folder.id),
+      ["a", "b", "c"],
+    );
+  } finally {
+    screenState = undefined;
+  }
+});
+
 test("폴더 목록은 2열로 배치하고 빈 목록은 안내 화면을 표시한다", () => {
   const { FolderScreen } = screenModule.exports;
   const folders = Array.from({ length: 3 }, (_, index) => ({
@@ -406,7 +460,7 @@ test("폴더 목록은 2열로 배치하고 빈 목록은 안내 화면을 표�
   const cards = findAll(tree, "FolderCard");
   assert.equal(cards.length, 3);
   assert.equal(findAll(findAll(tree, "ScrollView")[0], "Chip").length, 0);
-  assert.equal(findAll(tree, "Chip").length, 1);
+  assert.equal(findAll(tree, "FolderSortFilter").length, 1);
   assert.equal(
     findAll(tree, "View").filter((view) => view.props.className === "flex-row gap-gutter").length,
     2,

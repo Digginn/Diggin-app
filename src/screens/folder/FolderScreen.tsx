@@ -10,12 +10,12 @@ import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import FolderWordmark from "@/assets/images/folder/logo-folder-wordmark.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
-import { Chip } from "@/components/Chip";
 import { ActionModal } from "@/components/modal";
 
 import { FolderCard, type FolderItem } from "./components/FolderCard";
 import { FolderMenu, type FolderMenuAnchor } from "./components/FolderMenu";
 import { FolderNameModal } from "./components/FolderNameModal";
+import { FolderSortFilter, type FolderSortOrder } from "./components/FolderSortFilter";
 import { FolderToast } from "./components/FolderToast";
 
 const DEFAULT_FOLDERS: FolderItem[] = [
@@ -40,7 +40,7 @@ type FolderScreenProps = {
   onOpenFolder?: (folder: FolderItem) => void;
   onRenameFolder?: (folder: FolderItem, name: string) => void | Promise<void>;
   onDeleteFolder?: (folder: FolderItem) => void | Promise<void>;
-  onSort?: () => void;
+  onSort?: (order: FolderSortOrder) => void;
   onCreateFolder?: (name: string) => void | Promise<void>;
   onSearch?: () => void;
   onNotifications?: () => void;
@@ -50,7 +50,7 @@ export function FolderScreen({
   isError = false,
   onRetry,
   folders = DEFAULT_FOLDERS,
-  savedItemCount = 0,
+  savedItemCount = folders.reduce((count, folder) => count + folder.itemCount, 0),
   onOpenFolder,
   onRenameFolder,
   onDeleteFolder,
@@ -72,6 +72,13 @@ export function FolderScreen({
   } | null>(null);
   const hasFolders = folders.length > 0;
   const columnCount = folders.length >= 7 ? 3 : 2;
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState<FolderSortOrder | null>(null);
+  const sortedFolders = [...folders].sort((left, right) => {
+    if (sortOrder === "name") return left.name.localeCompare(right.name, "ko-KR");
+    if (sortOrder === "item-count") return right.itemCount - left.itemCount;
+    return (right.createdAt ?? 0) - (left.createdAt ?? 0);
+  });
 
   useEffect(() => {
     if (!toast) return;
@@ -101,29 +108,31 @@ export function FolderScreen({
   return (
     <View className="flex-1 bg-gray-0">
       <StatusBar style="dark" />
-      <AppBar
-        left="logo"
-        logo={<FolderWordmark />}
-        right={
-          !isError &&
-          !hasFolders && (
-            <>
-              <AppBar.IconButton
-                icon={IconSearch}
-                accessibilityLabel="아이템 검색"
-                onPress={onSearch}
-                disabled={!onSearch}
-              />
-              <AppBar.IconButton
-                icon={IconNotification}
-                accessibilityLabel="알림"
-                onPress={onNotifications}
-                disabled={!onNotifications}
-              />
-            </>
-          )
-        }
-      />
+      <View style={{ opacity: isSortOpen ? 0.12 : 1 }}>
+        <AppBar
+          left="logo"
+          logo={<FolderWordmark />}
+          right={
+            !isError &&
+            !hasFolders && (
+              <>
+                <AppBar.IconButton
+                  icon={IconSearch}
+                  accessibilityLabel="아이템 검색"
+                  onPress={onSearch}
+                  disabled={!onSearch}
+                />
+                <AppBar.IconButton
+                  icon={IconNotification}
+                  accessibilityLabel="알림"
+                  onPress={onNotifications}
+                  disabled={!onNotifications}
+                />
+              </>
+            )
+          }
+        />
+      </View>
       {isError ? (
         <View
           pointerEvents="box-none"
@@ -146,14 +155,35 @@ export function FolderScreen({
         </View>
       ) : hasFolders ? (
         <View className="flex-1">
-          <View className={clsx("px-margin pt-4", columnCount === 3 ? "pb-2" : "pb-4")}>
+          <View
+            pointerEvents="box-none"
+            className={clsx(
+              "px-margin pt-4",
+              isSortOpen && "absolute inset-0 z-20",
+              columnCount === 3 ? "pb-2" : "pb-4",
+            )}
+          >
             <Text className="text-gray-1000 font-label-12-semibold">
               저장한 아이템 {savedItemCount}개
             </Text>
-            <View className="mt-1 items-start py-2.5">
-              <Chip label="보기 순" onPress={() => onSort?.()} isDisabled={!onSort} />
+            <View
+              pointerEvents="box-none"
+              className={clsx("mt-1 items-start", isSortOpen && "flex-1")}
+            >
+              <FolderSortFilter
+                isOpen={isSortOpen}
+                value={sortOrder}
+                count={savedItemCount}
+                onToggle={() => setIsSortOpen(!isSortOpen)}
+                onChange={(order) => {
+                  setSortOrder(order);
+                  setIsSortOpen(false);
+                  onSort?.(order);
+                }}
+              />
             </View>
           </View>
+          {isSortOpen && <View className={columnCount === 3 ? "h-[90px]" : "h-[98px]"} />}
           <ScrollView
             className="flex-1"
             contentContainerClassName={clsx(
@@ -166,7 +196,7 @@ export function FolderScreen({
                 key={row}
                 className={clsx("flex-row", columnCount === 3 ? "gap-[13.5px]" : "gap-gutter")}
               >
-                {folders.slice(row * columnCount, (row + 1) * columnCount).map((folder) => (
+                {sortedFolders.slice(row * columnCount, (row + 1) * columnCount).map((folder) => (
                   <FolderCard
                     key={folder.id}
                     folder={folder}
@@ -184,6 +214,18 @@ export function FolderScreen({
               </View>
             ))}
           </ScrollView>
+          {isSortOpen && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="보기 순 필터 닫기"
+              className="absolute inset-0 z-10"
+              style={{
+                experimental_backgroundImage:
+                  "linear-gradient(to bottom, rgba(255,255,255,0.88), rgba(255,255,255,0))",
+              }}
+              onPress={() => setIsSortOpen(false)}
+            />
+          )}
         </View>
       ) : (
         <View
@@ -205,7 +247,7 @@ export function FolderScreen({
       {!isError && (
         <View
           pointerEvents="box-none"
-          className="absolute -bottom-[49px] -right-[49px] size-[200px]"
+          className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"
         >
           <View pointerEvents="none" className="absolute inset-0">
             <FabGlow />

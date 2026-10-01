@@ -15,6 +15,7 @@ export type FolderItem = {
   id: string;
   name: string;
   itemCount: number;
+  createdAt?: number;
   isOwnedItems?: boolean;
 };
 

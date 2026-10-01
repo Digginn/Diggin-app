@@ -80,7 +80,7 @@ export default function FolderRoute() {
               if (preview === "create-error") throw new Error("생성 실패 미리보기");
               setCreatedFolders((previous) => [
                 ...previous,
-                { id: `created-${Date.now()}`, name, itemCount: 0 },
+                { id: `created-${Date.now()}`, name, itemCount: 0, createdAt: Date.now() },
               ]);
             }
           : undefined
