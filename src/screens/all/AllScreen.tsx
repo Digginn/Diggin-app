@@ -4,11 +4,13 @@ import { Text, View } from "react-native";
 
 import { IconNotification, IconSearch } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
+import { STATE_MESSAGES } from "@/constants/messages";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
-import { AllEmpty } from "./components/AllEmpty";
 import { SortLabel, type SortOrder } from "./components/SortLabel";
 
 // TODO: API 연결 전까지 쓰는 임시 데이터. 연결 시 TanStack Query 로 교체한다.
@@ -26,6 +28,9 @@ export function AllScreen() {
   const router = useRouter();
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
 
+  // TODO: TanStack Query 연결 시 쿼리의 로딩 · 에러 상태로 바꾼다.
+  const isLoading = false;
+  const hasError = false;
   const items = MOCK_ITEMS;
 
   return (
@@ -44,11 +49,14 @@ export function AllScreen() {
         }
       />
 
-      {items.length === 0 ? (
-        <AllEmpty />
+      {hasError ? (
+        <ErrorState message={STATE_MESSAGES.loadFailed} onRetry={() => {}} />
+      ) : items.length === 0 && !isLoading ? (
+        <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
         <WishItemGrid
           items={items}
+          isLoading={isLoading}
           onItemPress={(item) => router.push(`/items/${item.id}`)}
           header={
             <View className="gap-2 pt-4">
