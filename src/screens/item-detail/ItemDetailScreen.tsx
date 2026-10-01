@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useState } from "react";
@@ -10,12 +11,15 @@ import ShareSvg from "@/assets/images/icon-share.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { FallbackImg } from "@/components/FallbackImg";
+import { LoadingDialog } from "@/components/Loading";
+import { FolderModal } from "@/components/modal";
 import { WishLevel } from "@/components/WishLevel";
-import type { WishLevelCounts } from "@/types/wish-item";
+import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { EditChip } from "./components/EditChip";
-import { ItemEditSheet } from "./components/ItemEditSheet";
+import { ItemEditSheet, type ItemEditValues } from "./components/ItemEditSheet";
 import { ItemInfo } from "./components/ItemInfo";
+import { RecommendSection } from "./components/RecommendSection";
 import { VotePrompt } from "./components/VotePrompt";
 
 const StyledImage = cssInterop(Image, { className: "style" });
@@ -23,18 +27,32 @@ const ShareIcon = cssInterop(ShareSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
 
-const HERO_FRAME = "h-[440px] w-full bg-gray-800";
+const HERO_FRAME = "h-[440px] w-full bg-gray-10 ";
 
 // TODO: API 연결 전까지 쓰는 임시 데이터.
-const MOCK_ITEM = {
+const MOCK_ITEM: ItemEditValues = {
   name: "Real Good Pants 엄청 좋은 바지",
-  price: 70000,
-  brand: "브랜드명",
+  price: "70000",
   sourceUrl: "http://pf.kakao.com/_zIxnrX",
-  thumbnailUrl: null as string | null,
+  thumbnailUrl: null,
+  wishLevel: null,
 };
 
+const BRAND = "브랜드명";
+
+// TODO: 폴더 목록 API 연결 전까지 쓰는 임시 값.
+const DEFAULT_FOLDER = "기본 폴더";
+
 const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
+
+// TODO: 추천 아이템 API 연결 전까지 쓰는 임시 데이터.
+const MOCK_RECOMMENDS: WishItem[] = Array.from({ length: 9 }, (_, index) => ({
+  id: `recommend-${index}`,
+  name: "아이템명",
+  price: 0,
+  brand: "브랜드명",
+  thumbnailUrl: null,
+}));
 
 export function ItemDetailScreen() {
   const router = useRouter();
@@ -42,11 +60,17 @@ export function ItemDetailScreen() {
   // TODO: API 연결 시 이 id 로 아이템을 조회한다.
   useLocalSearchParams<{ id: string }>();
 
+  // TODO: API 연결 시 수정 뮤테이션으로 바꾼다. 지금은 화면 안에서만 반영한다.
+  const [item, setItem] = useState(MOCK_ITEM);
   const [failed, setFailed] = useState(false);
   const [isEditOpen, setEditOpen] = useState(false);
   const [bottomHeight, setBottomHeight] = useState(0);
+  const [isFolderOpen, setFolderOpen] = useState(false);
+  // TODO: 저장 여부는 API 연결 시 서버 값으로 바꾼다.
+  const [folder, setFolder] = useState<string | null>(null);
+  // TODO: TanStack Query 연결 시 쿼리의 로딩 상태로 바꾼다.
+  const isLoading = false;
 
-  const item = MOCK_ITEM;
   const thumbnail = item.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
 
   return (
@@ -64,6 +88,19 @@ export function ItemDetailScreen() {
             <FallbackImg size="detail" className={HERO_FRAME} />
           )}
 
+          <LinearGradient
+            colors={["transparent", "rgba(0, 0, 0, 0.5)"]}
+            locations={[0.8, 1]}
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+            }}
+          />
+
+          {/* TODO: REC-05 의 폴더 드롭다운은 Dropdown 에 배경 옵션이 생기면 붙인다. */}
           <View className="absolute left-0 top-0" style={{ paddingTop: insets.top }}>
             <AppBar.IconButton
               icon={IconBack}
@@ -72,7 +109,7 @@ export function ItemDetailScreen() {
             />
           </View>
 
-          <View className="absolute bottom-3 left-4 h-12 justify-center">
+          <View className="absolute bottom-3 left-[17px] h-12 justify-center">
             <WishLevel
               levels={MOCK_LEVELS}
               openDirection="up"
@@ -93,29 +130,47 @@ export function ItemDetailScreen() {
           </Pressable>
         </View>
 
-        <View className="gap-[13px] px-4 pt-4">
-          <View className="w-full flex-row items-center justify-between">
-            <Text className="text-gray-1000 font-label-14">{item.brand}</Text>
-            <EditChip onPress={() => setEditOpen(true)} />
+        <View className="gap-6 pt-4">
+          <View className="gap-[13px] px-4">
+            <View className="w-full flex-row items-center justify-between">
+              <Text className="text-gray-1000 font-label-14">{BRAND}</Text>
+              <EditChip onPress={() => setEditOpen(true)} />
+            </View>
+            <ItemInfo name={item.name} price={Number(item.price)} sourceUrl={item.sourceUrl} />
           </View>
-          <ItemInfo name={item.name} price={item.price} sourceUrl={item.sourceUrl} />
+          <RecommendSection
+            items={MOCK_RECOMMENDS}
+            onItemPress={(recommend) => router.push(`/items/${recommend.id}`)}
+          />
         </View>
       </ScrollView>
 
       <ItemEditSheet
+        key={isEditOpen ? "open" : "closed"}
         visible={isEditOpen}
-        initialValues={{
-          name: item.name,
-          price: String(item.price),
-          sourceUrl: item.sourceUrl,
-        }}
-        thumbnailUrl={item.thumbnailUrl}
-        wishLevelLabel={null}
+        initialValues={item}
         onRequestClose={() => setEditOpen(false)}
-        onOpenWishLevel={() => {}}
-        onOpenTooltip={() => {}}
-        onPickImage={() => {}}
-        onSubmit={() => setEditOpen(false)}
+        onSubmit={(values) => {
+          setItem(values);
+          setFailed(false);
+          setEditOpen(false);
+        }}
+      />
+
+      <LoadingDialog visible={isLoading} message="상품 정보를 불러오는 중입니다." />
+
+      <FolderModal
+        visible={isFolderOpen}
+        title="아이템 담기 완료"
+        description="폴더 미지정 시 [기본 폴더]에 저장돼요."
+        selectedFolderName={folder ?? DEFAULT_FOLDER}
+        // TODO: 폴더 목록 화면이 나오면 연결한다.
+        onPressFolderSelect={() => {}}
+        onSave={() => {
+          setFolder(folder ?? DEFAULT_FOLDER);
+          setFolderOpen(false);
+        }}
+        onRequestClose={() => setFolderOpen(false)}
       />
 
       <View
@@ -128,7 +183,8 @@ export function ItemDetailScreen() {
           <Button variant="secondary" className="w-[155px]" onPress={() => {}}>
             웹사이트 이동
           </Button>
-          <Button variant="primary" className="w-[155px]" onPress={() => {}}>
+          {/* TODO: REC-05 의 "폴더에서 제외" 는 Btn Type=Cancel 이 생기면 붙인다. */}
+          <Button variant="primary" className="w-[155px]" onPress={() => setFolderOpen(true)}>
             폴더에 추가
           </Button>
         </View>
