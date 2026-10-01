@@ -13,7 +13,7 @@ export function RecentSearches({ keywords, onSelect, onRemove, onClearAll }: Rec
   if (keywords.length === 0) return null;
 
   return (
-    <View className="gap-0.5 pt-2">
+    <View className="gap-0.5 pt-[14px]">
       <View className="flex-row items-center justify-between px-margin">
         <Text className="text-gray-1000 font-label-14">최근 검색어</Text>
         <Pressable accessibilityRole="button" onPress={onClearAll} hitSlop={12}>

@@ -3,8 +3,10 @@ import { Text, View } from "react-native";
 
 import { IconNotification } from "@/assets/images/appbar";
 import { AppBar, SearchBar } from "@/components/app-bar";
+import { EmptyState } from "@/components/EmptyState";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
+import { STATE_MESSAGES } from "@/constants/messages";
 import { SortLabel, type SortOrder } from "@/screens/all/components/SortLabel";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
@@ -39,6 +41,7 @@ export function SearchScreen() {
   return (
     <View className="flex-1 bg-gray-0">
       <SearchBar
+        autoFocus
         value={keyword}
         onChangeText={setKeyword}
         onClear={() => setSubmitted("")}
@@ -46,7 +49,9 @@ export function SearchScreen() {
         right={<AppBar.IconButton icon={IconNotification} accessibilityLabel="알림" />}
       />
 
-      {submitted ? (
+      {submitted && results.length === 0 ? (
+        <EmptyState message={STATE_MESSAGES.searchEmpty} />
+      ) : submitted ? (
         <WishItemGrid
           items={results}
           header={
