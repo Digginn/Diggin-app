@@ -54,13 +54,14 @@ export function Card({ name, price, thumbnailUrl, brand, onPress, className }: C
             {name}
           </Text>
         </View>
-        {brand ? (
-          <View className="w-full flex-row items-center">
+        {/* 브랜드명이 없어도 카드 높이를 유지해야 그리드 행이 안 어긋남 */}
+        <View className="h-3 w-full flex-row items-center">
+          {brand ? (
             <Text className="flex-1 text-gray-500 font-brand-s" numberOfLines={1}>
               {brand}
             </Text>
-          </View>
-        ) : null}
+          ) : null}
+        </View>
       </View>
     </Pressable>
   );
