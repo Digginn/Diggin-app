@@ -29,6 +29,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "아이템 이미지를 바꾸려면 사진 접근 권한이 필요합니다."
+        }
       ]
     ],
     "experiments": {
