@@ -23,12 +23,21 @@ function loadModule(filename) {
       if (name === "react-native") {
         return {
           Modal: "NativeModal",
+          KeyboardAvoidingView: "KeyboardAvoidingView",
+          Keyboard: { isVisible: () => false, addListener: () => ({ remove: () => {} }) },
+          Platform: { OS: "android" },
           View: "View",
           Pressable: "Pressable",
           Text: "Text",
           TextInput: "TextInput",
         };
       }
+      if (name === "react")
+        return {
+          ...React,
+          useState: (value) => [typeof value === "function" ? value() : value, () => {}],
+          useEffect: () => {},
+        };
       if (name === "nativewind") return { cssInterop: (icon) => icon };
       if (name.endsWith(".svg")) return { default: "Svg" };
       if (name === "@/theme") return loadModule(path.join(__dirname, "../src/theme/colors.ts"));
@@ -42,6 +51,72 @@ function loadModule(filename) {
   return loaded.exports;
 }
 const modals = loadModule(path.join(__dirname, "../src/components/modal/index.ts"));
+test("입력 모달은 iOS와 Android 모두 키보드 유무에 따라 중앙과 키보드 위로 전환한다", () => {
+  for (const os of ["ios", "android"]) {
+    const loaded = { exports: {} };
+    let isVisible = false;
+    let hasSubscribed = false;
+    const listeners = {};
+    const code = ts.transpileModule(
+      readFileSync(path.join(__dirname, "../src/components/modal/Modal.tsx"), "utf8"),
+      {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+      },
+    ).outputText;
+    runInNewContext(code, {
+      exports: loaded.exports,
+      module: loaded,
+      require: (name) => {
+        if (name === "react")
+          return {
+            useState: () => [
+              isVisible,
+              (value) => {
+                isVisible = value;
+              },
+            ],
+            useEffect: (effect) => {
+              if (!hasSubscribed) {
+                hasSubscribed = true;
+                effect();
+              }
+            },
+          };
+        if (name === "react-native")
+          return {
+            Modal: "NativeModal",
+            View: "View",
+            KeyboardAvoidingView: "KeyboardAvoidingView",
+            Platform: { OS: os },
+            Keyboard: {
+              isVisible: () => false,
+              addListener: (event, callback) => {
+                listeners[event] = callback;
+                return { remove: () => {} };
+              },
+            },
+          };
+        return require(name);
+      },
+    });
+    const render = () =>
+      loaded.exports.Modal({
+        visible: true,
+        isKeyboardAvoiding: true,
+        keyboardGap: 24,
+        onRequestClose: () => {},
+        children: null,
+      });
+    const content = (tree) => React.Children.toArray(tree.props.children)[0].props.children;
+    assert.ok(content(render()).props.className.includes("justify-center"));
+    listeners[os === "ios" ? "keyboardWillShow" : "keyboardDidShow"]();
+    assert.ok(content(render()).props.className.includes("justify-end"));
+    assert.equal(content(render()).props.style.paddingBottom, 24);
+    listeners[os === "ios" ? "keyboardWillHide" : "keyboardDidHide"]();
+    assert.ok(content(render()).props.className.includes("justify-center"));
+    assert.equal(content(render()).props.style, undefined);
+  }
+});
 function flatten(node) {
   if (!React.isValidElement(node)) return [];
   if (typeof node.type === "function") return flatten(node.type(node.props));

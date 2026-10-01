@@ -21,10 +21,20 @@ type AppBarProps = {
   title?: string;
   progress?: number;
   right?: ReactNode;
+  logo?: ReactNode;
   onBack?: () => void;
+  isTitleLeftAligned?: boolean;
 };
 
-function AppBarRoot({ left = "back", title, progress, right, onBack }: AppBarProps) {
+function AppBarRoot({
+  left = "back",
+  title,
+  progress,
+  right,
+  logo,
+  onBack,
+  isTitleLeftAligned = false,
+}: AppBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -39,19 +49,25 @@ function AppBarRoot({ left = "back", title, progress, right, onBack }: AppBarPro
           )}
           {left === "logo" && (
             <View className="pl-5">
-              <LogoWordmark width={WORDMARK_WIDTH} height={WORDMARK_HEIGHT} />
+              {logo ?? <LogoWordmark width={WORDMARK_WIDTH} height={WORDMARK_HEIGHT} />}
             </View>
           )}
         </View>
 
         <View
           pointerEvents="none"
-          className="absolute h-full items-center justify-center"
-          style={{ left: SIDE_SLOT, right: SIDE_SLOT }}
+          className={`absolute h-full justify-center ${isTitleLeftAligned ? "items-start" : "items-center"}`}
+          style={{
+            left: isTitleLeftAligned ? 48 : SIDE_SLOT,
+            right: isTitleLeftAligned ? SIDE_SLOT + 12 : SIDE_SLOT,
+          }}
         >
           {progress === undefined ? (
             title ? (
-              <Text numberOfLines={1} className="text-gray-900 font-label-20">
+              <Text
+                numberOfLines={1}
+                className={`text-gray-900 ${isTitleLeftAligned ? "font-h2" : "font-label-20"}`}
+              >
                 {title}
               </Text>
             ) : null

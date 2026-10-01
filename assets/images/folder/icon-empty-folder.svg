@@ -1,0 +1,6 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="EmptyImgAll">
+<path id="FolderBack" d="M12 24C12 20.6863 14.6863 18 18 18H36.5L44.5 26H78C81.3137 26 84 28.6863 84 32V40H12V24Z" fill="#B9B9B9"/>
+<path id="FolderFront" d="M82 34H14C10.6863 34 8 36.6863 8 40V74C8 77.3137 10.6863 80 14 80H82C85.3137 80 88 77.3137 88 74V40C88 36.6863 85.3137 34 82 34Z" fill="#DDDDDD"/>
+</g>
+</svg>

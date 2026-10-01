@@ -10,6 +10,7 @@ type ChipLayout = { x: number; y: number; height: number };
 
 type WishLevelProps = {
   levels: Levels;
+  label?: string;
 };
 
 const LEVEL_CONFIG = [
@@ -65,7 +66,7 @@ function LevelList({ levels, onLayout }: { levels: Levels; onLayout: (height: nu
   );
 }
 
-export function WishLevel({ levels }: WishLevelProps) {
+export function WishLevel({ levels, label = "위시 레벨" }: WishLevelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isUp, setIsUp] = useState(false);
   const [chipLayout, setChipLayout] = useState<ChipLayout>({ x: 0, y: 0, height: 0 });
@@ -94,7 +95,7 @@ export function WishLevel({ levels }: WishLevelProps) {
   return (
     <View ref={chipRef} className="self-start">
       <Chip
-        label="위시 레벨"
+        label={label}
         color="black"
         isOpen={isOpen}
         onPress={handlePress}
