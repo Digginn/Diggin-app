@@ -39,7 +39,10 @@ const SCENARIOS: { label: string; result: CsvImportResult }[] = [
 ];
 
 export default function CsvImportPreview() {
-  const [scenario, setScenario] = useState<number | "loading" | "animation" | "error" | null>(null);
+  const [scenario, setScenario] = useState<
+    number | "intro" | "loading" | "animation" | "error" | null
+  >(null);
+  if (scenario === "intro") return <CsvImportScreen onBack={() => setScenario(null)} />;
   if (scenario === "error")
     return <CsvImportScreen error="missing-product-info" onBack={() => setScenario(null)} />;
   if (scenario === "animation")
@@ -68,6 +71,7 @@ export default function CsvImportPreview() {
         <Text className="text-gray-600 font-b3">
           디자인 예시 데이터이며 실제 상품은 등록되지 않습니다.
         </Text>
+        <Button onPress={() => setScenario("intro")}>CSV 소개 애니메이션</Button>
         <Button onPress={() => setScenario("loading")}>불러오는 중 (12 / 48)</Button>
         <Button onPress={() => setScenario("animation")}>진행 개수 수신 전 애니메이션</Button>
         {SCENARIOS.map(({ label }, index) => (

@@ -111,7 +111,8 @@ test("상품은 폴더에서 사라진 뒤 원래 위치와 크기로 반복된�
   const { motion, cleanup } = await setup();
   for (let index = 0; index < 5; index++) {
     const style = motion.productStyle(index);
-    assert.deepEqual(Array.from(style.opacity.outputRange), [1, 1, 0, 0, 0, 1]);
+    assert.deepEqual(Array.from(style.opacity.inputRange), [0, 1, 1.2, 2, 3, 4, 5]);
+    assert.deepEqual(Array.from(style.opacity.outputRange), [1, 1, 0, 0, 0, 0, 1]);
     const scales = style.transform[3].scale.outputRange;
     assert.equal(scales[0], 1);
     assert.ok(scales[2] < 0.32);

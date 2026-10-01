@@ -106,7 +106,11 @@ export function useCsvIllustrationMotion(isEnabled: boolean) {
     const base = poses[0];
     const loop = [...poses, base];
     return {
-      opacity: interpolate(loop.map((pose) => pose[4])),
+      // 반투명 폴더 앞면 뒤로 상품 잔상이 비치지 않도록 흡수 중 먼저 사라집니다.
+      opacity: step.interpolate({
+        inputRange: [0, 1, 1.2, 2, 3, 4, 5],
+        outputRange: [1, 1, 0, 0, 0, 0, 1],
+      }),
       transform: [
         { translateX: interpolate(loop.map((pose) => pose[0] - base[0])) },
         { translateY: interpolate(loop.map((pose) => pose[1] - base[1])) },
