@@ -157,3 +157,39 @@ test("로그인 로딩 스피너는 한 바퀴에 약 0.8초가 걸린다", () =
   const degrees = Number(source.match(/withTiming\((\d+)/)?.[1]);
   assert.equal((duration * 360) / degrees, 800);
 });
+
+test("인증 만료 안내의 나중에 버튼은 모달을 닫고 로그인 버튼은 로그인 화면으로 이동한다", () => {
+  const { SessionExpiredModal } = load("screens/login/components/SessionExpiredModal.tsx", {
+    "@/components/Button": { Button: "Button" },
+    "@/components/modal": { Modal: "Modal" },
+  });
+  let isVisible = true;
+  const routes = [];
+  const { default: Preview } = load("app/auth-expired-preview.tsx", {
+    "react": {
+      ...React,
+      useState: () => [
+        isVisible,
+        (value) => {
+          isVisible = value;
+        },
+      ],
+    },
+    "expo-router": { useRouter: () => ({ replace: (route) => routes.push(route) }) },
+    "@/screens/all/AllScreen": { AllScreen: "AllScreen" },
+    "@/screens/login/components/SessionExpiredModal": { SessionExpiredModal },
+  });
+  const previewModal = () => nodes(Preview()).find((node) => node.type === SessionExpiredModal);
+  const modal = SessionExpiredModal(previewModal().props);
+  const buttons = nodes(modal).filter((node) => node.type === "Button");
+  assert.equal(modal.props.visible, true);
+  assert.deepEqual(
+    buttons.map((node) => node.props.children),
+    ["다음에 할게요", "로그인하기"],
+  );
+  buttons[0].props.onPress();
+  assert.equal(previewModal().props.visible, false);
+  assert.equal(routes.length, 0);
+  buttons[1].props.onPress();
+  assert.deepEqual(routes, ["/login"]);
+});
