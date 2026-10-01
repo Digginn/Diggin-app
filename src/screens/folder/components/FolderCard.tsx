@@ -8,6 +8,7 @@ import OwnedItemsSmallIcon from "@/assets/images/folder/icon-owned-items-small.s
 import OwnedItemsIcon from "@/assets/images/folder/icon-owned-items.svg";
 
 import type { FolderMenuAnchor } from "./FolderMenu";
+import { FolderPreview, type FolderThumbnailSource } from "./FolderPreview";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 
@@ -17,6 +18,7 @@ export type FolderItem = {
   itemCount: number;
   createdAt?: number;
   isOwnedItems?: boolean;
+  thumbnails?: FolderThumbnailSource[];
 };
 
 type FolderCardProps = {
@@ -56,15 +58,23 @@ export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: Fo
       className="flex-1 gap-gutter active:opacity-75"
     >
       <View className={clsx("items-center justify-end", isCompact ? "h-[68px]" : "h-[104px]")}>
-        <StyledImage
-          source={
-            isCompact
-              ? require("@/assets/images/folder/image-closed-folder-small.png")
-              : require("@/assets/images/folder/image-closed-folder.png")
-          }
-          contentFit="contain"
-          className={isCompact ? "h-[56px] w-[74px] -translate-x-px" : "h-[85px] w-[112px]"}
-        />
+        {folder.itemCount > 0 && !folder.isOwnedItems ? (
+          <FolderPreview
+            itemCount={folder.itemCount}
+            thumbnails={folder.thumbnails}
+            isCompact={isCompact}
+          />
+        ) : (
+          <StyledImage
+            source={
+              isCompact
+                ? require("@/assets/images/folder/image-closed-folder-small.png")
+                : require("@/assets/images/folder/image-closed-folder.png")
+            }
+            contentFit="contain"
+            className={isCompact ? "h-[56px] w-[74px] -translate-x-px" : "h-[85px] w-[112px]"}
+          />
+        )}
         {folder.isOwnedItems && (
           <View
             className={clsx(

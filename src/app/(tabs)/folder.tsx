@@ -33,6 +33,21 @@ export default function FolderRoute() {
         ...PREVIEW_FOLDERS.slice(-2),
       ];
     }
+    if (preview === "items" || preview === "items-compact") {
+      folders = [
+        ...[0, 1, 2, 3].map((itemCount) => ({
+          id: `items-${itemCount}`,
+          name: `${itemCount}개 미리보기`,
+          itemCount,
+          thumbnails: Array.from({ length: Math.min(itemCount, 3) }, () =>
+            require("@/assets/images/folder/image-folder-item-preview.png"),
+          ),
+        })),
+        { id: "owned", name: "나의 소장템", itemCount: 3, isOwnedItems: true },
+        { id: "fallback", name: "이미지 없음", itemCount: 2 },
+        ...(preview === "items-compact" ? [{ id: "extra", name: "추가 폴더", itemCount: 5 }] : []),
+      ];
+    }
   }
 
   return (

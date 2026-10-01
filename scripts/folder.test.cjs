@@ -443,6 +443,78 @@ test("보기 순은 생성일·가나다·아이템 개수로 정렬하고 선�
   }
 });
 
+test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더는 닫힌 이미지를 유지한다", () => {
+  function loadComponent(filename, mocks) {
+    const loaded = { exports: {} };
+    const code = ts.transpileModule(readFileSync(path.join(__dirname, filename), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText;
+    runInNewContext(code, {
+      exports: loaded.exports,
+      module: loaded,
+      require: (name) =>
+        name in mocks
+          ? mocks[name]
+          : name.endsWith(".svg")
+            ? { __esModule: true, default: name }
+            : name.endsWith(".png")
+              ? name
+              : require(name),
+    });
+    return loaded.exports;
+  }
+  const mocks = {
+    "react": { useRef: () => ({ current: null }), useState: () => [undefined, () => {}] },
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+    "expo-image": { Image: "Image" },
+    "nativewind": { cssInterop: (component) => component },
+    "@/components/FallbackImg": { FallbackImg: "FallbackImg" },
+    "./FolderPreview": { FolderPreview: "FolderPreview" },
+  };
+  const { FolderCard } = loadComponent("../src/screens/folder/components/FolderCard.tsx", mocks);
+  const { FolderPreview } = loadComponent(
+    "../src/screens/folder/components/FolderPreview.tsx",
+    mocks,
+  );
+  function thumbnails(tree) {
+    return findAll(tree, "View")
+      .flatMap((node) => React.Children.toArray(node.props.children))
+      .filter((node) => typeof node.type === "function" && node.type.name === "Thumbnail");
+  }
+  for (const columnCount of [2, 3]) {
+    for (const itemCount of [0, 1, 2, 3, 8]) {
+      const folder = { id: "test", name: "폴더", itemCount, thumbnails: [101, 102, 103, 104] };
+      let tree = FolderCard({ folder, columnCount });
+      const preview = findAll(tree, "FolderPreview")[0];
+      assert.equal(!!preview, itemCount > 0);
+      if (preview) {
+        tree = FolderPreview(preview.props);
+        const rendered = thumbnails(tree);
+        assert.equal(rendered.length, Math.min(itemCount, 3));
+        assert.deepEqual(
+          rendered.map((node) => node.props.source).sort(),
+          [101, 102, 103].slice(0, Math.min(itemCount, 3)),
+        );
+        assert.equal(
+          findAll(
+            tree,
+            columnCount === 3
+              ? "@/assets/images/folder/image-open-folder-small.svg"
+              : "@/assets/images/folder/image-open-folder.svg",
+          ).length,
+          1,
+        );
+      }
+      tree = FolderCard({ folder: { ...folder, isOwnedItems: true }, columnCount });
+      assert.equal(findAll(tree, "FolderPreview").length, 0);
+      assert.equal(findAll(tree, "Image").length, 1);
+    }
+    const tree = FolderPreview({ itemCount: 2, isCompact: columnCount === 3 });
+    const thumbnail = thumbnails(tree)[0];
+    assert.equal(thumbnail.type(thumbnail.props).type, "FallbackImg");
+  }
+});
+
 test("폴더 목록은 2열로 배치하고 빈 목록은 안내 화면을 표시한다", () => {
   const { FolderScreen } = screenModule.exports;
   const folders = Array.from({ length: 3 }, (_, index) => ({
