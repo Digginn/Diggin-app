@@ -11,7 +11,6 @@ export const layout = {
   "margin": "24px",
   "gutter": "16px",
   "modal-action": "15px",
-  "photo-menu-row": "54px",
 };
 
 export const fieldShape = {

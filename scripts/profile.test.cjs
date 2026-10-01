@@ -31,21 +31,25 @@ function renderProfile(
     camera: 0,
     permission: 0,
     choices: [],
+    actionSheets: [],
     images: [],
     toasts: [],
     dismissed: [],
   };
   const states = [];
   let stateIndex = 0;
-  const pendingPhotoSource = { current: undefined };
   const native = {
     View: "View",
     Text: "Text",
     Pressable: "Pressable",
     ScrollView: "ScrollView",
-    Modal: "Modal",
     Keyboard: { dismiss() {} },
     Platform: { OS: platform },
+    ActionSheetIOS: {
+      showActionSheetWithOptions: (options, callback) => {
+        calls.actionSheets.push({ options, callback });
+      },
+    },
     Alert: {
       alert: (...args) => {
         calls.choices.push(args);
@@ -82,7 +86,6 @@ function renderProfile(
       if (name === "react")
         return {
           ...React,
-          useRef: () => pendingPhotoSource,
           useState: (initial) => {
             const index = stateIndex++;
             if (!(index in states)) states[index] = initial;
@@ -130,23 +133,31 @@ function renderProfile(
     stateIndex = 0;
     return screen.exports.ProfileEditScreen(screenProps);
   };
-  const button = (label) => find(render(), (node) => node.props.accessibilityLabel === label);
+  const button = (label) => {
+    const element = find(render(), (node) => node.props.accessibilityLabel === label);
+    if (element) return element;
+    if (platform === "ios") {
+      const sheet = calls.actionSheets.at(-1);
+      const index = sheet?.options.options.indexOf(label);
+      if (index >= 0) return { props: { onPress: () => sheet.callback(index) } };
+    } else {
+      const choice = calls.choices.at(-1)?.[2]?.find((choice) => choice.text === label);
+      if (choice) return { props: { onPress: choice.onPress ?? (() => {}) } };
+    }
+  };
   return {
     calls,
     button,
-    modal: () => find(render(), (node) => node.type === "Modal"),
     save: () => find(render(), (node) => node.type === "Button").props.onPress(),
   };
 }
 
 test("카메라 버튼은 먼저 선택 메뉴를 열고 선택한 경로만 실행한다", async () => {
-  const { calls, button, modal } = renderProfile();
-  assert.equal(modal().props.visible, false);
+  const { calls, button } = renderProfile();
   button("프로필 사진 변경").props.onPress();
-  assert.equal(modal().props.visible, true);
+  assert.equal(calls.choices[0][0], "프로필 사진 변경");
   assert.equal(calls.library, 0, "버튼을 누르자마자 앨범을 열면 안 됩니다");
   await button("사진찍기").props.onPress();
-  assert.equal(modal().props.visible, false);
   assert.equal(calls.permission, 1);
   assert.equal(calls.camera, 1);
   assert.equal(calls.library, 0);
@@ -179,33 +190,37 @@ test("카메라 권한 거부 시 촬영하지 않고 안내한다", async () =>
   button("프로필 사진 변경").props.onPress();
   await button("사진찍기").props.onPress();
   assert.equal(calls.camera, 0);
-  assert.equal(calls.choices[0][0], "카메라 권한 필요");
+  assert.equal(calls.choices.at(-1)[0], "카메라 권한 필요");
 });
 
-test("선택 메뉴 취소·배경 탭·뒤로 가기는 사진 선택기를 실행하지 않는다", () => {
-  const { calls, button, modal } = renderProfile("ios");
-  for (const close of [
-    () => button("취소").props.onPress(),
-    () => button("사진 선택 메뉴 닫기").props.onPress(),
-    () => modal().props.onRequestClose(),
-  ]) {
+test("각 플랫폼의 기본 메뉴 취소는 사진 선택기를 실행하지 않는다", () => {
+  for (const platform of ["ios", "android"]) {
+    const { calls, button } = renderProfile(platform);
     button("프로필 사진 변경").props.onPress();
-    close();
-    assert.equal(modal().props.visible, false);
+    button("취소").props.onPress();
+    if (platform === "ios") {
+      assert.equal(calls.actionSheets[0].options.cancelButtonIndex, 2);
+      assert.equal(calls.choices.length, 0);
+    } else {
+      assert.equal(calls.choices[0][3].cancelable, true);
+      assert.equal(calls.actionSheets.length, 0);
+    }
+    assert.equal(calls.library, 0);
+    assert.equal(calls.camera, 0);
   }
-  assert.equal(calls.library, 0);
-  assert.equal(calls.camera, 0);
 });
 
-test("iOS에서는 모달이 닫힌 뒤 시스템 사진 선택기를 실행한다", async () => {
-  const { calls, button, modal } = renderProfile("ios");
+test("iOS 기본 ActionSheet에서 선택한 촬영·앨범 경로만 실행한다", async () => {
+  const { calls, button } = renderProfile("ios");
   button("프로필 사진 변경").props.onPress();
-  button("앨범에서 선택").props.onPress();
   assert.equal(calls.library, 0);
-  await modal().props.onDismiss();
+  await button("앨범에서 선택").props.onPress();
   assert.equal(calls.library, 1);
-  await modal().props.onDismiss();
-  assert.equal(calls.library, 1);
+  assert.equal(calls.camera, 0);
+  button("프로필 사진 변경").props.onPress();
+  await button("사진찍기").props.onPress();
+  assert.equal(calls.camera, 1);
+  assert.deepEqual(calls.images, ["album.jpg", "camera.jpg"]);
 });
 
 test("유효한 닉네임 저장 성공 시 MY로 이동하고 성공 토스트를 표시한다", async () => {
