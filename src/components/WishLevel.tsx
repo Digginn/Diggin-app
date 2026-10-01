@@ -6,6 +6,7 @@ import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { Chip } from "@/components/Chip";
 import { Tooltip } from "@/components/Tooltip";
 import { colors } from "@/theme";
+import { WISH_LEVEL_DOT_CLASSNAMES, WISH_LEVEL_LABELS, type WishLevelKey } from "@/types/wish-item";
 
 const HINT_BUTTON_SIZE = 48;
 
@@ -25,11 +26,7 @@ type WishLevelProps = {
   hint?: string;
 };
 
-const LEVEL_CONFIG = [
-  { key: "high" as const, label: "높음", dotClassName: "bg-gray-600" },
-  { key: "medium" as const, label: "중간", dotClassName: "bg-gray-500" },
-  { key: "low" as const, label: "낮음", dotClassName: "bg-gray-400" },
-];
+const LEVEL_KEYS: WishLevelKey[] = ["high", "medium", "low"];
 
 function LevelItem({
   label,
@@ -42,8 +39,7 @@ function LevelItem({
 }) {
   return (
     <View
-      className="flex-row items-center rounded-full border border-gray-200 bg-gray-0 px-3 py-2"
-
+      className="flex-row items-center gap-2 rounded-full border border-gray-200 bg-gray-0 px-3 py-2"
       style={{
         shadowColor: colors.gray[1000],
         shadowOffset: { width: 0, height: 4 },
@@ -52,14 +48,10 @@ function LevelItem({
         elevation: 4,
       }}
     >
-      <View className="flex-row items-center gap-2">
-        <View className={`size-2 rounded-full ${dotClassName}`} />
-        <View className="flex-row items-center gap-1">
-          <Text className="text-gray-1000 font-b3">{label}</Text>
-          <Text className="text-gray-900 font-label-14">
-            {count >= 999 ? "999+" : String(count)}
-          </Text>
-        </View>
+      <View className={`size-2 rounded-full ${dotClassName}`} />
+      <View className="flex-row items-center gap-1">
+        <Text className="text-gray-1000 font-b3">{label}</Text>
+        <Text className="text-gray-900 font-label-14">{count >= 999 ? "999+" : String(count)}</Text>
       </View>
     </View>
   );
@@ -71,8 +63,13 @@ function LevelList({ levels, onLayout }: { levels: Levels; onLayout: (height: nu
       className="items-start gap-2 py-2.5"
       onLayout={(event) => onLayout(event.nativeEvent.layout.height)}
     >
-      {LEVEL_CONFIG.map(({ key, label, dotClassName }) => (
-        <LevelItem key={key} label={label} dotClassName={dotClassName} count={levels[key]} />
+      {LEVEL_KEYS.map((key) => (
+        <LevelItem
+          key={key}
+          label={WISH_LEVEL_LABELS[key]}
+          dotClassName={WISH_LEVEL_DOT_CLASSNAMES[key]}
+          count={levels[key]}
+        />
       ))}
     </View>
   );
