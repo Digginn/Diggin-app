@@ -3,6 +3,8 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 
+import { LinkDetectModal } from "@/components/LinkDetectModal";
+
 import "@/global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -21,5 +23,10 @@ export default function RootLayout() {
 
   if (!loaded && !error) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }} />
+      <LinkDetectModal />
+    </>
+  );
 }
