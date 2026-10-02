@@ -2,60 +2,63 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 
-const URL_PATTERN = /^https?:\/\/\S+$/i;
+// 제목과 링크를 같이 복사하는 앱이 많아 전체 일치가 아니라 첫 링크를 뽑음
+const URL_PATTERN = /https?:\/\/[^\s<>"']+/i;
 
-// iOS 는 클립보드를 읽으면 붙여넣기 허용 경고를 띄워서, 감지와 읽기를 나눔
 export function useDetectedLink() {
-  const [hasLink, setHasLink] = useState(false);
-  const dismissedRef = useRef(false);
+  const [link, setLink] = useState<string | null>(null);
+  const handledRef = useRef(new Set<string>());
+  const deniedRef = useRef(false);
+  const checkingRef = useRef(false);
 
   const check = useCallback(async () => {
-    if (dismissedRef.current) return;
-    // hasUrlAsync 는 평문 링크를 false 로 봐서 내용 유무만 확인함
-    setHasLink(await Clipboard.hasStringAsync());
+    if (deniedRef.current || checkingRef.current) return;
+    checkingRef.current = true;
+    try {
+      if (!(await Clipboard.hasStringAsync())) return;
+
+      const text = await Clipboard.getStringAsync();
+      if (!text) {
+        // 내용이 있다는데 빈 값이면 붙여넣기를 거부한 것임
+        deniedRef.current = true;
+        return;
+      }
+
+      const url = URL_PATTERN.exec(text)?.[0];
+      if (!url || handledRef.current.has(url)) return;
+
+      setLink(url);
+    } catch {
+      deniedRef.current = true;
+    } finally {
+      checkingRef.current = false;
+    }
+  }, []);
+
+  const handle = useCallback((url: string) => {
+    handledRef.current.add(url);
+    setLink(null);
   }, []);
 
   useEffect(() => {
     // 붙여넣기 허용 경고는 inactive 라 복귀로 세면 모달이 두 번 뜸
-    let wasBackground = AppState.currentState === "background";
+    let wasBackground = AppState.currentState !== "active";
 
-    const appState = AppState.addEventListener("change", (state: AppStateStatus) => {
+    const subscription = AppState.addEventListener("change", (state: AppStateStatus) => {
       if (state === "background") {
         wasBackground = true;
         return;
       }
       if (state !== "active" || !wasBackground) return;
       wasBackground = false;
-      // iOS 는 백그라운드에서 클립보드 변경 알림을 안 줘서 복귀 때 다시 확인함
-      dismissedRef.current = false;
-      void check();
-    });
-
-    const clipboard = Clipboard.addClipboardListener(() => {
-      dismissedRef.current = false;
+      deniedRef.current = false;
       void check();
     });
 
     void Promise.resolve().then(() => check());
 
-    return () => {
-      appState.remove();
-      Clipboard.removeClipboardListener(clipboard);
-    };
+    return () => subscription.remove();
   }, [check]);
 
-  const dismiss = useCallback(() => {
-    dismissedRef.current = true;
-    setHasLink(false);
-  }, []);
-
-  // 불러오기를 눌렀을 때만 읽음. 여기서 붙여넣기 허용 경고가 뜸
-  const read = useCallback(async () => {
-    const text = (await Clipboard.getStringAsync()).trim();
-    dismissedRef.current = true;
-    setHasLink(false);
-    return URL_PATTERN.test(text) ? text : null;
-  }, []);
-
-  return { hasLink, dismiss, read };
+  return { link, handle };
 }
