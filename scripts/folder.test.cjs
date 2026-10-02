@@ -390,10 +390,12 @@ test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7
   );
 });
 
-test("보기 순은 생성일·가나다·아이템 개수로 정렬하고 선택 및 바깥 탭 시 닫힌다", () => {
+test("보기 순은 생성일·아이템 개수로 정렬하고 선택 및 바깥 탭 시 닫힌다", () => {
   screenState = [];
   const folders = [
+    { id: "owned", name: "나의 소장템", itemCount: 100, createdAt: 100, isOwnedItems: true },
     { id: "a", name: "가방", itemCount: 2, createdAt: 10 },
+    { id: "default", name: "기본 폴더", itemCount: 90, createdAt: 90 },
     { id: "b", name: "바지", itemCount: 9, createdAt: 30 },
     { id: "c", name: "나무", itemCount: 1, createdAt: 20 },
   ];
@@ -410,10 +412,9 @@ test("보기 순은 생성일·가나다·아이템 개수로 정렬하고 선�
   const ids = (tree) => findAll(tree, "FolderCard").map((card) => card.props.folder.id);
   try {
     let tree = render();
-    assert.deepEqual(ids(tree), ["b", "c", "a"]);
+    assert.deepEqual(ids(tree), ["b", "c", "a", "default", "owned"]);
     let filter = findAll(tree, "FolderSortFilter")[0];
     assert.equal(filter.props.value, null);
-    assert.equal(filter.props.count, 12);
     filter.props.onToggle();
     tree = render();
     assert.equal(findAll(tree, "FolderSortFilter")[0].props.isOpen, true);
@@ -422,9 +423,8 @@ test("보기 순은 생성일·가나다·아이템 개수로 정렬하고 선�
       .props.onPress();
     assert.equal(findAll(render(), "FolderSortFilter")[0].props.isOpen, false);
     for (const [order, expected] of [
-      ["name", ["a", "c", "b"]],
-      ["item-count", ["b", "a", "c"]],
-      ["latest", ["b", "c", "a"]],
+      ["item-count", ["b", "a", "c", "default", "owned"]],
+      ["latest", ["b", "c", "a", "default", "owned"]],
     ]) {
       filter = findAll(render(), "FolderSortFilter")[0];
       filter.props.onToggle();
@@ -436,11 +436,61 @@ test("보기 순은 생성일·가나다·아이템 개수로 정렬하고 선�
     }
     assert.deepEqual(
       folders.map((folder) => folder.id),
-      ["a", "b", "c"],
+      ["owned", "a", "default", "b", "c"],
     );
   } finally {
     screenState = undefined;
   }
+});
+
+test("보기 순 필터는 도움말·점·개수 없이 두 정렬 옵션만 표시한다", () => {
+  const loaded = { exports: {} };
+  const code = ts.transpileModule(
+    readFileSync(
+      path.join(__dirname, "../src/screens/folder/components/FolderSortFilter.tsx"),
+      "utf8",
+    ),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } },
+  ).outputText;
+  runInNewContext(code, {
+    exports: loaded.exports,
+    module: loaded,
+    require: (name) => {
+      if (name === "react-native") return { Pressable: "Pressable", Text: "Text", View: "View" };
+      if (name.endsWith("/Chip")) return { Chip: "Chip" };
+      return require(name);
+    },
+  });
+  let selected;
+  const props = {
+    isOpen: true,
+    value: null,
+    onToggle: () => {},
+    onChange: (value) => {
+      selected = value;
+    },
+  };
+  const tree = loaded.exports.FolderSortFilter(props);
+  assert.equal(findAll(tree, "Chip")[0].props.label, "보기 순");
+  const buttons = findAll(tree, "Pressable");
+  assert.deepEqual(
+    buttons.map((button) => button.props.accessibilityLabel),
+    ["최신 순", "많이 담은 순"],
+  );
+  assert.deepEqual(
+    findAll(tree, "Text").map((text) => text.props.children),
+    ["최신 순", "많이 담은 순"],
+  );
+  assert.equal(
+    findAll(tree, "View").some((view) => view.props.className.includes("size-2")),
+    false,
+  );
+  buttons[1].props.onPress();
+  assert.equal(selected, "item-count");
+  assert.equal(
+    findAll(loaded.exports.FolderSortFilter({ ...props, isOpen: false }), "Pressable").length,
+    0,
+  );
 });
 
 test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더는 닫힌 이미지를 유지한다", () => {
@@ -464,7 +514,12 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
     return loaded.exports;
   }
   const mocks = {
-    "react": { useRef: () => ({ current: null }), useState: () => [undefined, () => {}] },
+    "react": {
+      useRef: () => ({
+        current: { measureInWindow: (callback) => callback(24, 200, 155, 150) },
+      }),
+      useState: () => [undefined, () => {}],
+    },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
     "expo-image": { Image: "Image" },
     "nativewind": { cssInterop: (component) => component },
@@ -482,6 +537,39 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
       .filter((node) => typeof node.type === "function" && node.type.name === "Thumbnail");
   }
   for (const columnCount of [2, 3]) {
+    const events = [];
+    const props = {
+      columnCount,
+      onPress: () => events.push("detail"),
+      onPressMenu: (anchor) => events.push(anchor),
+    };
+    const card = FolderCard({ ...props, folder: { id: "test", name: "폴더", itemCount: 0 } });
+    const menuButton = findAll(card, "Pressable")[1];
+    assert.ok(menuButton);
+    assert.equal(findAll(menuButton, "@/assets/images/folder/icon-folder-more.svg").length, 1);
+    card.props.onPress();
+    assert.deepEqual(events, ["detail"]);
+    card.props.onLongPress();
+    let stopped = false;
+    menuButton.props.onPress({
+      stopPropagation: () => {
+        stopped = true;
+      },
+    });
+    assert.equal(stopped, true);
+    assert.deepEqual(events.slice(1).map((anchor) => ({ ...anchor })), [
+      { x: 24, y: 200, width: 155, height: 150 },
+      { x: 24, y: 200, width: 155, height: 150 },
+    ]);
+    for (const folder of [
+      { id: "default", name: "기본 폴더", itemCount: 0 },
+      { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
+    ]) {
+      const special = FolderCard({ ...props, folder });
+      assert.equal(findAll(special, "Pressable").length, 1);
+      assert.equal(special.props.onLongPress, undefined);
+      assert.equal(special.props.onPress, props.onPress);
+    }
     for (const itemCount of [0, 1, 2, 3, 8]) {
       const folder = { id: "test", name: "폴더", itemCount, thumbnails: [101, 102, 103, 104] };
       let tree = FolderCard({ folder, columnCount });
@@ -489,6 +577,10 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
       assert.equal(!!preview, itemCount > 0);
       if (preview) {
         tree = FolderPreview(preview.props);
+        assert.equal(
+          findAll(tree, "View").some((view) => view.props.className.includes("scale-x")),
+          false,
+        );
         const rendered = thumbnails(tree);
         assert.equal(rendered.length, Math.min(itemCount, 3));
         assert.deepEqual(

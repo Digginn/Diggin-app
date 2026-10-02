@@ -49,9 +49,7 @@ export function FolderPreview({ itemCount, thumbnails = [], isCompact }: FolderP
                 : "left-[65.46px] top-[11.87px] size-[76px] rotate-[15deg] rounded-[6.135px]",
             )}
           >
-            <View className="h-full w-full -scale-x-100">
-              <Thumbnail source={thumbnails[visibleCount === 3 ? 2 : 1]} />
-            </View>
+            <Thumbnail source={thumbnails[visibleCount === 3 ? 2 : 1]} />
             <View className="absolute inset-0 bg-black/[0.08]" />
           </View>
           <View

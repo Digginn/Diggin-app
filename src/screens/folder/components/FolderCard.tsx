@@ -4,6 +4,7 @@ import { cssInterop } from "nativewind";
 import { useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import MoreIcon from "@/assets/images/folder/icon-folder-more.svg";
 import OwnedItemsSmallIcon from "@/assets/images/folder/icon-owned-items-small.svg";
 import OwnedItemsIcon from "@/assets/images/folder/icon-owned-items.svg";
 
@@ -31,30 +32,22 @@ type FolderCardProps = {
 export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: FolderCardProps) {
   const cardRef = useRef<View>(null);
   const isCompact = columnCount === 3;
+  const canManage = folder.id !== "default" && !folder.isOwnedItems && !!onPressMenu;
+  function openMenu() {
+    if (!canManage) return;
+    cardRef.current?.measureInWindow((x, y, width, height) =>
+      onPressMenu?.({ x, y, width, height }),
+    );
+  }
   return (
     <Pressable
       ref={cardRef}
       accessibilityRole="button"
       accessibilityLabel={`${folder.name}, ${folder.itemCount}개의 아이템`}
-      accessibilityState={{ disabled: !onPress && !onPressMenu }}
-      disabled={!onPress && !onPressMenu}
-      onPress={
-        onPress ??
-        (onPressMenu
-          ? () =>
-              cardRef.current?.measureInWindow((x, y, width, height) =>
-                onPressMenu({ x, y, width, height }),
-              )
-          : onPress)
-      }
-      onLongPress={
-        onPressMenu
-          ? () =>
-              cardRef.current?.measureInWindow((x, y, width, height) =>
-                onPressMenu({ x, y, width, height }),
-              )
-          : undefined
-      }
+      accessibilityState={{ disabled: !onPress && !canManage }}
+      disabled={!onPress && !canManage}
+      onPress={onPress}
+      onLongPress={canManage ? openMenu : undefined}
       className="flex-1 gap-gutter active:opacity-75"
     >
       <View className={clsx("items-center justify-end", isCompact ? "h-[68px]" : "h-[104px]")}>
@@ -92,6 +85,19 @@ export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: Fo
         </Text>
         <Text className="text-gray-500 font-name-s">{folder.itemCount}개의 아이템</Text>
       </View>
+      {canManage && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${folder.name} 관리 메뉴`}
+          className="absolute -top-[10.5px] right-[11.5px] size-8 items-center justify-center active:opacity-75"
+          onPress={(event) => {
+            event.stopPropagation();
+            openMenu();
+          }}
+        >
+          <MoreIcon />
+        </Pressable>
+      )}
     </Pressable>
   );
 }

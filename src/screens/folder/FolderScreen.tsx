@@ -75,7 +75,9 @@ export function FolderScreen({
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<FolderSortOrder | null>(null);
   const sortedFolders = [...folders].sort((left, right) => {
-    if (sortOrder === "name") return left.name.localeCompare(right.name, "ko-KR");
+    const leftRank = left.isOwnedItems ? 2 : left.id === "default" ? 1 : 0;
+    const rightRank = right.isOwnedItems ? 2 : right.id === "default" ? 1 : 0;
+    if (leftRank !== rightRank) return leftRank - rightRank;
     if (sortOrder === "item-count") return right.itemCount - left.itemCount;
     return (right.createdAt ?? 0) - (left.createdAt ?? 0);
   });
@@ -173,7 +175,6 @@ export function FolderScreen({
               <FolderSortFilter
                 isOpen={isSortOpen}
                 value={sortOrder}
-                count={savedItemCount}
                 onToggle={() => setIsSortOpen(!isSortOpen)}
                 onChange={(order) => {
                   setSortOrder(order);
