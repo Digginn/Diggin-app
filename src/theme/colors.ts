@@ -14,6 +14,7 @@ export const colors = {
     900: "#1E1E1E",
     1000: "#000000",
     placeholder: "#B3B3B3",
+    skeleton: "#EEEEEE",
   },
   semantic: {
     error: "#EB2525",
