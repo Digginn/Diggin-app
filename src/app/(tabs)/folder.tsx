@@ -4,12 +4,15 @@ import { useState } from "react";
 import type { FolderItem } from "@/screens/folder/components/FolderCard";
 import { FolderScreen } from "@/screens/folder/FolderScreen";
 
-// Figma의 2열 목록 시안 확인용 데이터입니다. 실제 조회 데이터가 아닙니다.
+// 폴더 목록과 아이템 1·2·3개 미리보기 확인용 데이터입니다. 실제 조회 데이터가 아닙니다.
 const PREVIEW_FOLDERS: FolderItem[] = [
   ...Array.from({ length: 6 }, (_, index) => ({
     id: `preview-${index}`,
     name: "폴더명",
-    itemCount: 0,
+    itemCount: index < 3 ? index + 1 : 0,
+    thumbnails: Array.from({ length: index < 3 ? index + 1 : 0 }, () =>
+      require("@/assets/images/folder/image-folder-item-preview.png"),
+    ),
   })),
   { id: "default", name: "기본 폴더", itemCount: 0 },
   { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
