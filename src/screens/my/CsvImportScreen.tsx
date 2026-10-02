@@ -158,7 +158,7 @@ export function CsvImportScreen({
               </Text>
               <Text className="text-center text-gray-400 font-label-16-medium">
                 {
-                  "다른 앱에서 내려받은 관심 상품\nCSV 파일이 있다면 Diggin으로\n한 번에 불러올 수 있습니다."
+                  "다른 앱에서 내려받은 위시 아이템\nCSV 파일이 있다면 Diggin으로\n한 번에 불러올 수 있습니다."
                 }
               </Text>
             </View>

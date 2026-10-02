@@ -150,7 +150,7 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
     { label: "내가 쓴 글", onPress: () => router.push("/my-posts" as Href) },
     { label: "내가 투표한 글", onPress: () => router.push("/my-voted-posts" as Href) },
     {
-      label: "CSV 파일로 관심 상품 불러오기",
+      label: "CSV 파일로 위시 아이템 불러오기",
       onPress: () => router.push("/csv-import" as Href),
       // 개발 중에는 길게 눌러 API 없이 결과 시안을 확인합니다.
       onLongPress: __DEV__ ? () => router.push("/csv-import-preview" as Href) : undefined,
