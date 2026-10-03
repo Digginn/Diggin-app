@@ -47,7 +47,7 @@ export function FolderModal({
           <Text className="text-gray-900 font-label-16-semibold">{title}</Text>
         </View>
         <View className="flex-row items-center gap-1">
-          <View className="rounded-[5px] bg-gray-200 px-1.5 py-1">
+          <View className="rounded-field bg-gray-200 px-1.5 py-1">
             <Text className="text-gray-600 font-name-s">{productName}</Text>
           </View>
           <Text className="max-w-[235px] text-gray-600 font-b3" numberOfLines={1}>
@@ -60,7 +60,7 @@ export function FolderModal({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`폴더 선택: ${selectedFolderName}`}
-          className="h-12 flex-row items-center rounded-[5px] border border-gray-300 px-4"
+          className="h-12 flex-row items-center rounded-field border border-gray-300 px-4"
           onPress={onPressFolderSelect}
         >
           <Text className="flex-1 text-gray-900 font-label-16-medium">{selectedFolderName}</Text>
@@ -71,7 +71,7 @@ export function FolderModal({
           </View>
         </Pressable>
       </View>
-      <View className="w-[295px] flex-row gap-[15px]">
+      <View className="w-[295px] flex-row gap-modal-action">
         <View className="w-[140px]">
           <ModalButton action={{ label: "돌아가기", onPress: onBack }} variant="secondary" />
         </View>
@@ -80,7 +80,7 @@ export function FolderModal({
         </View>
       </View>
       <Pressable
-        className="h-12 w-[295px] items-center justify-center rounded-[5px] bg-gray-900"
+        className="h-12 w-[295px] items-center justify-center rounded-field bg-gray-900"
         onPress={onSave}
       >
         <Text className="text-gray-0 font-label-16-semibold">저장하기</Text>
