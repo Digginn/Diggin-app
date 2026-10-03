@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
@@ -25,17 +26,31 @@ const MOCK_RESULTS: WishItem[] = Array.from({ length: 8 }, (_, index) => ({
 const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
 
 export function SearchScreen() {
+  const router = useRouter();
   const [keyword, setKeyword] = useState("");
-  const [submitted, setSubmitted] = useState("");
+  // 이 화면에서 검색한 순서. 뒤로 가기가 한 단계씩 되감는다.
+  const [history, setHistory] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
   const recentSearches = useRecentSearches();
 
+  const submitted = history.at(-1) ?? "";
   const results = submitted ? MOCK_RESULTS : [];
 
   const handleSubmit = (value: string) => {
-    if (!value) return;
-    setSubmitted(value);
+    if (!value || value === submitted) return;
+    setHistory((prev) => [...prev, value]);
     recentSearches.add(value);
+  };
+
+  // 검색 기록이 남아 있으면 직전 검색으로 돌아가고, 없을 때만 화면을 벗어난다.
+  const handleBack = () => {
+    if (history.length === 0) {
+      router.back();
+      return;
+    }
+    const previous = history.slice(0, -1);
+    setHistory(previous);
+    setKeyword(previous.at(-1) ?? "");
   };
 
   return (
@@ -44,7 +59,8 @@ export function SearchScreen() {
         autoFocus
         value={keyword}
         onChangeText={setKeyword}
-        onClear={() => setSubmitted("")}
+        onBack={handleBack}
+        onClear={() => setHistory([])}
         onSubmitEditing={(event) => handleSubmit(event.nativeEvent.text)}
         right={<AppBar.IconButton icon={IconNotification} accessibilityLabel="알림" />}
       />
@@ -62,6 +78,7 @@ export function SearchScreen() {
               <View className="h-12 flex-row items-center justify-between">
                 <View>
                   <WishLevel
+                    hasScrim
                     levels={MOCK_LEVELS}
                     hint="아이템 상세 화면에서 얼마나 사고 싶은지를 3단계로 기록해두어 구매 고민을 빠르게 마칠 수 있습니다."
                   />
