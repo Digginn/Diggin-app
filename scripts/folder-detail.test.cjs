@@ -13,6 +13,7 @@ function load(filename, mocks) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   runInNewContext(compiled, {
+    __DEV__: true,
     exports: loaded.exports,
     module: loaded,
     require: (name) =>
@@ -28,6 +29,142 @@ function findAll(node, type) {
     ...React.Children.toArray(node.props.children).flatMap((child) => findAll(child, type)),
   ];
 }
+
+test("폴더 관리 버튼은 1개 이하 배지를 숨기고 100개 이상을 99+로 표시한다", () => {
+  const { FolderManageButton } = load(
+    "../src/screens/item-detail/components/FolderManageButton.tsx",
+    {
+      "react-native": { Text: "Text", View: "View" },
+      "@/components/Button": { Button: "Button" },
+      "@/theme/colors": { colors: { gray: { 0: "#FFFFFF" } } },
+    },
+  );
+  let opened = false;
+  const render = (folderCount) =>
+    FolderManageButton({
+      folderCount,
+      onPress: () => {
+        opened = true;
+      },
+    });
+  for (const count of [0, 1]) assert.equal(findAll(render(count), "Text").length, 0);
+  assert.equal(render(0).props.variant, "primary");
+  assert.equal(render(0).props.children[0], "폴더에 추가");
+  assert.equal(render(1).props.children[0], "폴더 관리");
+  assert.equal(render(1).props.bgColor, "#FFFFFF");
+  assert.ok(render(1).props.className.includes("border-gray-900"));
+  for (const count of [2, 99, 100, 123]) {
+    const tree = render(count);
+    assert.equal(findAll(tree, "Text")[0].props.children, count > 99 ? "99+" : count);
+    assert.equal(tree.props.accessibilityLabel, `폴더 관리, ${count}개 폴더에 저장됨`);
+  }
+  render(2).props.onPress();
+  assert.equal(opened, true);
+});
+
+test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연다", () => {
+  let destination;
+  const route = load("../src/app/folder-detail.tsx", {
+    "expo-router": {
+      useLocalSearchParams: () => ({ name: "내 폴더" }),
+      useRouter: () => ({
+        push: (value) => {
+          destination = value;
+        },
+      }),
+    },
+    "@/screens/folder/FolderDetailScreen": { FolderDetailScreen: "FolderDetailScreen" },
+    "@/assets/images/folder/image-item-preview.png": 123,
+  });
+  const tree = route.default();
+  tree.props.onOpenItem({ id: "selected-item", name: "선택한 아이템", price: 0 });
+  assert.equal(destination.pathname, "/items/[id]");
+  assert.equal(destination.params.id, "selected-item");
+});
+
+test("폴더 관리는 다중 선택을 유지하고 새 폴더를 맨 위에 선택·강조한다", () => {
+  const state = [];
+  let cursor = 0;
+  let scrollPosition;
+  let folders = [
+    { id: "default", name: "기본 폴더" },
+    { id: "pants", name: "바지" },
+  ];
+  let completed;
+  const { FolderManageSheet } = load(
+    "../src/screens/item-detail/components/FolderManageSheet.tsx",
+    {
+      "react": {
+        useRef: () => ({
+          current: {
+            scrollTo: (value) => {
+              scrollPosition = value.y;
+            },
+          },
+        }),
+        useState: (initial) => {
+          const index = cursor++;
+          if (state[index] === undefined) state[index] = initial;
+          return [
+            state[index],
+            (next) => {
+              state[index] = typeof next === "function" ? next(state[index]) : next;
+            },
+          ];
+        },
+      },
+      "react-native": {
+        View: "View",
+        Text: "Text",
+        Pressable: "Pressable",
+        ScrollView: "ScrollView",
+      },
+      "@/components/BottomSheet": { BottomSheet: "BottomSheet" },
+      "@/components/Button": { Button: "Button" },
+      "@/screens/folder/components/FolderNameModal": { FolderNameModal: "FolderNameModal" },
+    },
+  );
+  const render = () => {
+    cursor = 0;
+    return FolderManageSheet({
+      folders,
+      selectedFolderIds: ["default"],
+      onClose: () => {},
+      onCreateFolder: (name) => {
+        const folder = { id: "new", name };
+        folders = [folder, ...folders];
+        return folder;
+      },
+      onComplete: (ids) => {
+        completed = ids;
+      },
+    });
+  };
+  const row = (tree, name) =>
+    findAll(tree, "Pressable").find((node) => node.props.accessibilityLabel === name);
+  let tree = render();
+  assert.equal(row(tree, "기본 폴더").props.accessibilityState.checked, true);
+  row(tree, "바지").props.onPress();
+  tree = render();
+  assert.equal(row(tree, "바지").props.accessibilityState.checked, true);
+  row(tree, "새 폴더 만들기").props.onPress();
+  tree = render();
+  assert.equal(tree.props.overlay.type, "FolderNameModal");
+  tree.props.overlay.props.onClose();
+  assert.equal(render().props.overlay, undefined);
+  row(render(), "새 폴더 만들기").props.onPress();
+  const modal = render().props.overlay;
+  assert.equal(modal.props.onSubmit("캠핑"), true);
+  modal.props.onClose();
+  tree = render();
+  assert.equal(tree.props.overlay, undefined);
+  assert.equal(findAll(tree, "ScrollView")[0].props.children[0].props.accessibilityLabel, "캠핑");
+  assert.equal(row(tree, "캠핑").props.accessibilityState.checked, true);
+  assert.ok(row(tree, "캠핑").props.className.includes("bg-gray-100"));
+  assert.equal(scrollPosition, 0);
+  findAll(tree, "Button")[0].props.onPress();
+  assert.deepEqual(Array.from(completed), ["default", "pants", "new"]);
+});
 
 test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실패 재시도를 처리한다", () => {
   const state = [];
@@ -51,9 +188,13 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
       Pressable: "Pressable",
       FlatList: "FlatList",
       Keyboard: { dismiss: () => {} },
-      useWindowDimensions: () => ({ height: 812 }),
+      useWindowDimensions: () => ({ width: 375, height: 812 }),
     },
-    "react-native-safe-area-context": { SafeAreaView: "SafeAreaView" },
+    "react-native-safe-area-context": {
+      SafeAreaView: "SafeAreaView",
+      useSafeAreaInsets: () => ({ top: 50 }),
+    },
+    "./components/FolderMenu": { FolderMenu: "FolderMenu" },
     "expo-status-bar": { StatusBar: "StatusBar" },
     "@/components/app-bar": {
       AppBar: Object.assign(() => null, { IconButton: "IconButton" }),
@@ -110,7 +251,43 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   const appBar = React.Children.toArray(tree.props.children).find(
     (node) => node.props.isTitleLeftAligned,
   );
-  appBar.props.right.props.onPress();
+  const headerButtons = React.Children.toArray(appBar.props.right.props.children);
+  assert.equal(headerButtons.length, 2);
+  assert.equal(headerButtons[1].props.accessibilityLabel, "폴더 상세 더보기");
+  assert.equal(headerButtons[1].props.iconSize, 16);
+  let menuOpened = false;
+  const menuAppBar = React.Children.toArray(
+    render({
+      onPressMenu: () => {
+        menuOpened = true;
+      },
+    }).props.children,
+  ).find((node) => node.props.isTitleLeftAligned);
+  React.Children.toArray(menuAppBar.props.right.props.children)[1].props.onPress();
+  assert.equal(menuOpened, true);
+  let edited = false;
+  let deleted = false;
+  const menu = findAll(
+    render({
+      onEditFolder: () => {
+        edited = true;
+      },
+      onDeleteFolder: () => {
+        deleted = true;
+      },
+    }),
+    "FolderMenu",
+  )[0];
+  assert.equal(menu.props.placement, "header");
+  assert.equal(menu.props.anchor.x, 311);
+  assert.equal(menu.props.anchor.y, 50);
+  menu.props.onEdit();
+  menu.props.onDelete();
+  assert.equal(edited, true);
+  assert.equal(deleted, true);
+  menu.props.onClose();
+  assert.equal(findAll(render(), "FolderMenu").length, 0);
+  headerButtons[0].props.onPress();
   tree = render();
   const searchBar = findAll(tree, "SearchBar")[0];
   assert.equal(searchBar.props.placeholder, "찾고 싶은 아이템을 입력하세요");
@@ -125,7 +302,7 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
       (node) => React.Children.toArray(node.props.children).join("") === "저장한 아이템 1,234개",
     ),
   );
-  appBar.props.right.props.onPress();
+  headerButtons[0].props.onPress();
   const searchItems = [
     { ...items[0], name: "Real Good Pants 엄청 좋은 바지" },
     { ...items[1], brand: "Good brand" },

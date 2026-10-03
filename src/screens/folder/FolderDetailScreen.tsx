@@ -1,15 +1,18 @@
 import { type ImageSource } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { FlatList, Keyboard, Pressable, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { FlatList, Keyboard, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import MoreIcon from "@/assets/images/folder/icon-detail-more.svg";
 import SearchIcon from "@/assets/images/folder/icon-detail-search.svg";
 import SortIcon from "@/assets/images/folder/icon-sort.svg";
 import { AppBar, SearchBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/card";
 import { WishLevel } from "@/components/WishLevel";
+
+import { FolderMenu } from "./components/FolderMenu";
 
 export type FolderDetailItem = {
   id: string;
@@ -29,6 +32,9 @@ type FolderDetailScreenProps = {
   onRetry?: () => void;
   onBack?: () => void;
   onSearch?: () => void;
+  onPressMenu?: () => void;
+  onEditFolder?: () => void;
+  onDeleteFolder?: () => void;
   onOpenItem?: (item: FolderDetailItem) => void;
 };
 
@@ -49,12 +55,18 @@ export function FolderDetailScreen({
   onRetry,
   onBack,
   onSearch,
+  onPressMenu,
+  onEditFolder,
+  onDeleteFolder,
   onOpenItem,
 }: FolderDetailScreenProps) {
   const [isOldestFirst, setIsOldestFirst] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const hasSearchResults = submittedQuery.length > 0;
   const visibleItems = hasSearchResults
     ? items.filter((item) =>
@@ -106,14 +118,25 @@ export function FolderDetailScreen({
           isTitleLeftAligned
           onBack={onBack}
           right={
-            <AppBar.IconButton
-              icon={DetailSearchIcon}
-              accessibilityLabel="폴더 내 아이템 검색"
-              onPress={() => {
-                setIsSearching(true);
-                onSearch?.();
-              }}
-            />
+            <>
+              <AppBar.IconButton
+                icon={DetailSearchIcon}
+                accessibilityLabel="폴더 내 아이템 검색"
+                onPress={() => {
+                  setIsSearching(true);
+                  onSearch?.();
+                }}
+              />
+              <AppBar.IconButton
+                icon={MoreIcon}
+                iconSize={16}
+                accessibilityLabel="폴더 상세 더보기"
+                onPress={() => {
+                  setIsMenuOpen(true);
+                  onPressMenu?.();
+                }}
+              />
+            </>
           }
         />
       )}
@@ -180,6 +203,15 @@ export function FolderDetailScreen({
             }
           />
         </>
+      )}
+      {isMenuOpen && (
+        <FolderMenu
+          placement="header"
+          anchor={{ x: width - 64, y: insets.top, width: 48, height: 56 }}
+          onClose={() => setIsMenuOpen(false)}
+          onEdit={onEditFolder}
+          onDelete={onDeleteFolder}
+        />
       )}
     </SafeAreaView>
   );

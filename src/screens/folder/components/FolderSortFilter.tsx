@@ -5,7 +5,7 @@ import { Chip } from "@/components/Chip";
 export type FolderSortOrder = "latest" | "item-count";
 
 const SORT_OPTIONS = [
-  { value: "latest", label: "최신 순" },
+  { value: "latest", label: "최근 담은 순" },
   { value: "item-count", label: "많이 담은 순" },
 ] as const;
 
@@ -21,7 +21,9 @@ export function FolderSortFilter({ isOpen, value, onToggle, onChange }: FolderSo
     <View pointerEvents="box-none" className={`relative self-start ${isOpen ? "flex-1" : ""}`}>
       <View className="h-12 flex-row items-center">
         <Chip
-          label={SORT_OPTIONS.find((option) => option.value === value)?.label ?? "보기 순"}
+          label={
+            SORT_OPTIONS.find((option) => option.value === value)?.label ?? SORT_OPTIONS[0].label
+          }
           isOpen={isOpen}
           accessibilityLabel="폴더 보기 순 필터"
           onPress={onToggle}

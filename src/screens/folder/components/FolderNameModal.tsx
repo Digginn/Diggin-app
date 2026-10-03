@@ -1,5 +1,5 @@
 import { type ReactNode, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { Text, type TextInput, View } from "react-native";
 import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import { TextField } from "@/components/Field";
@@ -7,6 +7,8 @@ import { ActionModal } from "@/components/modal";
 
 const INITIAL_FOLDER_NAME = "새 폴더";
 const MAX_FOLDER_NAME_LENGTH = 7;
+// Android에서는 모달 창의 포커스가 준비된 뒤 입력 포커스를 요청해야 키보드가 열립니다.
+const INPUT_FOCUS_DELAY_MS = 200;
 
 type FolderNameModalProps = {
   initialName?: string;
@@ -17,6 +19,7 @@ type FolderNameModalProps = {
 
 export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: FolderNameModalProps) {
   const isEditing = initialName !== undefined;
+  const inputRef = useRef<TextInput>(null);
   const [name, setName] = useState(initialName ?? INITIAL_FOLDER_NAME);
   const [hasEditedName, setHasEditedName] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,6 +57,11 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
       overlay={overlay}
       isKeyboardAvoiding
       keyboardGap={isEditing ? 24 : 40}
+      onShow={
+        isEditing
+          ? undefined
+          : () => setTimeout(() => inputRef.current?.focus(), INPUT_FOCUS_DELAY_MS)
+      }
       onRequestClose={handleClose}
       onClose={handleClose}
       title={isEditing ? "이름 수정하기" : "새 폴더 만들기"}
@@ -69,6 +77,7 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
         </Text>
         <View>
           <TextField
+            ref={inputRef}
             editable={!isSubmitting}
             selectTextOnFocus={!isEditing}
             accessibilityLabel={isEditing ? "수정한 폴더 이름" : "폴더 이름"}

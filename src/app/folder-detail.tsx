@@ -29,6 +29,7 @@ export default function FolderDetailRoute() {
       savedItemCount={isLongPreview ? 1234 : undefined}
       isError={isError}
       onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"))}
+      onOpenItem={(item) => router.push({ pathname: "/items/[id]", params: { id: item.id } })}
       onRetry={isError ? () => router.setParams({ preview: undefined }) : undefined}
     />
   );

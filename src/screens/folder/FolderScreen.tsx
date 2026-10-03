@@ -73,13 +73,16 @@ export function FolderScreen({
   const hasFolders = folders.length > 0;
   const columnCount = folders.length >= 7 ? 3 : 2;
   const [isSortOpen, setIsSortOpen] = useState(false);
-  const [sortOrder, setSortOrder] = useState<FolderSortOrder | null>(null);
+  const [sortOrder, setSortOrder] = useState<FolderSortOrder>("latest");
   const sortedFolders = [...folders].sort((left, right) => {
     const leftRank = left.isOwnedItems ? 2 : left.id === "default" ? 1 : 0;
     const rightRank = right.isOwnedItems ? 2 : right.id === "default" ? 1 : 0;
     if (leftRank !== rightRank) return leftRank - rightRank;
     if (sortOrder === "item-count") return right.itemCount - left.itemCount;
-    return (right.createdAt ?? 0) - (left.createdAt ?? 0);
+    return (
+      (right.lastItemAddedAt ?? right.createdAt ?? 0) -
+      (left.lastItemAddedAt ?? left.createdAt ?? 0)
+    );
   });
 
   useEffect(() => {

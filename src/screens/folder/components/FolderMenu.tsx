@@ -14,22 +14,43 @@ type FolderMenuProps = {
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  placement?: "card" | "header";
 };
 
-export function FolderMenu({ anchor, onClose, onEdit, onDelete }: FolderMenuProps) {
+export function FolderMenu({
+  anchor,
+  onClose,
+  onEdit,
+  onDelete,
+  placement = "card",
+}: FolderMenuProps) {
   const { width, height } = useWindowDimensions();
   // 선택한 폴더 중심에서 우측 24px. 가장자리에서는 메뉴가 화면 밖으로 잘리지 않게 합니다.
   const left = Math.max(
     MENU_OFFSET,
-    Math.min(anchor.x + anchor.width / 2 + MENU_OFFSET, width - MENU_WIDTH - MENU_OFFSET),
+    Math.min(
+      placement === "header"
+        ? anchor.x + anchor.width - MENU_WIDTH
+        : anchor.x + anchor.width / 2 + MENU_OFFSET,
+      width - MENU_WIDTH - (placement === "header" ? 16 : MENU_OFFSET),
+    ),
   );
   const top = Math.max(
     MENU_OFFSET,
-    Math.min(anchor.y + (anchor.height > 130 ? 59 : 40), height - MENU_HEIGHT - MENU_OFFSET),
+    Math.min(
+      anchor.y + (placement === "header" ? anchor.height - 4 : anchor.height > 130 ? 59 : 40),
+      height - MENU_HEIGHT - MENU_OFFSET,
+    ),
   );
 
   return (
-    <Modal visible transparent animationType="none" onRequestClose={onClose}>
+    <Modal
+      visible
+      transparent
+      statusBarTranslucent={placement === "header"}
+      animationType="none"
+      onRequestClose={onClose}
+    >
       <Pressable
         accessibilityLabel="폴더 메뉴 닫기"
         accessibilityRole="button"

@@ -18,6 +18,7 @@ export type FolderItem = {
   name: string;
   itemCount: number;
   createdAt?: number;
+  lastItemAddedAt?: number;
   isOwnedItems?: boolean;
   thumbnails?: FolderThumbnailSource[];
 };
@@ -48,7 +49,7 @@ export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: Fo
       disabled={!onPress && !canManage}
       onPress={onPress}
       onLongPress={canManage ? openMenu : undefined}
-      className="flex-1 gap-gutter active:opacity-75"
+      className={clsx("flex-1 gap-gutter active:opacity-75", isCompact && "pt-6")}
     >
       <View className={clsx("items-center justify-end", isCompact ? "h-[68px]" : "h-[104px]")}>
         {folder.itemCount > 0 && !folder.isOwnedItems ? (
@@ -89,7 +90,10 @@ export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: Fo
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${folder.name} 관리 메뉴`}
-          className="absolute -top-[10.5px] right-[11.5px] size-8 items-center justify-center active:opacity-75"
+          className={clsx(
+            "absolute size-8 items-center justify-center active:opacity-75",
+            isCompact ? "right-0 top-1" : "-top-[10.5px] right-[11.5px]",
+          )}
           onPress={(event) => {
             event.stopPropagation();
             openMenu();

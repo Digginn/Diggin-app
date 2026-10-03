@@ -300,6 +300,9 @@ function findAll(node, type) {
 test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7글자를 제한한다", async () => {
   const state = [];
   let cursor = 0;
+  let focusCalls = 0;
+  let focusCallback;
+  let focusDelay;
   const loaded = { exports: {} };
   const compiledModal = ts.transpileModule(
     readFileSync(
@@ -311,12 +314,25 @@ test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7
     },
   ).outputText;
   runInNewContext(compiledModal, {
+    setTimeout: (callback, delay) => {
+      focusCallback = callback;
+      focusDelay = delay;
+    },
     exports: loaded.exports,
     module: loaded,
     require: (name) => {
       if (name === "react")
         return {
-          useRef: () => ({ current: null }),
+          useRef: (initial) => ({
+            current:
+              initial === null
+                ? {
+                    focus: () => {
+                      focusCalls += 1;
+                    },
+                  }
+                : initial,
+          }),
           useState: (initial) => {
             const index = cursor++;
             if (state[index] === undefined) state[index] = initial;
@@ -350,7 +366,12 @@ test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7
     });
   };
   let tree = render();
-  assert.equal(tree.props.onShow, undefined);
+  assert.equal(typeof tree.props.onShow, "function");
+  tree.props.onShow();
+  assert.equal(focusCalls, 0);
+  assert.equal(focusDelay, 200);
+  focusCallback();
+  assert.equal(focusCalls, 1);
   assert.equal(tree.props.isPrimaryDisabled, true);
   assert.equal(findAll(tree, "TextField")[0].props.value, "새 폴더");
   assert.equal(findAll(tree, "Text").at(-1).props.children.join(""), "3/7");
@@ -390,11 +411,11 @@ test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7
   );
 });
 
-test("보기 순은 생성일·아이템 개수로 정렬하고 선택 및 바깥 탭 시 닫힌다", () => {
+test("보기 순은 최근 아이템을 담은 시각·아이템 개수로 정렬하고 선택 및 바깥 탭 시 닫힌다", () => {
   screenState = [];
   const folders = [
     { id: "owned", name: "나의 소장템", itemCount: 100, createdAt: 100, isOwnedItems: true },
-    { id: "a", name: "가방", itemCount: 2, createdAt: 10 },
+    { id: "a", name: "가방", itemCount: 2, createdAt: 10, lastItemAddedAt: 40 },
     { id: "default", name: "기본 폴더", itemCount: 90, createdAt: 90 },
     { id: "b", name: "바지", itemCount: 9, createdAt: 30 },
     { id: "c", name: "나무", itemCount: 1, createdAt: 20 },
@@ -412,9 +433,9 @@ test("보기 순은 생성일·아이템 개수로 정렬하고 선택 및 바�
   const ids = (tree) => findAll(tree, "FolderCard").map((card) => card.props.folder.id);
   try {
     let tree = render();
-    assert.deepEqual(ids(tree), ["b", "c", "a", "default", "owned"]);
+    assert.deepEqual(ids(tree), ["a", "b", "c", "default", "owned"]);
     let filter = findAll(tree, "FolderSortFilter")[0];
-    assert.equal(filter.props.value, null);
+    assert.equal(filter.props.value, "latest");
     filter.props.onToggle();
     tree = render();
     assert.equal(findAll(tree, "FolderSortFilter")[0].props.isOpen, true);
@@ -424,7 +445,7 @@ test("보기 순은 생성일·아이템 개수로 정렬하고 선택 및 바�
     assert.equal(findAll(render(), "FolderSortFilter")[0].props.isOpen, false);
     for (const [order, expected] of [
       ["item-count", ["b", "a", "c", "default", "owned"]],
-      ["latest", ["b", "c", "a", "default", "owned"]],
+      ["latest", ["a", "b", "c", "default", "owned"]],
     ]) {
       filter = findAll(render(), "FolderSortFilter")[0];
       filter.props.onToggle();
@@ -471,15 +492,15 @@ test("보기 순 필터는 도움말·점·개수 없이 두 정렬 옵션만 �
     },
   };
   const tree = loaded.exports.FolderSortFilter(props);
-  assert.equal(findAll(tree, "Chip")[0].props.label, "보기 순");
+  assert.equal(findAll(tree, "Chip")[0].props.label, "최근 담은 순");
   const buttons = findAll(tree, "Pressable");
   assert.deepEqual(
     buttons.map((button) => button.props.accessibilityLabel),
-    ["최신 순", "많이 담은 순"],
+    ["최근 담은 순", "많이 담은 순"],
   );
   assert.deepEqual(
     findAll(tree, "Text").map((text) => text.props.children),
-    ["최신 순", "많이 담은 순"],
+    ["최근 담은 순", "많이 담은 순"],
   );
   assert.equal(
     findAll(tree, "View").some((view) => view.props.className.includes("size-2")),
@@ -546,6 +567,12 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
     const card = FolderCard({ ...props, folder: { id: "test", name: "폴더", itemCount: 0 } });
     const menuButton = findAll(card, "Pressable")[1];
     assert.ok(menuButton);
+    if (columnCount === 3) {
+      assert.ok(card.props.className.includes("pt-6"));
+      assert.ok(menuButton.props.className.includes("top-1"));
+      assert.ok(menuButton.props.className.includes("right-0"));
+      assert.ok(!menuButton.props.className.includes("-top-"));
+    }
     assert.equal(findAll(menuButton, "@/assets/images/folder/icon-folder-more.svg").length, 1);
     card.props.onPress();
     assert.deepEqual(events, ["detail"]);
@@ -557,15 +584,19 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
       },
     });
     assert.equal(stopped, true);
-    assert.deepEqual(events.slice(1).map((anchor) => ({ ...anchor })), [
-      { x: 24, y: 200, width: 155, height: 150 },
-      { x: 24, y: 200, width: 155, height: 150 },
-    ]);
+    assert.deepEqual(
+      events.slice(1).map((anchor) => ({ ...anchor })),
+      [
+        { x: 24, y: 200, width: 155, height: 150 },
+        { x: 24, y: 200, width: 155, height: 150 },
+      ],
+    );
     for (const folder of [
       { id: "default", name: "기본 폴더", itemCount: 0 },
       { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
     ]) {
       const special = FolderCard({ ...props, folder });
+      if (columnCount === 3) assert.ok(special.props.className.includes("pt-6"));
       assert.equal(findAll(special, "Pressable").length, 1);
       assert.equal(special.props.onLongPress, undefined);
       assert.equal(special.props.onPress, props.onPress);
