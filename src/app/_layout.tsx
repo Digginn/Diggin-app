@@ -4,9 +4,10 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 
 import { LinkDetectModal } from "@/components/LinkDetectModal";
+import { ToastProvider } from "@/contexts/ToastContext";
 
 import "@/global.css";
-import { ToastProvider } from "@/contexts/ToastContext";
+
 
 SplashScreen.preventAutoHideAsync();
 
