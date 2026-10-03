@@ -16,6 +16,8 @@ type WishItemGridProps = {
   header?: ReactElement;
   isLoading?: boolean;
   onItemPress?: (item: WishItem) => void;
+  /** 선택 모드일 때만 넘긴다. 넘기면 모든 카드에 체크박스가 생긴다. */
+  selectedIds?: ReadonlySet<string>;
 };
 
 function padToFullRows(items: WishItem[]): (WishItem | null)[] {
@@ -24,7 +26,13 @@ function padToFullRows(items: WishItem[]): (WishItem | null)[] {
   return [...items, ...Array.from({ length: COLUMN_COUNT - remainder }, () => null)];
 }
 
-export function WishItemGrid({ items, header, isLoading = false, onItemPress }: WishItemGridProps) {
+export function WishItemGrid({
+  items,
+  header,
+  isLoading = false,
+  onItemPress,
+  selectedIds,
+}: WishItemGridProps) {
   return (
     <FlatList
       data={isLoading ? Array.from({ length: SKELETON_COUNT }, () => null) : padToFullRows(items)}
@@ -43,6 +51,7 @@ export function WishItemGrid({ items, header, isLoading = false, onItemPress }: 
             price={item.price}
             brand={item.brand}
             thumbnailUrl={item.thumbnailUrl}
+            select={selectedIds ? (selectedIds.has(item.id) ? "selected" : "unselected") : "none"}
             onPress={onItemPress ? () => onItemPress(item) : undefined}
           />
         ) : (

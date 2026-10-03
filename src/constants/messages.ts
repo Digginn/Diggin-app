@@ -17,6 +17,9 @@ export const TOAST_MESSAGES = {
 
 export type ToastMessageKey = keyof typeof TOAST_MESSAGES;
 
+// MSG 프레임 번호가 아직 없고 Figma에도 "신규 토스트, PM 확인 필요"로 적혀 있어 문구가 바뀔 수 있음
+export const selectDeletedMessage = (count: number) => `${count}개 아이템을 삭제했습니다.`;
+
 export const STATE_MESSAGES = {
   allEmpty: "아직 저장된 아이템이 없습니다.\n관심 아이템의 링크를 복사해 보세요.",
   searchEmpty: "검색 결과가 없습니다.\n다른 검색어로 다시 찾아보세요.",

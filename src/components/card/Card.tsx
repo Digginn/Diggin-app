@@ -4,11 +4,18 @@ import { cssInterop } from "nativewind";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import SelectCheckOffSvg from "@/assets/images/icon-select-check-off.svg";
+import SelectCheckOnSvg from "@/assets/images/icon-select-check-on.svg";
 import { FallbackImg } from "@/components/FallbackImg";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 
 export const CARD_IMAGE_FRAME = "h-[106px] w-full rounded-lg bg-gray-100";
+
+/** none: 일반 목록, unselected/selected: 선택 모드 */
+export type CardSelectState = "none" | "unselected" | "selected";
+
+const CHECK_ICON_SIZE = 20;
 
 type CardProps = {
   name: string;
@@ -16,17 +23,29 @@ type CardProps = {
   thumbnailUrl?: string | null;
   brand?: string | null;
   onPress?: () => void;
+  select?: CardSelectState;
   className?: string;
 };
 
-export function Card({ name, price, thumbnailUrl, brand, onPress, className }: CardProps) {
+export function Card({
+  name,
+  price,
+  thumbnailUrl,
+  brand,
+  onPress,
+  select = "none",
+  className,
+}: CardProps) {
   const [failedUrl, setFailedUrl] = useState<string>();
   // null, undefined, 빈 문자열을 모두 "이미지 없음"으로 보도록 처리
   const thumbnail = thumbnailUrl && thumbnailUrl !== failedUrl ? thumbnailUrl : undefined;
+  const isSelectMode = select !== "none";
+  const isSelected = select === "selected";
 
   return (
     <Pressable
-      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityRole={isSelectMode ? "checkbox" : onPress ? "button" : undefined}
+      accessibilityState={isSelectMode ? { checked: isSelected } : undefined}
       accessibilityLabel={onPress ? name : undefined}
       className={clsx("gap-2", onPress && "active:opacity-75", className)}
       disabled={!onPress}
@@ -63,6 +82,19 @@ export function Card({ name, price, thumbnailUrl, brand, onPress, className }: C
           ) : null}
         </View>
       </View>
+
+      {isSelected ? (
+        <View className="absolute inset-x-0 top-0 h-[106px] rounded-lg bg-gray-1000/15" />
+      ) : null}
+      {isSelectMode ? (
+        <View className="absolute right-1.5 top-1.5 size-6 items-center justify-center">
+          {isSelected ? (
+            <SelectCheckOnSvg width={CHECK_ICON_SIZE} height={CHECK_ICON_SIZE} />
+          ) : (
+            <SelectCheckOffSvg width={CHECK_ICON_SIZE} height={CHECK_ICON_SIZE} />
+          )}
+        </View>
+      ) : null}
     </Pressable>
   );
 }
