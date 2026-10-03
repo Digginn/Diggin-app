@@ -1,6 +1,7 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
-import { Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { Chip } from "@/components/Chip";
@@ -9,6 +10,8 @@ import { colors } from "@/theme";
 import { WISH_LEVEL_DOT_CLASSNAMES, WISH_LEVEL_LABELS, type WishLevelKey } from "@/types/wish-item";
 
 const HINT_BUTTON_SIZE = 48;
+
+const SCRIM_COLORS = ["rgba(255, 255, 255, 0.88)", "rgba(255, 255, 255, 0)"] as const;
 
 const HintIcon = cssInterop(TooltipSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
@@ -24,6 +27,7 @@ type WishLevelProps = {
   levels: Levels;
   openDirection?: OpenDirection;
   hint?: string;
+  hasScrim?: boolean;
 };
 
 const LEVEL_KEYS: WishLevelKey[] = ["high", "medium", "low"];
@@ -75,7 +79,12 @@ function LevelList({ levels, onLayout }: { levels: Levels; onLayout: (height: nu
   );
 }
 
-export function WishLevel({ levels, openDirection = "auto", hint }: WishLevelProps) {
+export function WishLevel({
+  levels,
+  openDirection = "auto",
+  hint,
+  hasScrim = false,
+}: WishLevelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isUp, setIsUp] = useState(false);
   const [chipLayout, setChipLayout] = useState<ChipLayout>({ x: 0, y: 0, width: 0, height: 0 });
@@ -117,7 +126,24 @@ export function WishLevel({ levels, openDirection = "auto", hint }: WishLevelPro
       />
 
       <Modal visible={isOpen} transparent animationType="none" onRequestClose={handleClose}>
-        <Pressable className="absolute inset-0" onPress={handleClose} />
+        <Pressable className="absolute inset-0" onPress={handleClose}>
+          {hasScrim ? (
+            <LinearGradient colors={SCRIM_COLORS} style={StyleSheet.absoluteFill} />
+          ) : null}
+        </Pressable>
+
+        {hasScrim ? (
+          <View className="absolute" style={{ top: chipLayout.y, left: chipLayout.x }}>
+            <Chip
+              label="위시 레벨"
+              color="black"
+              isOpen
+              onPress={handleClose}
+              accessibilityLabel="위시 레벨 필터"
+            />
+          </View>
+        ) : null}
+
         <View className="absolute" style={listPosition}>
           <LevelList levels={levels} onLayout={setListHeight} />
         </View>
