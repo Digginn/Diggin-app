@@ -163,17 +163,18 @@ export function FolderScreen({
           <View
             pointerEvents="box-none"
             className={clsx(
-              "px-margin pt-4",
-              isSortOpen && "absolute inset-0 z-20",
-              columnCount === 3 ? "pb-2" : "pb-4",
+              "flex-row justify-between px-margin pt-1.5",
+              isSortOpen ? "absolute inset-0 z-20 items-start" : "h-[54px] items-center",
             )}
           >
-            <Text className="text-gray-1000 font-label-12-semibold">
-              저장한 아이템 {savedItemCount}개
-            </Text>
+            <View className="h-12 justify-center">
+              <Text className="text-gray-1000 font-label-12-semibold">
+                저장한 아이템 {savedItemCount}개
+              </Text>
+            </View>
             <View
               pointerEvents="box-none"
-              className={clsx("mt-1 items-start", isSortOpen && "flex-1")}
+              className={clsx("items-end", isSortOpen && "h-full flex-1")}
             >
               <FolderSortFilter
                 isOpen={isSortOpen}
@@ -187,12 +188,12 @@ export function FolderScreen({
               />
             </View>
           </View>
-          {isSortOpen && <View className={columnCount === 3 ? "h-[90px]" : "h-[98px]"} />}
+          {isSortOpen && <View className="h-[54px]" />}
           <ScrollView
             className="flex-1"
             contentContainerClassName={clsx(
               "px-margin pb-20",
-              columnCount === 3 ? "gap-margin" : "gap-gutter",
+              columnCount === 3 ? "gap-margin" : "gap-0",
             )}
           >
             {Array.from({ length: Math.ceil(folders.length / columnCount) }, (_, row) => (
@@ -253,9 +254,11 @@ export function FolderScreen({
           pointerEvents="box-none"
           className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"
         >
-          <View pointerEvents="none" className="absolute inset-0">
-            <FabGlow />
-          </View>
+          {columnCount === 3 && (
+            <View pointerEvents="none" className="absolute inset-0">
+              <FabGlow />
+            </View>
+          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="폴더 추가"
@@ -285,7 +288,7 @@ export function FolderScreen({
         />
       )}
       {!isError && !isCreateModalOpen && !editingFolder && !deletingFolder && toast && (
-        <View pointerEvents="none" className="absolute inset-x-0 bottom-20">
+        <View pointerEvents="none" className="absolute inset-x-0 bottom-20 z-30">
           <FolderToast message={toast.message} />
         </View>
       )}

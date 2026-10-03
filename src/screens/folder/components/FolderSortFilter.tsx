@@ -18,7 +18,7 @@ type FolderSortFilterProps = {
 
 export function FolderSortFilter({ isOpen, value, onToggle, onChange }: FolderSortFilterProps) {
   return (
-    <View pointerEvents="box-none" className={`relative self-start ${isOpen ? "flex-1" : ""}`}>
+    <View pointerEvents="box-none" className={`relative self-end ${isOpen ? "flex-1" : ""}`}>
       <View className="h-12 flex-row items-center">
         <Chip
           label={
@@ -30,7 +30,7 @@ export function FolderSortFilter({ isOpen, value, onToggle, onChange }: FolderSo
         />
       </View>
       {isOpen && (
-        <View className="items-start gap-2">
+        <View className="absolute right-0 top-12 items-end gap-2">
           {SORT_OPTIONS.map((option) => (
             <Pressable
               key={option.value}

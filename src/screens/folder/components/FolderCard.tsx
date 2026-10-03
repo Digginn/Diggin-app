@@ -49,7 +49,10 @@ export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: Fo
       disabled={!onPress && !canManage}
       onPress={onPress}
       onLongPress={canManage ? openMenu : undefined}
-      className={clsx("flex-1 gap-gutter active:opacity-75", isCompact && "pt-6")}
+      className={clsx(
+        "flex-1 active:opacity-75",
+        isCompact ? "gap-gutter pt-6" : "gap-2 pt-[22px]",
+      )}
     >
       <View className={clsx("items-center justify-end", isCompact ? "h-[68px]" : "h-[104px]")}>
         {folder.itemCount > 0 && !folder.isOwnedItems ? (
@@ -91,8 +94,8 @@ export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: Fo
           accessibilityRole="button"
           accessibilityLabel={`${folder.name} 관리 메뉴`}
           className={clsx(
-            "absolute size-8 items-center justify-center active:opacity-75",
-            isCompact ? "right-0 top-1" : "-top-[10.5px] right-[11.5px]",
+            "absolute right-0 items-center justify-center active:opacity-75",
+            isCompact ? "top-1 size-8" : "-top-[7px] size-12",
           )}
           onPress={(event) => {
             event.stopPropagation();

@@ -68,6 +68,7 @@ runInNewContext(compiled, {
     if (name.endsWith("/app-bar"))
       return { AppBar: Object.assign(() => null, { IconButton: "IconButton" }) };
     if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
+    if (name.endsWith("image-fab-glow.svg")) return { __esModule: true, default: "FabGlow" };
     return { default: name };
   },
 });
@@ -98,6 +99,14 @@ test("폴더 생성 완료 토스트는 모달 닫힌 뒤 표시되고 2초 후 
     tree = render();
     assert.equal(findAll(tree, "FolderNameModal").length, 0);
     assert.equal(hasToast(tree), true);
+    const toastLayer = findAll(tree, "View").find((view) =>
+      React.Children.toArray(view.props.children).some((child) => child.type === "FolderToast"),
+    );
+    const fabLayer = findAll(tree, "View").find((view) =>
+      view.props.className?.includes("size-[200px]"),
+    );
+    const zIndex = (view) => Number(view.props.className.match(/(?:^| )z-(\d+)/)?.[1] ?? 0);
+    assert.ok(zIndex(toastLayer) > zIndex(fabLayer), "토스트가 FAB의 흰 효과 위에 표시되어야 한다");
     assert.equal(toastTimerDuration, 2000);
     toastTimer();
     assert.equal(hasToast(render()), false);
@@ -261,6 +270,12 @@ test("6개까지 2열, 7개부터 3열이며 마지막 행의 빈 칸을 유지�
     const rows = React.Children.toArray(findAll(tree, "ScrollView")[0].props.children);
     assert.equal(rows.length, Math.ceil(count / columnCount));
     assert.equal(findAll(tree, "FolderCard").length, count);
+    assert.equal(findAll(tree, "FabGlow").length, columnCount === 3 ? 1 : 0);
+    assert.ok(
+      findAll(tree, "View").some((node) =>
+        node.props.className?.includes("flex-row justify-between px-margin pt-1.5"),
+      ),
+    );
     assert.ok(findAll(tree, "FolderCard").every((card) => card.props.columnCount === columnCount));
     for (const row of rows)
       assert.equal(React.Children.toArray(row.props.children).length, columnCount);
@@ -572,6 +587,12 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
       assert.ok(menuButton.props.className.includes("top-1"));
       assert.ok(menuButton.props.className.includes("right-0"));
       assert.ok(!menuButton.props.className.includes("-top-"));
+    } else {
+      assert.ok(card.props.className.includes("pt-[22px]"));
+      assert.ok(card.props.className.includes("gap-2"));
+      assert.ok(menuButton.props.className.includes("size-12"));
+      assert.ok(menuButton.props.className.includes("-top-[7px]"));
+      assert.ok(menuButton.props.className.includes("right-0"));
     }
     assert.equal(findAll(menuButton, "@/assets/images/folder/icon-folder-more.svg").length, 1);
     card.props.onPress();
