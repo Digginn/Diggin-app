@@ -12,11 +12,12 @@ import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { FallbackImg } from "@/components/FallbackImg";
 import { LoadingDialog } from "@/components/Loading";
-import { FolderModal } from "@/components/modal";
 import { WishLevel } from "@/components/WishLevel";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { EditChip } from "./components/EditChip";
+import { FolderManageButton } from "./components/FolderManageButton";
+import { FolderManageSheet, type ManagedFolder } from "./components/FolderManageSheet";
 import { ItemEditSheet, type ItemEditValues } from "./components/ItemEditSheet";
 import { ItemInfo } from "./components/ItemInfo";
 import { RecommendSection } from "./components/RecommendSection";
@@ -41,7 +42,18 @@ const MOCK_ITEM: ItemEditValues = {
 const BRAND = "브랜드명";
 
 // TODO: 폴더 목록 API 연결 전까지 쓰는 임시 값.
-const DEFAULT_FOLDER = "기본 폴더";
+const MOCK_FOLDERS: ManagedFolder[] = [
+  "기본 폴더",
+  "바지",
+  "여름휴가때입을거",
+  "출근룩",
+  "선물 리스트",
+  "운동복",
+  "홈카페",
+  "겨울 코트",
+  "생일 선물",
+  "등산",
+].map((name, index) => ({ id: `folder-${index}`, name }));
 
 const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
 
@@ -67,7 +79,8 @@ export function ItemDetailScreen() {
   const [bottomHeight, setBottomHeight] = useState(0);
   const [isFolderOpen, setFolderOpen] = useState(false);
   // TODO: 저장 여부는 API 연결 시 서버 값으로 바꾼다.
-  const [folder, setFolder] = useState<string | null>(null);
+  const [folders, setFolders] = useState(MOCK_FOLDERS);
+  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>(["folder-0"]);
   // TODO: TanStack Query 연결 시 쿼리의 로딩 상태로 바꾼다.
   const isLoading = false;
 
@@ -159,19 +172,22 @@ export function ItemDetailScreen() {
 
       <LoadingDialog visible={isLoading} message="상품 정보를 불러오는 중입니다." />
 
-      <FolderModal
-        visible={isFolderOpen}
-        title="아이템 담기 완료"
-        description="폴더 미지정 시 [기본 폴더]에 저장돼요."
-        selectedFolderName={folder ?? DEFAULT_FOLDER}
-        // TODO: 폴더 목록 화면이 나오면 연결한다.
-        onPressFolderSelect={() => {}}
-        onSave={() => {
-          setFolder(folder ?? DEFAULT_FOLDER);
-          setFolderOpen(false);
-        }}
-        onRequestClose={() => setFolderOpen(false)}
-      />
+      {isFolderOpen && (
+        <FolderManageSheet
+          folders={folders}
+          selectedFolderIds={selectedFolderIds}
+          onClose={() => setFolderOpen(false)}
+          onCreateFolder={(name) => {
+            const folder = { id: `created-${Date.now()}`, name };
+            setFolders((previous) => [folder, ...previous]);
+            return folder;
+          }}
+          onComplete={(ids) => {
+            setSelectedFolderIds(ids);
+            setFolderOpen(false);
+          }}
+        />
+      )}
 
       <View
         className="absolute inset-x-0 bottom-0"
@@ -179,14 +195,18 @@ export function ItemDetailScreen() {
       >
         <VotePrompt onPress={() => router.push("/diggle")} />
 
-        <View className="flex-row justify-between border-t border-gray-200 bg-gray-0 px-margin pb-10 pt-3">
-          <Button variant="secondary" className="w-[155px]" onPress={() => {}}>
-            웹사이트 이동
-          </Button>
-          {/* TODO: REC-05 의 "폴더에서 제외" 는 Btn Type=Cancel 이 생기면 붙인다. */}
-          <Button variant="primary" className="w-[155px]" onPress={() => setFolderOpen(true)}>
-            폴더에 추가
-          </Button>
+        <View className="flex-row gap-gutter border-t border-gray-200 bg-gray-0 px-margin pb-10 pt-3">
+          <View className="flex-1">
+            <Button variant="secondary" onPress={() => {}}>
+              웹사이트 이동
+            </Button>
+          </View>
+          <View className="flex-1">
+            <FolderManageButton
+              folderCount={selectedFolderIds.length}
+              onPress={() => setFolderOpen(true)}
+            />
+          </View>
         </View>
       </View>
     </View>

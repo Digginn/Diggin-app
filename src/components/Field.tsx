@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type Ref, useEffect, useState } from "react";
 import { Pressable, Text, TextInput, type TextInputProps, View } from "react-native";
 import { splitGraphemes } from "unicode-segmenter/grapheme";
 
@@ -8,6 +8,8 @@ import IconSearch from "@/assets/images/icon-search.svg";
 import { colors } from "@/theme";
 
 type TextFieldProps = TextInputProps & {
+  ref?: Ref<TextInput>;
+  inputClassName?: string;
   isError?: boolean;
   className?: string;
 };
@@ -61,6 +63,8 @@ function useInputValue(
 }
 
 export function TextField({
+  ref: inputRef,
+  inputClassName,
   isError = false,
   className,
   defaultValue,
@@ -85,9 +89,10 @@ export function TextField({
       className={`h-11 w-full flex-row items-center rounded-field border bg-gray-0 px-4 ${borderClassName} ${className ?? ""}`}
     >
       <TextInput
+        ref={inputRef}
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
-        className="flex-1 p-0 text-gray-900 font-label-16-medium-input"
+        className={`flex-1 p-0 text-gray-900 font-label-16-medium-input ${inputClassName ?? ""}`}
         cursorColor={colors.semantic.focus}
         onBlur={(event) => {
           setIsFocused(false);

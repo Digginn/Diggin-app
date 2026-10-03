@@ -13,7 +13,9 @@ export const colors = {
     800: "#3F3F3F",
     900: "#1E1E1E",
     1000: "#000000",
-    placeholder: "#B3B3B3",
+    "placeholder": "#B3B3B3",
+    "menu-text": "#44403C",
+    "menu-divider": "#F5F5F4",
   },
   semantic: {
     error: "#EB2525",

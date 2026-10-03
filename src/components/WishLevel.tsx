@@ -25,6 +25,7 @@ type OpenDirection = "auto" | "up" | "down";
 
 type WishLevelProps = {
   levels: Levels;
+  label?: string;
   openDirection?: OpenDirection;
   hint?: string;
   hasScrim?: boolean;
@@ -81,6 +82,7 @@ function LevelList({ levels, onLayout }: { levels: Levels; onLayout: (height: nu
 
 export function WishLevel({
   levels,
+  label = "위시 레벨",
   openDirection = "auto",
   hint,
   hasScrim = false,
@@ -118,7 +120,7 @@ export function WishLevel({
   return (
     <View ref={chipRef} className="self-start">
       <Chip
-        label="위시 레벨"
+        label={label}
         color="black"
         isOpen={isOpen}
         onPress={handlePress}
@@ -135,7 +137,7 @@ export function WishLevel({
         {hasScrim ? (
           <View className="absolute" style={{ top: chipLayout.y, left: chipLayout.x }}>
             <Chip
-              label="위시 레벨"
+              label={label}
               color="black"
               isOpen
               onPress={handleClose}

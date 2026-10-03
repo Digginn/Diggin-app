@@ -22,7 +22,9 @@ type AppBarProps = {
   titleClassName?: string;
   progress?: number;
   right?: ReactNode;
+  logo?: ReactNode;
   onBack?: () => void;
+  isTitleLeftAligned?: boolean;
   backIcon?: SvgIcon;
   backIconSize?: number;
   colorScheme?: "light" | "dark";
@@ -34,7 +36,9 @@ function AppBarRoot({
   titleClassName,
   progress,
   right,
+  logo,
   onBack,
+  isTitleLeftAligned = false,
   backIcon = IconBack,
   backIconSize = 48,
   colorScheme = "light",
@@ -60,21 +64,24 @@ function AppBarRoot({
           )}
           {left === "logo" && (
             <View className="pl-5">
-              <LogoWordmark width={WORDMARK_WIDTH} height={WORDMARK_HEIGHT} />
+              {logo ?? <LogoWordmark width={WORDMARK_WIDTH} height={WORDMARK_HEIGHT} />}
             </View>
           )}
         </View>
 
         <View
           pointerEvents="none"
-          className="absolute h-full items-center justify-center"
-          style={{ left: SIDE_SLOT, right: SIDE_SLOT }}
+          className={`absolute h-full justify-center ${isTitleLeftAligned ? "items-start" : "items-center"}`}
+          style={{
+            left: isTitleLeftAligned ? 48 : SIDE_SLOT,
+            right: isTitleLeftAligned ? SIDE_SLOT + 12 : SIDE_SLOT,
+          }}
         >
           {progress === undefined ? (
             title ? (
               <Text
                 numberOfLines={1}
-                className={`${isDark ? "text-gray-0" : "text-gray-900"} ${titleClassName ?? (isDark ? "font-label-20-medium" : "font-label-20")}`}
+                className={`${isDark ? "text-gray-0" : "text-gray-900"} ${titleClassName ?? (isTitleLeftAligned ? "font-h2" : isDark ? "font-label-20-medium" : "font-label-20")}`}
               >
                 {title}
               </Text>

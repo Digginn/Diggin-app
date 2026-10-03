@@ -17,6 +17,7 @@ type ChipProps = {
   onPress: () => void;
   accessibilityLabel?: string;
   className?: string;
+  isDisabled?: boolean;
 };
 
 export function Chip({
@@ -26,14 +27,16 @@ export function Chip({
   onPress,
   accessibilityLabel,
   className,
+  isDisabled = false,
 }: ChipProps) {
   const isBlack = color === "black";
   return (
     <Pressable
       onPress={onPress}
+      disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ expanded: isOpen }}
+      accessibilityState={{ expanded: isOpen, disabled: isDisabled }}
       className={clsx(
         "h-7 flex-row items-center gap-2 rounded-full px-3 active:opacity-75",
         isBlack ? "bg-gray-900" : "bg-gray-0",
