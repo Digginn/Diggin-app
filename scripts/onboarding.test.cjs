@@ -27,7 +27,10 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
         return {
           Children: React.Children,
           isValidElement: React.isValidElement,
-          useState: () => [activeIndex, (index) => (activeIndex = index)],
+          useState: (initial) =>
+            initial === false ? [false, () => {}] : [activeIndex, (index) => (activeIndex = index)],
+          useCallback: (callback) => callback,
+          useEffect: () => {},
           useRef: () => ({ current: { scrollTo: (options) => scrollCalls.push(options) } }),
         };
       }
@@ -39,6 +42,7 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
           View: "View",
         };
       }
+      if (name === "react-native-reanimated") return { useReducedMotion: () => false };
       if (name === "./BtnCarousel") return { BtnCarousel: "BtnCarousel" };
       return require(name);
     },
@@ -79,6 +83,99 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
   tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 9999 } } });
   assert.equal(activeIndex, 2);
   assert.equal(componentModule.exports.SwipeCarousel({ children: null }), null);
+});
+
+test("자동 전환은 마지막에서 멈추고 스와이프·모션 줄이기 시에는 쉬어간다", () => {
+  const source = readFileSync(
+    path.join(__dirname, "../src/components/carousel/SwipeCarousel.tsx"),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const componentModule = { exports: {} };
+  const state = [0, false];
+  const timers = new Map();
+  const scrollCalls = [];
+  let hookIndex = 0;
+  let effect;
+  let cleanup;
+  let isReducedMotion = false;
+  runInNewContext(compiled, {
+    exports: componentModule.exports,
+    module: componentModule,
+    setTimeout: (callback, delay) => {
+      const timer = { callback, delay };
+      timers.set(timer, timer);
+      return timer;
+    },
+    clearTimeout: (timer) => timers.delete(timer),
+    require: (name) => {
+      if (name === "react")
+        return {
+          Children: React.Children,
+          isValidElement: React.isValidElement,
+          useCallback: (callback) => callback,
+          useEffect: (callback) => {
+            effect = callback;
+          },
+          useRef: () => ({ current: { scrollTo: (options) => scrollCalls.push(options) } }),
+          useState: () => {
+            const slot = hookIndex++;
+            return [
+              state[slot],
+              (value) => {
+                state[slot] = value;
+              },
+            ];
+          },
+        };
+      if (name === "react-native") return { View: "View", ScrollView: "ScrollView" };
+      if (name === "react-native-reanimated") return { useReducedMotion: () => isReducedMotion };
+      if (name === "./BtnCarousel") return { BtnCarousel: "BtnCarousel" };
+      return require(name);
+    },
+  });
+  function render(autoAdvanceDelays = [2500, 2500]) {
+    cleanup?.();
+    hookIndex = 0;
+    const root = componentModule.exports.SwipeCarousel({
+      children: ["1", "2", "3"].map((key) => React.createElement("CardCarousel", { key })),
+      autoAdvanceDelays,
+    });
+    cleanup = effect();
+    return React.Children.toArray(root.props.children)[0];
+  }
+  render();
+  assert.equal(timers.values().next().value.delay, 2500);
+  timers.values().next().value.callback();
+  assert.equal(state[0], 1);
+  assert.equal(scrollCalls.at(-1).x, 296);
+  render();
+  assert.equal(timers.values().next().value.delay, 2500);
+  timers.values().next().value.callback();
+  assert.equal(state[0], 2);
+  assert.equal(scrollCalls.at(-1).x, 592);
+  render();
+  assert.equal(timers.size, 0);
+
+  state[0] = 0;
+  render().props.onScrollBeginDrag();
+  render();
+  assert.equal(timers.size, 0);
+  render().props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
+  render();
+  assert.equal(timers.values().next().value.delay, 2500);
+
+  isReducedMotion = true;
+  render();
+  assert.equal(timers.size, 0);
+  isReducedMotion = false;
+  render([]);
+  assert.equal(timers.size, 0);
+  render();
+  cleanup();
+  assert.equal(timers.size, 0);
 });
 
 test("카드 문구·이미지를 사용처에서 받고, 페이지 버튼의 터치 영역은 겹치지 않는다", () => {
@@ -169,6 +266,13 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
 
   const firstPage = render();
   assert.equal(firstPage.length, 1);
+  assert.equal(Array.from(firstPage[0].props.autoAdvanceDelays).join(","), "2500,2500");
+  for (const card of React.Children.toArray(firstPage[0].props.children)) {
+    assert.ok(
+      !card.props.children.props.className.includes("left-px"),
+      "슬라이드 이미지를 오른쪽으로 밀면 페이지 경계에 흰 틈이 생깁니다.",
+    );
+  }
   firstPage[0].props.onPageChange(2);
   const lastPage = render();
   assert.equal(lastPage.length, 2);

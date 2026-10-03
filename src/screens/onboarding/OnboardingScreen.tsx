@@ -8,6 +8,8 @@ import { Button } from "@/components/Button";
 import { CardCarousel, SwipeCarousel } from "@/components/carousel";
 import { baseFrame } from "@/theme";
 
+const AUTO_ADVANCE_DELAYS_MS = [2500, 2500] as const;
+
 const PAGES = [
   {
     mainCopy: "이 쇼핑몰, 저 쇼핑몰\n분명 저장해뒀는데, 어디였더라?",
@@ -20,7 +22,7 @@ const PAGES = [
     mainCopy: "흩어진 취향을, Diggin.\n한곳에 모아보세요.",
     subCopy: "여러 쇼핑몰의 위시 아이템을 한곳에 모아\n편하게 다시 찾아보세요.",
     sampleClassName: "bg-[#FFCC00]",
-    imageClassName: "left-px top-px",
+    imageClassName: "top-px",
     mainCopyClassName: "font-h2",
   },
   {
@@ -53,7 +55,11 @@ export function OnboardingScreen() {
           paddingBottom: Math.max(insets.bottom + 10, 44),
         }}
       >
-        <SwipeCarousel accessibilityLabel="서비스 소개" onPageChange={setActiveIndex}>
+        <SwipeCarousel
+          accessibilityLabel="서비스 소개"
+          onPageChange={setActiveIndex}
+          autoAdvanceDelays={AUTO_ADVANCE_DELAYS_MS}
+        >
           {PAGES.map((page) => (
             <CardCarousel
               key={page.mainCopy}
