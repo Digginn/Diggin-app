@@ -88,7 +88,8 @@ export function Comment({
           <Text className="text-gray-500 font-label-12-regular">·</Text>
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>
-        <View className="w-[120px] flex-row items-center justify-end gap-1.5">
+        {/* 케밥(48)이 이 줄의 높이를 만든다. 삭제된 댓글이라 숨겨도 높이는 유지한다. */}
+        <View className="h-12 w-[120px] flex-row items-center justify-end gap-1.5">
           {isDeleted ? null : (
             <Pressable
               ref={kebabRef}
