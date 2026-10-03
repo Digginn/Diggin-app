@@ -1,13 +1,21 @@
 {
   "expo": {
     "name": "Diggin",
+    "owner": "diggin",
     "slug": "Diggin",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon-app.png",
     "scheme": "diggin",
     "userInterfaceStyle": "automatic",
+    "ios": {
+      "infoPlist": {
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+      }
+    },
     "android": {
+      "package": "com.diggin.app.preview",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -23,17 +31,38 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필 사진 변경을 위해 사진에 접근합니다.",
+          "cameraPermission": "프로필 사진 촬영을 위해 카메라에 접근합니다.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#000000",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200
+          "image": "./assets/images/splash-logo.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "아이템 이미지를 바꾸려면 사진 접근 권한이 필요합니다."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a58be392-d642-442d-a55a-bdfaedbcb9eb"
+      }
     }
   }
 }

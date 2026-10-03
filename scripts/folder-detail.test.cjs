@@ -177,6 +177,26 @@ test("공용 Card는 가격 없음과 0원을 구분하고 로컬 썸네일을 �
   assert.ok(labels.includes("0"));
   assert.ok(labels.includes("원"));
   assert.equal(findAll(tree, "Image")[0].props.source, 123);
+  const onPress = () => {};
+  tree = Card({
+    name: "선택된 아이템",
+    price: 0,
+    thumbnailSource: 123,
+    select: "selected",
+    onPress,
+  });
+  assert.equal(tree.props.accessibilityRole, "checkbox");
+  assert.equal(tree.props.accessibilityState.checked, true);
+  assert.equal(tree.props.onPress, onPress);
+  assert.equal(findAll(tree, "Image")[0].props.source, 123);
+  assert.ok(findAll(tree, "View").some((node) => node.props.className.includes("bg-gray-1000/15")));
+  tree = Card({ name: "선택되지 않은 아이템", price: 0, select: "unselected", onPress });
+  assert.equal(tree.props.accessibilityState.checked, false);
+  assert.ok(
+    findAll(tree, "View").some(
+      (node) => node.props.className === "h-3 w-full flex-row items-center",
+    ),
+  );
   tree = Card({ name: "아이템명", price: "000,000" });
   assert.ok(findAll(tree, "Text").some((node) => node.props.children === "000,000"));
   tree = Card({

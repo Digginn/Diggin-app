@@ -1,6 +1,6 @@
 import { type Tabs } from "expo-router";
 import type { ComponentProps, FC } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import type { SvgProps } from "react-native-svg";
 
 import {
@@ -27,13 +27,19 @@ const ICON_SIZE = 28;
 
 // 라우트 파일명 → 탭에 표시할 라벨과 아이콘
 const TABS: Record<string, TabConfig> = {
-  index: { label: "ALL", ActiveIcon: IconAllActive, InactiveIcon: IconAllInactive },
+  all: { label: "ALL", ActiveIcon: IconAllActive, InactiveIcon: IconAllInactive },
   folder: { label: "FOLDER", ActiveIcon: IconFolderActive, InactiveIcon: IconFolderInactive },
   diggle: { label: "DIGGLE", ActiveIcon: IconDiggleActive, InactiveIcon: IconDiggleInactive },
   my: { label: "MY", ActiveIcon: IconMyActive, InactiveIcon: IconMyInactive },
 };
 
-export function NavigationBar({ state, navigation }: NavigationBarProps) {
+export function NavigationBar({ state, descriptors, navigation }: NavigationBarProps) {
+  // 화면이 tabBarStyle에 display: "none"을 주면 탭바를 감춘다. (ALL 탭 선택 모드 등)
+  // tabBarStyle 타입이 Animated까지 품고 있어, 우리가 넘기는 평범한 객체로 좁혀서 읽는다.
+  const tabBarStyle = descriptors[state.routes[state.index].key]?.options.tabBarStyle as
+    ViewStyle | undefined;
+  if (StyleSheet.flatten(tabBarStyle)?.display === "none") return null;
+
   return (
     <View
       className="flex-row items-center justify-center gap-gutter rounded-t-[20px] bg-gray-900 px-margin"

@@ -1,6 +1,8 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { Keyboard, KeyboardAvoidingView, Modal as NativeModal, Platform, View } from "react-native";
 
+import { ToastText } from "@/components/ToastText";
+
 export type ModalProps = {
   children: ReactNode;
   visible: boolean;
@@ -9,6 +11,13 @@ export type ModalProps = {
   keyboardGap?: number;
   onShow?: () => void;
   overlay?: ReactNode;
+  isFullScreen?: boolean;
+  className?: string;
+  contentClassName?: string;
+  scrimOpacity?: number;
+  backdropClassName?: string;
+  toastMessage?: string;
+  onToastDismiss?: () => void;
 };
 
 export function Modal({
@@ -19,6 +28,13 @@ export function Modal({
   keyboardGap = 40,
   onShow,
   overlay,
+  isFullScreen = false,
+  className,
+  contentClassName,
+  scrimOpacity = 0.4,
+  backdropClassName,
+  toastMessage,
+  onToastDismiss,
 }: ModalProps) {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(() => Keyboard.isVisible());
   useEffect(() => {
@@ -37,6 +53,12 @@ export function Modal({
     };
   }, [isKeyboardAvoiding]);
   const isAboveKeyboard = isKeyboardAvoiding && isKeyboardVisible;
+  useEffect(() => {
+    if (!visible || !toastMessage) return;
+    const timer = setTimeout(() => onToastDismiss?.(), 2000);
+    return () => clearTimeout(timer);
+  }, [visible, toastMessage, onToastDismiss]);
+
   return (
     <NativeModal
       animationType="fade"
@@ -44,19 +66,32 @@ export function Modal({
       onShow={onShow}
       transparent
       visible={visible}
+      statusBarTranslucent={isFullScreen}
+      navigationBarTranslucent={isFullScreen}
     >
       <KeyboardAvoidingView enabled={isKeyboardAvoiding} behavior="padding" className="flex-1">
         <View
-          className={`flex-1 items-center px-margin ${isAboveKeyboard ? "justify-end" : "justify-center"}`}
+          className={`flex-1 items-center px-margin ${isAboveKeyboard ? "justify-end" : "justify-center"} ${backdropClassName ?? ""}`}
           style={isAboveKeyboard ? { paddingBottom: keyboardGap } : undefined}
         >
-          <View className="absolute inset-0 bg-black/40" />
-          <View className="w-full max-w-[327px] items-center rounded-[5px] bg-gray-0 px-2.5 py-4 shadow-lg">
-            <View className="w-[295px] items-center gap-[25px]">{children}</View>
+          <View className="absolute inset-0 bg-gray-1000" style={{ opacity: scrimOpacity }} />
+          <View
+            className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-lg ${className ?? "px-2.5 py-4"}`}
+          >
+            <View className={contentClassName ?? "w-full max-w-[295px] items-center gap-[25px]"}>
+              {children}
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
       {overlay}
+      {toastMessage && (
+        <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px] items-center">
+          <View className="w-full max-w-[327px] items-center">
+            <ToastText message={toastMessage} />
+          </View>
+        </View>
+      )}
     </NativeModal>
   );
 }

@@ -1,7 +1,11 @@
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+
+import { LinkDetectModal } from "@/components/LinkDetectModal";
+import { ToastProvider } from "@/contexts/ToastContext";
 
 import "@/global.css";
 
@@ -21,5 +25,11 @@ export default function RootLayout() {
 
   if (!loaded && !error) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <ToastProvider>
+      <StatusBar style="auto" />
+      <Stack screenOptions={{ headerShown: false }} />
+      <LinkDetectModal />
+    </ToastProvider>
+  );
 }

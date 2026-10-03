@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -13,9 +13,15 @@ const DEFAULT_PLACEHOLDER = "찾고 싶은 아이템을 입력하세요";
 
 type SearchBarProps = Omit<ComponentProps<typeof SearchField>, "className"> & {
   onBack?: () => void;
+  right?: ReactNode;
 };
 
-export function SearchBar({ onBack, placeholder = DEFAULT_PLACEHOLDER, ...props }: SearchBarProps) {
+export function SearchBar({
+  onBack,
+  right,
+  placeholder = DEFAULT_PLACEHOLDER,
+  ...props
+}: SearchBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -28,6 +34,7 @@ export function SearchBar({ onBack, placeholder = DEFAULT_PLACEHOLDER, ...props 
         <View className="flex-1">
           <SearchField placeholder={placeholder} {...props} />
         </View>
+        {right}
       </View>
     </View>
   );

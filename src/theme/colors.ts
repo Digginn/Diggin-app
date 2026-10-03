@@ -19,6 +19,17 @@ export const colors = {
   },
   semantic: {
     error: "#EB2525",
+    errorOnDark: "#FF7E7E",
+    // Figma ErrorBg (Dark): Gray #121212 위에 Error 12%를 합성한 색상.
+    errorBgDark: "#2C1414",
     focus: "#717171",
+    errorBg: "#2C1414",
+  },
+  brand: {
+    kakao: "#FBE300",
+  },
+  accent: {
+    blue: "#0088FF",
+    pink: "#FF2D55",
   },
 } as const;

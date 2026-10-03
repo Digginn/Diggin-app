@@ -1,0 +1,11 @@
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="LiveArea" clip-path="url(#clip0_0_4)">
+<circle id="Circle" cx="10" cy="10" r="9.25" stroke="#B9B9B9" stroke-width="1.5"/>
+<path id="Plus" d="M10 5V15M5 10H15" stroke="#B9B9B9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<defs>
+<clipPath id="clip0_0_4">
+<rect width="20" height="20" fill="white"/>
+</clipPath>
+</defs>
+</svg>

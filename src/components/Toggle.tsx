@@ -18,7 +18,7 @@ const DURATION = 200;
 const TRACK_OFF = colors.gray[500];
 const TRACK_ON = colors.gray[900];
 
-// 토글 
+// 토글
 const trackBase = {
   width: TRACK_WIDTH,
   height: TRACK_HEIGHT,
@@ -38,9 +38,11 @@ const knobBase = {
 type ToggleProps = {
   isOn: boolean;
   onChange: (isOn: boolean) => void;
+  isDisabled?: boolean;
+  accessibilityLabel?: string;
 };
 
-export function Toggle({ isOn, onChange }: ToggleProps) {
+export function Toggle({ isOn, onChange, isDisabled = false, accessibilityLabel }: ToggleProps) {
   const progress = useDerivedValue(() => withTiming(isOn ? 1 : 0, { duration: DURATION }));
 
   // on/off 두 색 사이의 중간색을 계산한다 - progress가 0이면 gray_500, 1이면 gray_900, 0.5면 그 중간색
@@ -55,9 +57,11 @@ export function Toggle({ isOn, onChange }: ToggleProps) {
 
   return (
     <Pressable
+      disabled={isDisabled}
+      accessibilityLabel={accessibilityLabel}
       onPress={() => onChange(!isOn)}
       accessibilityRole="switch"
-      accessibilityState={{ checked: isOn }}
+      accessibilityState={{ checked: isOn, disabled: isDisabled }}
       // 세로 높이를 위아래 10씩 넓혀 접근성 최소 기준 48을 맞춤 (48 * 48)
       hitSlop={{ top: 10, bottom: 10 }}
       className="w-16"
