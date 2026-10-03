@@ -1,10 +1,11 @@
 import { clsx } from "clsx";
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { BackHandler, Pressable, ScrollView, Text, View } from "react-native";
 
 import { AppBar } from "@/components/app-bar";
 import { BodyTextField, HelperText } from "@/components/Field";
+import { ActionModal } from "@/components/modal";
 import type { PostItem } from "@/types/post";
 
 import { MAX_ATTACH_COUNT, ProductAttachGrid } from "./components/ProductAttachGrid";
@@ -16,15 +17,36 @@ export function PostWriteScreen() {
   // TODO: 아이템 선택 화면에서 돌려받는 건 전역 상태가 정해지면 연결한다.
   const [items, setItems] = useState<PostItem[]>([]);
 
+  const [isExitOpen, setExitOpen] = useState(false);
+
   // 빈 상태에서는 안내를 띄우지 않음
   const showBodyError = body.length > 0 && !isBodyValid;
   const canSubmit = isBodyValid && items.length > 0;
+  const hasDraft = body.length > 0 || items.length > 0;
+
+  // 쓴 게 없으면 물어볼 것도 없으니 그냥 나간다.
+  const leave = useCallback(() => {
+    if (hasDraft) setExitOpen(true);
+    else router.back();
+  }, [hasDraft, router]);
+
+  // 안드로이드 하드웨어 뒤로 가기로 확인을 건너뛸 수 없게 막는다.
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+        if (!hasDraft) return false;
+        setExitOpen(true);
+        return true;
+      });
+      return () => subscription.remove();
+    }, [hasDraft]),
+  );
 
   return (
     <View className="flex-1 bg-gray-0">
       <AppBar
         title="게시글 작성"
-        onBack={() => router.back()}
+        onBack={leave}
         right={
           <Pressable
             accessibilityRole="button"
@@ -79,6 +101,22 @@ export function PostWriteScreen() {
           <HelperText message="위시 아이템만 첨부할 수 있습니다." />
         </View>
       </ScrollView>
+
+      <ActionModal
+        visible={isExitOpen}
+        type="2Btn"
+        title="작성을 그만두시겠습니까?"
+        description="작성 중인 내용은 저장되지 않습니다."
+        secondaryAction={{ label: "계속 작성", onPress: () => setExitOpen(false) }}
+        primaryAction={{
+          label: "나가기",
+          onPress: () => {
+            setExitOpen(false);
+            router.back();
+          },
+        }}
+        onRequestClose={() => setExitOpen(false)}
+      />
     </View>
   );
 }
