@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from "react";
-import { Modal as NativeModal, View } from "react-native";
+import { Keyboard, Modal as NativeModal, Pressable, View } from "react-native";
 
 import { ToastText } from "@/components/ToastText";
 
@@ -43,7 +43,12 @@ export function Modal({
       statusBarTranslucent={isFullScreen}
       navigationBarTranslucent={isFullScreen}
     >
-      <View className={`flex-1 items-center justify-center px-margin ${backdropClassName ?? ""}`}>
+      {/* 버튼과 입력은 각자 터치를 가져가므로 여기까지 올라오지 않는다. */}
+      <Pressable
+        accessible={false}
+        className={`flex-1 items-center justify-center px-margin ${backdropClassName ?? ""}`}
+        onPress={Keyboard.dismiss}
+      >
         <View className="absolute inset-0 bg-gray-1000" style={{ opacity: scrimOpacity }} />
         <View
           className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-lg ${className ?? "px-2.5 py-4"}`}
@@ -59,7 +64,7 @@ export function Modal({
             </View>
           </View>
         )}
-      </View>
+      </Pressable>
     </NativeModal>
   );
 }
