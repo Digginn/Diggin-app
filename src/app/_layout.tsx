@@ -8,7 +8,6 @@ import { ToastProvider } from "@/contexts/ToastContext";
 
 import "@/global.css";
 
-
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -26,14 +25,9 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <>
-      (
     <ToastProvider>
       <Stack screenOptions={{ headerShown: false }} />
       <LinkDetectModal />
-          </ToastProvider>
-    </>
-    
-  )
-
+    </ToastProvider>
+  );
 }

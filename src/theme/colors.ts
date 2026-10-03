@@ -22,7 +22,6 @@ export const colors = {
     errorBgDark: "#2C1414",
     focus: "#717171",
     errorBg: "#2C1414",
-    errorOnDark: "#FF7E7E",
   },
   accent: {
     blue: "#0088FF",
