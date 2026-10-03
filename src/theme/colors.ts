@@ -23,6 +23,9 @@ export const colors = {
     focus: "#717171",
     errorBg: "#2C1414",
   },
+  brand: {
+    kakao: "#FBE300",
+  },
   accent: {
     blue: "#0088FF",
     pink: "#FF2D55",

@@ -82,6 +82,25 @@ test("공개 모달만 export하고 공용 껍데기의 바깥 영역은 닫힘 
   assert.equal(toast.props.message, "저장하지 못했습니다.");
   assert.equal(toast.props.variant, undefined);
   assert.equal(withToast.type, "NativeModal");
+  const fullScreen = modals.Modal({
+    visible: true,
+    onRequestClose: close,
+    children: React.createElement("Text", null, "인증 만료"),
+    isFullScreen: true,
+    scrimOpacity: 0.36,
+    contentClassName: "w-full gap-4",
+    toastMessage: "안내",
+  });
+  assert.equal(fullScreen.props.statusBarTranslucent, true);
+  assert.equal(fullScreen.props.navigationBarTranslucent, true);
+  const fullScreenNodes = flatten(fullScreen);
+  assert.equal(
+    fullScreenNodes.find((node) => node.props.className === "absolute inset-0 bg-gray-1000").props
+      .style.opacity,
+    0.36,
+  );
+  assert.ok(fullScreenNodes.some((node) => node.props.className === "w-full gap-4"));
+  assert.ok(fullScreenNodes.some((node) => node.type === "ToastText"));
 });
 
 test("FolderModal 문구와 폴더 이름은 사용처 props를 표시하고 콜백을 전달한다", () => {

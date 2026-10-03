@@ -7,6 +7,7 @@ export type ModalProps = {
   children: ReactNode;
   visible: boolean;
   onRequestClose: () => void;
+  isFullScreen?: boolean;
   className?: string;
   contentClassName?: string;
   scrimOpacity?: number;
@@ -19,6 +20,7 @@ export function Modal({
   children,
   visible,
   onRequestClose,
+  isFullScreen = false,
   className,
   contentClassName,
   scrimOpacity = 0.4,
@@ -33,7 +35,14 @@ export function Modal({
   }, [visible, toastMessage, onToastDismiss]);
 
   return (
-    <NativeModal animationType="fade" onRequestClose={onRequestClose} transparent visible={visible}>
+    <NativeModal
+      animationType="fade"
+      onRequestClose={onRequestClose}
+      transparent
+      visible={visible}
+      statusBarTranslucent={isFullScreen}
+      navigationBarTranslucent={isFullScreen}
+    >
       <View className={`flex-1 items-center justify-center px-margin ${backdropClassName ?? ""}`}>
         <View className="absolute inset-0 bg-gray-1000" style={{ opacity: scrimOpacity }} />
         <View
