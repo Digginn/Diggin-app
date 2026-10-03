@@ -12,6 +12,7 @@ import { CommentEditBanner } from "@/components/CommentEditBanner";
 import { COMMENT_MAX_LENGTH, CommentInput } from "@/components/CommentInput";
 import { FloatingToolbar } from "@/components/FloatingToolbar";
 import { ActionModal } from "@/components/modal";
+import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { colors } from "@/theme";
 import type { PostComment, PostDetail, PostItem } from "@/types/post";
 
@@ -23,6 +24,7 @@ import { SaveToAllSheet } from "./components/SaveToAllSheet";
 // TODO: API 연결 전까지 쓰는 임시 데이터.
 const MOCK_POST: PostDetail = {
   id: "0",
+  authorId: "user-1",
   author: "디기",
   timeLabel: "N분 전",
   body: "본문 텍스트",
@@ -36,11 +38,13 @@ const MOCK_POST: PostDetail = {
 };
 
 // TODO: API 연결 시 내 글 여부를 서버 값으로 바꾼다.
-const IS_MY_POST = true;
+// TODO: 로그인 사용자 식별자는 인증 연결 시 교체한다.
+const CURRENT_USER_ID = "me";
 
 const MOCK_COMMENTS: PostComment[] = [
   {
     id: "0",
+    authorId: "me",
     author: "디기 1 (나)",
     body: "저는 왼쪽이 더 예쁜 것 같아요!",
     timeLabel: "N분 전",
@@ -48,6 +52,7 @@ const MOCK_COMMENTS: PostComment[] = [
   },
   {
     id: "1",
+    authorId: "user-withdrawn",
     author: "(탈퇴한 사용자)",
     body: "",
     timeLabel: "N분 전",
@@ -56,6 +61,7 @@ const MOCK_COMMENTS: PostComment[] = [
   },
   {
     id: "2",
+    authorId: "user-2",
     author: "디기 2",
     body: "여기가 더 싸요 https://diggin.link/a1",
     timeLabel: "N분 전",
@@ -77,11 +83,16 @@ export function PostDetailScreen() {
   const [isDeleteOpen, setDeleteOpen] = useState(false);
   // 삭제 확인을 받는 동안 어떤 댓글이었는지 들고 있는다.
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  // TODO: 차단은 계정 단위라 서버 목록으로 바꾼다. 지금은 이 화면을 벗어나면 풀린다.
+  const [blockedIds, setBlockedIds] = useState<ReadonlySet<string>>(new Set());
   const [infoItem, setInfoItem] = useState<PostItem | null>(null);
   const [isSaveOpen, setSaveOpen] = useState(false);
 
   const isTooLong = draft.length > COMMENT_MAX_LENGTH;
   const menuComment = comments.find((comment) => comment.id === menuCommentId);
+  const visibleComments = comments.filter((comment) => !blockedIds.has(comment.authorId));
+  const isMyPost = post.authorId === CURRENT_USER_ID;
 
   function startEdit(comment: PostComment) {
     setMenuCommentId(null);
@@ -110,7 +121,7 @@ export function PostDetailScreen() {
         left="back"
         onBack={() => router.back()}
         right={
-          IS_MY_POST ? (
+          isMyPost ? (
             <Pressable
               accessibilityLabel="게시글 메뉴"
               accessibilityRole="button"
@@ -124,7 +135,7 @@ export function PostDetailScreen() {
               accessibilityLabel="신고하기"
               accessibilityRole="button"
               className="h-[52px] w-[55px] items-center justify-center active:opacity-75"
-              onPress={() => {}}
+              onPress={() => setReportTarget({ authorId: post.authorId })}
             >
               <ReportSvg width={18} height={18} color={colors.gray[400]} />
             </Pressable>
@@ -162,7 +173,7 @@ export function PostDetailScreen() {
 
         <View className="h-3 w-full bg-gray-100" />
 
-        {comments.map((comment) => (
+        {visibleComments.map((comment) => (
           <Comment
             key={comment.id}
             author={comment.author}
@@ -198,7 +209,12 @@ export function PostDetailScreen() {
                 }}
               />
             ) : (
-              <FloatingToolbar onReport={() => setMenuCommentId(null)} />
+              <FloatingToolbar
+                onReport={() => {
+                  setReportTarget({ authorId: menuComment.authorId });
+                  setMenuCommentId(null);
+                }}
+              />
             )}
           </View>
         </>
@@ -250,6 +266,12 @@ export function PostDetailScreen() {
         onPressFolder={() => {}}
         onSubmit={() => setSaveOpen(false)}
         onRequestClose={() => setSaveOpen(false)}
+      />
+
+      <ReportFlow
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+        onBlock={(authorId) => setBlockedIds((prev) => new Set(prev).add(authorId))}
       />
 
       <ActionModal
