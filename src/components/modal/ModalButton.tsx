@@ -14,7 +14,7 @@ export function ModalButton({
 }) {
   const containerClassName =
     variant === "primary"
-      ? "bg-gray-900 rounded-[5px]"
+      ? "bg-gray-900 rounded-field"
       : variant === "secondary"
         ? "bg-gray-100 rounded"
         : "bg-gray-200 rounded";

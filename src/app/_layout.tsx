@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { LinkDetectModal } from "@/components/LinkDetectModal";
 
 import "@/global.css";
+import { ToastProvider } from "@/contexts/ToastContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,8 +26,13 @@ export default function RootLayout() {
 
   return (
     <>
+      (
+    <ToastProvider>
       <Stack screenOptions={{ headerShown: false }} />
       <LinkDetectModal />
+          </ToastProvider>
     </>
-  );
+    
+  )
+
 }

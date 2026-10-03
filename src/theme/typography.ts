@@ -17,6 +17,7 @@ export const typography = {
   "b4": { weight: "Regular", size: 13, ratio: 1.5, tracking: -1 },
 
   "label-20": { weight: "SemiBold", size: 20, ratio: 1.5 },
+  "label-20-medium": { weight: "Medium", size: 20, ratio: 1.5 },
   "label-18-semibold": { weight: "SemiBold", size: 18, ratio: 1.35 },
   "label-18-medium": { weight: "Medium", size: 18, ratio: 1.35 },
   "label-16-bold": { weight: "Bold", size: 16, ratio: 1.2, tracking: -2 },

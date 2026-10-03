@@ -10,7 +10,7 @@ function FolderNameField() {
     <View className="w-[295px] gap-2">
       <Text className="text-gray-1000 font-b3">폴더 이름</Text>
       <TextInput
-        className="h-11 rounded-[5px] border border-gray-300 px-4 py-0 text-gray-700 font-label-16-medium"
+        className="h-11 rounded-field border border-gray-300 px-4 py-0 text-gray-700 font-label-16-medium"
         defaultValue="새 폴더"
         textAlignVertical="center"
       />
@@ -28,25 +28,25 @@ export default function ModalPreview() {
         <Text className="text-gray-900 font-h1">Modal</Text>
         <Text className="text-gray-700 font-b3">버튼을 눌러 모달 상태를 확인하세요.</Text>
         <Pressable
-          className="h-12 items-center justify-center rounded-[5px] bg-gray-900"
+          className="h-12 items-center justify-center rounded-field bg-gray-900"
           onPress={() => setPreviewModal("folder")}
         >
           <Text className="text-gray-0 font-label-16-semibold">Modal1 (1Btn) 열기</Text>
         </Pressable>
         <Pressable
-          className="h-12 items-center justify-center rounded-[5px] bg-gray-900"
+          className="h-12 items-center justify-center rounded-field bg-gray-900"
           onPress={() => setPreviewModal("folderWithActions")}
         >
           <Text className="text-gray-0 font-label-16-semibold">Modal1 (2Btn) 열기</Text>
         </Pressable>
         <Pressable
-          className="h-12 items-center justify-center rounded-[5px] bg-gray-900"
+          className="h-12 items-center justify-center rounded-field bg-gray-900"
           onPress={() => setPreviewModal("link")}
         >
           <Text className="text-gray-0 font-label-16-semibold">Modal2 열기</Text>
         </Pressable>
         <Pressable
-          className="h-12 items-center justify-center rounded-[5px] bg-gray-900"
+          className="h-12 items-center justify-center rounded-field bg-gray-900"
           onPress={() => setPreviewModal("report")}
         >
           <Text className="text-gray-0 font-label-16-semibold">ModalReport 열기</Text>

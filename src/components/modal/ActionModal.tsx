@@ -63,7 +63,7 @@ export function ActionModal({
         {children}
       </View>
       {isTwoButton ? (
-        <View className="w-[295px] flex-row gap-[15px]">
+        <View className="w-[295px] flex-row gap-modal-action">
           <View className="w-[140px]">
             <ModalButton action={secondaryAction} variant="secondary" />
           </View>

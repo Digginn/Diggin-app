@@ -39,7 +39,7 @@ export function ReportModal({ visible, onRequestClose, onCancel, onReport }: Rep
         {REPORT_REASONS.map((item) => (
           <Pressable
             key={item}
-            className="min-h-12 flex-row items-center gap-2 rounded-[5px] border-[1.5px] border-gray-300 px-4 py-[11px]"
+            className="min-h-12 flex-row items-center gap-2 rounded-field border-[1.5px] border-gray-300 px-4 py-[11px]"
             onPress={() => {
               setReason(item);
               if (item !== "직접 작성") {
@@ -57,7 +57,7 @@ export function ReportModal({ visible, onRequestClose, onCancel, onReport }: Rep
         ))}
         {isOther && (
           <View
-            className={`min-h-[88px] w-full rounded-[5px] border-[1.5px] px-4 py-2.5 ${isDetailFocused ? "border-semantic-focus" : "border-gray-300"}`}
+            className={`min-h-[88px] w-full rounded-field border-[1.5px] px-4 py-2.5 ${isDetailFocused ? "border-semantic-focus" : "border-gray-300"}`}
           >
             <TextInput
               className="flex-1 p-0 text-gray-900 font-label-16-medium"
@@ -79,7 +79,7 @@ export function ReportModal({ visible, onRequestClose, onCancel, onReport }: Rep
           </View>
         )}
       </View>
-      <View className="w-[295px] flex-row gap-[15px]">
+      <View className="w-[295px] flex-row gap-modal-action">
         <View className="w-[140px]">
           <ModalButton action={{ label: "취소", onPress: onCancel }} variant="secondary" />
         </View>
