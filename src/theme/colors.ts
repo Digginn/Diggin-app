@@ -16,6 +16,7 @@ export const colors = {
     placeholder: "#B3B3B3",
   },
   semantic: {
+    link: "#0076AF",
     error: "#EB2525",
     errorOnDark: "#FF7E7E",
     // Figma ErrorBg (Dark): Gray #121212 위에 Error 12%를 합성한 색상.
