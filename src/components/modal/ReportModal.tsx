@@ -32,6 +32,7 @@ export function ReportModal({ visible, onRequestClose, onCancel, onReport }: Rep
   const [detail, setDetail] = useState("");
   const [isDetailFocused, setIsDetailFocused] = useState(false);
   const isOther = reason === "직접 작성";
+  const canSubmit = reason !== undefined && (!isOther || detail.trim().length > 0);
   return (
     <Modal visible={visible} onRequestClose={onRequestClose}>
       <Text className="text-gray-900 font-label-16-semibold">신고 사유</Text>
@@ -86,6 +87,7 @@ export function ReportModal({ visible, onRequestClose, onCancel, onReport }: Rep
         <View className="w-[140px]">
           <ModalButton
             action={{ label: "신고하기", onPress: () => onReport(reason ?? "", detail) }}
+            variant={canSubmit ? "primary" : "disabled"}
           />
         </View>
       </View>
