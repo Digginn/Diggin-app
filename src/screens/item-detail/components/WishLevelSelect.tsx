@@ -70,10 +70,10 @@ export function WishLevelSelect({
         ) : (
           <Text className="text-gray-900 font-label-14">미선택</Text>
         )}
-        {/* 열림 여부와 무관하게 항상 위쪽 화살표임 */}
+        {/* 목록은 위로 열리므로 닫혔을 때 위쪽, 열렸을 때 아래쪽을 가리킨다. */}
         <View
           className="size-4 items-center justify-center"
-          style={{ transform: [{ rotate: "180deg" }] }}
+          style={{ transform: [{ rotate: isOpen ? "0deg" : "180deg" }] }}
         >
           <ChevronIcon className="size-3 text-gray-900" />
         </View>
