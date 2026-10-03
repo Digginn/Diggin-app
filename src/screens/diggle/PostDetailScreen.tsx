@@ -67,6 +67,7 @@ export function PostDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [post, setPost] = useState(MOCK_POST);
+  const [comments, setComments] = useState(MOCK_COMMENTS);
   const [draft, setDraft] = useState("");
   const [menuCommentId, setMenuCommentId] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
@@ -74,17 +75,24 @@ export function PostDetailScreen() {
   const inputRef = useRef<TextInput>(null);
   const [isPostMenuOpen, setPostMenuOpen] = useState(false);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
+  // 삭제 확인을 받는 동안 어떤 댓글이었는지 들고 있는다.
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [infoItem, setInfoItem] = useState<PostItem | null>(null);
   const [isSaveOpen, setSaveOpen] = useState(false);
 
   const isTooLong = draft.length > COMMENT_MAX_LENGTH;
-  const menuComment = MOCK_COMMENTS.find((comment) => comment.id === menuCommentId);
+  const menuComment = comments.find((comment) => comment.id === menuCommentId);
 
   function startEdit(comment: PostComment) {
     setMenuCommentId(null);
     setEditingComment(comment);
     setDraft(comment.body);
     inputRef.current?.focus();
+  }
+
+  function deleteComment() {
+    setComments((prev) => prev.filter((comment) => comment.id !== deletingCommentId));
+    setDeletingCommentId(null);
   }
 
   function cancelEdit() {
@@ -154,7 +162,7 @@ export function PostDetailScreen() {
 
         <View className="h-3 w-full bg-gray-100" />
 
-        {MOCK_COMMENTS.map((comment) => (
+        {comments.map((comment) => (
           <Comment
             key={comment.id}
             author={comment.author}
@@ -184,7 +192,10 @@ export function PostDetailScreen() {
             {menuComment.isMine ? (
               <FloatingToolbar
                 onEdit={() => startEdit(menuComment)}
-                onDelete={() => setMenuCommentId(null)}
+                onDelete={() => {
+                  setDeletingCommentId(menuComment.id);
+                  setMenuCommentId(null);
+                }}
               />
             ) : (
               <FloatingToolbar onReport={() => setMenuCommentId(null)} />
@@ -239,6 +250,16 @@ export function PostDetailScreen() {
         onPressFolder={() => {}}
         onSubmit={() => setSaveOpen(false)}
         onRequestClose={() => setSaveOpen(false)}
+      />
+
+      <ActionModal
+        visible={deletingCommentId !== null}
+        type="2Btn"
+        title="댓글을 삭제하시겠습니까?"
+        description="삭제한 댓글은 복구할 수 없습니다."
+        secondaryAction={{ label: "취소", onPress: () => setDeletingCommentId(null) }}
+        primaryAction={{ label: "삭제하기", onPress: deleteComment }}
+        onRequestClose={() => setDeletingCommentId(null)}
       />
 
       <ActionModal
