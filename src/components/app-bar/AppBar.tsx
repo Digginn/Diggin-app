@@ -19,29 +19,34 @@ const WORDMARK_HEIGHT = 26;
 type AppBarProps = {
   left?: "back" | "logo" | "none";
   title?: string;
+  titleClassName?: string;
   progress?: number;
   right?: ReactNode;
   onBack?: () => void;
   backIcon?: SvgIcon;
   backIconSize?: number;
+  colorScheme?: "light" | "dark";
 };
 
 function AppBarRoot({
   left = "back",
   title,
+  titleClassName,
   progress,
   right,
   onBack,
   backIcon = IconBack,
   backIconSize = 48,
+  colorScheme = "light",
 }: AppBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const handleBack = onBack ?? (() => router.back());
+  const isDark = colorScheme === "dark";
 
   return (
-    <View className="bg-gray-0" style={{ paddingTop: insets.top }}>
+    <View className={isDark ? "bg-gray-1000" : "bg-gray-0"} style={{ paddingTop: insets.top }}>
       <View className="relative flex-row items-center" style={{ height: BAR_HEIGHT }}>
         <View className="absolute left-0 h-full justify-center">
           {left === "back" && (
@@ -50,6 +55,7 @@ function AppBarRoot({
               iconSize={backIconSize}
               accessibilityLabel="뒤로 가기"
               onPress={handleBack}
+              className={isDark ? "text-gray-0" : "text-gray-900"}
             />
           )}
           {left === "logo" && (
@@ -66,7 +72,10 @@ function AppBarRoot({
         >
           {progress === undefined ? (
             title ? (
-              <Text numberOfLines={1} className="text-gray-900 font-label-20">
+              <Text
+                numberOfLines={1}
+                className={`${isDark ? "text-gray-0" : "text-gray-900"} ${titleClassName ?? (isDark ? "font-label-20-medium" : "font-label-20")}`}
+              >
                 {title}
               </Text>
             ) : null

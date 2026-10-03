@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 
 import "@/global.css";
+import { ToastProvider } from "@/contexts/ToastContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,9 +24,9 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <>
+    <ToastProvider>
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }} />
-    </>
+    </ToastProvider>
   );
 }

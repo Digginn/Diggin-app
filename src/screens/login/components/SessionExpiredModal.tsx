@@ -11,7 +11,7 @@ type SessionExpiredModalProps = {
 
 export function SessionExpiredModal({ visible, onLater, onLogin }: SessionExpiredModalProps) {
   return (
-    <Modal visible={visible} onRequestClose={onLater} scrimClassName="bg-black/[0.36]" isFullScreen>
+    <Modal visible={visible} onRequestClose={onLater} scrimOpacity={0.36} isFullScreen>
       <View className="-mt-2 w-full items-center gap-1">
         <View className="h-12 w-full items-center justify-center">
           <Text

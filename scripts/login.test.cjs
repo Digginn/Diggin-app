@@ -39,6 +39,8 @@ function nodes(root) {
 
 test("소셜 버튼이 공통 Button과 지정 로고·색상·콜백을 사용한다", () => {
   const { colors } = load("theme/colors.ts");
+  assert.equal(colors.accent.blue, "#0088FF");
+  assert.equal(colors.accent.pink, "#FF2D55");
   const { SocialLoginButton } = load("screens/login/components/SocialLoginButton.tsx", {
     "@/components/Button": { Button: "Button" },
     "@/theme": { colors },
@@ -62,6 +64,57 @@ test("소셜 버튼이 공통 Button과 지정 로고·색상·콜백을 사용�
     assert.equal(logo.props.width, undefined);
     assert.equal(logo.props.height, undefined);
   }
+});
+
+test("루트는 폰트 준비 후 스플래시를 닫고 전역 토스트·상태바·라우터를 함께 제공한다", () => {
+  let isLoaded = false;
+  let fontError = null;
+  let effect;
+  let hidden = 0;
+  let prevented = 0;
+  const { default: RootLayout } = load("app/_layout.tsx", {
+    "expo-font": { useFonts: () => [isLoaded, fontError] },
+    "expo-router": { Stack: "Stack" },
+    "expo-status-bar": { StatusBar: "StatusBar" },
+    "expo-splash-screen": {
+      preventAutoHideAsync: () => {
+        prevented += 1;
+      },
+      hideAsync: () => {
+        hidden += 1;
+      },
+    },
+    "react": {
+      useEffect: (callback) => {
+        effect = callback;
+      },
+    },
+    "@/global.css": {},
+    "@/contexts/ToastContext": { ToastProvider: "ToastProvider" },
+    "@/assets/fonts/Pretendard-Regular.otf": 1,
+    "@/assets/fonts/Pretendard-Medium.otf": 2,
+    "@/assets/fonts/Pretendard-SemiBold.otf": 3,
+    "@/assets/fonts/Pretendard-Bold.otf": 4,
+  });
+  assert.equal(prevented, 1);
+  assert.equal(RootLayout(), null);
+  effect();
+  assert.equal(hidden, 0);
+  isLoaded = true;
+  const root = RootLayout();
+  effect();
+  assert.equal(hidden, 1);
+  assert.equal(root.type, "ToastProvider");
+  const children = React.Children.toArray(root.props.children);
+  assert.equal(children[0].type, "StatusBar");
+  assert.equal(children[0].props.style, "auto");
+  assert.equal(children[1].type, "Stack");
+  assert.equal(children[1].props.screenOptions.headerShown, false);
+  isLoaded = false;
+  fontError = new Error("폰트 로딩 실패");
+  assert.equal(RootLayout().type, "ToastProvider");
+  effect();
+  assert.equal(hidden, 2);
 });
 
 test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정상 동작한다", () => {
@@ -130,14 +183,55 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
 });
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
-  const { ToastText } = load("components/ToastText.tsx");
+  const { ToastText } = load("components/ToastText.tsx", {
+    "@/assets/images/toast": { IconToastError: "IconToastError" },
+  });
   const toast = ToastText({ message: "로그인 실패" });
   assert.equal(toast.props.pointerEvents, "none");
   assert.equal(toast.props.accessibilityRole, "alert");
   assert.equal(toast.props.accessibilityLiveRegion, "polite");
-  assert.ok(toast.props.className.includes("border-gray-800 bg-gray-700 p-3"));
-  assert.ok(toast.props.children.props.className.includes("text-gray-200 font-label-14"));
-  assert.equal(toast.props.children.props.children, "로그인 실패");
+  for (const token of ["border-gray-800", "bg-gray-700", "p-3"]) {
+    assert.ok(toast.props.className.includes(token));
+  }
+  const text = nodes(toast).find((node) => node.type === "Text");
+  assert.ok(text.props.className.includes("text-gray-200"));
+  assert.ok(text.props.className.includes("font-label-14"));
+  assert.equal(text.props.children, "로그인 실패");
+});
+
+test("AppBar는 로그인용 아이콘 옵션과 develop의 다크모드·제목 옵션을 함께 유지한다", () => {
+  const routes = [];
+  const { AppBar } = load("components/app-bar/AppBar.tsx", {
+    "expo-router": { useRouter: () => ({ back: () => routes.push("back") }) },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 24 }) },
+    "@/assets/images/appbar": { IconBack: "DefaultBack" },
+    "./IconButton": { IconButton: "IconButton" },
+    "./TextButton": { TextButton: "TextButton" },
+  });
+  const dark = nodes(
+    AppBar({
+      title: "제목",
+      titleClassName: "font-h2",
+      colorScheme: "dark",
+      backIcon: "LoginBack",
+      backIconSize: 24,
+    }),
+  );
+  assert.equal(dark[0].props.className, "bg-gray-1000");
+  assert.equal(dark[0].props.style.paddingTop, 24);
+  const icon = dark.find((node) => node.type === "IconButton");
+  assert.equal(icon.props.icon, "LoginBack");
+  assert.equal(icon.props.iconSize, 24);
+  assert.equal(icon.props.className, "text-gray-0");
+  icon.props.onPress();
+  assert.deepEqual(routes, ["back"]);
+  const title = dark.find((node) => node.type === "Text");
+  assert.ok(title.props.className.includes("font-h2"));
+  assert.ok(title.props.className.includes("text-gray-0"));
+  const light = nodes(AppBar({})).find((node) => node.type === "IconButton");
+  assert.equal(light.props.icon, "DefaultBack");
+  assert.equal(light.props.iconSize, 48);
+  assert.equal(light.props.className, "text-gray-900");
 });
 
 test("공통 아이콘 버튼의 기존 48px 기본값과 로그인용 24px 옵션을 유지한다", () => {
@@ -183,6 +277,8 @@ test("인증 만료 안내의 나중에 버튼은 모달을 닫고 로그인 버
   const modal = SessionExpiredModal(previewModal().props);
   const buttons = nodes(modal).filter((node) => node.type === "Button");
   assert.equal(modal.props.visible, true);
+  assert.equal(modal.props.scrimOpacity, 0.36);
+  assert.equal(modal.props.isFullScreen, true);
   assert.deepEqual(
     buttons.map((node) => node.props.children),
     ["다음에 할게요", "로그인하기"],
