@@ -21,6 +21,7 @@ export const colors = {
     // Figma ErrorBg (Dark): Gray #121212 위에 Error 12%를 합성한 색상.
     errorBgDark: "#2C1414",
     focus: "#717171",
+    errorBg: "#2C1414",
   },
   brand: {
     kakao: "#FBE300",

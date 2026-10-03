@@ -4,8 +4,10 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 
-import "@/global.css";
+import { LinkDetectModal } from "@/components/LinkDetectModal";
 import { ToastProvider } from "@/contexts/ToastContext";
+
+import "@/global.css";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,6 +29,7 @@ export default function RootLayout() {
     <ToastProvider>
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }} />
+      <LinkDetectModal />
     </ToastProvider>
   );
 }
