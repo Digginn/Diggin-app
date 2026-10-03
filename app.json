@@ -1,13 +1,21 @@
 {
   "expo": {
     "name": "Diggin",
+    "owner": "diggin",
     "slug": "Diggin",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon-app.png",
     "scheme": "diggin",
     "userInterfaceStyle": "automatic",
+    "ios": {
+      "infoPlist": {
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+      }
+    },
     "android": {
+      "package": "com.diggin.app.preview",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,14 +42,21 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#000000",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200
+          "image": "./assets/images/splash-logo.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a58be392-d642-442d-a55a-bdfaedbcb9eb"
+      }
     }
   }
 }
