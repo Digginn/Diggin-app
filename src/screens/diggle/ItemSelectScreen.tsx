@@ -5,6 +5,7 @@ import { FlatList, KeyboardAvoidingView, Platform, Text, View } from "react-nati
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { HelperText, SearchField } from "@/components/Field";
+import { usePostDraft } from "@/contexts/PostDraftContext";
 import type { PostItem } from "@/types/post";
 
 import { MAX_ATTACH_COUNT } from "./components/ProductAttachGrid";
@@ -26,9 +27,10 @@ const MOCK_ITEMS = Array.from({ length: 9 }, (_, index) => ({
 
 export function ItemSelectScreen() {
   const router = useRouter();
+  const { items: attached, setItems } = usePostDraft();
   const [keyword, setKeyword] = useState("");
   // 검색어가 바뀌어도 이미 고른 아이템은 선택 상태를 유지함
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>(attached.map((item) => item.id));
 
   const results = keyword
     ? MOCK_ITEMS.filter((item) => item.name.includes(keyword) || item.brand.includes(keyword))
@@ -46,7 +48,8 @@ export function ItemSelectScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      // 안드로이드는 adjustResize 로 OS 가 창을 줄여주므로 여기서 또 줄이면 입력란이 밀린다.
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-gray-0"
     >
       <AppBar title="아이템 선택" onBack={() => router.back()} />
@@ -86,7 +89,13 @@ export function ItemSelectScreen() {
       />
 
       <View className="w-full border-t border-gray-200 bg-gray-0 px-margin pb-10 pt-3">
-        <Button isDisabled={selectedIds.length === 0} onPress={() => router.back()}>
+        <Button
+          isDisabled={selectedIds.length === 0}
+          onPress={() => {
+            setItems(MOCK_ITEMS.filter((item) => selectedIds.includes(item.id)));
+            router.back();
+          }}
+        >
           첨부하기
         </Button>
       </View>

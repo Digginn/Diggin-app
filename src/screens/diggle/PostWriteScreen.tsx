@@ -1,12 +1,12 @@
 import { clsx } from "clsx";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BackHandler, Pressable, ScrollView, Text, View } from "react-native";
 
 import { AppBar } from "@/components/app-bar";
 import { BodyTextField, HelperText } from "@/components/Field";
 import { ActionModal } from "@/components/modal";
-import type { PostItem } from "@/types/post";
+import { usePostDraft } from "@/contexts/PostDraftContext";
 
 import { MAX_ATTACH_COUNT, ProductAttachGrid } from "./components/ProductAttachGrid";
 
@@ -14,8 +14,7 @@ export function PostWriteScreen() {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [isBodyValid, setBodyValid] = useState(false);
-  // TODO: 아이템 선택 화면에서 돌려받는 건 전역 상태가 정해지면 연결한다.
-  const [items, setItems] = useState<PostItem[]>([]);
+  const { items, setItems, reset } = usePostDraft();
 
   const [isExitOpen, setExitOpen] = useState(false);
 
@@ -23,6 +22,9 @@ export function PostWriteScreen() {
   const showBodyError = body.length > 0 && !isBodyValid;
   const canSubmit = isBodyValid && items.length > 0;
   const hasDraft = body.length > 0 || items.length > 0;
+
+  // 아이템 선택은 push 라 이 화면이 살아 있음. 진짜로 내려갈 때만 비움
+  useEffect(() => reset, [reset]);
 
   // 쓴 게 없으면 물어볼 것도 없으니 그냥 나간다.
   const leave = useCallback(() => {
@@ -53,7 +55,10 @@ export function PostWriteScreen() {
             accessibilityState={{ disabled: !canSubmit }}
             className="size-12 items-center justify-center active:opacity-75"
             disabled={!canSubmit}
-            onPress={() => router.back()}
+            onPress={() => {
+              // TODO: 게시글 등록 API 로 본문과 아이템을 넘긴다.
+              router.back();
+            }}
           >
             <Text
               className={clsx(
@@ -96,7 +101,7 @@ export function PostWriteScreen() {
           <ProductAttachGrid
             items={items}
             onPressAdd={() => router.push("/posts/item-select")}
-            onRemove={(item) => setItems((prev) => prev.filter((it) => it.id !== item.id))}
+            onRemove={(item) => setItems(items.filter((it) => it.id !== item.id))}
           />
           <HelperText message="위시 아이템만 첨부할 수 있습니다." />
         </View>
