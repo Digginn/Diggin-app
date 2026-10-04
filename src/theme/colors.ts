@@ -13,11 +13,24 @@ export const colors = {
     800: "#3F3F3F",
     900: "#1E1E1E",
     1000: "#000000",
-    placeholder: "#B3B3B3",
-    skeleton: "#EEEEEE",
+    "placeholder": "#B3B3B3",
+    "skeleton": "#EEEEEE",
+    "menu-text": "#44403C",
+    "menu-divider": "#F5F5F4",
   },
   semantic: {
     error: "#EB2525",
+    errorOnDark: "#FF7E7E",
+    // Figma ErrorBg (Dark): Gray #121212 위에 Error 12%를 합성한 색상.
+    errorBgDark: "#2C1414",
     focus: "#717171",
+    errorBg: "#2C1414",
+  },
+  brand: {
+    kakao: "#FBE300",
+  },
+  accent: {
+    blue: "#0088FF",
+    pink: "#FF2D55",
   },
 } as const;

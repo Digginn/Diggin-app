@@ -73,7 +73,7 @@ export default function NotificationsRoute() {
       }
       onBack={() => {
         if (router.canGoBack()) router.back();
-        else router.replace("/(tabs)");
+        else router.replace("/(tabs)/all");
       }}
     />
   );

@@ -3,6 +3,7 @@ import { Pressable, Text } from "react-native";
 export type ModalAction = {
   label: string;
   onPress: () => void;
+  isDisabled?: boolean;
 };
 
 export function ModalButton({
@@ -12,9 +13,10 @@ export function ModalButton({
   action: ModalAction;
   variant?: "primary" | "secondary" | "disabled";
 }) {
+  if (action.isDisabled) variant = "disabled";
   const containerClassName =
     variant === "primary"
-      ? "bg-gray-900 rounded-[5px]"
+      ? "bg-gray-900 rounded-field"
       : variant === "secondary"
         ? "bg-gray-100 rounded"
         : "bg-gray-200 rounded";

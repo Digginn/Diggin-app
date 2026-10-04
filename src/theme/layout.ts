@@ -8,8 +8,9 @@
  *   <View className="flex-row gap-gutter">  컬럼 사이 간격
  */
 export const layout = {
-  margin: "24px",
-  gutter: "16px",
+  "margin": "24px",
+  "gutter": "16px",
+  "modal-action": "15px",
 };
 
 export const fieldShape = {

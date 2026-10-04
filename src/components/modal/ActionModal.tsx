@@ -15,6 +15,8 @@ type ActionModalProps = Omit<ModalProps, "children"> & {
   onClose?: () => void;
   primaryAction: ModalAction;
   secondaryAction?: ModalAction;
+  isPrimaryDisabled?: boolean;
+  hasTallHeader?: boolean;
 };
 
 const CloseIcon = cssInterop(CloseSvg, {
@@ -31,29 +33,46 @@ export function ActionModal({
   onClose,
   primaryAction,
   secondaryAction,
+  isPrimaryDisabled = true,
+  hasTallHeader = false,
+  isKeyboardAvoiding,
+  keyboardGap,
+  onShow,
+  overlay,
 }: ActionModalProps) {
   const isTwoButton = type === "2Btn" && secondaryAction;
   const hasCloseButton = type === "1Btn" && onClose !== undefined;
 
   return (
-    <Modal visible={visible} onRequestClose={onRequestClose}>
-      <View className={`w-[295px] items-center gap-[30px] ${hasCloseButton ? "-mt-2" : ""}`}>
-        <View className="w-[295px] items-center gap-1">
+    <Modal
+      visible={visible}
+      onRequestClose={onRequestClose}
+      isKeyboardAvoiding={isKeyboardAvoiding}
+      keyboardGap={keyboardGap}
+      onShow={onShow}
+      overlay={overlay}
+    >
+      <View
+        className={`w-[295px] items-center gap-[30px] ${hasCloseButton || hasTallHeader ? "-mt-2" : ""}`}
+      >
+        <View className={`w-[295px] items-center gap-1 ${hasCloseButton ? "pt-2.5" : ""}`}>
           {hasCloseButton ? (
-            <View className="w-[295px] flex-row items-center overflow-hidden">
-              <View className="size-12" />
-              <Text className="flex-1 text-center text-gray-900 font-label-16-semibold">
-                {title}
-              </Text>
+            <>
+              <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>
               <Pressable
                 accessibilityLabel="모달 닫기"
-                className="size-12 items-center justify-center overflow-hidden"
+                accessibilityRole="button"
+                className="absolute -right-4 -top-2 size-12 items-center justify-center overflow-hidden"
                 onPress={onClose}
               >
                 <View className="size-4 items-center justify-center overflow-hidden">
                   <CloseIcon className="size-4" />
                 </View>
               </Pressable>
+            </>
+          ) : hasTallHeader ? (
+            <View className="h-12 justify-center">
+              <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>
             </View>
           ) : (
             <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>
@@ -63,7 +82,7 @@ export function ActionModal({
         {children}
       </View>
       {isTwoButton ? (
-        <View className="w-[295px] flex-row gap-[15px]">
+        <View className="w-[295px] flex-row gap-modal-action">
           <View className="w-[140px]">
             <ModalButton action={secondaryAction} variant="secondary" />
           </View>
@@ -73,7 +92,10 @@ export function ActionModal({
         </View>
       ) : (
         <View className="w-[295px]">
-          <ModalButton action={primaryAction} variant="disabled" />
+          <ModalButton
+            action={primaryAction}
+            variant={isPrimaryDisabled ? "disabled" : "primary"}
+          />
         </View>
       )}
     </Modal>

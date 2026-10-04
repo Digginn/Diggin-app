@@ -158,7 +158,7 @@ test("뒤로 가기는 이전 화면으로, 직접 진입한 경우에는 탭 �
       { __DEV__: false },
     );
     Route().props.onBack();
-    assert.deepEqual(events, [canGoBack ? "back" : "/(tabs)"]);
+    assert.deepEqual(events, [canGoBack ? "back" : "/(tabs)/all"]);
   }
 });
 
