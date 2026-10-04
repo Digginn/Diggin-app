@@ -4,7 +4,7 @@ import { Pressable, Text } from "react-native";
 import EditSvg from "@/assets/images/icon-edit.svg";
 
 const EditIcon = cssInterop(EditSvg, {
-  className: { target: "style", nativeStyleToProp: { width: true, height: true } },
+  className: { target: "style", nativeStyleToProp: { width: true, height: true, color: true } },
 });
 
 type EditChipProps = {
@@ -20,7 +20,7 @@ export function EditChip({ onPress }: EditChipProps) {
       hitSlop={{ top: 12, bottom: 12 }}
       onPress={onPress}
     >
-      <EditIcon className="size-[14px]" />
+      <EditIcon className="size-[14px] text-gray-700" />
       <Text className="text-gray-700 font-tag">수정하기</Text>
     </Pressable>
   );

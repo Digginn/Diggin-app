@@ -5,6 +5,9 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 
 import { LinkDetectModal } from "@/components/LinkDetectModal";
+import { BlockedUsersProvider } from "@/contexts/BlockedUsersContext";
+import { PostDraftProvider } from "@/contexts/PostDraftContext";
+import { PostsProvider } from "@/contexts/PostsContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 
 import "@/global.css";
@@ -27,9 +30,15 @@ export default function RootLayout() {
 
   return (
     <ToastProvider>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }} />
-      <LinkDetectModal />
+      <BlockedUsersProvider>
+        <PostDraftProvider>
+          <PostsProvider>
+            <StatusBar style="auto" />
+            <Stack screenOptions={{ headerShown: false }} />
+            <LinkDetectModal />
+          </PostsProvider>
+        </PostDraftProvider>
+      </BlockedUsersProvider>
     </ToastProvider>
   );
 }

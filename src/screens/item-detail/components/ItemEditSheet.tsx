@@ -53,7 +53,6 @@ export function ItemEditSheet({
   const [values, setValues] = useState(initialValues);
   const [isLevelOpen, setLevelOpen] = useState(false);
   const [isHintOpen, setHintOpen] = useState(false);
-  // 툴팁이 ScrollView 안에서는 잘려서 좌표를 재고 Modal 로 띄움
   const hintRef = useRef<View>(null);
   const [hintAnchor, setHintAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -62,7 +61,7 @@ export function ItemEditSheet({
     (value: ItemEditValues[K]) =>
       setValues((prev) => ({ ...prev, [key]: value }));
 
-  // 위시 레벨은 필수가 아니라 값 변경 여부로 활성화를 판단함
+  // 시안의 수정 완료는 비활성이다. 위시 레벨은 필수가 아니므로 값이 바뀌었는지로 판단한다.
   const isDirty = (Object.keys(values) as (keyof ItemEditValues)[]).some(
     (key) => values[key] !== initialValues[key],
   );
@@ -97,6 +96,7 @@ export function ItemEditSheet({
 
   return (
     <BottomSheet visible={visible} onRequestClose={handleClose}>
+      {/* 시안 Body gap-25 > Form gap-16 > Fields gap-30 */}
       <ScrollView
         className="px-margin"
         contentContainerStyle={{ gap: 25 }}
@@ -153,7 +153,7 @@ export function ItemEditSheet({
             </View>
           </View>
 
-          {/* 도움말 버튼 48 이 줄 높이를 밀지 않게 32 로 고정함 */}
+          {/* 시안 WishscoreRow 는 32 높이고 도움말 버튼만 48 로 겹쳐 놓는다. */}
           <View className="h-8 flex-row items-center justify-between">
             <View className="h-8 flex-row items-center">
               <Text className="text-gray-900 font-b3">위시 레벨</Text>

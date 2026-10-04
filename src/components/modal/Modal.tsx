@@ -1,5 +1,12 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Modal as NativeModal, Platform, View } from "react-native";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal as NativeModal,
+  Platform,
+  Pressable,
+  View,
+} from "react-native";
 
 import { ToastText } from "@/components/ToastText";
 
@@ -69,12 +76,19 @@ export function Modal({
       statusBarTranslucent={isFullScreen}
       navigationBarTranslucent={isFullScreen}
     >
-      <KeyboardAvoidingView enabled={isKeyboardAvoiding} behavior="padding" className="flex-1">
+      {/* 안드로이드는 adjustResize 로 OS 가 창을 줄여주므로 여기서 또 줄이면 입력란이 밀린다. */}
+      <KeyboardAvoidingView
+        enabled={isKeyboardAvoiding}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className="flex-1"
+      >
         <View
           className={`flex-1 items-center px-margin ${isAboveKeyboard ? "justify-end" : "justify-center"} ${backdropClassName ?? ""}`}
           style={isAboveKeyboard ? { paddingBottom: keyboardGap } : undefined}
         >
           <View className="absolute inset-0 bg-gray-1000" style={{ opacity: scrimOpacity }} />
+          {/* 카드 바깥을 누르면 키보드만 닫는다. 모달은 닫지 않는다. */}
+          <Pressable accessible={false} className="absolute inset-0" onPress={Keyboard.dismiss} />
           <View
             className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-lg ${className ?? "px-2.5 py-4"}`}
           >

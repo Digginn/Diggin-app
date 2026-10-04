@@ -22,6 +22,8 @@ type BottomSheetProps = {
   scrimOpacity?: number;
   overlay?: ReactNode;
   isKeyboardAvoiding?: boolean;
+  /** 그래버 없이 바로 내용이 시작하는 시트가 있다. */
+  isGrabberVisible?: boolean;
 };
 
 export function BottomSheet({
@@ -34,6 +36,7 @@ export function BottomSheet({
   scrimOpacity = 0.4,
   overlay,
   isKeyboardAvoiding = true,
+  isGrabberVisible = true,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -46,7 +49,8 @@ export function BottomSheet({
     >
       <KeyboardAvoidingView
         enabled={isKeyboardAvoiding}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        // 안드로이드는 adjustResize 로 OS 가 창을 줄여주므로 여기서 또 줄이면 입력란이 밀린다.
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1 justify-end"
       >
         <Pressable
@@ -64,13 +68,15 @@ export function BottomSheet({
             boxShadow: `0px -4px 4px ${colors.gray[1000]}1F`,
           }}
         >
-          <View
-            accessibilityElementsHidden
-            className={
-              handleClassName ?? "mb-5 h-1 w-8 self-center rounded-full bg-gray-500 opacity-40"
-            }
-            importantForAccessibility="no"
-          />
+          {isGrabberVisible ? (
+            <View
+              accessibilityElementsHidden
+              className={
+                handleClassName ?? "mb-5 h-1 w-8 self-center rounded-full bg-gray-500 opacity-40"
+              }
+              importantForAccessibility="no"
+            />
+          ) : null}
           {children}
         </View>
       </KeyboardAvoidingView>

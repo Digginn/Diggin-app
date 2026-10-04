@@ -19,6 +19,7 @@ export const colors = {
     "menu-divider": "#F5F5F4",
   },
   semantic: {
+    link: "#0076AF",
     error: "#EB2525",
     errorOnDark: "#FF7E7E",
     // Figma ErrorBg (Dark): Gray #121212 위에 Error 12%를 합성한 색상.
