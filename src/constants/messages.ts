@@ -17,6 +17,12 @@ export const TOAST_MESSAGES = {
     "파일 형식이 올바르지 않아 아이템 정보를 불러오지 못했습니다. 파일을 확인한 뒤 다시 시도해 주세요.",
 } as const;
 
+export const DIGGLE_TOAST_MESSAGES = {
+  DIGGLE_009: "게시글이 삭제되었습니다.",
+  COMMENT_004: "댓글을 수정하지 못했습니다. 다시 시도해 주세요.",
+  REPORT_004: "사용자를 차단했습니다.",
+} as const;
+
 export type ToastMessageKey = keyof typeof TOAST_MESSAGES;
 
 // 문구 확정 전이라 바뀔 수 있음

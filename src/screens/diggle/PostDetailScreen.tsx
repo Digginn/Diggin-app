@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import type { TextInput } from "react-native";
@@ -13,85 +13,47 @@ import { COMMENT_MAX_LENGTH, CommentInput } from "@/components/CommentInput";
 import { FloatingToolbar } from "@/components/FloatingToolbar";
 import { ActionModal } from "@/components/modal";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
+import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
+import { useBlockedUsers } from "@/contexts/BlockedUsersContext";
+import { usePosts } from "@/contexts/PostsContext";
+import { useToast } from "@/hooks/useToast";
 import { colors } from "@/theme";
-import type { PostComment, PostDetail, PostItem } from "@/types/post";
+import type { PostComment, PostItem } from "@/types/post";
 
 import { LikeCommentRow } from "./components/LikeCommentRow";
 import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
 import { SaveToAllSheet } from "./components/SaveToAllSheet";
-
-// TODO: API 연결 전까지 쓰는 임시 데이터.
-const MOCK_POST: PostDetail = {
-  id: "0",
-  authorId: "user-1",
-  author: "디기",
-  timeLabel: "N분 전",
-  body: "본문 텍스트",
-  items: [
-    { id: "0", imageUrl: null },
-    { id: "1", imageUrl: null },
-  ],
-  likeCount: 1,
-  commentCount: 1,
-  isLiked: false,
-};
-
-// TODO: API 연결 시 내 글 여부를 서버 값으로 바꾼다.
-// TODO: 로그인 사용자 식별자는 인증 연결 시 교체한다.
-const CURRENT_USER_ID = "me";
-
-const MOCK_COMMENTS: PostComment[] = [
-  {
-    id: "0",
-    authorId: "me",
-    author: "디기 1 (나)",
-    body: "저는 왼쪽이 더 예쁜 것 같아요!",
-    timeLabel: "N분 전",
-    isMine: true,
-  },
-  {
-    id: "1",
-    authorId: "user-withdrawn",
-    author: "(탈퇴한 사용자)",
-    body: "",
-    timeLabel: "N분 전",
-    isMine: false,
-    isDeleted: true,
-  },
-  {
-    id: "2",
-    authorId: "user-2",
-    author: "디기 2",
-    body: "여기가 더 싸요 https://diggin.link/a1",
-    timeLabel: "N분 전",
-    isMine: false,
-  },
-];
+import { CURRENT_USER_ID, findMockComments, MOCK_POSTS } from "./constants/mockPosts";
 
 export function PostDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [post, setPost] = useState(MOCK_POST);
-  const [comments, setComments] = useState(MOCK_COMMENTS);
+  const showToast = useToast();
+  const { isBlocked, block } = useBlockedUsers();
+  const { findPost, deletePost } = usePosts();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [post, setPost] = useState(() => findPost(id) ?? MOCK_POSTS[0]);
+  const [comments, setComments] = useState(() => findMockComments(id));
   const [draft, setDraft] = useState("");
   const [menuCommentId, setMenuCommentId] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   const [editingComment, setEditingComment] = useState<PostComment | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  // 댓글마다 ScrollView 안에서의 y 좌표. 수정할 때 그 댓글로 스크롤하는 데 쓴다.
+  const commentOffsets = useRef<Record<string, number>>({});
   const [isPostMenuOpen, setPostMenuOpen] = useState(false);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
   // 삭제 확인을 받는 동안 어떤 댓글이었는지 들고 있는다.
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
-  // TODO: 차단은 계정 단위라 서버 목록으로 바꾼다. 지금은 이 화면을 벗어나면 풀린다.
-  const [blockedIds, setBlockedIds] = useState<ReadonlySet<string>>(new Set());
   const [infoItem, setInfoItem] = useState<PostItem | null>(null);
   const [isSaveOpen, setSaveOpen] = useState(false);
 
   const isTooLong = draft.length > COMMENT_MAX_LENGTH;
   const menuComment = comments.find((comment) => comment.id === menuCommentId);
-  const visibleComments = comments.filter((comment) => !blockedIds.has(comment.authorId));
+  const visibleComments = comments.filter((comment) => !isBlocked(comment.authorId));
   const isMyPost = post.authorId === CURRENT_USER_ID;
 
   function startEdit(comment: PostComment) {
@@ -99,11 +61,52 @@ export function PostDetailScreen() {
     setEditingComment(comment);
     setDraft(comment.body);
     inputRef.current?.focus();
+    // 수정 배너가 그려진 뒤에 옮겨야 자리가 어긋나지 않는다.
+    requestAnimationFrame(() => {
+      const y = commentOffsets.current[comment.id];
+      if (y !== undefined) scrollRef.current?.scrollTo({ y, animated: true });
+    });
   }
 
   function deleteComment() {
     setComments((prev) => prev.filter((comment) => comment.id !== deletingCommentId));
     setDeletingCommentId(null);
+  }
+
+  function submitComment() {
+    const body = draft.trim();
+    if (!body) return;
+
+    if (editingComment) {
+      const targetId = editingComment.id;
+      setComments((prev) =>
+        prev.map((comment) => (comment.id === targetId ? { ...comment, body } : comment)),
+      );
+    } else {
+      // TODO: 댓글 등록 API 연결. 지금은 화면 안에서만 더한다.
+      setComments((prev) => [
+        ...prev,
+        {
+          id: `local-${Date.now()}`,
+          authorId: CURRENT_USER_ID,
+          author: "글쓴이 (나)",
+          body,
+          timeLabel: "방금 전",
+          isMine: true,
+        },
+      ]);
+    }
+
+    setDraft("");
+    setEditingComment(null);
+    inputRef.current?.blur();
+  }
+
+  // 글쓴이를 차단하면 이 게시글은 더 볼 수 없다
+  function handleBlock(authorId: string) {
+    block(authorId);
+    showToast(DIGGLE_TOAST_MESSAGES.REPORT_004);
+    if (authorId === post.authorId) router.back();
   }
 
   function cancelEdit() {
@@ -114,7 +117,8 @@ export function PostDetailScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      // 안드로이드는 adjustResize 로 OS 가 창을 줄여주므로 여기서 또 줄이면 입력란이 밀린다.
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-gray-0"
     >
       <AppBar
@@ -143,7 +147,7 @@ export function PostDetailScreen() {
         }
       />
 
-      <ScrollView keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} className="flex-1" keyboardShouldPersistTaps="handled">
         <View className="w-full justify-center px-margin">
           <View className="w-full flex-row items-center">
             <View className="flex-row items-center gap-1">
@@ -174,18 +178,24 @@ export function PostDetailScreen() {
         <View className="h-3 w-full bg-gray-100" />
 
         {visibleComments.map((comment) => (
-          <Comment
+          <View
             key={comment.id}
-            author={comment.author}
-            body={comment.body}
-            timeLabel={comment.timeLabel}
-            isDeleted={comment.isDeleted}
-            isHighlighted={menuCommentId === comment.id || editingComment?.id === comment.id}
-            onPressMenu={(anchor) => {
-              setMenuAnchor(anchor);
-              setMenuCommentId(comment.id);
+            onLayout={(event) => {
+              commentOffsets.current[comment.id] = event.nativeEvent.layout.y;
             }}
-          />
+          >
+            <Comment
+              author={comment.author}
+              body={comment.body}
+              timeLabel={comment.timeLabel}
+              isDeleted={comment.isDeleted}
+              isHighlighted={menuCommentId === comment.id || editingComment?.id === comment.id}
+              onPressMenu={(anchor) => {
+                setMenuAnchor(anchor);
+                setMenuCommentId(comment.id);
+              }}
+            />
+          </View>
         ))}
       </ScrollView>
 
@@ -271,7 +281,7 @@ export function PostDetailScreen() {
       <ReportFlow
         target={reportTarget}
         onClose={() => setReportTarget(null)}
-        onBlock={(authorId) => setBlockedIds((prev) => new Set(prev).add(authorId))}
+        onBlock={handleBlock}
       />
 
       <ActionModal
@@ -290,7 +300,16 @@ export function PostDetailScreen() {
         title="게시글을 삭제하시겠습니까?"
         description={"삭제한 게시글은 복구할 수 없습니다.\n게시글의 댓글도 함께 삭제됩니다."}
         secondaryAction={{ label: "취소", onPress: () => setDeleteOpen(false) }}
-        primaryAction={{ label: "삭제하기", onPress: () => setDeleteOpen(false) }}
+        primaryAction={{
+          label: "삭제하기",
+          onPress: () => {
+            // TODO: 게시글 삭제 API 연결.
+            setDeleteOpen(false);
+            deletePost(post.id);
+            showToast(DIGGLE_TOAST_MESSAGES.DIGGLE_009);
+            router.back();
+          },
+        }}
         onRequestClose={() => setDeleteOpen(false)}
       />
 
@@ -301,10 +320,7 @@ export function PostDetailScreen() {
           value={draft}
           onChangeText={setDraft}
           errorMessage={isTooLong ? "댓글은 1~30자로 입력해 주세요." : undefined}
-          onSend={() => {
-            setDraft("");
-            setEditingComment(null);
-          }}
+          onSend={submitComment}
         />
       </View>
     </KeyboardAvoidingView>
