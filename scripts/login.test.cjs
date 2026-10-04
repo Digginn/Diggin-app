@@ -91,6 +91,7 @@ test("루트는 폰트 준비 후 스플래시를 닫고 전역 토스트·상�
     },
     "@/global.css": {},
     "@/contexts/ToastContext": { ToastProvider: "ToastProvider" },
+    "@/components/LinkDetectModal": { LinkDetectModal: "LinkDetectModal" },
     "@/assets/fonts/Pretendard-Regular.otf": 1,
     "@/assets/fonts/Pretendard-Medium.otf": 2,
     "@/assets/fonts/Pretendard-SemiBold.otf": 3,
@@ -110,6 +111,7 @@ test("루트는 폰트 준비 후 스플래시를 닫고 전역 토스트·상�
   assert.equal(children[0].props.style, "auto");
   assert.equal(children[1].type, "Stack");
   assert.equal(children[1].props.screenOptions.headerShown, false);
+  assert.equal(children[2].type, "LinkDetectModal");
   isLoaded = false;
   fontError = new Error("폰트 로딩 실패");
   assert.equal(RootLayout().type, "ToastProvider");
@@ -232,6 +234,17 @@ test("AppBar는 로그인용 아이콘 옵션과 develop의 다크모드·제목
   assert.equal(light.props.icon, "DefaultBack");
   assert.equal(light.props.iconSize, 48);
   assert.equal(light.props.className, "text-gray-900");
+  const customLogo = React.createElement("FolderLogo");
+  const folder = nodes(
+    AppBar({ title: "폴더 이름", left: "logo", logo: customLogo, isTitleLeftAligned: true }),
+  );
+  assert.ok(folder.includes(customLogo));
+  assert.ok(
+    folder.some(
+      (node) => node.props.className?.includes("items-start") && node.props.style?.left === 48,
+    ),
+  );
+  assert.ok(folder.find((node) => node.type === "Text").props.className.includes("font-h2"));
 });
 
 test("공통 아이콘 버튼의 기존 48px 기본값과 로그인용 24px 옵션을 유지한다", () => {

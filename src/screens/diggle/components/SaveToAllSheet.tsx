@@ -43,7 +43,7 @@ export function SaveToAllSheet({
       setValues((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <BottomSheet visible={visible} showGrabber bottomPadding={32} onRequestClose={onRequestClose}>
+    <BottomSheet visible={visible} onRequestClose={onRequestClose}>
       <ScrollView className="px-margin" contentContainerStyle={{ gap: 25 }}>
         <View className="gap-4">
           <View className="gap-[30px]">
