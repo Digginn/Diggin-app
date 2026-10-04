@@ -4,7 +4,6 @@ import { cssInterop } from "nativewind";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import SelectCheckOffSvg from "@/assets/images/icon-select-check-off.svg";
 import SelectCheckOnSvg from "@/assets/images/icon-select-check-on.svg";
 import { FallbackImg } from "@/components/FallbackImg";
 
@@ -86,7 +85,6 @@ export function Card({
             {name}
           </Text>
         </View>
-        {/* 브랜드명이 없어도 카드 높이를 유지해야 그리드 행이 안 어긋남 */}
         <View className="h-3 w-full flex-row items-center">
           {brand ? (
             <Text
@@ -101,16 +99,12 @@ export function Card({
       </View>
 
       {isSelected ? (
-        <View className="absolute inset-x-0 top-0 h-[106px] rounded-lg bg-gray-1000/15" />
-      ) : null}
-      {isSelectMode ? (
-        <View className="absolute right-1.5 top-1.5 size-6 items-center justify-center">
-          {isSelected ? (
+        <>
+          <View className="absolute inset-x-0 top-0 h-[106px] rounded-lg bg-gray-1000/15" />
+          <View className="absolute right-1.5 top-1.5 size-6 items-center justify-center">
             <SelectCheckOnSvg width={CHECK_ICON_SIZE} height={CHECK_ICON_SIZE} />
-          ) : (
-            <SelectCheckOffSvg width={CHECK_ICON_SIZE} height={CHECK_ICON_SIZE} />
-          )}
-        </View>
+          </View>
+        </>
       ) : null}
     </Pressable>
   );
