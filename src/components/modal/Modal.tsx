@@ -76,7 +76,12 @@ export function Modal({
       statusBarTranslucent={isFullScreen}
       navigationBarTranslucent={isFullScreen}
     >
-      <KeyboardAvoidingView enabled={isKeyboardAvoiding} behavior="padding" className="flex-1">
+      {/* 안드로이드는 adjustResize 로 OS 가 창을 줄여주므로 여기서 또 줄이면 입력란이 밀린다. */}
+      <KeyboardAvoidingView
+        enabled={isKeyboardAvoiding}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className="flex-1"
+      >
         <View
           className={`flex-1 items-center px-margin ${isAboveKeyboard ? "justify-end" : "justify-center"} ${backdropClassName ?? ""}`}
           style={isAboveKeyboard ? { paddingBottom: keyboardGap } : undefined}

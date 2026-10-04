@@ -49,7 +49,8 @@ export function BottomSheet({
     >
       <KeyboardAvoidingView
         enabled={isKeyboardAvoiding}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        // 안드로이드는 adjustResize 로 OS 가 창을 줄여주므로 여기서 또 줄이면 입력란이 밀린다.
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1 justify-end"
       >
         <Pressable
