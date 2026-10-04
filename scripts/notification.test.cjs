@@ -29,6 +29,53 @@ function findAll(node, type) {
   ];
 }
 
+test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
+  const events = [];
+  const AppBar = Object.assign(() => null, { IconButton: "IconButton" });
+  const mocks = {
+    "react": {
+      useState: (initial) => [initial, () => {}],
+      useLayoutEffect: () => {},
+    },
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+    "expo-router": {
+      useRouter: () => ({ push: (route) => events.push(route) }),
+      useNavigation: () => ({}),
+      useLocalSearchParams: () => ({}),
+    },
+    "@/assets/images/appbar": { IconNotification: "NotificationIcon", IconSearch: "SearchIcon" },
+    "@/components/app-bar": { AppBar, SearchBar: "SearchBar" },
+    "@/components/EmptyState": { EmptyState: "EmptyState" },
+    "@/components/ErrorState": { ErrorState: "ErrorState" },
+    "@/components/modal": { ActionModal: "ActionModal" },
+    "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
+    "@/components/WishLevel": { WishLevel: "WishLevel" },
+    "@/constants/messages": { STATE_MESSAGES: {} },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "./components/DeleteBar": { DeleteBar: "DeleteBar" },
+    "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
+    "./components/SortLabel": { SortLabel: "SortLabel" },
+    "@/screens/all/components/SortLabel": { SortLabel: "SortLabel" },
+    "./components/RecentSearches": { RecentSearches: "RecentSearches" },
+    "./useRecentSearches": { useRecentSearches: () => ({ keywords: [] }) },
+    "@/screens/folder/FolderScreen": { FolderScreen: "FolderScreen" },
+    "@/assets/images/folder/image-folder-item-preview.png": 1,
+  };
+  const { AllScreen } = load("../src/screens/all/AllScreen.tsx", mocks);
+  const allBar = findAll(AllScreen(), AppBar)[0];
+  const allButton = findAll(allBar.props.right, "IconButton").find(
+    (button) => button.props.icon === "NotificationIcon",
+  );
+  allButton.props.onPress();
+  const { SearchScreen } = load("../src/screens/search/SearchScreen.tsx", mocks);
+  findAll(SearchScreen(), "SearchBar")[0].props.right.props.onPress();
+  const { default: FolderRoute } = load("../src/app/(tabs)/folder.tsx", mocks, {
+    __DEV__: false,
+  });
+  FolderRoute().props.onNotifications();
+  assert.deepEqual(events, ["/notifications", "/notifications", "/notifications"]);
+});
+
 test("알림 없음 화면은 공용 AppBar와 전체 화면 중앙 안내를 표시한다", () => {
   const { NotificationScreen } = load("../src/screens/notification/NotificationScreen.tsx", {
     "react": {

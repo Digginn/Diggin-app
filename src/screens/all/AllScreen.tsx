@@ -102,7 +102,11 @@ export function AllScreen() {
                 accessibilityLabel="검색"
                 onPress={() => router.push("/search")}
               />
-              <AppBar.IconButton icon={IconNotification} accessibilityLabel="알림" />
+              <AppBar.IconButton
+                icon={IconNotification}
+                accessibilityLabel="알림"
+                onPress={() => router.push("/notifications")}
+              />
             </>
           }
         />
