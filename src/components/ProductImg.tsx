@@ -27,8 +27,8 @@ type ProductImgProps = {
 };
 
 export function ProductImg({ url, onPressInfo, onRemove, className }: ProductImgProps) {
-  const [failed, setFailed] = useState(false);
-  const source = url && !failed ? url : undefined;
+  const [isFailed, setIsFailed] = useState(false);
+  const source = url && !isFailed ? url : undefined;
 
   return (
     <View className={clsx("aspect-square", className)}>
@@ -36,7 +36,7 @@ export function ProductImg({ url, onPressInfo, onRemove, className }: ProductImg
         <StyledImage
           className={FRAME}
           contentFit="cover"
-          onError={() => setFailed(true)}
+          onError={() => setIsFailed(true)}
           source={source}
         />
       ) : (

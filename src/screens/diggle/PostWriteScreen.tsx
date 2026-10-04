@@ -19,7 +19,7 @@ export function PostWriteScreen() {
   const [isExitOpen, setExitOpen] = useState(false);
 
   // 빈 상태에서는 안내를 띄우지 않음
-  const showBodyError = body.length > 0 && !isBodyValid;
+  const hasBodyError = body.length > 0 && !isBodyValid;
   const canSubmit = isBodyValid && items.length > 0;
   const hasDraft = body.length > 0 || items.length > 0;
 
@@ -84,7 +84,7 @@ export function PostWriteScreen() {
           onValidityChange={setBodyValid}
         />
 
-        {showBodyError ? (
+        {hasBodyError ? (
           <HelperText
             status="error"
             message="공백을 제외하고 5자 이상 입력해 주세요. (이모지 포함)"

@@ -23,7 +23,7 @@ type BottomSheetProps = {
   overlay?: ReactNode;
   isKeyboardAvoiding?: boolean;
   /** 그래버 없이 바로 내용이 시작하는 시트가 있다. */
-  showGrabber?: boolean;
+  isGrabberVisible?: boolean;
 };
 
 export function BottomSheet({
@@ -36,7 +36,7 @@ export function BottomSheet({
   scrimOpacity = 0.4,
   overlay,
   isKeyboardAvoiding = true,
-  showGrabber = true,
+  isGrabberVisible = true,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -68,7 +68,7 @@ export function BottomSheet({
             boxShadow: `0px -4px 4px ${colors.gray[1000]}1F`,
           }}
         >
-          {showGrabber ? (
+          {isGrabberVisible ? (
             <View
               accessibilityElementsHidden
               className={
