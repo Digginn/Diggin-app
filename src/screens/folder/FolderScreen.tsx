@@ -7,7 +7,6 @@ import { IconNotification, IconSearch } from "@/assets/images/appbar";
 import EmptyFolderIcon from "@/assets/images/folder/icon-empty-folder.svg";
 import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
 import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
-import FolderWordmark from "@/assets/images/folder/logo-folder-wordmark.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { ActionModal } from "@/components/modal";
@@ -116,7 +115,6 @@ export function FolderScreen({
       <View style={{ opacity: isSortOpen ? 0.12 : 1 }}>
         <AppBar
           left="logo"
-          logo={<FolderWordmark />}
           right={
             !isError &&
             !hasFolders && (
