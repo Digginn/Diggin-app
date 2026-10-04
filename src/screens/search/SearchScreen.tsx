@@ -62,7 +62,13 @@ export function SearchScreen() {
         onBack={handleBack}
         onClear={() => setHistory([])}
         onSubmitEditing={(event) => handleSubmit(event.nativeEvent.text)}
-        right={<AppBar.IconButton icon={IconNotification} accessibilityLabel="알림" />}
+        right={
+          <AppBar.IconButton
+            icon={IconNotification}
+            accessibilityLabel="알림"
+            onPress={() => router.push("/notifications")}
+          />
+        }
       />
 
       {submitted && results.length === 0 ? (

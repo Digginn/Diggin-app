@@ -55,6 +55,7 @@ export default function FolderRoute() {
 
   return (
     <FolderScreen
+      onNotifications={() => router.push("/notifications")}
       onOpenFolder={(folder) =>
         router.push({
           pathname: "/folder-detail",
