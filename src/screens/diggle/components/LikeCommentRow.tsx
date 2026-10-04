@@ -13,6 +13,7 @@ type LikeCommentRowProps = {
   commentCount: number;
   isLiked: boolean;
   onPressLike: () => void;
+  hasLike?: boolean;
 };
 
 export function LikeCommentRow({
@@ -20,26 +21,29 @@ export function LikeCommentRow({
   commentCount,
   isLiked,
   onPressLike,
+  hasLike = true,
 }: LikeCommentRowProps) {
   const Heart = isLiked ? LikeHeartFilledSvg : LikeHeartSvg;
 
   return (
     <View className="w-full flex-row items-center gap-2.5 pl-3">
-      <View className="flex-row items-center justify-center">
-        <Pressable
-          accessibilityLabel="좋아요"
-          accessibilityRole="button"
-          accessibilityState={{ selected: isLiked }}
-          className="-mr-1.5 size-12 items-center justify-center active:opacity-75"
-          onPress={onPressLike}
-        >
-          <Heart {...HEART} color={isLiked ? colors.semantic.error : colors.gray[900]} />
-        </Pressable>
-        <Text className="text-gray-500 font-label-14">{likeCount}</Text>
-      </View>
+      {hasLike ? (
+        <View className="flex-row items-center justify-center">
+          <Pressable
+            accessibilityLabel="좋아요"
+            accessibilityRole="button"
+            accessibilityState={{ selected: isLiked }}
+            className="-mr-1.5 size-12 items-center justify-center active:opacity-75"
+            onPress={onPressLike}
+          >
+            <Heart {...HEART} color={isLiked ? colors.semantic.error : colors.gray[900]} />
+          </Pressable>
+          <Text className="text-gray-500 font-label-14">{likeCount}</Text>
+        </View>
+      ) : null}
       <View className="flex-row items-center justify-center">
         <View className="-mr-1.5 size-12 items-center justify-center">
-          <CommentSvg {...COMMENT} color={colors.gray[900]} />
+          <CommentSvg {...COMMENT} color={hasLike ? colors.gray[900] : colors.gray[500]} />
         </View>
         <Text className="text-gray-500 font-label-14">{commentCount}</Text>
       </View>

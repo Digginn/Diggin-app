@@ -19,12 +19,18 @@ type SelectCardProps = {
 export function SelectCard({ item, name, price, brand, isSelected, onToggle }: SelectCardProps) {
   return (
     <View className="flex-1">
-      <Card name={name} price={price} brand={brand} thumbnailUrl={item.imageUrl} />
+      <Card
+        name={name}
+        price={price}
+        brand={brand}
+        thumbnailUrl={item.imageUrl}
+        onPress={onToggle}
+      />
       <Pressable
         accessibilityLabel={`${name} 선택`}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: isSelected }}
-        className="absolute left-[63px] top-[62px] size-12 items-center justify-center p-2.5"
+        className="absolute -right-1 top-[62px] size-12 items-center justify-center p-2.5"
         onPress={onToggle}
       >
         <View className="size-[18px] items-center justify-center rounded-[3px] border border-gray-600 bg-gray-0">

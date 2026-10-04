@@ -18,6 +18,8 @@ export const TOAST_MESSAGES = {
 } as const;
 
 export const DIGGLE_TOAST_MESSAGES = {
+  VOTE_009: "투표를 등록했습니다. 24시간 뒤 결과를 알려드립니다.",
+  VOTE_002: "내가 만든 투표에는 참여할 수 없습니다.",
   DIGGLE_009: "게시글이 삭제되었습니다.",
   COMMENT_004: "댓글을 수정하지 못했습니다. 다시 시도해 주세요.",
   REPORT_004: "사용자를 차단했습니다.",
