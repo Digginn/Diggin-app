@@ -24,26 +24,41 @@ import { FloatingToolbar } from "@/components/FloatingToolbar";
 import { ActionModal } from "@/components/modal";
 import { ProductImg } from "@/components/ProductImg";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
-import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
+import { DIGGLE_TOAST_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useBlockedUsers } from "@/contexts/BlockedUsersContext";
 import { usePosts } from "@/contexts/PostsContext";
 import { useToast } from "@/hooks/useToast";
+import {
+  FolderManageSheet,
+  type ManagedFolder,
+} from "@/screens/item-detail/components/FolderManageSheet";
 import { colors } from "@/theme";
 import type { PostComment, PostItem, VoteChoice } from "@/types/post";
 
 import { LikeCommentRow } from "./components/LikeCommentRow";
 import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
-import { SaveToAllSheet } from "./components/SaveToAllSheet";
+import { SaveToAllSheet, type SaveToAllValues } from "./components/SaveToAllSheet";
 import { VoteBlock } from "./components/VoteBlock";
 import { VoteReasonScreen } from "./components/VoteReasonScreen";
 import {
   CURRENT_USER_ID,
   findMockComments,
+  DEFAULT_FOLDER_ID,
   findMockVoteComments,
+  MOCK_FOLDERS,
   MOCK_POSTS,
 } from "./constants/mockPosts";
 import { getVoteTiming } from "./utils/voteTiming";
+
+// TODO: API 연결 시 아이템 상세 조회 응답으로 채운다.
+const SAVE_INITIAL_VALUES: SaveToAllValues = {
+  name: "Real Good Pants 엄청 좋은 바지",
+  price: "70000",
+  sourceUrl: "http://pf.kakao.com/_zIxnrX",
+  thumbnailUrl: null,
+  wishLevel: null,
+};
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const isVote = type === "vote";
@@ -74,7 +89,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [infoItem, setInfoItem] = useState<PostItem | null>(null);
-  const [isSaveOpen, setSaveOpen] = useState(false);
+  // 내 ALL에 저장은 정보 입력 -> 폴더 선택 두 단계로 이어진다.
+  const [saveStep, setSaveStep] = useState<"form" | "folder" | null>(null);
+  const [saveValues, setSaveValues] = useState<SaveToAllValues>(SAVE_INITIAL_VALUES);
+  const [folders, setFolders] = useState<ManagedFolder[]>(MOCK_FOLDERS);
   const [reasonChoice, setReasonChoice] = useState<VoteChoice | null>(null);
   const blurTargetRef = useRef<View>(null);
 
@@ -92,6 +110,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         .map((comment) => comment.authorId),
     );
     return existingAuthor ?? `디기 ${anonymousAuthors.size + 1} (나)`;
+  }
+
+  function closeSave() {
+    setSaveStep(null);
+    setSaveValues(SAVE_INITIAL_VALUES);
   }
 
   function startEdit(comment: PostComment) {
@@ -398,24 +421,42 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               onOpenWebsite={() => setInfoItem(null)}
               onSaveToAll={() => {
                 setInfoItem(null);
-                setSaveOpen(true);
+                setSaveValues(SAVE_INITIAL_VALUES);
+                setSaveStep("form");
               }}
               onRequestClose={() => setInfoItem(null)}
             />
 
+            {/* 폴더 선택 단계에서도 뒤에 깔려 있어야 해서 두 단계 모두 띄워 둔다. */}
             <SaveToAllSheet
-              key={isSaveOpen ? "open" : "closed"}
-              visible={isSaveOpen}
-              initialValues={{
-                name: "Real Good Pants 엄청 좋은 바지",
-                price: "70000",
-                sourceUrl: "http://pf.kakao.com/_zIxnrX",
-                thumbnailUrl: null,
-                folder: "기본 폴더",
-              }}
-              onPressFolder={() => {}}
-              onSubmit={() => setSaveOpen(false)}
-              onRequestClose={() => setSaveOpen(false)}
+              visible={saveStep !== null}
+              values={saveValues}
+              onChange={setSaveValues}
+              onNext={() => setSaveStep("folder")}
+              onRequestClose={closeSave}
+              overlay={
+                saveStep === "folder" ? (
+                  <FolderManageSheet
+                    title="저장할 폴더 선택"
+                    completeLabel="저장하기"
+                    folders={folders}
+                    selectedFolderIds={[DEFAULT_FOLDER_ID]}
+                    onBack={() => setSaveStep("form")}
+                    onClose={closeSave}
+                    onCreateFolder={(name) => {
+                      // TODO: 폴더 생성 API 연결.
+                      const folder = { id: `folder-${Date.now()}`, name };
+                      setFolders((prev) => [folder, ...prev]);
+                      return folder;
+                    }}
+                    onComplete={() => {
+                      // TODO: 내 ALL에 저장 API 연결.
+                      closeSave();
+                      showToast(TOAST_MESSAGES.SAVE_011);
+                    }}
+                  />
+                ) : undefined
+              }
             />
 
             <ReportFlow
