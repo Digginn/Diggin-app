@@ -22,6 +22,7 @@ type PostsValue = {
   chooseVote: (id: string, choice: VoteChoice) => void;
   deleteVote: (id: string) => void;
   findPost: (id: string) => Post | undefined;
+  addPost: (post: Post) => void;
   deletePost: (id: string) => void;
 };
 
@@ -119,14 +120,24 @@ export function PostsProvider({ children }: { children: ReactNode }) {
   );
 
   const findPost = useCallback((id: string) => posts.find((post) => post.id === id), [posts]);
+  const addPost = useCallback((post: Post) => setPosts((prev) => [post, ...prev]), []);
   const deletePost = useCallback(
     (id: string) => setPosts((prev) => prev.filter((post) => post.id !== id)),
     [],
   );
 
   const value = useMemo(
-    () => ({ posts, votes, addVotePreview, chooseVote, deleteVote, findPost, deletePost }),
-    [posts, votes, addVotePreview, chooseVote, deleteVote, findPost, deletePost],
+    () => ({
+      posts,
+      votes,
+      addVotePreview,
+      chooseVote,
+      deleteVote,
+      findPost,
+      addPost,
+      deletePost,
+    }),
+    [posts, votes, addVotePreview, chooseVote, deleteVote, findPost, addPost, deletePost],
   );
 
   return <PostsContext.Provider value={value}>{children}</PostsContext.Provider>;
