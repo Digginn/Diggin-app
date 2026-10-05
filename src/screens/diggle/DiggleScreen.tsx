@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, View } from "react-native";
 
@@ -21,12 +21,13 @@ const TABS = [
 
 export function DiggleScreen() {
   const router = useRouter();
-  const [tab, setTab] = useState<PostTab>("all");
+  const { tab: requestedTab } = useLocalSearchParams<{ tab?: string }>();
+  const tab: PostTab = requestedTab === "vote" ? "vote" : "all";
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const { isBlocked, block } = useBlockedUsers();
-  const { posts: allPosts } = usePosts();
+  const { posts: allPosts, votes } = usePosts();
 
-  const posts = allPosts.filter((post) => !isBlocked(post.authorId));
+  const posts = (tab === "vote" ? votes : allPosts).filter((post) => !isBlocked(post.authorId));
 
   return (
     <View className="flex-1 bg-gray-0">
@@ -39,7 +40,7 @@ export function DiggleScreen() {
           </>
         }
       />
-      <TopTab items={TABS} activeKey={tab} onChange={(key) => setTab(key as PostTab)} />
+      <TopTab items={TABS} activeKey={tab} onChange={(key) => router.setParams({ tab: key })} />
 
       {posts.length === 0 ? (
         <EmptyState
@@ -59,8 +60,12 @@ export function DiggleScreen() {
               authorLabel={item.authorLabel}
               likeCount={tab === "all" ? item.likeCount : undefined}
               commentCount={item.commentCount}
-              // TODO: 투표 상세는 다른 작업자가 맡아 아직 연결하지 않음
-              onPress={tab === "all" ? () => router.push(`/posts/${item.id}`) : undefined}
+              onPress={() =>
+                router.push({
+                  pathname: tab === "vote" ? "/votes/[id]" : "/posts/[id]",
+                  params: { id: item.id },
+                })
+              }
               onPressReport={() => setReportTarget({ authorId: item.authorId })}
             />
           )}
@@ -68,7 +73,10 @@ export function DiggleScreen() {
       )}
 
       <View className="absolute bottom-6 right-[27px]">
-        <Fab accessibilityLabel="게시글 작성" onPress={() => router.push("/posts/write")} />
+        <Fab
+          accessibilityLabel={tab === "vote" ? "투표글 작성" : "게시글 작성"}
+          onPress={() => router.push(tab === "vote" ? "/votes/write" : "/posts/write")}
+        />
       </View>
 
       <ReportFlow target={reportTarget} onClose={() => setReportTarget(null)} onBlock={block} />

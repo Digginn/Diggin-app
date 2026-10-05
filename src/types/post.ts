@@ -26,6 +26,7 @@ export type PostComment = {
   timeLabel: string;
   isMine: boolean;
   isDeleted?: boolean;
+  vote?: "buy" | "not";
 };
 
 export type PostDetail = {
@@ -39,3 +40,16 @@ export type PostDetail = {
   commentCount: number;
   isLiked: boolean;
 };
+
+export type VoteChoice = "BUY" | "NOT";
+
+export type VotePost = FeedPost &
+  PostDetail & {
+    /** 등록 시각(밀리초). API 연결 시 서버 시각을 사용한다. */
+    createdAt: number;
+    buyCount: number;
+    notCount: number;
+    myChoice: VoteChoice | null;
+    isClosed: boolean;
+    remainingLabel: string;
+  };

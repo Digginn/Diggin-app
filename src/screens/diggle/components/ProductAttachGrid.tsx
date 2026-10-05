@@ -15,25 +15,32 @@ type ProductAttachGridProps = {
   items: PostItem[];
   onPressAdd: () => void;
   onRemove?: (item: PostItem) => void;
+  maxCount?: number;
 };
 
-function toRows(items: PostItem[]): Cell[][] {
+function toRows(items: PostItem[], maxCount: number): Cell[][] {
+  const columnCount = maxCount === 1 ? 1 : COLUMN_COUNT;
   const cells: Cell[] = [...items];
-  if (items.length < MAX_ATTACH_COUNT) cells.push("add");
+  if (items.length < maxCount) cells.push("add");
 
   const rows: Cell[][] = [];
-  for (let index = 0; index < cells.length; index += COLUMN_COUNT) {
-    const row: Cell[] = cells.slice(index, index + COLUMN_COUNT);
-    while (row.length < COLUMN_COUNT) row.push(null);
+  for (let index = 0; index < cells.length; index += columnCount) {
+    const row: Cell[] = cells.slice(index, index + columnCount);
+    while (row.length < columnCount) row.push(null);
     rows.push(row);
   }
   return rows;
 }
 
-export function ProductAttachGrid({ items, onPressAdd, onRemove }: ProductAttachGridProps) {
+export function ProductAttachGrid({
+  items,
+  onPressAdd,
+  onRemove,
+  maxCount = MAX_ATTACH_COUNT,
+}: ProductAttachGridProps) {
   return (
     <View className="w-full gap-[7px]">
-      {toRows(items).map((row, rowIndex) => (
+      {toRows(items, maxCount).map((row, rowIndex) => (
         <View key={rowIndex} className="flex-row gap-[7px]">
           {row.map((cell, columnIndex) => {
             if (cell === null) return <View key={`empty-${columnIndex}`} className="flex-1" />;
@@ -43,7 +50,7 @@ export function ProductAttachGrid({ items, onPressAdd, onRemove }: ProductAttach
                   key="add"
                   accessibilityLabel="아이템 추가"
                   accessibilityRole="button"
-                  className="aspect-square flex-1 items-center justify-center gap-2 overflow-hidden rounded-lg border-field border-dashed border-gray-300 bg-gray-50 active:opacity-75"
+                  className={`${maxCount === 1 ? "h-40" : "aspect-square"} flex-1 items-center justify-center gap-2 overflow-hidden rounded-lg border-field border-dashed border-gray-300 bg-gray-50 active:opacity-75`}
                   onPress={onPressAdd}
                 >
                   <PlusSvg width={PLUS_SIZE} height={PLUS_SIZE} color={colors.gray[900]} />

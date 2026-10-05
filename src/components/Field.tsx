@@ -26,6 +26,7 @@ type SearchFieldProps = TextInputProps & {
 };
 
 type BodyTextFieldProps = Omit<TextInputProps, "multiline" | "placeholder"> & {
+  size?: "default" | "compact";
   className?: string;
   onValidityChange?: (isValid: boolean) => void;
   placeholder: string;
@@ -124,6 +125,7 @@ export function HelperText({ status = "default", message, className }: HelperTex
 }
 
 export function BodyTextField({
+  size = "default",
   className,
   defaultValue,
   onChangeText,
@@ -139,7 +141,7 @@ export function BodyTextField({
   const isError = !isEmpty && !isValid;
   const borderClassName = isError
     ? "border-semantic-error"
-    : isValid
+    : isValid && size !== "compact"
       ? "border-gray-600"
       : "border-gray-300";
 
@@ -149,7 +151,7 @@ export function BodyTextField({
 
   return (
     <View
-      className={`relative h-[200px] w-full rounded-field border-field bg-gray-0 p-4 ${borderClassName} ${className ?? ""}`}
+      className={`relative w-full border-field bg-gray-0 p-4 ${size === "compact" ? "h-[120px] rounded" : "h-[200px] rounded-field"} ${borderClassName} ${className ?? ""}`}
     >
       <TextInput
         {...props}

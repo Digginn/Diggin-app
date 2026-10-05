@@ -110,3 +110,27 @@ export const findMockPost = (id: string) =>
   MOCK_POSTS.find((post) => post.id === id) ?? MOCK_POSTS[0];
 
 export const findMockComments = (id: string) => COMMENTS_BY_POST[id] ?? [];
+
+const MOCK_VOTE_COMMENTS: PostComment[] = [
+  {
+    id: "vote-2-buy",
+    authorId: "vote-user-1",
+    author: "디기 1",
+    body: "가격 대비 품질이 좋아 보여요.",
+    timeLabel: "5분 전",
+    isMine: false,
+    vote: "buy",
+  },
+  {
+    id: "vote-2-not",
+    authorId: "vote-user-2",
+    author: "디기 2",
+    body: "세일 기간까지 기다려 보세요!",
+    timeLabel: "3분 전",
+    isMine: false,
+    vote: "not",
+  },
+];
+
+export const findMockVoteComments = (id: string) =>
+  id === "2" ? MOCK_VOTE_COMMENTS : findMockComments(id);
