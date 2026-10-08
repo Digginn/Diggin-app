@@ -187,7 +187,7 @@ export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditSc
 
       <View className="absolute left-6 right-6" style={{ bottom: insets.bottom + 10 }}>
         <Button size="large" isDisabled={isSaving} onPress={handleSave}>
-          저장
+          저장하기
         </Button>
       </View>
     </View>

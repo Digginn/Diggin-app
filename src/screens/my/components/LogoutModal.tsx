@@ -41,12 +41,12 @@ export function LogoutModal({
       </View>
       <View className="w-full flex-row gap-modal-action">
         <View className="flex-1">
-          <Button variant="secondary" isDisabled={isLoggingOut} onPress={onClose}>
-            돌아가기
+          <Button isDisabled={isLoggingOut} onPress={onClose}>
+            취소
           </Button>
         </View>
         <View className="flex-1">
-          <Button isDisabled={isLoggingOut} onPress={onConfirm}>
+          <Button variant="secondary" isDisabled={isLoggingOut} onPress={onConfirm}>
             로그아웃
           </Button>
         </View>

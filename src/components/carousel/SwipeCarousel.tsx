@@ -17,6 +17,7 @@ type SwipeCarouselProps = {
   accessibilityLabel?: string;
   onPageChange?: (index: number) => void;
   autoAdvanceDelays?: readonly number[];
+  media?: ReactNode;
 };
 
 const CARD_WIDTH = 296;
@@ -26,6 +27,7 @@ export function SwipeCarousel({
   accessibilityLabel = "캐러셀",
   onPageChange,
   autoAdvanceDelays,
+  media,
 }: SwipeCarouselProps) {
   const pages = Children.toArray(children).filter(isValidElement);
   const scrollRef = useRef<ScrollView>(null);
@@ -63,7 +65,7 @@ export function SwipeCarousel({
   if (pages.length === 0) return null;
 
   return (
-    <View className="h-[584px] w-[295px]">
+    <View className="h-[600px] w-[295px]">
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -103,7 +105,7 @@ export function SwipeCarousel({
           </View>
         ))}
       </ScrollView>
-      <View className="absolute inset-x-0 top-[544px] h-12 flex-row justify-center pl-px">
+      <View className="absolute inset-x-0 top-[561px] h-12 flex-row justify-center pl-px">
         {pages.map((page, index) => (
           <BtnCarousel
             key={page.key}
@@ -113,6 +115,11 @@ export function SwipeCarousel({
           />
         ))}
       </View>
+      {media && (
+        <View pointerEvents="none" className="absolute left-0 top-0 h-[396px] w-[295px]">
+          {media}
+        </View>
+      )}
     </View>
   );
 }

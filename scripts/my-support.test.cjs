@@ -210,7 +210,7 @@ test("로그아웃 모달은 Figma 문구·36% scrim·48px 제목과 버튼을 �
   assert.ok(nodes.some((node) => node.props.className === "h-12 justify-center"));
   assert.deepEqual(
     nodes.filter((node) => node.type === "Button").map((node) => node.props.children),
-    ["돌아가기", "로그아웃"],
+    ["취소", "로그아웃"],
   );
 });
 
@@ -289,10 +289,10 @@ test("탈퇴 확인 → 완료 확인에서만 요청하며 실패 시 원래 �
     const buttons = () => descendants(tree()).filter((node) => node.type === "Button");
     assert.deepEqual(
       buttons().map((node) => node.props.children),
-      ["동의 후 탈퇴", "돌아가기"],
+      ["취소", "탈퇴하기"],
     );
-    assert.equal(buttons()[0].props.variant, "secondary");
-    buttons()[0].props.onPress();
+    assert.equal(buttons()[1].props.variant, "secondary");
+    buttons()[1].props.onPress();
     assert.equal(calls, 0);
     assert.equal(tree().props.backdropClassName, "bg-gray-0");
     assert.ok(
@@ -307,7 +307,7 @@ test("탈퇴 확인 → 완료 확인에서만 요청하며 실패 시 원래 �
     await buttons()[0].props.onPress();
     assert.equal(calls, 1);
     assert.equal(closes, hasFailure ? 0 : 1);
-    assert.equal(buttons()[0].props.children, "동의 후 탈퇴");
+    assert.equal(buttons()[1].props.children, "탈퇴하기");
     assert.equal(
       tree().props.toastMessage,
       hasFailure ? "회원탈퇴를 완료하지 못했습니다. 다시 시도해 주세요." : undefined,
@@ -324,7 +324,7 @@ test("미연결 탈퇴는 실행하지 않고, 완료 X는 삭제 없이 취소�
   const props = { isVisible: true, onClose: () => closes++ };
   const tree = () => Screen(props);
   const buttons = () => descendants(tree()).filter((node) => node.type === "Button");
-  buttons()[0].props.onPress();
+  buttons()[1].props.onPress();
   assert.equal(tree().props.toastMessage, "회원탈퇴 기능은 준비 중입니다.");
   assert.deepEqual(toasts, []);
   assert.equal(buttons().length, 2);
@@ -334,13 +334,13 @@ test("미연결 탈퇴는 실행하지 않고, 완료 X는 삭제 없이 취소�
       finish = resolve;
     });
   };
-  buttons()[0].props.onPress();
+  buttons()[1].props.onPress();
   descendants(tree())
     .find((node) => node.props.accessibilityLabel === "회원탈퇴 완료 창 닫기")
     .props.onPress();
   assert.equal(closes, 1);
   assert.equal(calls, 0);
-  buttons()[0].props.onPress();
+  buttons()[1].props.onPress();
   const pending = buttons()[0].props.onPress();
   assert.equal(buttons()[0].props.isDisabled, true);
   tree().props.onRequestClose();
