@@ -442,7 +442,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                     folders={folders}
                     selectedFolderIds={[DEFAULT_FOLDER_ID]}
                     onBack={() => setSaveStep("form")}
-                    onClose={closeSave}
+                    // 2단계를 닫은 것이라 1단계로 돌아간다. 적어둔 정보를 날리지 않는다.
+                    onClose={() => setSaveStep("form")}
                     onCreateFolder={(name) => {
                       // TODO: 폴더 생성 API 연결.
                       const folder = { id: `folder-${Date.now()}`, name };
