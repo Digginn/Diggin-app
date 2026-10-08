@@ -98,13 +98,13 @@ export function AccountWithdrawalModal({
       ) : (
         <View className="w-full flex-row gap-modal-action">
           <View className="flex-1">
-            <Button variant="secondary" isDisabled={isWithdrawing} onPress={handleAgree}>
-              동의 후 탈퇴
+            <Button isDisabled={isWithdrawing} onPress={handleClose}>
+              취소
             </Button>
           </View>
           <View className="flex-1">
-            <Button isDisabled={isWithdrawing} onPress={handleClose}>
-              돌아가기
+            <Button variant="secondary" isDisabled={isWithdrawing} onPress={handleAgree}>
+              탈퇴하기
             </Button>
           </View>
         </View>
