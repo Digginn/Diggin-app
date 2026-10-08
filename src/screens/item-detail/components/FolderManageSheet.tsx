@@ -16,6 +16,10 @@ type FolderManageSheetProps = {
   onClose: () => void;
   onCreateFolder: (name: string) => ManagedFolder;
   onComplete: (ids: string[]) => void;
+  /** DGL-12 저장 흐름은 제목과 버튼이 다르고 앞 단계로 돌아갈 수 있다. */
+  title?: string;
+  completeLabel?: string;
+  onBack?: () => void;
 };
 
 export function FolderManageSheet({
@@ -24,6 +28,9 @@ export function FolderManageSheet({
   onClose,
   onCreateFolder,
   onComplete,
+  title = "폴더 관리",
+  completeLabel = "완료",
+  onBack,
 }: FolderManageSheetProps) {
   const [selectedIds, setSelectedIds] = useState(selectedFolderIds);
   const [isCreating, setIsCreating] = useState(false);
@@ -56,7 +63,7 @@ export function FolderManageSheet({
     >
       <View className="flex-1 gap-gutter px-margin">
         <View className="gap-1">
-          <Text className="text-gray-900 font-label-18-semibold">폴더 관리</Text>
+          <Text className="text-gray-900 font-label-18-semibold">{title}</Text>
           <Text className="text-gray-600 font-b3">아이템을 담을 폴더를 모두 선택해 주세요.</Text>
         </View>
         <Pressable
@@ -98,9 +105,20 @@ export function FolderManageSheet({
             );
           })}
         </ScrollView>
-        <Button size="large" onPress={() => onComplete(selectedIds)}>
-          완료
-        </Button>
+        {onBack ? (
+          <View className="flex-row justify-between">
+            <Button className="w-[155px]" variant="secondary" onPress={onBack}>
+              이전으로
+            </Button>
+            <Button className="w-[155px]" onPress={() => onComplete(selectedIds)}>
+              {completeLabel}
+            </Button>
+          </View>
+        ) : (
+          <Button size="large" onPress={() => onComplete(selectedIds)}>
+            {completeLabel}
+          </Button>
+        )}
       </View>
     </BottomSheet>
   );

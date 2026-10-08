@@ -6,6 +6,7 @@ import { IconNotification, IconSearch } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { Fab } from "@/components/Fab";
+import { Spinner } from "@/components/Loading";
 import { Post } from "@/components/Post";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
@@ -19,6 +20,8 @@ const TABS = [
   { key: "vote", label: "투표" },
 ];
 
+const LOAD_MORE_DELAY_MS = 1200;
+
 export function DiggleScreen() {
   const router = useRouter();
   const { tab: requestedTab } = useLocalSearchParams<{ tab?: string }>();
@@ -26,8 +29,17 @@ export function DiggleScreen() {
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const { isBlocked, block } = useBlockedUsers();
   const { posts: allPosts, votes } = usePosts();
+  const [isLoadingMore, setLoadingMore] = useState(false);
 
   const posts = (tab === "vote" ? votes : allPosts).filter((post) => !isBlocked(post.authorId));
+
+  // 시안 SYS-11
+  function loadMore() {
+    if (isLoadingMore) return;
+    setLoadingMore(true);
+    // TODO: 다음 페이지 조회 API 연결. 마지막 페이지면 스피너를 띄우지 않는다.
+    setTimeout(() => setLoadingMore(false), LOAD_MORE_DELAY_MS);
+  }
 
   return (
     <View className="flex-1 bg-gray-0">
@@ -51,6 +63,15 @@ export function DiggleScreen() {
         <FlatList
           data={posts}
           keyExtractor={(post) => post.id}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View className="items-center py-5">
+                <Spinner />
+              </View>
+            ) : null
+          }
           renderItem={({ item }) => (
             <Post
               type={tab}

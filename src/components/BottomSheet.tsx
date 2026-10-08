@@ -1,7 +1,11 @@
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  Animated,
+  Dimensions,
+  Keyboard,
   KeyboardAvoidingView,
   Modal as NativeModal,
+  PanResponder,
   Platform,
   Pressable,
   View,
@@ -11,6 +15,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "@/theme";
 
 const BOTTOM_PADDING = 32;
+// 이 거리 이상 끌어내리거나 이 속도 이상으로 튕기면 닫는다.
+const DISMISS_DISTANCE = 80;
+const DISMISS_VELOCITY = 0.5;
+// 아래로 끄는 게 분명할 때만 제스처를 가져온다.
+const DRAG_START = 6;
+// 닫을 때 화면 밖으로 밀어내는 거리. 시트 높이를 재지 않아도 되게 넉넉히 잡는다.
+const EXIT_DISTANCE = Dimensions.get("window").height;
+// Animated.View 로 감싸면 퍼센트 기준이 될 높이가 사라져서 px 로 계산해 둔다.
+const MAX_HEIGHT = Dimensions.get("window").height * 0.86;
 
 type BottomSheetProps = {
   children: ReactNode;
@@ -22,8 +35,10 @@ type BottomSheetProps = {
   scrimOpacity?: number;
   overlay?: ReactNode;
   isKeyboardAvoiding?: boolean;
-  /** 그래버 없이 바로 내용이 시작하는 시트가 있다. */
+  /** 그래버 없이 바로 내용이 시작하는 시트가 있다. 보이면 끌어내려 닫을 수 있다. */
   isGrabberVisible?: boolean;
+  /** 입력이 있는 시트는 바깥을 눌러 닫으면 적던 내용이 날아간다. */
+  isScrimClosable?: boolean;
 };
 
 export function BottomSheet({
@@ -37,8 +52,50 @@ export function BottomSheet({
   overlay,
   isKeyboardAvoiding = true,
   isGrabberVisible = true,
+  isScrimClosable = true,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
+  const [dragY] = useState(() => new Animated.Value(0));
+
+  // 끌어내린 위치는 열 때만 되돌린다. 닫을 때 되돌리면 모달이 슬라이드로 사라지는 동안
+  // 시트가 제자리로 튀어 올라왔다가 닫히는 것처럼 보인다.
+  useEffect(() => {
+    if (!visible) return;
+    dragY.stopAnimation();
+    dragY.setValue(0);
+  }, [visible, dragY]);
+
+  const dragHandlers = useMemo(() => {
+    // 그래버가 보이면 끌어서 닫힌다. 손잡이처럼 생긴 게 안 움직이면 고장으로 보인다.
+    if (!isGrabberVisible) return undefined;
+
+    // setValue 와 애니메이션이 같은 JS 노드를 쓰도록 네이티브 드라이버는 켜지 않는다.
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+        gesture.dy > DRAG_START && gesture.dy > Math.abs(gesture.dx),
+      onPanResponderGrant: () => Keyboard.dismiss(),
+      onPanResponderMove: (_event, gesture) => {
+        // 위로 끄는 건 무시한다. 시트는 더 올라가지 않는다.
+        if (gesture.dy > 0) dragY.setValue(gesture.dy);
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        if (gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY) {
+          Animated.timing(dragY, {
+            toValue: EXIT_DISTANCE,
+            duration: 160,
+            useNativeDriver: false,
+            // 도중에 끊긴 애니메이션까지 닫기로 세면 엉뚱할 때 닫힌다.
+          }).start(({ finished }) => {
+            if (finished) onRequestClose();
+          });
+          return;
+        }
+        Animated.spring(dragY, { toValue: 0, bounciness: 0, useNativeDriver: false }).start();
+      },
+      onPanResponderTerminationRequest: () => false,
+    }).panHandlers;
+  }, [dragY, isGrabberVisible, onRequestClose]);
 
   return (
     <NativeModal
@@ -54,31 +111,40 @@ export function BottomSheet({
         className="flex-1 justify-end"
       >
         <Pressable
-          accessibilityLabel="닫기"
-          accessibilityRole="button"
+          accessible={isScrimClosable}
+          accessibilityLabel={isScrimClosable ? "닫기" : undefined}
+          accessibilityRole={isScrimClosable ? "button" : undefined}
           className="absolute inset-0 bg-black"
           style={{ opacity: scrimOpacity }}
-          onPress={onRequestClose}
+          // 닫지 않는 시트에서도 키보드는 내려줘야 가린 버튼을 누를 수 있다.
+          onPress={isScrimClosable ? onRequestClose : Keyboard.dismiss}
         />
-        <View
-          className={`max-h-[86%] rounded-t-2xl bg-gray-0 pt-3 ${className ?? ""}`}
-          style={{
-            height,
-            paddingBottom: Math.max(insets.bottom, BOTTOM_PADDING),
-            boxShadow: `0px -4px 4px ${colors.gray[1000]}1F`,
-          }}
-        >
-          {isGrabberVisible ? (
-            <View
-              accessibilityElementsHidden
-              className={
-                handleClassName ?? "mb-5 h-1 w-8 self-center rounded-full bg-gray-500 opacity-40"
-              }
-              importantForAccessibility="no"
-            />
-          ) : null}
-          {children}
-        </View>
+        <Animated.View style={{ transform: [{ translateY: dragY }] }}>
+          <View
+            className={`rounded-t-2xl bg-gray-0 ${className ?? ""}`}
+            style={{
+              height,
+              maxHeight: MAX_HEIGHT,
+              paddingBottom: Math.max(insets.bottom, BOTTOM_PADDING),
+              boxShadow: `0px -4px 4px ${colors.gray[1000]}1F`,
+            }}
+          >
+            {/* 그래버와 그 둘레 여백이 끌어내리는 손잡이가 된다. */}
+            <View {...dragHandlers} className="pt-3">
+              {isGrabberVisible ? (
+                <View
+                  accessibilityElementsHidden
+                  className={
+                    handleClassName ??
+                    "mb-5 h-1 w-8 self-center rounded-full bg-gray-500 opacity-40"
+                  }
+                  importantForAccessibility="no"
+                />
+              ) : null}
+            </View>
+            {children}
+          </View>
+        </Animated.View>
       </KeyboardAvoidingView>
       {overlay}
     </NativeModal>

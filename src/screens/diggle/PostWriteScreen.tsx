@@ -22,6 +22,7 @@ import { usePosts } from "@/contexts/PostsContext";
 import { useToast } from "@/hooks/useToast";
 
 import { MAX_ATTACH_COUNT, ProductAttachGrid } from "./components/ProductAttachGrid";
+import { CURRENT_USER_ID } from "./constants/mockPosts";
 
 export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const router = useRouter();
@@ -31,7 +32,7 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const [body, setBody] = useState("");
   const [isBodyValid, setBodyValid] = useState(false);
   const { items, setItems, reset } = usePostDraft();
-  const { addVotePreview } = usePosts();
+  const { addPost, addVotePreview } = usePosts();
 
   const [isExitOpen, setExitOpen] = useState(false);
   const [isSubmitPreview, setSubmitPreview] = useState(false);
@@ -40,13 +41,31 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
   useEffect(() => {
     if (!isSubmitPreview) return;
     const timeout = setTimeout(() => {
-      addVotePreview(body, items);
+      if (isVote) {
+        addVotePreview(body, items);
+        setSubmitPreview(false);
+        router.dismissTo({ pathname: "/(tabs)/diggle", params: { tab: "vote" } });
+        showToast(DIGGLE_TOAST_MESSAGES.VOTE_009);
+        return;
+      }
+      // 시안 DGL-06
+      addPost({
+        id: `post-${Date.now()}`,
+        authorId: CURRENT_USER_ID,
+        author: "글쓴이 (나)",
+        authorLabel: "익명",
+        body,
+        items,
+        timeLabel: "방금 전",
+        likeCount: 0,
+        commentCount: 0,
+        isLiked: false,
+      });
       setSubmitPreview(false);
-      router.dismissTo({ pathname: "/(tabs)/diggle", params: { tab: "vote" } });
-      showToast(DIGGLE_TOAST_MESSAGES.VOTE_009);
+      router.back();
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [isSubmitPreview, addVotePreview, body, items, router, showToast]);
+  }, [isSubmitPreview, isVote, addPost, addVotePreview, body, items, router, showToast]);
 
   // 빈 상태에서는 안내를 띄우지 않음
   const hasBodyError = body.length > 0 && !isBodyValid;
@@ -58,20 +77,22 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
 
   // 쓴 게 없으면 물어볼 것도 없으니 그냥 나간다.
   const leave = useCallback(() => {
+    if (isSubmitPreview) return;
     if (hasDraft) setExitOpen(true);
     else router.back();
-  }, [hasDraft, router]);
+  }, [hasDraft, isSubmitPreview, router]);
 
   // 안드로이드 하드웨어 뒤로 가기로 확인을 건너뛸 수 없게 막는다.
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+        if (isSubmitPreview) return true;
         if (!hasDraft) return false;
         setExitOpen(true);
         return true;
       });
       return () => subscription.remove();
-    }, [hasDraft]),
+    }, [hasDraft, isSubmitPreview]),
   );
 
   return (
@@ -89,13 +110,8 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
             className="size-12 items-center justify-center active:opacity-75"
             disabled={!canSubmit || isSubmitPreview}
             onPress={() => {
-              if (isVote) {
-                Keyboard.dismiss();
-                setSubmitPreview(true);
-                return;
-              }
-              // TODO: 게시글 등록 API 로 본문과 아이템을 넘긴다.
-              router.back();
+              Keyboard.dismiss();
+              setSubmitPreview(true);
             }}
           >
             <Text
@@ -164,7 +180,11 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
         </View>
       </ScrollView>
 
-      {isSubmitPreview ? <LoadingDialog message="투표를 등록하는 중입니다." /> : null}
+      {isSubmitPreview ? (
+        <LoadingDialog
+          message={isVote ? "투표를 등록하는 중입니다." : "게시글을 등록하는 중입니다."}
+        />
+      ) : null}
 
       <ActionModal
         visible={isExitOpen}

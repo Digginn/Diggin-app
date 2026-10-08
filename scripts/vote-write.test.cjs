@@ -99,6 +99,9 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
           }),
         },
         "@/hooks/useToast": { useToast: () => () => {} },
+        "@/screens/item-detail/components/FolderManageSheet": {
+          FolderManageSheet: "FolderManageSheet",
+        },
         "@/theme": { colors: { gray: { 900: "#1E1E1E", 400: "#B9B9B9" } } },
         "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
         "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
@@ -109,6 +112,8 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
         "./utils/voteTiming": load("../src/screens/diggle/utils/voteTiming.ts", {}),
         "./constants/mockPosts": {
           CURRENT_USER_ID: "me",
+          DEFAULT_FOLDER_ID: "default",
+          MOCK_FOLDERS: [],
           findMockComments: () => [],
           findMockVoteComments: () => [
             { id: "author", authorId: "other-user", author: "글쓴이", body: "작성자 댓글" },
@@ -431,6 +436,7 @@ test("투표 작성은 공용 입력 검증과 1개 첨부 조건으로 등록�
         "setTimeout": (callback) => {
           completeRegistration = callback;
         },
+        "./constants/mockPosts": { CURRENT_USER_ID: "me" },
         "react-native": {
           View: "View",
           Text: "Text",
