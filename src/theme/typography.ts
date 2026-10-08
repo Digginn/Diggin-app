@@ -26,6 +26,7 @@ export const typography = {
   "label-16-medium": { weight: "Medium", size: 16, ratio: 1.4, tracking: -2 },
   "label-16-regular": { weight: "Regular", size: 16, ratio: 1.6, tracking: -2 },
   "label-14": { weight: "SemiBold", size: 14, ratio: 1.5, tracking: -1 },
+  "label-13-semibold": { weight: "SemiBold", size: 13, ratio: 1.2 },
   "label-12-semibold": { weight: "SemiBold", size: 12, ratio: 1.2, tracking: -1 },
   "label-12-regular": { weight: "Regular", size: 12, ratio: 1.2, tracking: -1 },
 
