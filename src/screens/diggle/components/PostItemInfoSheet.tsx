@@ -28,8 +28,8 @@ export function PostItemInfoSheet({
   onRequestClose,
 }: PostItemInfoSheetProps) {
   return (
-    <BottomSheet visible={visible} isGrabberVisible={false} onRequestClose={onRequestClose}>
-      <View className="w-full items-start gap-4 px-margin pt-7">
+    <BottomSheet visible={visible} onRequestClose={onRequestClose}>
+      <View className="w-full items-start gap-4 px-margin">
         <View className="w-full flex-row items-start gap-[14px]">
           <StyledImage
             className="size-[72px] rounded-lg bg-gray-200"
