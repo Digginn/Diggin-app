@@ -3,14 +3,18 @@ import { useLayoutEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { IconNotification, IconSearch } from "@/assets/images/appbar";
+import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
+import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { ActionModal } from "@/components/modal";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
-import { selectDeletedMessage, STATE_MESSAGES } from "@/constants/messages";
+import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useToast } from "@/hooks/useToast";
+import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
+import { ItemSaveSheet, type ItemSaveValues } from "@/screens/save/components/ItemSaveSheet";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { DeleteBar } from "./components/DeleteBar";
@@ -27,6 +31,15 @@ const MOCK_ITEMS: WishItem[] = Array.from({ length: 11 }, (_, index) => ({
 }));
 
 const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
+
+const EMPTY_SAVE_VALUES: ItemSaveValues = {
+  name: "",
+  brand: "",
+  price: "",
+  sourceUrl: "",
+  thumbnailUrl: null,
+  wishLevel: null,
+};
 
 const WISH_LEVEL_HINT =
   "아이템 상세 화면에서 얼마나 사고 싶은지를 3단계로 기록해두어 구매 고민을 빠르게 마칠 수 있습니다.";
@@ -45,6 +58,8 @@ export function AllScreen() {
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [confirming, setConfirming] = useState<"cancel" | "delete" | null>(null);
+  const [isLinkSheetOpen, setLinkSheetOpen] = useState(false);
+  const [saveValues, setSaveValues] = useState<ItemSaveValues | null>(null);
 
   const selectedCount = selectedIds.size;
   const isAllSelected = items.length > 0 && selectedCount === items.length;
@@ -157,6 +172,37 @@ export function AllScreen() {
         <DeleteBar selectedCount={selectedCount} onPress={() => setConfirming("delete")} />
       ) : null}
 
+      <ItemLinkSheet
+        key={isLinkSheetOpen ? "open" : "closed"}
+        visible={isLinkSheetOpen}
+        onRequestClose={() => setLinkSheetOpen(false)}
+        onSubmit={(url) => {
+          setLinkSheetOpen(false);
+          // TODO: 크롤링이 붙으면 불러온 이름 · 브랜드 · 가격 · 이미지를 채워 넘긴다.
+          setSaveValues({
+            name: "",
+            brand: "",
+            price: "",
+            sourceUrl: url,
+            thumbnailUrl: null,
+            wishLevel: null,
+          });
+        }}
+      />
+
+      <ItemSaveSheet
+        key={saveValues?.sourceUrl ?? "closed"}
+        visible={saveValues !== null}
+        // 크롤링 전까지는 값이 비어 있어 직접 입력하는 흐름으로 연다.
+        hasExtractionFailed
+        initialValues={saveValues ?? EMPTY_SAVE_VALUES}
+        onRequestClose={() => setSaveValues(null)}
+        onSubmit={() => {
+          setSaveValues(null);
+          showToast(TOAST_MESSAGES.SAVE_011);
+        }}
+      />
+
       <ActionModal
         visible={confirming === "cancel"}
         onRequestClose={() => setConfirming(null)}
@@ -166,6 +212,26 @@ export function AllScreen() {
         secondaryAction={{ label: "계속 선택", onPress: () => setConfirming(null) }}
         primaryAction={{ label: "선택 취소", onPress: exitSelectMode }}
       />
+
+      {/* 시안 FAB 는 200 박스 안에 흰 그라디언트와 54 버튼이 들어간다. 폴더 탭과 같은 배치다. */}
+      {!isSelectMode ? (
+        <View
+          pointerEvents="box-none"
+          className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"
+        >
+          <View pointerEvents="none" className="absolute inset-0">
+            <FabGlow />
+          </View>
+          <Pressable
+            accessibilityLabel="아이템 추가"
+            accessibilityRole="button"
+            className="absolute left-[73px] top-[73px] size-[54px] items-center justify-center rounded-full bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.1)] active:opacity-75"
+            onPress={() => setLinkSheetOpen(true)}
+          >
+            <PlusIcon />
+          </Pressable>
+        </View>
+      ) : null}
 
       <ActionModal
         visible={confirming === "delete"}

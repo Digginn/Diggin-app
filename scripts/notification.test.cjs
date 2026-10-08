@@ -60,6 +60,10 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "./useRecentSearches": { useRecentSearches: () => ({ keywords: [] }) },
     "@/screens/folder/FolderScreen": { FolderScreen: "FolderScreen" },
     "@/assets/images/folder/image-folder-item-preview.png": 1,
+    "@/assets/images/folder/icon-folder-plus.svg": "PlusIcon",
+    "@/assets/images/folder/image-fab-glow.svg": "FabGlow",
+    "@/screens/save/components/ItemLinkSheet": { ItemLinkSheet: "ItemLinkSheet" },
+    "@/screens/save/components/ItemSaveSheet": { ItemSaveSheet: "ItemSaveSheet" },
   };
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", mocks);
   const allBar = findAll(AllScreen(), AppBar)[0];
