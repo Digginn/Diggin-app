@@ -10,9 +10,8 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
 import { TextField } from "@/components/Field";
 import { Tooltip } from "@/components/Tooltip";
+import { WishLevelSelect } from "@/components/WishLevelSelect";
 import type { WishLevelKey } from "@/types/wish-item";
-
-import { WishLevelSelect } from "./WishLevelSelect";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 const CameraIcon = cssInterop(CameraSvg, {
