@@ -95,7 +95,7 @@ export function ItemEditSheet({
   }
 
   return (
-    <BottomSheet visible={visible} onRequestClose={handleClose}>
+    <BottomSheet visible={visible} isScrimClosable={false} onRequestClose={handleClose}>
       {/* 시안 Body gap-25 > Form gap-16 > Fields gap-30 */}
       <ScrollView
         className="px-margin"

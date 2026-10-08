@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal as NativeModal,
   Platform,
@@ -24,6 +25,8 @@ type BottomSheetProps = {
   isKeyboardAvoiding?: boolean;
   /** 그래버 없이 바로 내용이 시작하는 시트가 있다. */
   isGrabberVisible?: boolean;
+  /** 입력이 있는 시트는 바깥을 눌러 닫으면 적던 내용이 날아간다. */
+  isScrimClosable?: boolean;
 };
 
 export function BottomSheet({
@@ -37,6 +40,7 @@ export function BottomSheet({
   overlay,
   isKeyboardAvoiding = true,
   isGrabberVisible = true,
+  isScrimClosable = true,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -54,11 +58,13 @@ export function BottomSheet({
         className="flex-1 justify-end"
       >
         <Pressable
-          accessibilityLabel="닫기"
-          accessibilityRole="button"
+          accessible={isScrimClosable}
+          accessibilityLabel={isScrimClosable ? "닫기" : undefined}
+          accessibilityRole={isScrimClosable ? "button" : undefined}
           className="absolute inset-0 bg-black"
           style={{ opacity: scrimOpacity }}
-          onPress={onRequestClose}
+          // 닫지 않는 시트에서도 키보드는 내려줘야 가린 버튼을 누를 수 있다.
+          onPress={isScrimClosable ? onRequestClose : Keyboard.dismiss}
         />
         <View
           className={`max-h-[86%] rounded-t-2xl bg-gray-0 pt-3 ${className ?? ""}`}

@@ -58,7 +58,12 @@ export function SaveToAllSheet({
       onChange({ ...values, [key]: value });
 
   return (
-    <BottomSheet visible={visible} overlay={overlay} onRequestClose={onRequestClose}>
+    <BottomSheet
+      visible={visible}
+      isScrimClosable={false}
+      overlay={overlay}
+      onRequestClose={onRequestClose}
+    >
       <ScrollView className="px-margin" contentContainerStyle={{ gap: 25 }}>
         <View className="gap-4">
           <View className="gap-[30px]">
