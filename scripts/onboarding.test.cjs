@@ -7,6 +7,127 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에셋을 유지한다", () => {
+  const file = "../src/screens/onboarding/components/OnboardingIllustration.tsx";
+  const source = readFileSync(path.join(__dirname, file), "utf8");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const componentModule = { exports: {} };
+  const time = { value: 0 };
+  const timings = [];
+  const repeats = [];
+  const styledAnimatedTargets = [];
+  let isReducedMotion = false;
+  let effect;
+  let cancellations = 0;
+  runInNewContext(
+    compiled +
+      "\nexports.AppCell=AppCell; exports.ItemTile=ItemTile; exports.ITEMS=ITEMS; exports.VoteResult=VoteResult; exports.FolderIllustration=FolderIllustration;",
+    {
+      exports: componentModule.exports,
+      module: componentModule,
+      require: (name) => {
+        if (name === "react")
+          return {
+            useEffect: (callback) => {
+              effect = callback;
+            },
+          };
+        if (name === "react-native") return { Image: "Image", Text: "Text", View: "View" };
+        if (name === "expo-linear-gradient") return { LinearGradient: "Gradient" };
+        if (name === "expo-image") return { Image: "Image" };
+        if (name === "nativewind") return { cssInterop: (component) => component };
+        if (name === "react-native-reanimated")
+          return {
+            __esModule: true,
+            default: {
+              View: "Animated.View",
+              Text: "Animated.Text",
+              createAnimatedComponent: (component) => {
+                styledAnimatedTargets.push(component);
+                return `Animated.${component}`;
+              },
+            },
+            Easing: { bezierFn: () => (value) => value, linear: (value) => value },
+            useAnimatedStyle: (callback) => callback(),
+            useSharedValue: () => time,
+            useReducedMotion: () => isReducedMotion,
+            withTiming: (to, options) => {
+              timings.push({ to, options });
+              return to;
+            },
+            withRepeat: (animation, count, reverse) => {
+              repeats.push({ count, reverse });
+              return animation;
+            },
+            cancelAnimation: () => {
+              cancellations++;
+            },
+          };
+        if (name.startsWith("@/assets/")) {
+          assert.ok(readFileSync(path.join(__dirname, "..", name.slice(2))).length > 0);
+          return name.endsWith(".svg") ? { default: () => React.createElement("Svg") } : name;
+        }
+        return require(name);
+      },
+    },
+  );
+  const { OnboardingIllustration, AppCell, ItemTile, ITEMS, VoteResult, FolderIllustration } =
+    componentModule.exports;
+  const initial = OnboardingIllustration({ page: 0 });
+  assert.deepEqual(
+    styledAnimatedTargets,
+    ["View", "Text"],
+    "기본 뷰의 NativeWind 스타일을 처리한 뒤 애니메이션으로 감싸야 실기기 배치가 유지된다.",
+  );
+  assert.ok(initial.props.className.includes("h-[396px]"));
+  assert.ok(initial.props.className.includes("rounded-3xl"));
+  const cleanup = effect();
+  assert.equal(timings[0].options.duration, 3600);
+  assert.equal(repeats[0].count, -1);
+  assert.equal(repeats[0].reverse, false);
+  cleanup();
+  assert.equal(cancellations, 1);
+  time.value = 0;
+  let cell = React.Children.toArray(AppCell({ index: 0, time }).props.children);
+  assert.equal(cell[0].props.style.opacity, 0);
+  assert.equal(cell[0].props.style.transform[0].scale, 0.4);
+  time.value = 500;
+  cell = React.Children.toArray(AppCell({ index: 0, time }).props.children);
+  assert.equal(cell[0].props.style.opacity, 1);
+  assert.equal(cell[0].props.style.transform[0].scale, 1);
+  for (const item of ITEMS) {
+    time.value = item.delay;
+    const tile = ItemTile({ item, time });
+    assert.equal(tile.props.style[1].transform[0].translateY, -150);
+    time.value = item.delay + 600;
+    assert.equal(Math.abs(ItemTile({ item, time }).props.style[1].transform[0].translateY), 0);
+  }
+  time.value = 1400;
+  assert.equal(FolderIllustration({ time }).props.style.transform[0].scaleX, 1.04);
+  time.value = 1650;
+  assert.equal(FolderIllustration({ time }).props.style.transform[0].scaleX, 1);
+  for (const [isBuy, width] of [
+    [true, 216],
+    [false, 96],
+  ]) {
+    time.value = 2000;
+    const children = React.Children.toArray(VoteResult({ isBuy, time }).props.children);
+    assert.equal(children[0].props.style.width, width);
+    time.value = 1050;
+    assert.equal(
+      React.Children.toArray(VoteResult({ isBuy, time }).props.children)[0].props.style.width,
+      1,
+    );
+  }
+  isReducedMotion = true;
+  OnboardingIllustration({ page: 2 });
+  effect();
+  assert.equal(time.value, 3600);
+  assert.equal(timings.length, 1, "모션 줄이기에서는 반복 애니메이션을 시작하지 않는다.");
+});
+
 test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·접근성 이동을 처리한다", () => {
   let activeIndex = 0;
   const scrollCalls = [];
@@ -58,7 +179,10 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
   }
   let tree = render();
   assert.ok(tree.root.props.className.includes("w-[295px]"));
-  assert.ok(tree.root.props.className.includes("h-[584px]"));
+  assert.ok(tree.root.props.className.includes("h-[600px]"));
+  assert.ok(
+    React.Children.toArray(tree.root.props.children)[1].props.className.includes("top-[561px]"),
+  );
   assert.equal(Array.from(tree.scroll.props.snapToOffsets).join(","), "0,296,592");
   assert.equal(React.Children.count(tree.scroll.props.children), 3);
   assert.equal(tree.dots[0].props.isActive, true);
@@ -254,6 +378,8 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
       if (name === "@/components/carousel")
         return { CardCarousel: "CardCarousel", SwipeCarousel: "SwipeCarousel" };
       if (name === "@/theme") return { baseFrame: { height: 812 } };
+      if (name === "./components/OnboardingIllustration")
+        return { OnboardingIllustration: "OnboardingIllustration" };
       return require(name);
     },
   });
@@ -267,15 +393,14 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
   const firstPage = render();
   assert.equal(firstPage.length, 1);
   assert.equal(Array.from(firstPage[0].props.autoAdvanceDelays).join(","), "2500,2500");
-  for (const card of React.Children.toArray(firstPage[0].props.children)) {
-    assert.ok(
-      !card.props.children.props.className.includes("left-px"),
-      "슬라이드 이미지를 오른쪽으로 밀면 페이지 경계에 흰 틈이 생깁니다.",
-    );
-  }
+  assert.equal(firstPage[0].props.media.type, "OnboardingIllustration");
+  assert.equal(firstPage[0].props.media.props.page, 0);
+  for (const card of React.Children.toArray(firstPage[0].props.children))
+    assert.equal(card.props.children, undefined, "미디어는 고정하고 문구만 스와이프한다.");
   firstPage[0].props.onPageChange(2);
   const lastPage = render();
   assert.equal(lastPage.length, 2);
+  assert.equal(lastPage[0].props.media.props.page, 2);
   const button = lastPage[1].props.children;
   assert.equal(button.props.children, "시작하기");
   button.props.onPress();
