@@ -12,3 +12,15 @@ export function findItemLink(text: string): string | null {
 export function isItemLink(text: string): boolean {
   return ITEM_LINK_ONLY.test(text.trim());
 }
+
+// scheme:// 로 시작하는 모든 주소. http · https 가 아니면 앱 전용 주소다.
+const ANY_SCHEME = /\b[a-z][a-z0-9+.-]*:\/\//i;
+
+/** 공유로 받은 값을 왜 쓸 수 없는지 가른다. 쓸 수 있으면 null 이다. */
+export function classifyItemLink(text: string): "no_url" | "deeplink" | "invalid_format" | null {
+  if (findItemLink(text)) return null;
+  const scheme = ANY_SCHEME.exec(text)?.[0];
+  if (!scheme) return "no_url";
+  // https://ㅁㄴㅇㄹ 처럼 웹 주소 모양이지만 호스트가 성립하지 않는 경우
+  return /^https?:\/\//i.test(scheme) ? "invalid_format" : "deeplink";
+}
