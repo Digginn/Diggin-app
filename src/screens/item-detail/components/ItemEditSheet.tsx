@@ -60,7 +60,7 @@ export function ItemEditSheet({
     (value: ItemEditValues[K]) =>
       setValues((prev) => ({ ...prev, [key]: value }));
 
-  // 시안의 수정 완료는 비활성이다. 위시 레벨은 필수가 아니므로 값이 바뀌었는지로 판단한다.
+  // 위시 레벨은 필수가 아니라 값이 바뀌었는지로 판단한다.
   const isDirty = (Object.keys(values) as (keyof ItemEditValues)[]).some(
     (key) => values[key] !== initialValues[key],
   );
@@ -95,7 +95,6 @@ export function ItemEditSheet({
 
   return (
     <BottomSheet visible={visible} isScrimClosable={false} onRequestClose={handleClose}>
-      {/* 시안 Body gap-25 > Form gap-16 > Fields gap-30 */}
       <ScrollView
         className="px-margin"
         contentContainerStyle={{ gap: 25 }}
@@ -152,7 +151,6 @@ export function ItemEditSheet({
             </View>
           </View>
 
-          {/* 시안 WishscoreRow 는 32 높이고 도움말 버튼만 48 로 겹쳐 놓는다. */}
           <View className="h-8 flex-row items-center justify-between">
             <View className="h-8 flex-row items-center">
               <Text className="text-gray-900 font-b3">위시 레벨</Text>

@@ -18,7 +18,6 @@ type PasteGuideModalProps = {
 export function PasteGuideModal({ visible, onRequestClose, onOpenSettings }: PasteGuideModalProps) {
   return (
     <Modal visible={visible} onRequestClose={onRequestClose} className="px-2.5 pb-4 pt-[18px]">
-      {/* 시안 Header gap-16 > TitleWrap gap-4 */}
       <View className="w-full items-center gap-4">
         <View className="w-full items-center gap-1">
           <View className="flex-row items-start justify-center gap-1">

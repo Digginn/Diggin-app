@@ -121,7 +121,6 @@ export function ItemSaveSheet({
         />
       }
     >
-      {/* 시안 Body gap-25 > Form gap-16 > Fields gap-30 */}
       <ScrollView
         className="px-margin"
         contentContainerStyle={{ gap: 25 }}
@@ -136,7 +135,6 @@ export function ItemSaveSheet({
               </Text>
             </View>
 
-            {/* 시안 FieldList gap-16, 각 필드 gap-8 */}
             <View className="gap-4">
               <View className="gap-2">
                 <Text className="text-gray-900 font-b3">아이템 이미지</Text>
@@ -175,7 +173,6 @@ export function ItemSaveSheet({
                 />
               </View>
 
-              {/* 시안 FieldRow gap-17, 두 필드가 폭을 반씩 나눈다 */}
               <View className="flex-row gap-[17px]">
                 <View className="flex-1 gap-2">
                   <Text className="text-gray-900 font-b3">브랜드명</Text>
@@ -204,7 +201,6 @@ export function ItemSaveSheet({
             </View>
           </View>
 
-          {/* 시안 WishscoreRow 는 32 높이고 도움말 버튼만 48 로 겹쳐 놓는다. */}
           <View className="h-8 flex-row items-center justify-between">
             <View className="h-8 flex-row items-center">
               <Text className="text-gray-900 font-b3">위시 레벨</Text>
@@ -232,12 +228,11 @@ export function ItemSaveSheet({
           </View>
         </View>
 
-        {/* 시안 Actions gap-17, 두 버튼이 폭을 반씩 나눈다 */}
         <View className="flex-row gap-[17px]">
           <Button className="flex-1" variant="secondary" onPress={handleClose}>
             취소
           </Button>
-          {/* 아이템명이 비면 저장할 게 없다. 시안의 비활성 상태가 이 경우다. */}
+          {/* 아이템명이 비면 저장할 게 없다. */}
           <Button
             className="flex-1"
             isDisabled={values.name.trim().length === 0}

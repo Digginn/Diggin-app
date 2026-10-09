@@ -38,10 +38,10 @@ export default function SavePreviewRoute() {
         {(
           [
             ["link", "아이템 추가 (링크 입력)"],
-            ["loaded", "아이템 정보 확인 (SAVE-06)"],
-            ["failed", "정보를 불러오지 못함 (SAVE-08)"],
-            ["paste", "붙여넣기 설정 안내 (SAVE-17)"],
-            ["no_url", "공유 오류 · URL 없음 (MSG-SAVE-014)"],
+            ["loaded", "아이템 정보 확인"],
+            ["failed", "정보를 불러오지 못함"],
+            ["paste", "붙여넣기 설정 안내"],
+            ["no_url", "공유 오류 · URL 없음"],
             ["deeplink", "공유 오류 · 앱 전용 딥링크"],
             ["invalid_format", "공유 오류 · 형식 오류"],
           ] as const

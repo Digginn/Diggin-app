@@ -15,7 +15,7 @@ const CloseIcon = cssInterop(CloseSvg, {
 
 const BOTTOM_PADDING = 32;
 
-/** 공유 시트가 링크를 못 받았을 때의 사유. 문구는 시안 MSG-SAVE-014 를 따른다. */
+/** 공유 시트가 링크를 못 받았을 때의 사유. */
 export type ShareErrorReason = "no_url" | "deeplink" | "invalid_format";
 
 const MESSAGES: Record<ShareErrorReason, string> = {

@@ -35,7 +35,6 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
       onToastDismiss={() => setToast(undefined)}
       onRequestClose={onRequestClose}
     >
-      {/* 시안 Body gap-25 > Form gap-16 > Fields gap-30 */}
       <ScrollView
         className="px-margin"
         contentContainerStyle={{ gap: 25 }}
@@ -72,7 +71,6 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
           </View>
         </View>
 
-        {/* 시안 Actions gap-17, 두 버튼이 폭을 반씩 나눈다 */}
         <View className="flex-row gap-[17px]">
           <Button className="flex-1" variant="secondary" onPress={onRequestClose}>
             취소

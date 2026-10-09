@@ -48,7 +48,6 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
         showToast(DIGGLE_TOAST_MESSAGES.VOTE_009);
         return;
       }
-      // 시안 DGL-06
       addPost({
         id: `post-${Date.now()}`,
         authorId: CURRENT_USER_ID,

@@ -16,7 +16,7 @@ type FolderManageSheetProps = {
   onClose: () => void;
   onCreateFolder: (name: string) => ManagedFolder;
   onComplete: (ids: string[]) => void;
-  /** DGL-12 저장 흐름은 제목과 버튼이 다르고 앞 단계로 돌아갈 수 있다. */
+  /** 게시글 아이템 저장 흐름은 제목과 버튼이 다르고 앞 단계로 돌아갈 수 있다. */
   title?: string;
   completeLabel?: string;
   onBack?: () => void;

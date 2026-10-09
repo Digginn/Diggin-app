@@ -203,7 +203,6 @@ export function AllScreen() {
         primaryAction={{ label: "선택 취소", onPress: exitSelectMode }}
       />
 
-      {/* 시안 FAB 는 200 박스 안에 흰 그라디언트와 54 버튼이 들어간다. 폴더 탭과 같은 배치다. */}
       {!isSelectMode ? (
         <View
           pointerEvents="box-none"
