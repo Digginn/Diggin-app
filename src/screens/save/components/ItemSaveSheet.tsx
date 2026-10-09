@@ -163,7 +163,11 @@ export function ItemSaveSheet({
               </View>
 
               <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템명</Text>
+                {/* 저장에 꼭 필요한 값이라 라벨 옆에 표시한다. */}
+                <View className="flex-row items-start gap-2">
+                  <Text className="text-gray-900 font-b3">아이템명</Text>
+                  <Text className="text-semantic-error font-note">*필수 정보</Text>
+                </View>
                 <TextField
                   placeholder="아이템명을 입력해 주세요."
                   value={values.name}

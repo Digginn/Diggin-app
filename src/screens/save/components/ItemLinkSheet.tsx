@@ -5,7 +5,7 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
 import { HelperText, TextField } from "@/components/Field";
 import { TOAST_MESSAGES } from "@/constants/messages";
-import { isItemLink } from "@/utils/itemLink";
+import { findItemLink, isItemLink } from "@/utils/itemLink";
 
 type ItemLinkSheetProps = {
   visible: boolean;
@@ -57,9 +57,9 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
               keyboardType="url"
               placeholder="아이템 링크를 붙여넣어 주세요."
               value={url}
-              // 다시 입력하기 시작하면 에러 표시를 거둔다.
               onChangeText={(next) => {
-                setUrl(next);
+                // 상품명과 링크를 같이 복사하는 앱이 많아 링크만 남긴다.
+                setUrl(findItemLink(next) ?? next);
                 setError(false);
               }}
             />
