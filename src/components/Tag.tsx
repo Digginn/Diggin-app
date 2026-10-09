@@ -14,9 +14,17 @@ type TagProps = {
   onClose?: () => void;
   onPress?: () => void;
   accessibilityLabel?: string;
+  className?: string;
 };
 
-export function Tag({ label, isActive = false, onClose, onPress, accessibilityLabel }: TagProps) {
+export function Tag({
+  label,
+  isActive = false,
+  onClose,
+  onPress,
+  accessibilityLabel,
+  className,
+}: TagProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -27,10 +35,16 @@ export function Tag({ label, isActive = false, onClose, onPress, accessibilityLa
         onPress && "active:opacity-75",
         isActive ? "border-gray-900 bg-gray-900" : "border-gray-400 bg-gray-0",
         !isActive && onClose ? "pl-3" : "px-3",
+        className,
       )}
     >
       <Text
-        className={clsx("font-label-12-semibold", isActive ? "text-gray-200" : "text-gray-500")}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        className={clsx(
+          "min-w-0 shrink font-label-12-semibold",
+          isActive ? "text-gray-200" : "text-gray-500",
+        )}
       >
         {label}
       </Text>
@@ -39,7 +53,7 @@ export function Tag({ label, isActive = false, onClose, onPress, accessibilityLa
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel={`${label} 삭제`}
-          className="justify-center self-stretch pl-1 pr-2 active:opacity-75"
+          className="shrink-0 justify-center self-stretch pl-1 pr-2 active:opacity-75"
         >
           <CloseIcon className="size-4" />
         </Pressable>

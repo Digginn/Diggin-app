@@ -12,6 +12,7 @@ import { SortLabel, type SortOrder } from "@/screens/all/components/SortLabel";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { RecentSearches } from "./components/RecentSearches";
+import { MAX_SEARCH_LENGTH } from "./constants";
 import { useRecentSearches } from "./useRecentSearches";
 
 // TODO: API 연결 전까지 쓰는 임시 데이터.
@@ -36,8 +37,10 @@ export function SearchScreen() {
   const submitted = history.at(-1) ?? "";
   const results = submitted ? MOCK_RESULTS : [];
 
-  const handleSubmit = (value: string) => {
-    if (!value || value === submitted) return;
+  const handleSubmit = (text: string) => {
+    const value = text.slice(0, MAX_SEARCH_LENGTH);
+    if (!value.trim() || value === submitted) return;
+    setKeyword(value);
     setHistory((prev) => [...prev, value]);
     recentSearches.add(value);
   };
@@ -57,6 +60,7 @@ export function SearchScreen() {
     <View className="flex-1 bg-gray-0">
       <SearchBar
         autoFocus
+        maxLength={MAX_SEARCH_LENGTH}
         value={keyword}
         onChangeText={setKeyword}
         onBack={handleBack}
