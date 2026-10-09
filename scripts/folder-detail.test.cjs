@@ -82,13 +82,14 @@ test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연
   assert.equal(destination.params.id, "selected-item");
 });
 
-test("폴더 관리는 다중 선택을 유지하고 새 폴더를 맨 위에 선택·강조한다", () => {
+test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 폴더 선택 배경을 유지한다", () => {
   const state = [];
   let cursor = 0;
   let scrollPosition;
   let folders = [
-    { id: "default", name: "기본 폴더" },
+    { id: "gift", name: "선물 리스트" },
     { id: "pants", name: "바지" },
+    { id: "owned", name: "나의 소장템", isOwnedItems: true },
   ];
   let completed;
   const { FolderManageSheet } = load(
@@ -128,7 +129,7 @@ test("폴더 관리는 다중 선택을 유지하고 새 폴더를 맨 위에 �
     cursor = 0;
     return FolderManageSheet({
       folders,
-      selectedFolderIds: ["default"],
+      selectedFolderIds: [],
       onClose: () => {},
       onCreateFolder: (name) => {
         const folder = { id: "new", name };
@@ -143,10 +144,24 @@ test("폴더 관리는 다중 선택을 유지하고 새 폴더를 맨 위에 �
   const row = (tree, name) =>
     findAll(tree, "Pressable").find((node) => node.props.accessibilityLabel === name);
   let tree = render();
-  assert.equal(row(tree, "기본 폴더").props.accessibilityState.checked, true);
+  const listRows = () => findAll(findAll(tree, "ScrollView")[0], "Pressable");
+  assert.equal(listRows()[0].props.accessibilityLabel, "나의 소장템");
+  assert.equal(
+    findAll(tree, "View").filter((node) => node.props.className === "mt-2 h-px bg-[#E6E6E6]")
+      .length,
+    1,
+  );
+  assert.equal(tree.props.height, 556);
+  assert.equal(row(tree, "선물 리스트").props.accessibilityState.checked, false);
+  assert.equal(row(tree, "나의 소장템").props.accessibilityState.checked, false);
+  row(tree, "선물 리스트").props.onPress();
+  tree = render();
+  assert.ok(row(tree, "선물 리스트").props.className.includes("bg-gray-100"));
+  assert.equal(row(tree, "선물 리스트").props.accessibilityState.checked, true);
   row(tree, "바지").props.onPress();
   tree = render();
   assert.equal(row(tree, "바지").props.accessibilityState.checked, true);
+  assert.ok(row(tree, "바지").props.className.includes("bg-gray-100"));
   row(tree, "새 폴더 만들기").props.onPress();
   tree = render();
   assert.equal(tree.props.overlay.type, "FolderNameModal");
@@ -158,12 +173,13 @@ test("폴더 관리는 다중 선택을 유지하고 새 폴더를 맨 위에 �
   modal.props.onClose();
   tree = render();
   assert.equal(tree.props.overlay, undefined);
-  assert.equal(findAll(tree, "ScrollView")[0].props.children[0].props.accessibilityLabel, "캠핑");
+  assert.equal(listRows()[0].props.accessibilityLabel, "나의 소장템");
+  assert.equal(listRows()[1].props.accessibilityLabel, "캠핑");
   assert.equal(row(tree, "캠핑").props.accessibilityState.checked, true);
   assert.ok(row(tree, "캠핑").props.className.includes("bg-gray-100"));
   assert.equal(scrollPosition, 0);
   findAll(tree, "Button")[0].props.onPress();
-  assert.deepEqual(Array.from(completed), ["default", "pants", "new"]);
+  assert.deepEqual(Array.from(completed), ["gift", "pants", "new"]);
 });
 
 test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실패 재시도를 처리한다", () => {

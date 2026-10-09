@@ -4,6 +4,9 @@ export type WishItem = {
   price: number;
   brand?: string | null;
   thumbnailUrl?: string | null;
+  isOwned?: boolean;
+  /** 소장 등록 시각 (Unix milliseconds). 소장템끼리 최근 소장 순으로 정렬한다. */
+  ownedAt?: number;
 };
 
 export type WishLevelKey = "high" | "medium" | "low";

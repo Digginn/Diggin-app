@@ -8,11 +8,13 @@ import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
 import { ActionModal } from "@/components/modal";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
 import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
+import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
@@ -22,6 +24,7 @@ import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 import { DeleteBar } from "./components/DeleteBar";
 import { SelectModeBar } from "./components/SelectModeBar";
 import { SortLabel, type SortOrder } from "./components/SortLabel";
+import { orderWishItems } from "./domain/orderWishItems";
 
 // TODO: API 연결 전까지 쓰는 임시 데이터. 연결 시 TanStack Query 로 교체한다.
 const MOCK_ITEMS: WishItem[] = Array.from({ length: 11 }, (_, index) => ({
@@ -30,6 +33,8 @@ const MOCK_ITEMS: WishItem[] = Array.from({ length: 11 }, (_, index) => ({
   price: 0,
   brand: "브랜드명",
   thumbnailUrl: null,
+  isOwned: index === 0 || index === 2,
+  ownedAt: index === 0 ? 1_790_000_000_000 : index === 2 ? 1_791_000_000_000 : undefined,
 }));
 
 const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
@@ -41,6 +46,7 @@ export function AllScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const showToast = useToast();
+  const guide = useFirstVisitGuide("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
 
   // TODO: TanStack Query 연결 시 쿼리의 로딩 · 에러 상태와 뮤테이션으로 바꾼다.
@@ -120,13 +126,15 @@ export function AllScreen() {
         />
       )}
 
-      {hasError ? (
+      {guide.isVisible ? (
+        <View className="flex-1" />
+      ) : hasError ? (
         <ErrorState message={STATE_MESSAGES.loadFailed} onRetry={() => {}} />
       ) : items.length === 0 && !isLoading ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
         <WishItemGrid
-          items={items}
+          items={orderWishItems(items)}
           isLoading={isLoading}
           selectedIds={isSelectMode ? selectedIds : undefined}
           onItemPress={(item) =>
@@ -233,6 +241,7 @@ export function AllScreen() {
         secondaryAction={{ label: "취소", onPress: () => setConfirming(null) }}
         primaryAction={{ label: "삭제하기", onPress: handleDelete }}
       />
+      {guide.isVisible && <FirstVisitGuide kind="all" onClose={guide.dismiss} />}
     </View>
   );
 }

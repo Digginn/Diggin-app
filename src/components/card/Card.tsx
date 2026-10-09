@@ -4,6 +4,7 @@ import { cssInterop } from "nativewind";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import OwnedBadgeIcon from "@/assets/images/icon-basket-check-white.svg";
 import SelectCheckOnSvg from "@/assets/images/icon-select-check-on.svg";
 import { FallbackImg } from "@/components/FallbackImg";
 
@@ -22,6 +23,7 @@ type CardProps = {
   thumbnailUrl?: string | null;
   thumbnailSource?: ImageSource | number;
   brand?: string | null;
+  isOwned?: boolean;
   onPress?: () => void;
   select?: CardSelectState;
   className?: string;
@@ -33,6 +35,7 @@ export function Card({
   thumbnailUrl,
   thumbnailSource,
   brand,
+  isOwned = false,
   onPress,
   select = "none",
   className,
@@ -48,7 +51,7 @@ export function Card({
     <Pressable
       accessibilityRole={isSelectMode ? "checkbox" : onPress ? "button" : undefined}
       accessibilityState={isSelectMode ? { checked: isSelected } : undefined}
-      accessibilityLabel={onPress ? name : undefined}
+      accessibilityLabel={isOwned ? `${name}, 나의 소장템` : onPress ? name : undefined}
       className={clsx("gap-2", onPress && "active:opacity-75", className)}
       disabled={!onPress}
       onPress={onPress}
@@ -62,6 +65,18 @@ export function Card({
         />
       ) : (
         <FallbackImg className={CARD_IMAGE_FRAME} />
+      )}
+      {isOwned && (
+        <View
+          pointerEvents="none"
+          className="absolute inset-x-0 top-0 h-[106px] rounded-lg bg-gray-0/40"
+        >
+          <View className="absolute left-1.5 top-1.5 size-6 items-center justify-center rounded-full bg-gray-900 shadow-sm">
+            <View className="size-4 items-center justify-center">
+              <OwnedBadgeIcon width={12} height={12} />
+            </View>
+          </View>
+        </View>
       )}
       <View className="w-full gap-1.5">
         <View className="w-full gap-0.5">

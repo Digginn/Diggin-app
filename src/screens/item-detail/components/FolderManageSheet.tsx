@@ -8,7 +8,7 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
 import { FolderNameModal } from "@/screens/folder/components/FolderNameModal";
 
-export type ManagedFolder = { id: string; name: string };
+export type ManagedFolder = { id: string; name: string; isOwnedItems?: boolean };
 
 type FolderManageSheetProps = {
   folders: ManagedFolder[];
@@ -34,14 +34,17 @@ export function FolderManageSheet({
 }: FolderManageSheetProps) {
   const [selectedIds, setSelectedIds] = useState(selectedFolderIds);
   const [isCreating, setIsCreating] = useState(false);
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
+  const orderedFolders = [
+    ...folders.filter((folder) => folder.isOwnedItems),
+    ...folders.filter((folder) => !folder.isOwnedItems),
+  ];
 
   return (
     <BottomSheet
       visible
       onRequestClose={onClose}
-      height={550}
+      height={556}
       className="rounded-t-[20px]"
       handleClassName="mb-4 h-1 w-9 self-center rounded-sm bg-gray-300"
       scrimOpacity={0.36}
@@ -53,7 +56,6 @@ export function FolderManageSheet({
             onSubmit={(name) => {
               const folder = onCreateFolder(name);
               setSelectedIds((previous) => [...previous, folder.id]);
-              setHighlightedId(folder.id);
               listRef.current?.scrollTo({ y: 0, animated: false });
               return true;
             }}
@@ -63,8 +65,10 @@ export function FolderManageSheet({
     >
       <View className="flex-1 gap-gutter px-margin">
         <View className="gap-1">
-          <Text className="text-gray-900 font-label-18-semibold">{title}</Text>
-          <Text className="text-gray-600 font-b3">아이템을 담을 폴더를 모두 선택해 주세요.</Text>
+          <Text className="text-gray-900 font-label-20">{title}</Text>
+          <Text className="text-gray-600 font-label-14">
+            아이템을 담을 폴더를 모두 선택해 주세요.
+          </Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -74,34 +78,42 @@ export function FolderManageSheet({
         >
           <Text className="text-gray-900 font-label-14">+ 새 폴더 만들기</Text>
         </Pressable>
-        <ScrollView ref={listRef} className="flex-1" showsVerticalScrollIndicator={false}>
-          {folders.map((folder) => {
+        <ScrollView
+          ref={listRef}
+          className="flex-1"
+          contentContainerClassName="gap-2"
+          showsVerticalScrollIndicator={false}
+        >
+          {orderedFolders.map((folder) => {
             const isSelected = selectedIds.includes(folder.id);
             return (
-              <Pressable
-                key={folder.id}
-                accessibilityRole="checkbox"
-                accessibilityLabel={folder.name}
-                accessibilityState={{ checked: isSelected }}
-                className={clsx(
-                  "h-[53px] flex-row items-center justify-between border-b border-gray-1000/20 pl-4 pr-0.5 active:opacity-75",
-                  highlightedId === folder.id && "bg-gray-100",
-                )}
-                onPress={() =>
-                  setSelectedIds((previous) =>
-                    isSelected
-                      ? previous.filter((id) => id !== folder.id)
-                      : [...previous, folder.id],
-                  )
-                }
-              >
-                <Text numberOfLines={1} className="flex-1 text-gray-900 font-label-16-medium">
-                  {folder.name}
-                </Text>
-                <View className="size-11 items-center justify-center">
-                  {isSelected ? <SelectedIcon /> : <AddIcon />}
-                </View>
-              </Pressable>
+              <View key={folder.id}>
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={folder.name}
+                  accessibilityState={{ checked: isSelected }}
+                  aria-checked={isSelected}
+                  className={clsx(
+                    "h-[46px] flex-row items-center justify-between rounded pl-4 pr-1.5 active:opacity-75",
+                    isSelected && "bg-gray-100",
+                  )}
+                  onPress={() =>
+                    setSelectedIds((previous) =>
+                      isSelected
+                        ? previous.filter((id) => id !== folder.id)
+                        : [...previous, folder.id],
+                    )
+                  }
+                >
+                  <Text numberOfLines={1} className="flex-1 text-gray-900 font-b2">
+                    {folder.name}
+                  </Text>
+                  <View className="size-11 items-center justify-center">
+                    {isSelected ? <SelectedIcon /> : <AddIcon />}
+                  </View>
+                </Pressable>
+                {folder.isOwnedItems && <View className="mt-2 h-px bg-[#E6E6E6]" />}
+              </View>
             );
           })}
         </ScrollView>

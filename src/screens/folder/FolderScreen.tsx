@@ -9,7 +9,9 @@ import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
 import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
+import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { ActionModal } from "@/components/modal";
+import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 
 import { FolderCard, type FolderItem } from "./components/FolderCard";
 import { FolderMenu, type FolderMenuAnchor } from "./components/FolderMenu";
@@ -17,8 +19,7 @@ import { FolderNameModal } from "./components/FolderNameModal";
 import { FolderSortFilter, type FolderSortOrder } from "./components/FolderSortFilter";
 import { FolderToast } from "./components/FolderToast";
 
-const DEFAULT_FOLDERS: FolderItem[] = [
-  { id: "default", name: "기본 폴더", itemCount: 0 },
+const INITIAL_FOLDERS: FolderItem[] = [
   { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
 ];
 const TOAST_DURATION_MS = 2000;
@@ -48,7 +49,7 @@ type FolderScreenProps = {
 export function FolderScreen({
   isError = false,
   onRetry,
-  folders = DEFAULT_FOLDERS,
+  folders = INITIAL_FOLDERS,
   savedItemCount = folders.reduce((count, folder) => count + folder.itemCount, 0),
   onOpenFolder,
   onRenameFolder,
@@ -59,6 +60,9 @@ export function FolderScreen({
   onNotifications,
 }: FolderScreenProps = {}) {
   const { height } = useWindowDimensions();
+  const guide = useFirstVisitGuide("folder", !isError);
+  const ownedGuideRef = useRef<View>(null);
+  const fabGuideRef = useRef<View>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -70,12 +74,15 @@ export function FolderScreen({
     anchor: FolderMenuAnchor;
   } | null>(null);
   const hasFolders = folders.length > 0;
-  const columnCount = folders.length >= 7 ? 3 : 2;
+  // 첫 진입 안내 중에는 소장템 한 장만 보여주고, 닫으면 원래 목록/정렬을 복원합니다.
+  const guideFolder = folders.find((folder) => folder.isOwnedItems);
+  const displayedFolders = guide.isVisible && guideFolder ? [guideFolder] : folders;
+  const columnCount = displayedFolders.length >= 7 ? 3 : 2;
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<FolderSortOrder>("latest");
-  const sortedFolders = [...folders].sort((left, right) => {
-    const leftRank = left.isOwnedItems ? 2 : left.id === "default" ? 1 : 0;
-    const rightRank = right.isOwnedItems ? 2 : right.id === "default" ? 1 : 0;
+  const sortedFolders = [...displayedFolders].sort((left, right) => {
+    const leftRank = Number(Boolean(left.isOwnedItems));
+    const rightRank = Number(Boolean(right.isOwnedItems));
     if (leftRank !== rightRank) return leftRank - rightRank;
     if (sortOrder === "item-count") return right.itemCount - left.itemCount;
     return (
@@ -194,7 +201,7 @@ export function FolderScreen({
               columnCount === 3 ? "gap-margin" : "gap-0",
             )}
           >
-            {Array.from({ length: Math.ceil(folders.length / columnCount) }, (_, row) => (
+            {Array.from({ length: Math.ceil(displayedFolders.length / columnCount) }, (_, row) => (
               <View
                 key={row}
                 className={clsx("flex-row", columnCount === 3 ? "gap-[13.5px]" : "gap-gutter")}
@@ -203,13 +210,15 @@ export function FolderScreen({
                   <FolderCard
                     key={folder.id}
                     folder={folder}
+                    guideRef={folder.isOwnedItems ? ownedGuideRef : undefined}
+                    isGuidePreview={guide.isVisible}
                     columnCount={columnCount}
                     onPress={onOpenFolder ? () => onOpenFolder(folder) : undefined}
                     onPressMenu={(anchor) => setSelectedFolderMenu({ folder, anchor })}
                   />
                 ))}
                 {Array.from(
-                  { length: Math.max(0, (row + 1) * columnCount - folders.length) },
+                  { length: Math.max(0, (row + 1) * columnCount - displayedFolders.length) },
                   (_, index) => (
                     <View key={`empty-${index}`} className="flex-1" />
                   ),
@@ -258,6 +267,8 @@ export function FolderScreen({
             </View>
           )}
           <Pressable
+            ref={fabGuideRef}
+            collapsable={false}
             accessibilityRole="button"
             accessibilityLabel="폴더 추가"
             onPress={() => {
@@ -311,9 +322,7 @@ export function FolderScreen({
           type="2Btn"
           hasTallHeader
           title="폴더 삭제하기"
-          description={
-            "해당 폴더를 삭제하시겠습니까?\n삭제된 폴더는 복구할 수 없으며, 다른 폴더에 없는 아이템은 기본 폴더로 이동합니다."
-          }
+          description={"해당 폴더를 삭제하시겠습니까?\n삭제된 폴더는 복구할 수 없습니다."}
           onRequestClose={() => {
             if (!isDeletingRef.current) setDeletingFolder(null);
           }}
@@ -343,6 +352,13 @@ export function FolderScreen({
               if (!isDeletingRef.current) setDeletingFolder(null);
             },
           }}
+        />
+      )}
+      {guide.isVisible && !isError && (
+        <FirstVisitGuide
+          kind="folder"
+          targets={{ owned: ownedGuideRef, fab: fabGuideRef }}
+          onClose={guide.dismiss}
         />
       )}
     </View>

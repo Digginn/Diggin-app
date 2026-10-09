@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 import { Image } from "expo-image";
 import { cssInterop } from "nativewind";
-import { useRef } from "react";
+import { useRef, type RefObject } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import MoreIcon from "@/assets/images/folder/icon-folder-more.svg";
@@ -28,12 +28,21 @@ type FolderCardProps = {
   columnCount?: 2 | 3;
   onPress?: () => void;
   onPressMenu?: (anchor: FolderMenuAnchor) => void;
+  guideRef?: RefObject<View | null>;
+  isGuidePreview?: boolean;
 };
 
-export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: FolderCardProps) {
+export function FolderCard({
+  folder,
+  columnCount = 2,
+  onPress,
+  onPressMenu,
+  guideRef,
+  isGuidePreview = false,
+}: FolderCardProps) {
   const cardRef = useRef<View>(null);
   const isCompact = columnCount === 3;
-  const canManage = folder.id !== "default" && !folder.isOwnedItems && !!onPressMenu;
+  const canManage = !folder.isOwnedItems && !!onPressMenu;
   function openMenu() {
     if (!canManage) return;
     cardRef.current?.measureInWindow((x, y, width, height) =>
@@ -42,7 +51,11 @@ export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: Fo
   }
   return (
     <Pressable
-      ref={cardRef}
+      ref={(view) => {
+        cardRef.current = view;
+        if (guideRef) guideRef.current = view;
+      }}
+      collapsable={false}
       accessibilityRole="button"
       accessibilityLabel={`${folder.name}, ${folder.itemCount}개의 아이템`}
       accessibilityState={{ disabled: !onPress && !canManage }}
@@ -104,6 +117,18 @@ export function FolderCard({ folder, columnCount = 2, onPress, onPressMenu }: Fo
         >
           <MoreIcon />
         </Pressable>
+      )}
+      {isGuidePreview && !canManage && (
+        <View
+          pointerEvents="none"
+          accessible={false}
+          className={clsx(
+            "absolute right-0 items-center justify-center",
+            isCompact ? "top-1 size-8" : "-top-[7px] size-12",
+          )}
+        >
+          <MoreIcon />
+        </View>
       )}
     </Pressable>
   );

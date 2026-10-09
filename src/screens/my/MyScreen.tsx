@@ -1,30 +1,16 @@
 import { useRouter, type Href } from "expo-router";
 import { useRef, useState, type FC } from "react";
-import { Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { Linking, ScrollView, Text, View } from "react-native";
 import type { SvgProps } from "react-native-svg";
 
-import {
-  IconMyActivity,
-  IconMyChevron,
-  IconMyProfile,
-  IconMySettings,
-  IconMySupport,
-} from "@/assets/images/my";
+import { IconMyProfile, IconMySettings, IconMySupport } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
 
 import { AccountWithdrawalModal } from "./components/AccountWithdrawalModal";
 import type { WithdrawalSurvey } from "./components/AccountWithdrawalSurvey";
 import { LogoutModal } from "./components/LogoutModal";
+import { MyMenuList, type MyMenuRow } from "./components/MyMenuList";
 import { SUPPORT_CHANNEL_URL } from "./constants/supportChannel";
-
-type MyMenuRow = {
-  label: string;
-  value?: string;
-  hasChevron?: boolean;
-  hasDivider?: boolean;
-  onPress?: () => void;
-  onLongPress?: () => void;
-};
 
 type MySectionProps = {
   title: string;
@@ -45,35 +31,7 @@ function MySection({ title, Icon, rows }: MySectionProps) {
         <View className="h-0.5 w-full bg-gray-900" />
       </View>
 
-      <View className="px-2">
-        {rows.map((row) => {
-          const hasDivider = row.hasDivider ?? true;
-
-          return (
-            <Pressable
-              key={row.label}
-              accessibilityRole={row.onPress ? "button" : undefined}
-              disabled={!row.onPress}
-              onPress={row.onPress}
-              onLongPress={row.onLongPress}
-              className={`h-12 flex-row items-center justify-between ${hasDivider ? "border-b border-gray-300" : ""}`}
-            >
-              <Text numberOfLines={1} className="flex-1 text-gray-800 font-b3">
-                {row.label}
-              </Text>
-              {row.value ? (
-                <Text className="text-gray-800 font-meta">{row.value}</Text>
-              ) : row.hasChevron !== false ? (
-                <View className="h-6 w-6 items-center justify-center">
-                  <View style={{ transform: [{ scaleX: -1 }] }}>
-                    <IconMyChevron width={18} height={18} />
-                  </View>
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
+      <MyMenuList rows={rows} />
     </View>
   );
 }
@@ -130,7 +88,12 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
       onLongPress: __DEV__ ? () => router.push("/customer-support" as Href) : undefined,
     },
     { label: "이용약관", onPress: () => router.push("/terms" as Href) },
-    { label: "앱 정보", value: "버전명", hasChevron: false, hasDivider: false },
+    {
+      label: "CSV 파일로 위시 아이템 불러오기",
+      onPress: () => router.push("/csv-import" as Href),
+      onLongPress: __DEV__ ? () => router.push("/csv-import-preview" as Href) : undefined,
+    },
+    { label: "앱 정보", value: "1.0.0 (100)", hasChevron: false },
   ];
   const settingsRows: MyMenuRow[] = [
     {
@@ -147,17 +110,6 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
       onLongPress: __DEV__ ? () => router.push("/account-withdrawal-preview" as Href) : undefined,
     },
   ];
-  const activityRows: MyMenuRow[] = [
-    { label: "내가 쓴 글", onPress: () => router.push("/my-posts" as Href) },
-    { label: "내가 투표한 글", onPress: () => router.push("/my-voted-posts" as Href) },
-    {
-      label: "CSV 파일로 위시 아이템 불러오기",
-      onPress: () => router.push("/csv-import" as Href),
-      // 개발 중에는 길게 눌러 API 없이 결과 시안을 확인합니다.
-      onLongPress: __DEV__ ? () => router.push("/csv-import-preview" as Href) : undefined,
-    },
-  ];
-
   return (
     <View className="flex-1 bg-gray-0">
       <AppBar left="none" title="MY" />
@@ -169,9 +121,11 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
         <MySection
           title="프로필"
           Icon={IconMyProfile}
-          rows={[{ label: "프로필 수정", onPress: () => router.push("/profile-edit" as Href) }]}
+          rows={[
+            { label: "프로필 수정", onPress: () => router.push("/profile-edit" as Href) },
+            { label: "내 활동", onPress: () => router.push("/my-activity" as Href) },
+          ]}
         />
-        <MySection title="활동" Icon={IconMyActivity} rows={activityRows} />
         <MySection title="고객지원" Icon={IconMySupport} rows={supportRows} />
         <MySection title="설정" Icon={IconMySettings} rows={settingsRows} />
       </ScrollView>

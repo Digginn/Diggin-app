@@ -51,6 +51,7 @@ export function WishItemGrid({
             price={item.price}
             brand={item.brand}
             thumbnailUrl={item.thumbnailUrl}
+            isOwned={item.isOwned}
             select={selectedIds ? (selectedIds.has(item.id) ? "selected" : "unselected") : "none"}
             onPress={onItemPress ? () => onItemPress(item) : undefined}
           />

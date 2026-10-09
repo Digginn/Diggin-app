@@ -9,9 +9,11 @@ import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
 import { STATE_MESSAGES } from "@/constants/messages";
 import { SortLabel, type SortOrder } from "@/screens/all/components/SortLabel";
+import { orderWishItems } from "@/screens/all/domain/orderWishItems";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { RecentSearches } from "./components/RecentSearches";
+import { MAX_SEARCH_LENGTH } from "./constants";
 import { useRecentSearches } from "./useRecentSearches";
 
 // TODO: API 연결 전까지 쓰는 임시 데이터.
@@ -21,6 +23,8 @@ const MOCK_RESULTS: WishItem[] = Array.from({ length: 8 }, (_, index) => ({
   price: 0,
   brand: "브랜드명",
   thumbnailUrl: null,
+  isOwned: index === 0 || index === 2,
+  ownedAt: index === 0 ? 1_790_000_000_000 : index === 2 ? 1_791_000_000_000 : undefined,
 }));
 
 const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
@@ -34,10 +38,12 @@ export function SearchScreen() {
   const recentSearches = useRecentSearches();
 
   const submitted = history.at(-1) ?? "";
-  const results = submitted ? MOCK_RESULTS : [];
+  const results = submitted ? orderWishItems(MOCK_RESULTS) : [];
 
-  const handleSubmit = (value: string) => {
-    if (!value || value === submitted) return;
+  const handleSubmit = (text: string) => {
+    const value = text.slice(0, MAX_SEARCH_LENGTH);
+    if (!value.trim() || value === submitted) return;
+    setKeyword(value);
     setHistory((prev) => [...prev, value]);
     recentSearches.add(value);
   };
@@ -57,6 +63,7 @@ export function SearchScreen() {
     <View className="flex-1 bg-gray-0">
       <SearchBar
         autoFocus
+        maxLength={MAX_SEARCH_LENGTH}
         value={keyword}
         onChangeText={setKeyword}
         onBack={handleBack}
