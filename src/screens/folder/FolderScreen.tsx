@@ -9,7 +9,9 @@ import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
 import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
+import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { ActionModal } from "@/components/modal";
+import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 
 import { FolderCard, type FolderItem } from "./components/FolderCard";
 import { FolderMenu, type FolderMenuAnchor } from "./components/FolderMenu";
@@ -59,6 +61,9 @@ export function FolderScreen({
   onNotifications,
 }: FolderScreenProps = {}) {
   const { height } = useWindowDimensions();
+  const guide = useFirstVisitGuide("folder", !isError);
+  const ownedGuideRef = useRef<View>(null);
+  const fabGuideRef = useRef<View>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -70,10 +75,13 @@ export function FolderScreen({
     anchor: FolderMenuAnchor;
   } | null>(null);
   const hasFolders = folders.length > 0;
-  const columnCount = folders.length >= 7 ? 3 : 2;
+  // 첫 진입 안내 중에는 소장템 한 장만 보여주고, 닫으면 원래 목록/정렬을 복원합니다.
+  const guideFolder = folders.find((folder) => folder.isOwnedItems);
+  const displayedFolders = guide.isVisible && guideFolder ? [guideFolder] : folders;
+  const columnCount = displayedFolders.length >= 7 ? 3 : 2;
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<FolderSortOrder>("latest");
-  const sortedFolders = [...folders].sort((left, right) => {
+  const sortedFolders = [...displayedFolders].sort((left, right) => {
     const leftRank = left.isOwnedItems ? 2 : left.id === "default" ? 1 : 0;
     const rightRank = right.isOwnedItems ? 2 : right.id === "default" ? 1 : 0;
     if (leftRank !== rightRank) return leftRank - rightRank;
@@ -194,7 +202,7 @@ export function FolderScreen({
               columnCount === 3 ? "gap-margin" : "gap-0",
             )}
           >
-            {Array.from({ length: Math.ceil(folders.length / columnCount) }, (_, row) => (
+            {Array.from({ length: Math.ceil(displayedFolders.length / columnCount) }, (_, row) => (
               <View
                 key={row}
                 className={clsx("flex-row", columnCount === 3 ? "gap-[13.5px]" : "gap-gutter")}
@@ -203,13 +211,15 @@ export function FolderScreen({
                   <FolderCard
                     key={folder.id}
                     folder={folder}
+                    guideRef={folder.isOwnedItems ? ownedGuideRef : undefined}
+                    isGuidePreview={guide.isVisible}
                     columnCount={columnCount}
                     onPress={onOpenFolder ? () => onOpenFolder(folder) : undefined}
                     onPressMenu={(anchor) => setSelectedFolderMenu({ folder, anchor })}
                   />
                 ))}
                 {Array.from(
-                  { length: Math.max(0, (row + 1) * columnCount - folders.length) },
+                  { length: Math.max(0, (row + 1) * columnCount - displayedFolders.length) },
                   (_, index) => (
                     <View key={`empty-${index}`} className="flex-1" />
                   ),
@@ -258,6 +268,8 @@ export function FolderScreen({
             </View>
           )}
           <Pressable
+            ref={fabGuideRef}
+            collapsable={false}
             accessibilityRole="button"
             accessibilityLabel="폴더 추가"
             onPress={() => {
@@ -343,6 +355,13 @@ export function FolderScreen({
               if (!isDeletingRef.current) setDeletingFolder(null);
             },
           }}
+        />
+      )}
+      {guide.isVisible && !isError && (
+        <FirstVisitGuide
+          kind="folder"
+          targets={{ owned: ownedGuideRef, fab: fabGuideRef }}
+          onClose={guide.dismiss}
         />
       )}
     </View>

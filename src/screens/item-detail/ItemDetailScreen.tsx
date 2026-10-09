@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -11,8 +11,10 @@ import ShareSvg from "@/assets/images/icon-share.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { FallbackImg } from "@/components/FallbackImg";
+import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
 import { WishLevel } from "@/components/WishLevel";
+import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { EditChip } from "./components/EditChip";
@@ -43,17 +45,20 @@ const BRAND = "브랜드명";
 
 // TODO: 폴더 목록 API 연결 전까지 쓰는 임시 값.
 const MOCK_FOLDERS: ManagedFolder[] = [
-  "기본 폴더",
-  "바지",
-  "여름휴가때입을거",
-  "출근룩",
-  "선물 리스트",
-  "운동복",
-  "홈카페",
-  "겨울 코트",
-  "생일 선물",
-  "등산",
-].map((name, index) => ({ id: `folder-${index}`, name }));
+  { id: "owned", name: "나의 소장템", isOwnedItems: true },
+  ...[
+    "기본 폴더",
+    "바지",
+    "여름휴가때입을거",
+    "출근룩",
+    "선물 리스트",
+    "운동복",
+    "홈카페",
+    "겨울 코트",
+    "생일 선물",
+    "등산",
+  ].map((name, index) => ({ id: `folder-${index}`, name })),
+];
 
 const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
 
@@ -69,6 +74,9 @@ const MOCK_RECOMMENDS: WishItem[] = Array.from({ length: 9 }, (_, index) => ({
 export function ItemDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const guide = useFirstVisitGuide("item-detail");
+  const wishGuideRef = useRef<View>(null);
+  const voteGuideRef = useRef<View>(null);
   // TODO: API 연결 시 이 id 로 아이템을 조회한다.
   useLocalSearchParams<{ id: string }>();
 
@@ -122,7 +130,11 @@ export function ItemDetailScreen() {
             />
           </View>
 
-          <View className="absolute bottom-3 left-[17px] h-12 justify-center">
+          <View
+            ref={wishGuideRef}
+            collapsable={false}
+            className="absolute bottom-3 left-[17px] h-12 justify-center"
+          >
             <WishLevel
               levels={MOCK_LEVELS}
               openDirection="up"
@@ -193,7 +205,9 @@ export function ItemDetailScreen() {
         className="absolute inset-x-0 bottom-0"
         onLayout={(event) => setBottomHeight(event.nativeEvent.layout.height)}
       >
-        <VotePrompt onPress={() => router.push("/diggle")} />
+        <View ref={voteGuideRef} collapsable={false}>
+          <VotePrompt onPress={() => router.push("/diggle")} />
+        </View>
 
         <View className="flex-row gap-gutter border-t border-gray-200 bg-gray-0 px-margin pb-10 pt-3">
           <View className="flex-1">
@@ -209,6 +223,13 @@ export function ItemDetailScreen() {
           </View>
         </View>
       </View>
+      {guide.isVisible && (
+        <FirstVisitGuide
+          kind="item-detail"
+          targets={{ wish: wishGuideRef, vote: voteGuideRef }}
+          onClose={guide.dismiss}
+        />
+      )}
     </View>
   );
 }

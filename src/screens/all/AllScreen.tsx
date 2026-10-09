@@ -6,10 +6,12 @@ import { IconNotification, IconSearch } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { ActionModal } from "@/components/modal";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
 import { selectDeletedMessage, STATE_MESSAGES } from "@/constants/messages";
+import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useToast } from "@/hooks/useToast";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
@@ -35,6 +37,7 @@ export function AllScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const showToast = useToast();
+  const guide = useFirstVisitGuide("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
 
   // TODO: TanStack Query 연결 시 쿼리의 로딩 · 에러 상태와 뮤테이션으로 바꾼다.
@@ -112,7 +115,9 @@ export function AllScreen() {
         />
       )}
 
-      {hasError ? (
+      {guide.isVisible ? (
+        <View className="flex-1" />
+      ) : hasError ? (
         <ErrorState message={STATE_MESSAGES.loadFailed} onRetry={() => {}} />
       ) : items.length === 0 && !isLoading ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
@@ -178,6 +183,7 @@ export function AllScreen() {
         secondaryAction={{ label: "취소", onPress: () => setConfirming(null) }}
         primaryAction={{ label: "삭제하기", onPress: handleDelete }}
       />
+      {guide.isVisible && <FirstVisitGuide kind="all" onClose={guide.dismiss} />}
     </View>
   );
 }

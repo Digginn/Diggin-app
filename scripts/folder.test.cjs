@@ -16,6 +16,7 @@ let screenState;
 let screenCursor = 0;
 let toastTimer;
 let toastTimerDuration;
+let isGuideVisible = false;
 runInNewContext(compiled, {
   exports: screenModule.exports,
   module: screenModule,
@@ -26,6 +27,9 @@ runInNewContext(compiled, {
   },
   clearTimeout: () => {},
   require: (name) => {
+    if (name.endsWith("useFirstVisitGuide"))
+      return { useFirstVisitGuide: () => ({ isVisible: isGuideVisible }) };
+    if (name.endsWith("FirstVisitGuide")) return { FirstVisitGuide: "FirstVisitGuide" };
     if (name === "react-native") {
       return {
         Pressable: "Pressable",
@@ -71,6 +75,35 @@ runInNewContext(compiled, {
     if (name.endsWith("image-fab-glow.svg")) return { __esModule: true, default: "FabGlow" };
     return { default: name };
   },
+});
+
+test("첫 진입 안내 중에만 소장템 한 장을 첫 칸에 보여주고 닫으면 원래 목록을 복원한다", () => {
+  const folders = [
+    { id: "one", name: "일반 폴더", itemCount: 1 },
+    { id: "default", name: "기본 폴더", itemCount: 0 },
+    { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
+  ];
+  try {
+    isGuideVisible = true;
+    const tree = screenModule.exports.FolderScreen({ folders });
+    const cards = findAll(tree, "FolderCard");
+    assert.deepEqual(
+      cards.map((card) => card.props.folder.id),
+      ["owned"],
+    );
+    assert.equal(cards[0].props.columnCount, 2);
+    assert.equal(cards[0].props.isGuidePreview, true);
+    assert.equal(findAll(tree, "FirstVisitGuide").length, 1);
+  } finally {
+    isGuideVisible = false;
+  }
+  const tree = screenModule.exports.FolderScreen({ folders });
+  assert.deepEqual(
+    findAll(tree, "FolderCard").map((card) => card.props.folder.id),
+    ["one", "default", "owned"],
+  );
+  assert.equal(findAll(tree, "FirstVisitGuide").length, 0);
+  assert.ok(findAll(tree, "FolderCard").every((card) => !card.props.isGuidePreview));
 });
 
 test("폴더 생성 완료 토스트는 모달 닫힌 뒤 표시되고 2초 후 사라진다", async () => {
@@ -621,6 +654,11 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
       assert.equal(findAll(special, "Pressable").length, 1);
       assert.equal(special.props.onLongPress, undefined);
       assert.equal(special.props.onPress, props.onPress);
+      assert.equal(findAll(special, "@/assets/images/folder/icon-folder-more.svg").length, 0);
+      const guide = FolderCard({ ...props, folder, isGuidePreview: true });
+      assert.equal(findAll(guide, "@/assets/images/folder/icon-folder-more.svg").length, 1);
+      assert.equal(findAll(guide, "Pressable").length, 1);
+      assert.equal(guide.props.onLongPress, undefined);
     }
     for (const itemCount of [0, 1, 2, 3, 8]) {
       const folder = { id: "test", name: "폴더", itemCount, thumbnails: [101, 102, 103, 104] };
