@@ -8,13 +8,15 @@ import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { LoadingDialog } from "@/components/Loading";
 import { ActionModal } from "@/components/modal";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
 import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useToast } from "@/hooks/useToast";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
-import { ItemSaveSheet, type ItemSaveValues } from "@/screens/save/components/ItemSaveSheet";
+import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
+import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/screens/save/useItemSave";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { DeleteBar } from "./components/DeleteBar";
@@ -31,15 +33,6 @@ const MOCK_ITEMS: WishItem[] = Array.from({ length: 11 }, (_, index) => ({
 }));
 
 const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
-
-const EMPTY_SAVE_VALUES: ItemSaveValues = {
-  name: "",
-  brand: "",
-  price: "",
-  sourceUrl: "",
-  thumbnailUrl: null,
-  wishLevel: null,
-};
 
 const WISH_LEVEL_HINT =
   "아이템 상세 화면에서 얼마나 사고 싶은지를 3단계로 기록해두어 구매 고민을 빠르게 마칠 수 있습니다.";
@@ -59,7 +52,7 @@ export function AllScreen() {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [confirming, setConfirming] = useState<"cancel" | "delete" | null>(null);
   const [isLinkSheetOpen, setLinkSheetOpen] = useState(false);
-  const [saveValues, setSaveValues] = useState<ItemSaveValues | null>(null);
+  const itemSave = useItemSave();
 
   const selectedCount = selectedIds.size;
   const isAllSelected = items.length > 0 && selectedCount === items.length;
@@ -173,32 +166,29 @@ export function AllScreen() {
       ) : null}
 
       <ItemLinkSheet
-        key={isLinkSheetOpen ? "open" : "closed"}
+        key={`link-${isLinkSheetOpen}`}
         visible={isLinkSheetOpen}
         onRequestClose={() => setLinkSheetOpen(false)}
         onSubmit={(url) => {
           setLinkSheetOpen(false);
-          // TODO: 크롤링이 붙으면 불러온 이름 · 브랜드 · 가격 · 이미지를 채워 넘긴다.
-          setSaveValues({
-            name: "",
-            brand: "",
-            price: "",
-            sourceUrl: url,
-            thumbnailUrl: null,
-            wishLevel: null,
-          });
+          void itemSave.start(url);
         }}
       />
 
+      <LoadingDialog
+        visible={itemSave.isLoading}
+        message="아이템 정보를 불러오는 중입니다."
+        onDismiss={itemSave.openAfterLoading}
+      />
+
       <ItemSaveSheet
-        key={saveValues?.sourceUrl ?? "closed"}
-        visible={saveValues !== null}
-        // 크롤링 전까지는 값이 비어 있어 직접 입력하는 흐름으로 연다.
-        hasExtractionFailed
-        initialValues={saveValues ?? EMPTY_SAVE_VALUES}
-        onRequestClose={() => setSaveValues(null)}
+        key={`save-${itemSave.values?.sourceUrl ?? ""}`}
+        visible={itemSave.values !== null}
+        hasExtractionFailed={itemSave.hasFailed}
+        initialValues={itemSave.values ?? EMPTY_ITEM_SAVE_VALUES}
+        onRequestClose={itemSave.close}
         onSubmit={() => {
-          setSaveValues(null);
+          itemSave.close();
           showToast(TOAST_MESSAGES.SAVE_011);
         }}
       />
