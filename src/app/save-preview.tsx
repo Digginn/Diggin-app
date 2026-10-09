@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { PasteGuideModal } from "@/components/PasteGuideModal";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
 import { ItemSaveSheet, type ItemSaveValues } from "@/screens/save/components/ItemSaveSheet";
+import { ShareErrorSheet, type ShareErrorReason } from "@/screens/save/components/ShareErrorSheet";
 
 // 아이템 저장 시트 확인용 화면입니다. 실제 저장 흐름이 붙기 전까지만 씁니다.
 const PREVIEW_VALUES: ItemSaveValues = {
@@ -16,7 +17,7 @@ const PREVIEW_VALUES: ItemSaveValues = {
   wishLevel: null,
 };
 
-type PreviewKind = "link" | "loaded" | "failed" | "paste" | null;
+type PreviewKind = "link" | "loaded" | "failed" | "paste" | ShareErrorReason | null;
 
 const EMPTY_VALUES: ItemSaveValues = {
   name: "",
@@ -40,6 +41,9 @@ export default function SavePreviewRoute() {
             ["loaded", "아이템 정보 확인 (SAVE-06)"],
             ["failed", "정보를 불러오지 못함 (SAVE-08)"],
             ["paste", "붙여넣기 설정 안내 (SAVE-17)"],
+            ["no_url", "공유 오류 · URL 없음 (MSG-SAVE-014)"],
+            ["deeplink", "공유 오류 · 앱 전용 딥링크"],
+            ["invalid_format", "공유 오류 · 형식 오류"],
           ] as const
         ).map(([kind, label]) => (
           <Pressable
@@ -68,6 +72,13 @@ export default function SavePreviewRoute() {
         onRequestClose={() => setOpen(null)}
         onSubmit={() => setOpen(null)}
       />
+
+      {open === "no_url" || open === "deeplink" || open === "invalid_format" ? (
+        // 실제로는 공유 확장이 띄운다. 여기서는 생김새만 확인한다.
+        <View className="absolute inset-x-0 bottom-0">
+          <ShareErrorSheet reason={open} onClose={() => setOpen(null)} />
+        </View>
+      ) : null}
 
       <PasteGuideModal
         visible={open === "paste"}
