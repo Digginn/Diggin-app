@@ -13,7 +13,7 @@ import { TextField } from "@/components/Field";
 import { ActionModal } from "@/components/modal";
 import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
-import type { WishLevelKey } from "@/types/wish-item";
+import type { ItemSaveValues } from "@/types/wish-item";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 const CameraIcon = cssInterop(CameraSvg, {
@@ -29,15 +29,6 @@ const HINT_GAP = 10;
 const HINT_TOP_OFFSET = 4;
 
 type Anchor = { x: number; y: number; width: number; height: number };
-
-export type ItemSaveValues = {
-  name: string;
-  brand: string;
-  price: string;
-  sourceUrl: string;
-  thumbnailUrl: string | null;
-  wishLevel: WishLevelKey | null;
-};
 
 type ItemSaveSheetProps = {
   visible: boolean;

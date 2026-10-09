@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 
-import type { ItemSaveValues } from "./components/ItemSaveSheet";
-import { fetchItemPreview } from "./fetchItemPreview";
+import { MOCK_ITEM_PREVIEW } from "@/constants/mockItemPreview";
+import type { ItemSaveValues } from "@/types/wish-item";
 
 export const EMPTY_ITEM_SAVE_VALUES: ItemSaveValues = {
   name: "",
@@ -14,6 +14,12 @@ export const EMPTY_ITEM_SAVE_VALUES: ItemSaveValues = {
 };
 
 type Loaded = { values: ItemSaveValues; hasFailed: boolean };
+
+// TODO: 크롤링 API 로 교체한다. 지금은 불러오기에 성공했다고 보고 목 데이터를 돌려준다.
+// 실패를 돌려줄 때는 null 을 주면 저장 시트가 직접 입력 상태로 열린다.
+async function loadItemPreview(sourceUrl: string): Promise<ItemSaveValues | null> {
+  return { ...MOCK_ITEM_PREVIEW, sourceUrl };
+}
 
 /**
  * 링크를 받아 아이템 정보를 불러오고 저장 시트를 띄운다. ALL 탭의 아이템 추가와 클립보드
@@ -30,7 +36,7 @@ export function useItemSave() {
 
   const start = useCallback(async (sourceUrl: string) => {
     setLoading(true);
-    const preview = await fetchItemPreview(sourceUrl);
+    const preview = await loadItemPreview(sourceUrl);
     // 못 불러오면 링크만 남기고 사용자가 직접 채우게 한다.
     const next: Loaded = {
       values: preview ?? { ...EMPTY_ITEM_SAVE_VALUES, sourceUrl },

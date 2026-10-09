@@ -4,8 +4,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PasteGuideModal } from "@/components/PasteGuideModal";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
-import { ItemSaveSheet, type ItemSaveValues } from "@/screens/save/components/ItemSaveSheet";
+import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
 import { ShareErrorSheet, type ShareErrorReason } from "@/screens/save/components/ShareErrorSheet";
+import type { ItemSaveValues } from "@/types/wish-item";
 
 // 아이템 저장 시트 확인용 화면입니다. 실제 저장 흐름이 붙기 전까지만 씁니다.
 const PREVIEW_VALUES: ItemSaveValues = {
