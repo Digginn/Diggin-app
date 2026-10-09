@@ -14,7 +14,6 @@ const PREVIEW_FOLDERS: FolderItem[] = [
       require("@/assets/images/folder/image-folder-item-preview.png"),
     ),
   })),
-  { id: "default", name: "기본 폴더", itemCount: 0 },
   { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
 ];
 
@@ -29,11 +28,11 @@ export default function FolderRoute() {
   let folders: FolderItem[] | undefined;
   if (__DEV__) {
     folders =
-      preview === "empty" ? [] : preview === "basic" ? PREVIEW_FOLDERS.slice(-2) : PREVIEW_FOLDERS;
+      preview === "empty" ? [] : preview === "basic" ? PREVIEW_FOLDERS.slice(-1) : PREVIEW_FOLDERS;
     if (preview === "menu" || preview === "six" || preview === "seven") {
       folders = [
-        ...PREVIEW_FOLDERS.slice(0, preview === "menu" ? 2 : preview === "six" ? 4 : 5),
-        ...PREVIEW_FOLDERS.slice(-2),
+        ...PREVIEW_FOLDERS.slice(0, preview === "menu" ? 2 : preview === "six" ? 5 : 6),
+        ...PREVIEW_FOLDERS.slice(-1),
       ];
     }
     if (preview === "items" || preview === "items-compact") {

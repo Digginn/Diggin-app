@@ -52,12 +52,17 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "@/components/WishLevel": { WishLevel: "WishLevel" },
     "@/constants/messages": { STATE_MESSAGES: {} },
     "@/hooks/useToast": { useToast: () => () => {} },
+    "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: false }) },
+    "@/components/FirstVisitGuide": { FirstVisitGuide: "FirstVisitGuide" },
     "./components/DeleteBar": { DeleteBar: "DeleteBar" },
     "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
     "./components/SortLabel": { SortLabel: "SortLabel" },
     "@/screens/all/components/SortLabel": { SortLabel: "SortLabel" },
     "./components/RecentSearches": { RecentSearches: "RecentSearches" },
     "./useRecentSearches": { useRecentSearches: () => ({ keywords: [] }) },
+    "./constants": { MAX_SEARCH_LENGTH: 100 },
+    "./domain/orderWishItems": { orderWishItems: (items) => items },
+    "@/screens/all/domain/orderWishItems": { orderWishItems: (items) => items },
     "@/screens/folder/FolderScreen": { FolderScreen: "FolderScreen" },
     "@/assets/images/folder/image-folder-item-preview.png": 1,
   };
@@ -68,6 +73,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   );
   allButton.props.onPress();
   const { SearchScreen } = load("../src/screens/search/SearchScreen.tsx", mocks);
+  assert.equal(findAll(SearchScreen(), "SearchBar")[0].props.maxLength, 100);
   findAll(SearchScreen(), "SearchBar")[0].props.right.props.onPress();
   const { default: FolderRoute } = load("../src/app/(tabs)/folder.tsx", mocks, {
     __DEV__: false,

@@ -112,7 +112,6 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
         "./utils/voteTiming": load("../src/screens/diggle/utils/voteTiming.ts", {}),
         "./constants/mockPosts": {
           CURRENT_USER_ID: "me",
-          DEFAULT_FOLDER_ID: "default",
           MOCK_FOLDERS: [],
           findMockComments: () => [],
           findMockVoteComments: () => [

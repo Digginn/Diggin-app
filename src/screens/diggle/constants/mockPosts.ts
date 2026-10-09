@@ -135,11 +135,9 @@ const MOCK_VOTE_COMMENTS: PostComment[] = [
 export const findMockVoteComments = (id: string) =>
   id === "2" ? MOCK_VOTE_COMMENTS : findMockComments(id);
 
-export const DEFAULT_FOLDER_ID = "default";
-
 // TODO: API 연결 시 내 폴더 목록 조회로 바꾼다.
 export const MOCK_FOLDERS = [
-  { id: DEFAULT_FOLDER_ID, name: "기본 폴더" },
+  { id: "owned", name: "나의 소장템", isOwnedItems: true },
   { id: "pants", name: "바지" },
   { id: "summer", name: "여름휴가때입을거" },
   { id: "work", name: "출근룩" },
