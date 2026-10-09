@@ -294,7 +294,7 @@ test("인증 만료 안내의 나중에 버튼은 모달을 닫고 로그인 버
   assert.equal(modal.props.isFullScreen, true);
   assert.deepEqual(
     buttons.map((node) => node.props.children),
-    ["다음에 할게요", "로그인하기"],
+    ["다음에 할게요", "로그인"],
   );
   buttons[0].props.onPress();
   assert.equal(previewModal().props.visible, false);

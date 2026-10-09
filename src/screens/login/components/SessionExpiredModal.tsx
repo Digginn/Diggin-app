@@ -30,7 +30,7 @@ export function SessionExpiredModal({ visible, onLater, onLogin }: SessionExpire
           다음에 할게요
         </Button>
         <Button className="flex-1" onPress={onLogin}>
-          로그인하기
+          로그인
         </Button>
       </View>
     </Modal>
