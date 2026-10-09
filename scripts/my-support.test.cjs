@@ -77,6 +77,7 @@ function setup(screenName) {
         if (name === "@/components/Button") return { Button: "Button" };
         if (name === "@/components/modal") return { Modal: "Modal" };
         if (name === "./components/LogoutModal") return { LogoutModal: "LogoutModal" };
+        if (name === "./components/MyMenuList") return { MyMenuList: "MyMenuList" };
         if (name === "./components/AccountWithdrawalModal")
           return { AccountWithdrawalModal: "AccountWithdrawalModal" };
         if (name === "@/assets/images/my")
@@ -113,6 +114,42 @@ function descendants(element) {
   if (!React.isValidElement(element)) return [];
   return [element, ...React.Children.toArray(element.props.children).flatMap(descendants)];
 }
+
+test("MY는 활동을 프로필의 2depth로 옮기고 CSV를 고객지원에 배치한다", () => {
+  const context = setup("MyScreen");
+  const nodes = descendants(context.Screen());
+  const sections = nodes.filter((node) => node.props.rows && node.props.title);
+  assert.deepEqual(
+    sections.map((node) => node.props.title),
+    ["프로필", "고객지원", "설정"],
+  );
+  const profile = nodes.find((node) => node.props.title === "프로필");
+  assert.deepEqual(
+    Array.from(profile.props.rows, (row) => row.label),
+    ["프로필 수정", "내 활동"],
+  );
+  profile.props.rows[1].onPress();
+  assert.equal(context.routes[0], "/my-activity");
+  const support = nodes.find((node) => node.props.title === "고객지원");
+  const csv = support.props.rows.find((row) => row.label === "CSV 파일로 위시 아이템 불러오기");
+  csv.onPress();
+  assert.equal(context.routes[1], "/csv-import");
+});
+
+test("내 활동은 쓴 글과 좋아요한 글만 표시하고 쓴 글 목록으로 이동한다", () => {
+  const context = setup("MyActivityScreen");
+  const nodes = descendants(context.Screen());
+  assert.equal(nodes.find((node) => node.type === "AppBar").props.title, "내 활동");
+  const rows = nodes.find((node) => node.type === "MyMenuList").props.rows;
+  assert.deepEqual(
+    Array.from(rows, (row) => row.label),
+    ["내가 쓴 글", "내가 좋아요한 글"],
+  );
+  rows[0].onPress();
+  assert.equal(context.routes[0], "/my-posts");
+  rows[1].onPress();
+  assert.deepEqual(context.toasts, ["좋아요한 글 목록은 준비 중입니다."]);
+});
 
 test("MY 문의는 채널로 바로 이동하고 실패할 때만 고객지원 화면을 표시한다", async () => {
   const context = setup("MyScreen");
