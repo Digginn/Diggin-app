@@ -13,6 +13,7 @@ import {
 import { AppBar } from "@/components/app-bar";
 
 import { AccountWithdrawalModal } from "./components/AccountWithdrawalModal";
+import type { WithdrawalSurvey } from "./components/AccountWithdrawalSurvey";
 import { LogoutModal } from "./components/LogoutModal";
 import { SUPPORT_CHANNEL_URL } from "./constants/supportChannel";
 
@@ -79,7 +80,7 @@ function MySection({ title, Icon, rows }: MySectionProps) {
 
 type MyScreenProps = {
   onLogout?: () => Promise<void>;
-  onWithdraw?: () => Promise<void>;
+  onWithdraw?: (survey: WithdrawalSurvey) => Promise<void>;
 };
 
 export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
@@ -182,11 +183,13 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
         toastMessage={modalToast}
         onToastDismiss={() => setModalToast(undefined)}
       />
-      <AccountWithdrawalModal
-        isVisible={isWithdrawalOpen}
-        onClose={() => setIsWithdrawalOpen(false)}
-        onWithdraw={onWithdraw}
-      />
+      {isWithdrawalOpen && (
+        <AccountWithdrawalModal
+          isVisible
+          onClose={() => setIsWithdrawalOpen(false)}
+          onWithdraw={onWithdraw}
+        />
+      )}
     </View>
   );
 }
