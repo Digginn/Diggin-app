@@ -47,7 +47,6 @@ const BRAND = "브랜드명";
 const MOCK_FOLDERS: ManagedFolder[] = [
   { id: "owned", name: "나의 소장템", isOwnedItems: true },
   ...[
-    "기본 폴더",
     "바지",
     "여름휴가때입을거",
     "출근룩",
@@ -88,7 +87,7 @@ export function ItemDetailScreen() {
   const [isFolderOpen, setFolderOpen] = useState(false);
   // TODO: 저장 여부는 API 연결 시 서버 값으로 바꾼다.
   const [folders, setFolders] = useState(MOCK_FOLDERS);
-  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>(["folder-0"]);
+  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
   // TODO: TanStack Query 연결 시 쿼리의 로딩 상태로 바꾼다.
   const isLoading = false;
 

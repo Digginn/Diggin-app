@@ -19,8 +19,7 @@ import { FolderNameModal } from "./components/FolderNameModal";
 import { FolderSortFilter, type FolderSortOrder } from "./components/FolderSortFilter";
 import { FolderToast } from "./components/FolderToast";
 
-const DEFAULT_FOLDERS: FolderItem[] = [
-  { id: "default", name: "기본 폴더", itemCount: 0 },
+const INITIAL_FOLDERS: FolderItem[] = [
   { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
 ];
 const TOAST_DURATION_MS = 2000;
@@ -50,7 +49,7 @@ type FolderScreenProps = {
 export function FolderScreen({
   isError = false,
   onRetry,
-  folders = DEFAULT_FOLDERS,
+  folders = INITIAL_FOLDERS,
   savedItemCount = folders.reduce((count, folder) => count + folder.itemCount, 0),
   onOpenFolder,
   onRenameFolder,
@@ -82,8 +81,8 @@ export function FolderScreen({
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<FolderSortOrder>("latest");
   const sortedFolders = [...displayedFolders].sort((left, right) => {
-    const leftRank = left.isOwnedItems ? 2 : left.id === "default" ? 1 : 0;
-    const rightRank = right.isOwnedItems ? 2 : right.id === "default" ? 1 : 0;
+    const leftRank = Number(Boolean(left.isOwnedItems));
+    const rightRank = Number(Boolean(right.isOwnedItems));
     if (leftRank !== rightRank) return leftRank - rightRank;
     if (sortOrder === "item-count") return right.itemCount - left.itemCount;
     return (
@@ -323,9 +322,7 @@ export function FolderScreen({
           type="2Btn"
           hasTallHeader
           title="폴더 삭제하기"
-          description={
-            "해당 폴더를 삭제하시겠습니까?\n삭제된 폴더는 복구할 수 없으며, 다른 폴더에 없는 아이템은 기본 폴더로 이동합니다."
-          }
+          description={"해당 폴더를 삭제하시겠습니까?\n삭제된 폴더는 복구할 수 없습니다."}
           onRequestClose={() => {
             if (!isDeletingRef.current) setDeletingFolder(null);
           }}

@@ -44,7 +44,6 @@ import { VoteReasonScreen } from "./components/VoteReasonScreen";
 import {
   CURRENT_USER_ID,
   findMockComments,
-  DEFAULT_FOLDER_ID,
   findMockVoteComments,
   MOCK_FOLDERS,
   MOCK_POSTS,
@@ -440,7 +439,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                     title="저장할 폴더 선택"
                     completeLabel="저장하기"
                     folders={folders}
-                    selectedFolderIds={[DEFAULT_FOLDER_ID]}
+                    selectedFolderIds={[]}
                     onBack={() => setSaveStep("form")}
                     // 2단계를 닫은 것이라 1단계로 돌아간다. 적어둔 정보를 날리지 않는다.
                     onClose={() => setSaveStep("form")}

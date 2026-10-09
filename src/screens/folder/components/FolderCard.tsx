@@ -42,7 +42,7 @@ export function FolderCard({
 }: FolderCardProps) {
   const cardRef = useRef<View>(null);
   const isCompact = columnCount === 3;
-  const canManage = folder.id !== "default" && !folder.isOwnedItems && !!onPressMenu;
+  const canManage = !folder.isOwnedItems && !!onPressMenu;
   function openMenu() {
     if (!canManage) return;
     cardRef.current?.measureInWindow((x, y, width, height) =>
