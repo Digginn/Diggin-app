@@ -2,11 +2,12 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 
-// 제목과 링크를 같이 복사하는 앱이 많아 전체 일치가 아니라 첫 링크를 뽑음
-const URL_PATTERN = /https?:\/\/[^\s<>"']+/i;
+import { findItemLink } from "@/utils/itemLink";
 
 export function useDetectedLink() {
   const [link, setLink] = useState<string | null>(null);
+  // 클립보드를 읽는 순간이 iOS 시스템 팝업이 뜨는 순간이다.
+  const [hasReadClipboard, setHasReadClipboard] = useState(false);
   const handledRef = useRef(new Set<string>());
   const deniedRef = useRef(false);
   const checkingRef = useRef(false);
@@ -18,13 +19,14 @@ export function useDetectedLink() {
       if (!(await Clipboard.hasStringAsync())) return;
 
       const text = await Clipboard.getStringAsync();
+      setHasReadClipboard(true);
       if (!text) {
         // 내용이 있다는데 빈 값이면 붙여넣기를 거부한 것임
         deniedRef.current = true;
         return;
       }
 
-      const url = URL_PATTERN.exec(text)?.[0];
+      const url = findItemLink(text);
       if (!url || handledRef.current.has(url)) return;
 
       setLink(url);
@@ -60,5 +62,5 @@ export function useDetectedLink() {
     return () => subscription.remove();
   }, [check]);
 
-  return { link, handle };
+  return { link, handle, hasReadClipboard };
 }

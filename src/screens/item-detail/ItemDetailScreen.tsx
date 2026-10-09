@@ -120,7 +120,7 @@ export function ItemDetailScreen() {
             }}
           />
 
-          {/* TODO: REC-05 의 폴더 드롭다운은 Dropdown 에 배경 옵션이 생기면 붙인다. */}
+          {/* TODO: 추천 영역의 폴더 드롭다운은 Dropdown 에 배경 옵션이 생기면 붙인다. */}
           <View className="absolute left-0 top-0" style={{ paddingTop: insets.top }}>
             <AppBar.IconButton
               icon={IconBack}

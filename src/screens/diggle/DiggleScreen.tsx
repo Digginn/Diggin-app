@@ -33,7 +33,6 @@ export function DiggleScreen() {
 
   const posts = (tab === "vote" ? votes : allPosts).filter((post) => !isBlocked(post.authorId));
 
-  // 시안 SYS-11
   function loadMore() {
     if (isLoadingMore) return;
     setLoadingMore(true);

@@ -26,6 +26,7 @@ const CloseIcon = cssInterop(CloseSvg, {
 export function ActionModal({
   visible,
   onRequestClose,
+  onDismiss,
   type = "1Btn",
   title,
   description,
@@ -50,6 +51,7 @@ export function ActionModal({
       isKeyboardAvoiding={isKeyboardAvoiding}
       keyboardGap={keyboardGap}
       onShow={onShow}
+      onDismiss={onDismiss}
       overlay={overlay}
     >
       <View

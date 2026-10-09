@@ -8,10 +8,12 @@ import CameraSvg from "@/assets/images/icon-camera.svg";
 import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
+import { FallbackImg } from "@/components/FallbackImg";
 import { TextField } from "@/components/Field";
+import { ActionModal } from "@/components/modal";
 import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
-import type { WishLevelKey } from "@/types/wish-item";
+import type { ItemSaveValues } from "@/types/wish-item";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 const CameraIcon = cssInterop(CameraSvg, {
@@ -28,27 +30,31 @@ const HINT_TOP_OFFSET = 4;
 
 type Anchor = { x: number; y: number; width: number; height: number };
 
-export type ItemEditValues = {
-  name: string;
-  price: string;
-  sourceUrl: string;
-  thumbnailUrl: string | null;
-  wishLevel: WishLevelKey | null;
-};
-
-type ItemEditSheetProps = {
+type ItemSaveSheetProps = {
   visible: boolean;
-  initialValues: ItemEditValues;
+  initialValues: ItemSaveValues;
+  /** 정보를 불러오지 못하면 안내 문구가 바뀌고 사용자가 직접 채운다. */
+  hasExtractionFailed?: boolean;
+  /** 이미 저장한 링크면 기존 아이템으로 갈지 묻는다. */
+  duplicate?: { onConfirm: () => void; onDismiss: () => void };
   onRequestClose: () => void;
-  onSubmit: (values: ItemEditValues) => void;
+  onSubmit: (values: ItemSaveValues) => void;
 };
 
-export function ItemEditSheet({
+const DESCRIPTION = {
+  loaded: "불러온 정보를 확인하고 저장해 주세요.\n아이템 링크는 수정할 수 없습니다.",
+  failed:
+    "아이템 정보를 불러오지 못했습니다.\n아이템 링크는 유지했어요. 정보를 직접 입력해 저장할 수 있어요.",
+} as const;
+
+export function ItemSaveSheet({
   visible,
   initialValues,
+  hasExtractionFailed = false,
+  duplicate,
   onRequestClose,
   onSubmit,
-}: ItemEditSheetProps) {
+}: ItemSaveSheetProps) {
   const [values, setValues] = useState(initialValues);
   const [isLevelOpen, setLevelOpen] = useState(false);
   const [isHintOpen, setHintOpen] = useState(false);
@@ -56,14 +62,9 @@ export function ItemEditSheet({
   const [hintAnchor, setHintAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
 
   const update =
-    <K extends keyof ItemEditValues>(key: K) =>
-    (value: ItemEditValues[K]) =>
+    <K extends keyof ItemSaveValues>(key: K) =>
+    (value: ItemSaveValues[K]) =>
       setValues((prev) => ({ ...prev, [key]: value }));
-
-  // 위시 레벨은 필수가 아니라 값이 바뀌었는지로 판단한다.
-  const isDirty = (Object.keys(values) as (keyof ItemEditValues)[]).some(
-    (key) => values[key] !== initialValues[key],
-  );
 
   async function handlePickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -94,7 +95,23 @@ export function ItemEditSheet({
   }
 
   return (
-    <BottomSheet visible={visible} isScrimClosable={false} onRequestClose={handleClose}>
+    <BottomSheet
+      visible={visible}
+      isScrimClosable={false}
+      onRequestClose={handleClose}
+      // 시트가 네이티브 모달이라 중복 안내도 같은 레이어 안에서 띄워야 보인다.
+      overlay={
+        <ActionModal
+          visible={duplicate !== undefined}
+          type="2Btn"
+          title="이미 저장한 아이템입니다."
+          description="기존에 저장한 아이템을 확인하시겠습니까?"
+          secondaryAction={{ label: "괜찮아요", onPress: () => duplicate?.onDismiss() }}
+          primaryAction={{ label: "확인하기", onPress: () => duplicate?.onConfirm() }}
+          onRequestClose={() => duplicate?.onDismiss()}
+        />
+      }
+    >
       <ScrollView
         className="px-margin"
         contentContainerStyle={{ gap: 25 }}
@@ -103,9 +120,9 @@ export function ItemEditSheet({
         <View className="gap-4">
           <View className="gap-[30px]">
             <View className="items-center gap-1">
-              <Text className="text-gray-1000 font-label-16-semibold">아이템 정보 수정</Text>
+              <Text className="text-gray-1000 font-label-16-semibold">아이템 정보 확인</Text>
               <Text className="text-center text-gray-700 font-b3">
-                아이템 정보를 직접 수정해 보세요.{"\n"}URL은 수정할 수 없습니다.
+                {hasExtractionFailed ? DESCRIPTION.failed : DESCRIPTION.loaded}
               </Text>
             </View>
 
@@ -113,11 +130,15 @@ export function ItemEditSheet({
               <View className="gap-2">
                 <Text className="text-gray-900 font-b3">아이템 이미지</Text>
                 <View className="w-[92px]">
-                  <StyledImage
-                    className="size-[92px] rounded-field bg-gray-100"
-                    contentFit="cover"
-                    source={values.thumbnailUrl ?? undefined}
-                  />
+                  {values.thumbnailUrl ? (
+                    <StyledImage
+                      className="size-[92px] rounded-field bg-gray-100"
+                      contentFit="cover"
+                      source={values.thumbnailUrl}
+                    />
+                  ) : (
+                    <FallbackImg size="field" className="size-[92px] rounded-lg" />
+                  )}
                   <Pressable
                     accessibilityLabel="아이템 이미지 변경"
                     accessibilityRole="button"
@@ -131,22 +152,42 @@ export function ItemEditSheet({
               </View>
 
               <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템 이름</Text>
-                <TextField value={values.name} onChangeText={update("name")} />
-              </View>
-
-              <View className="gap-2">
-                <Text className="text-gray-900 font-b3">가격</Text>
+                {/* 저장에 꼭 필요한 값이라 라벨 옆에 표시한다. */}
+                <View className="flex-row items-start gap-2">
+                  <Text className="text-gray-900 font-b3">아이템명</Text>
+                  <Text className="text-semantic-error font-note">*필수 정보</Text>
+                </View>
                 <TextField
-                  keyboardType="number-pad"
-                  value={values.price}
-                  onChangeText={update("price")}
+                  placeholder="아이템명을 입력해 주세요."
+                  value={values.name}
+                  onChangeText={update("name")}
                 />
               </View>
 
+              <View className="flex-row gap-[17px]">
+                <View className="flex-1 gap-2">
+                  <Text className="text-gray-900 font-b3">브랜드명</Text>
+                  <TextField
+                    placeholder="선택 입력"
+                    value={values.brand}
+                    onChangeText={update("brand")}
+                  />
+                </View>
+                <View className="flex-1 gap-2">
+                  <Text className="text-gray-900 font-b3">가격</Text>
+                  <TextField
+                    keyboardType="number-pad"
+                    placeholder="선택 입력"
+                    value={values.price}
+                    onChangeText={update("price")}
+                  />
+                </View>
+              </View>
+
               <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템 출처</Text>
-                <TextField value={values.sourceUrl} onChangeText={update("sourceUrl")} />
+                <Text className="text-gray-900 font-b3">아이템 링크</Text>
+                {/* 불러온 링크는 수정 대상이 아니다. */}
+                <TextField editable={false} value={values.sourceUrl} />
               </View>
             </View>
           </View>
@@ -178,12 +219,17 @@ export function ItemEditSheet({
           </View>
         </View>
 
-        <View className="flex-row justify-between">
-          <Button className="w-[155px]" variant="secondary" onPress={handleClose}>
-            원본 유지하기
+        <View className="flex-row gap-[17px]">
+          <Button className="flex-1" variant="secondary" onPress={handleClose}>
+            취소
           </Button>
-          <Button className="w-[155px]" isDisabled={!isDirty} onPress={() => onSubmit(values)}>
-            수정 완료
+          {/* 아이템명이 비면 저장할 게 없다. */}
+          <Button
+            className="flex-1"
+            isDisabled={values.name.trim().length === 0}
+            onPress={() => onSubmit(values)}
+          >
+            저장하기
           </Button>
         </View>
       </ScrollView>

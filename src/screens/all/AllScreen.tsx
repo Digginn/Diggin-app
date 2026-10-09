@@ -3,16 +3,22 @@ import { useLayoutEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { IconNotification, IconSearch } from "@/assets/images/appbar";
+import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
+import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
+import { LoadingDialog } from "@/components/Loading";
 import { ActionModal } from "@/components/modal";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
-import { selectDeletedMessage, STATE_MESSAGES } from "@/constants/messages";
+import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
+import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
+import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
+import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { DeleteBar } from "./components/DeleteBar";
@@ -51,6 +57,8 @@ export function AllScreen() {
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [confirming, setConfirming] = useState<"cancel" | "delete" | null>(null);
+  const [isLinkSheetOpen, setLinkSheetOpen] = useState(false);
+  const itemSave = useItemSave();
 
   const selectedCount = selectedIds.size;
   const isAllSelected = items.length > 0 && selectedCount === items.length;
@@ -165,6 +173,34 @@ export function AllScreen() {
         <DeleteBar selectedCount={selectedCount} onPress={() => setConfirming("delete")} />
       ) : null}
 
+      <ItemLinkSheet
+        key={`link-${isLinkSheetOpen}`}
+        visible={isLinkSheetOpen}
+        onRequestClose={() => setLinkSheetOpen(false)}
+        onSubmit={(url) => {
+          setLinkSheetOpen(false);
+          void itemSave.start(url);
+        }}
+      />
+
+      <LoadingDialog
+        visible={itemSave.isLoading}
+        message="아이템 정보를 불러오는 중입니다."
+        onDismiss={itemSave.openAfterLoading}
+      />
+
+      <ItemSaveSheet
+        key={`save-${itemSave.values?.sourceUrl ?? ""}`}
+        visible={itemSave.values !== null}
+        hasExtractionFailed={itemSave.hasFailed}
+        initialValues={itemSave.values ?? EMPTY_ITEM_SAVE_VALUES}
+        onRequestClose={itemSave.close}
+        onSubmit={() => {
+          itemSave.close();
+          showToast(TOAST_MESSAGES.SAVE_011);
+        }}
+      />
+
       <ActionModal
         visible={confirming === "cancel"}
         onRequestClose={() => setConfirming(null)}
@@ -174,6 +210,25 @@ export function AllScreen() {
         secondaryAction={{ label: "계속 선택", onPress: () => setConfirming(null) }}
         primaryAction={{ label: "선택 취소", onPress: exitSelectMode }}
       />
+
+      {!isSelectMode ? (
+        <View
+          pointerEvents="box-none"
+          className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"
+        >
+          <View pointerEvents="none" className="absolute inset-0">
+            <FabGlow />
+          </View>
+          <Pressable
+            accessibilityLabel="아이템 추가"
+            accessibilityRole="button"
+            className="absolute left-[73px] top-[73px] size-[54px] items-center justify-center rounded-full bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.1)] active:opacity-75"
+            onPress={() => setLinkSheetOpen(true)}
+          >
+            <PlusIcon />
+          </Pressable>
+        </View>
+      ) : null}
 
       <ActionModal
         visible={confirming === "delete"}

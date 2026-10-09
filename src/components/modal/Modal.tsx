@@ -17,6 +17,8 @@ export type ModalProps = {
   isKeyboardAvoiding?: boolean;
   keyboardGap?: number;
   onShow?: () => void;
+  /** iOS 는 닫히는 중에 다른 모달을 띄우면 무시한다. 이어서 띄울 때 이 시점을 쓴다. */
+  onDismiss?: () => void;
   overlay?: ReactNode;
   isFullScreen?: boolean;
   className?: string;
@@ -34,6 +36,7 @@ export function Modal({
   isKeyboardAvoiding = false,
   keyboardGap = 40,
   onShow,
+  onDismiss,
   overlay,
   isFullScreen = false,
   className,
@@ -71,6 +74,7 @@ export function Modal({
       animationType="fade"
       onRequestClose={onRequestClose}
       onShow={onShow}
+      onDismiss={onDismiss}
       transparent
       visible={visible}
       statusBarTranslucent={isFullScreen}

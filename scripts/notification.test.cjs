@@ -47,6 +47,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "@/components/app-bar": { AppBar, SearchBar: "SearchBar" },
     "@/components/EmptyState": { EmptyState: "EmptyState" },
     "@/components/ErrorState": { ErrorState: "ErrorState" },
+    "@/components/Loading": { LoadingDialog: "LoadingDialog" },
     "@/components/modal": { ActionModal: "ActionModal" },
     "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
@@ -65,6 +66,22 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "@/screens/all/domain/orderWishItems": { orderWishItems: (items) => items },
     "@/screens/folder/FolderScreen": { FolderScreen: "FolderScreen" },
     "@/assets/images/folder/image-folder-item-preview.png": 1,
+    "@/assets/images/folder/icon-folder-plus.svg": "PlusIcon",
+    "@/assets/images/folder/image-fab-glow.svg": "FabGlow",
+    "@/screens/save/components/ItemLinkSheet": { ItemLinkSheet: "ItemLinkSheet" },
+    "@/screens/save/components/ItemSaveSheet": { ItemSaveSheet: "ItemSaveSheet" },
+    "@/hooks/useItemSave": {
+      useItemSave: () => ({
+        values: null,
+        hasFailed: false,
+        isLoading: false,
+        isBusy: false,
+        start: () => {},
+        openAfterLoading: () => {},
+        close: () => {},
+      }),
+      EMPTY_ITEM_SAVE_VALUES: {},
+    },
   };
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", mocks);
   const allBar = findAll(AllScreen(), AppBar)[0];

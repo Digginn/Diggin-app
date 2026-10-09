@@ -27,14 +27,20 @@ const RadioInactiveIcon = cssInterop(RadioInactiveSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
 
-export function ReportModal({ visible, onRequestClose, onCancel, onReport }: ReportModalProps) {
+export function ReportModal({
+  visible,
+  onRequestClose,
+  onDismiss,
+  onCancel,
+  onReport,
+}: ReportModalProps) {
   const [reason, setReason] = useState<(typeof REPORT_REASONS)[number] | undefined>();
   const [detail, setDetail] = useState("");
   const [isDetailFocused, setIsDetailFocused] = useState(false);
   const isOther = reason === "직접 작성";
   const canSubmit = reason !== undefined && (!isOther || detail.trim().length > 0);
   return (
-    <Modal visible={visible} onRequestClose={onRequestClose}>
+    <Modal visible={visible} onRequestClose={onRequestClose} onDismiss={onDismiss}>
       <Text className="text-gray-900 font-label-16-semibold">신고 사유</Text>
       <View className="w-[295px] gap-2">
         {REPORT_REASONS.map((item) => (

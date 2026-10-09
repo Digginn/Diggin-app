@@ -28,3 +28,13 @@ export type WishLevelCounts = {
   medium: number;
   low: number;
 };
+
+/** 아이템 저장 시트가 다루는 입력 값. */
+export type ItemSaveValues = {
+  name: string;
+  brand: string;
+  price: string;
+  sourceUrl: string;
+  thumbnailUrl: string | null;
+  wishLevel: WishLevelKey | null;
+};

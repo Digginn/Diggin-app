@@ -55,11 +55,19 @@ export function Spinner() {
 type LoadingDialogProps = {
   visible: boolean;
   message: string;
+  /** iOS 는 닫히는 중에 다른 모달을 띄우면 무시한다. 이어서 띄울 때 이 시점을 쓴다. */
+  onDismiss?: () => void;
 };
 
-export function LoadingDialog({ visible, message }: LoadingDialogProps) {
+export function LoadingDialog({ visible, message, onDismiss }: LoadingDialogProps) {
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onDismiss={onDismiss}
+    >
       <View className="flex-1 items-center justify-center">
         <View className="absolute inset-0 bg-black/[0.36]" />
         <View

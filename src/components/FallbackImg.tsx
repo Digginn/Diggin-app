@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 
 import LogoSymbol from "@/assets/images/logo-symbol.svg";
 
-type FallbackImgSize = "card" | "detail";
+type FallbackImgSize = "card" | "detail" | "field";
 
 type FallbackImgProps = {
   size?: FallbackImgSize;
@@ -13,6 +13,8 @@ type FallbackImgProps = {
 const SYMBOL_SIZE: Record<FallbackImgSize, number> = {
   card: 40,
   detail: 86,
+  // 저장 시트의 92 박스 안에 들어가는 크기
+  field: 34,
 };
 
 export function FallbackImg({ size = "card", className }: FallbackImgProps) {

@@ -28,6 +28,7 @@ const LinkIcon = cssInterop(LinkSvg, {
 export function FolderModal({
   visible,
   onRequestClose,
+  onDismiss,
   title,
   description,
   productName,
@@ -38,7 +39,7 @@ export function FolderModal({
   onSave,
 }: FolderModalProps) {
   return (
-    <Modal visible={visible} onRequestClose={onRequestClose}>
+    <Modal visible={visible} onRequestClose={onRequestClose} onDismiss={onDismiss}>
       <View className="w-full items-center gap-1">
         <View className="flex-row items-start justify-center gap-1">
           {productName ? (
