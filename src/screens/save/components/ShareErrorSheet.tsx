@@ -19,8 +19,8 @@ const BOTTOM_PADDING = 32;
 export type ShareErrorReason = "no_url" | "deeplink" | "invalid_format";
 
 const MESSAGES: Record<ShareErrorReason, string> = {
-  no_url: "공유한 내용에서 상품 페이지 링크를 찾지 못했습니다.",
-  deeplink: "이 앱의 링크는 불러올 수 없습니다. 상품 페이지 링크를 다시 복사한 후 시도해 주세요.",
+  no_url: "공유한 내용에서 아이템 페이지 링크를 찾지 못했습니다.",
+  deeplink: "이 앱의 링크는 불러올 수 없습니다. 아이템 페이지 링크를 다시 복사한 후 시도해 주세요.",
   invalid_format: "올바른 아이템 링크인지 확인 후 다시 시도해 주세요.",
 };
 

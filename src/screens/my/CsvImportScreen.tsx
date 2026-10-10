@@ -14,7 +14,7 @@ import { CsvImportLoading } from "./components/CsvImportLoading";
 import { CsvImportResultModal } from "./components/CsvImportResultModal";
 import type { CsvImportFailure, CsvImportProgress, CsvImportResult } from "./types/csvImport";
 
-const MISSING_PRODUCT_MESSAGE = "파일에서 상품 정보를 찾을 수 없습니다.";
+const MISSING_PRODUCT_MESSAGE = "파일에서 아이템 정보를 찾을 수 없습니다.";
 // Figma: 화면 812 - 버튼 top 720 - 버튼 높이 48.
 const MIN_BUTTON_BOTTOM_SPACING = 44;
 
@@ -106,7 +106,10 @@ export function CsvImportScreen({
           else setResult(imported);
         }
       } else {
-        Alert.alert("CSV 파일 선택", `${file.name}\n상품 불러오기 API는 아직 연결되지 않았습니다.`);
+        Alert.alert(
+          "CSV 파일 선택",
+          `${file.name}\n아이템 불러오기 API는 아직 연결되지 않았습니다.`,
+        );
       }
     } catch {
       if (isMounted.current)

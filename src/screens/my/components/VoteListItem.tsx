@@ -43,7 +43,7 @@ export function VoteListItem({ item, onPress, onReport }: VoteListItemProps) {
             source={item.imageSource}
             contentFit="cover"
             className="h-20 w-20 rounded-[2px]"
-            accessibilityLabel="투표 상품 이미지"
+            accessibilityLabel="투표 아이템 이미지"
           />
         </View>
         <View className="flex-row items-center justify-between">

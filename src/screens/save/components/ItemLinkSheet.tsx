@@ -57,7 +57,7 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
               placeholder="아이템 링크를 붙여넣어 주세요."
               value={url}
               onChangeText={(next) => {
-                // 상품명과 링크를 같이 복사하는 앱이 많아 링크만 남긴다.
+                // 아이템명과 링크를 같이 복사하는 앱이 많아 링크만 남긴다.
                 setUrl(findItemLink(next) ?? next);
                 setError(false);
               }}

@@ -181,7 +181,7 @@ export function ItemDetailScreen() {
         }}
       />
 
-      <LoadingDialog visible={isLoading} message="상품 정보를 불러오는 중입니다." />
+      <LoadingDialog visible={isLoading} message="아이템 정보를 불러오는 중입니다." />
 
       {isFolderOpen && (
         <FolderManageSheet
