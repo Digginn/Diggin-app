@@ -69,7 +69,7 @@ test("토스트는 하단 160px에 표시되고 새 메시지·자동 닫힘·�
   assert.equal(timers.size, 0);
 });
 
-test("에러 토스트는 Figma 아이콘·에러 토큰·첫 줄 정렬을 사용하고 기본 토스트는 유지한다", () => {
+test("성공·에러 토스트는 아이콘을 앞에 두고 좌측 정렬, 기본 토스트는 가운데 정렬이다", () => {
   const toastModule = { exports: {} };
   const source = readFileSync(path.join(__dirname, "../src/components/ToastText.tsx"), "utf8");
   runInNewContext(
@@ -81,19 +81,28 @@ test("에러 토스트는 Figma 아이콘·에러 토큰·첫 줄 정렬을 사�
       exports: toastModule.exports,
       require: (name) => {
         if (name === "react-native") return { View: "View", Text: "Text" };
-        if (name === "@/assets/images/toast") return { IconToastError: "IconToastError" };
+        if (name === "@/assets/images/toast")
+          return { IconToastError: "IconToastError", IconToastSuccess: "IconToastSuccess" };
         return require(name);
       },
     },
   );
-  const error = toastModule.exports.ToastText({ message: "오류 안내", variant: "error" });
-  assert.match(error.props.className, /items-start/);
-  assert.match(error.props.className, /border-semantic-errorOnDark bg-semantic-errorBgDark/);
-  const children = React.Children.toArray(error.props.children);
-  assert.equal(children[0].props.children.type, "IconToastError");
-  assert.match(children[1].props.className, /shrink text-left text-semantic-errorOnDark/);
-  assert.equal(children[1].props.lineBreakStrategyIOS, "hangul-word");
-  const defaultToast = toastModule.exports.ToastText({ message: "완료 안내" });
-  assert.match(defaultToast.props.className, /border-gray-800 bg-gray-700/);
-  assert.equal(React.Children.toArray(defaultToast.props.children).length, 1);
+  const { ToastText } = toastModule.exports;
+  for (const [variant, icon] of [
+    ["error", "IconToastError"],
+    ["success", "IconToastSuccess"],
+  ]) {
+    const toast = ToastText({ message: "안내", variant });
+    // 시안: 세 타입 모두 같은 회색 배경, 아이콘은 세로 가운데.
+    assert.match(toast.props.className, /items-center/);
+    assert.match(toast.props.className, /bg-gray-700\/\[0\.92\]/);
+    const children = React.Children.toArray(toast.props.children);
+    assert.equal(children[0].props.children.type, icon);
+    assert.match(children[1].props.className, /text-left/);
+    assert.equal(children[1].props.lineBreakStrategyIOS, "hangul-word");
+  }
+  const defaultToast = ToastText({ message: "완료 안내" });
+  const children = React.Children.toArray(defaultToast.props.children);
+  assert.equal(children.length, 1);
+  assert.match(children[0].props.className, /text-center/);
 });
