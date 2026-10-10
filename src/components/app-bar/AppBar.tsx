@@ -28,6 +28,8 @@ type AppBarProps = {
   backIcon?: SvgIcon;
   backIconSize?: number;
   colorScheme?: "light" | "dark";
+  /** 바텀시트가 위를 덮는 동안 눌리지 않는 걸 흐린 아이콘으로 알린다. */
+  isDisabled?: boolean;
 };
 
 function AppBarRoot({
@@ -42,6 +44,7 @@ function AppBarRoot({
   backIcon = IconBack,
   backIconSize = 48,
   colorScheme = "light",
+  isDisabled = false,
 }: AppBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -59,7 +62,8 @@ function AppBarRoot({
               iconSize={backIconSize}
               accessibilityLabel="뒤로 가기"
               onPress={handleBack}
-              className={isDark ? "text-gray-0" : "text-gray-900"}
+              disabled={isDisabled}
+              className={isDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900"}
             />
           )}
           {left === "logo" && (

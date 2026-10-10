@@ -60,7 +60,7 @@ export function SaveToAllScreen() {
 
   return (
     <View className="flex-1 bg-gray-0">
-      <AppBar title="내 ALL에 저장" onBack={() => router.back()} />
+      <AppBar title="내 ALL에 저장" onBack={() => router.back()} isDisabled={isFolderOpen} />
 
       <ScrollView
         className="px-margin"

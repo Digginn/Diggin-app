@@ -222,21 +222,28 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             <AppBar
               left="back"
               onBack={() => router.back()}
+              isDisabled={infoItem !== null}
               right={
                 isMyPost ? (
                   <Pressable
                     accessibilityLabel={isVote ? "투표글 메뉴" : "게시글 메뉴"}
                     accessibilityRole="button"
                     className="size-12 items-center justify-center active:opacity-75"
+                    disabled={infoItem !== null}
                     onPress={() => setPostMenuOpen(true)}
                   >
-                    <KebabSvg width={16} height={16} color={colors.gray[900]} />
+                    <KebabSvg
+                      width={16}
+                      height={16}
+                      color={infoItem !== null ? colors.gray[400] : colors.gray[900]}
+                    />
                   </Pressable>
                 ) : (
                   <Pressable
                     accessibilityLabel="신고하기"
                     accessibilityRole="button"
                     className="h-[52px] w-[55px] items-center justify-center active:opacity-75"
+                    disabled={infoItem !== null}
                     onPress={() => setReportTarget({ authorId: post.authorId })}
                   >
                     <ReportSvg width={18} height={18} color={colors.gray[400]} />

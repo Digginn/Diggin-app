@@ -133,6 +133,8 @@ export function ItemDetailScreen() {
               icon={IconBack}
               accessibilityLabel="뒤로 가기"
               onPress={() => router.back()}
+              disabled={isEditOpen || isFolderOpen}
+              className={isEditOpen || isFolderOpen ? "text-gray-400" : "text-gray-900"}
             />
           </View>
 
