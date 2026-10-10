@@ -132,7 +132,7 @@ export function ItemEditSheet({
 
               <View className="gap-2">
                 <Text className="text-gray-900 font-b3">아이템 이름</Text>
-                <TextField value={values.name} onChangeText={update("name")} />
+                <TextField growsTo={88} value={values.name} onChangeText={update("name")} />
               </View>
 
               <View className="gap-2">

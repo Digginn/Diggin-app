@@ -1,5 +1,15 @@
 import { type Ref, useEffect, useState } from "react";
-import { Pressable, Text, TextInput, type TextInputProps, View } from "react-native";
+import {
+  type LayoutChangeEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  Text,
+  TextInput,
+  type TextInputContentSizeChangeEventData,
+  type TextInputProps,
+  type TextInputScrollEvent,
+  View,
+} from "react-native";
 import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import IconClearArea from "@/assets/images/icon-btn-mini-close-white-live-area.svg";
@@ -12,6 +22,8 @@ type TextFieldProps = TextInputProps & {
   inputClassName?: string;
   isError?: boolean;
   className?: string;
+  /** 긴 글이 들어오면 이 높이까지 자라고, 더 길면 안에서 스크롤된다. */
+  growsTo?: number;
 };
 
 type HelperTextProps = {
@@ -63,12 +75,56 @@ function useInputValue(
   return { inputValue, handleChangeText };
 }
 
+const FIELD_HEIGHT = 44;
+// 시안 ScrollIndicator: 폭 3, 영역 안쪽으로 4, 최소 길이 24, 터치 불가.
+const BAR_WIDTH = 3;
+const BAR_INSET = 4;
+const BAR_MIN_LENGTH = 24;
+
+type ScrollBar = { length: number; offset: number } | null;
+
+/** 넘치지 않으면 null 이다. 끝까지 찬 막대는 알려주는 게 없다. */
+export function measureScrollBar(viewport: number, content: number, scrolled: number): ScrollBar {
+  if (viewport <= 0 || content <= viewport) return null;
+  const track = viewport - BAR_INSET * 2;
+  const length = Math.min(track, Math.max(BAR_MIN_LENGTH, track * (viewport / content)));
+  const progress = Math.min(1, Math.max(0, scrolled / (content - viewport)));
+  return { length, offset: BAR_INSET + (track - length) * progress };
+}
+
+function useScrollIndicator() {
+  const [viewport, setViewport] = useState(0);
+  const [content, setContent] = useState(0);
+  const [scrolled, setScrolled] = useState(0);
+  const bar = measureScrollBar(viewport, content, scrolled);
+
+  return {
+    bar: { bar },
+    handleLayout: (event: LayoutChangeEvent) => setViewport(event.nativeEvent.layout.height),
+    handleContentSizeChange: (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) =>
+      setContent(event.nativeEvent.contentSize.height),
+    handleScroll: (event: TextInputScrollEvent) => setScrolled(event.nativeEvent.contentOffset.y),
+  };
+}
+
+function ScrollIndicator({ bar }: { bar: ScrollBar }) {
+  if (!bar) return null;
+  return (
+    <View
+      pointerEvents="none"
+      className="absolute w-[3px] rounded-[10px] bg-gray-500"
+      style={{ right: BAR_INSET, top: bar.offset, height: bar.length, width: BAR_WIDTH }}
+    />
+  );
+}
+
 export function TextField({
   ref: inputRef,
   inputClassName,
   isError = false,
   className,
   defaultValue,
+  growsTo,
   onBlur,
   onChangeText,
   onFocus,
@@ -79,35 +135,49 @@ export function TextField({
   const [isFocused, setIsFocused] = useState(false);
   const { inputValue, handleChangeText } = useInputValue(value, defaultValue, onChangeText);
   const isActive = isFocused || inputValue.length > 0;
+  const scroll = useScrollIndicator();
   const borderClassName = isError
     ? "border-semantic-error"
     : isActive
       ? "border-semantic-focus"
       : "border-gray-350";
 
+  // 자라는 칸은 세로 가운데가 아니라 위에서부터 쌓인다.
+  const frameClassName = growsTo ? "items-start py-2.5" : "h-11 items-center";
+  // 줄 간격 없는 -input 은 한 줄일 때만 맞다. 여러 줄은 줄 간격이 있어야 읽힌다.
+  const fontClassName =
+    growsTo && inputValue.length > 0 ? "font-label-16-medium" : "font-label-16-medium-input";
+
   return (
     <View
-      className={`h-11 w-full flex-row items-center rounded-field border bg-gray-0 px-4 ${borderClassName} ${className ?? ""}`}
+      className={`w-full flex-row rounded-field border bg-gray-0 px-4 ${frameClassName} ${borderClassName} ${className ?? ""}`}
+      style={growsTo ? { minHeight: FIELD_HEIGHT, maxHeight: growsTo } : undefined}
     >
       <TextInput
         ref={inputRef}
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
-        className={`flex-1 p-0 text-gray-900 font-label-16-medium-input ${inputClassName ?? ""}`}
+        className={`flex-1 p-0 text-gray-900 ${fontClassName} ${inputClassName ?? ""}`}
         cursorColor={colors.semantic.focus}
+        multiline={growsTo ? true : props.multiline}
         onBlur={(event) => {
           setIsFocused(false);
           onBlur?.(event);
         }}
         onChangeText={handleChangeText}
+        onContentSizeChange={growsTo ? scroll.handleContentSizeChange : props.onContentSizeChange}
         onFocus={(event) => {
           setIsFocused(true);
           onFocus?.(event);
         }}
+        onLayout={growsTo ? scroll.handleLayout : props.onLayout}
+        onScroll={growsTo ? scroll.handleScroll : props.onScroll}
         placeholder={placeholder}
         placeholderTextColor={colors.gray[400]}
+        textAlignVertical={growsTo ? "top" : props.textAlignVertical}
         value={inputValue}
       />
+      {growsTo ? <ScrollIndicator {...scroll.bar} /> : null}
     </View>
   );
 }

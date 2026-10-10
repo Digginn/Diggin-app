@@ -160,8 +160,10 @@ export function ItemDetailScreen() {
 
         <View className="gap-6 pt-4">
           <View className="gap-[13px] px-4">
-            <View className="w-full flex-row items-center justify-between">
-              <Text className="text-gray-1000 font-label-14">{BRAND}</Text>
+            <View className="w-full flex-row items-center justify-between gap-2">
+              <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
+                {BRAND}
+              </Text>
               <EditChip onPress={() => setEditOpen(true)} />
             </View>
             <ItemInfo name={item.name} price={Number(item.price)} sourceUrl={item.sourceUrl} />
