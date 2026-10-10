@@ -21,7 +21,8 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
   function handleSubmit() {
     if (!isItemLink(url)) {
       setError(true);
-      setToast(TOAST_MESSAGES.SAVE_004);
+      // 시안 MSG-SAVE-004: 형식이 틀린 링크는 다른 링크를 넣으라고 안내한다.
+      setToast(TOAST_MESSAGES.SAVE_005);
       return;
     }
     onSubmit(url.trim());
@@ -32,6 +33,7 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
       visible={visible}
       isScrimClosable={false}
       toastMessage={toast}
+      toastVariant="error"
       onToastDismiss={() => setToast(undefined)}
       onRequestClose={onRequestClose}
     >

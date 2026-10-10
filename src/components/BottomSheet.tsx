@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ToastText } from "@/components/ToastText";
+import { ToastText, type ToastVariant } from "@/components/ToastText";
 import { colors } from "@/theme";
 
 const BOTTOM_PADDING = 32;
@@ -48,6 +48,7 @@ type BottomSheetProps = {
   isCloseConfirmed?: boolean;
   /** 시트가 네이티브 모달이라 바깥 토스트는 가려진다. 시트 위에 띄우려면 여기로 넘긴다. */
   toastMessage?: string;
+  toastVariant?: ToastVariant;
   onToastDismiss?: () => void;
 };
 
@@ -67,15 +68,17 @@ export function BottomSheet({
   isScrimClosable = true,
   isCloseConfirmed = false,
   toastMessage,
+  toastVariant = "default",
   onToastDismiss,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!visible || !toastMessage) return;
-    const timer = setTimeout(() => onToastDismiss?.(), 2000);
+    // 에러는 원인을 읽을 시간이 필요해 시안대로 더 오래 둔다.
+    const timer = setTimeout(() => onToastDismiss?.(), toastVariant === "error" ? 4000 : 2000);
     return () => clearTimeout(timer);
-  }, [visible, toastMessage, onToastDismiss]);
+  }, [visible, toastMessage, toastVariant, onToastDismiss]);
   const [dragY] = useState(() => new Animated.Value(0));
 
   // 끌어내린 위치는 열 때만 되돌린다. 닫을 때 되돌리면 모달이 슬라이드로 사라지는 동안
@@ -179,7 +182,7 @@ export function BottomSheet({
       {toastMessage ? (
         <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px] items-center">
           <View className="w-full max-w-[327px] items-center">
-            <ToastText message={toastMessage} />
+            <ToastText message={toastMessage} variant={toastVariant} />
           </View>
         </View>
       ) : null}
