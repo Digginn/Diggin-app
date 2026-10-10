@@ -44,6 +44,8 @@ type BottomSheetProps = {
   isGrabberVisible?: boolean;
   /** 입력이 있는 시트는 바깥을 눌러 닫으면 적던 내용이 날아간다. */
   isScrimClosable?: boolean;
+  /** 켜져 있으면 끌어내려도 내보내지 않고 제자리로 돌린 뒤 onRequestClose 로 확인을 맡긴다. */
+  isCloseConfirmed?: boolean;
   /** 시트가 네이티브 모달이라 바깥 토스트는 가려진다. 시트 위에 띄우려면 여기로 넘긴다. */
   toastMessage?: string;
   onToastDismiss?: () => void;
@@ -63,6 +65,7 @@ export function BottomSheet({
   isKeyboardAvoiding = true,
   isGrabberVisible = true,
   isScrimClosable = true,
+  isCloseConfirmed = false,
   toastMessage,
   onToastDismiss,
 }: BottomSheetProps) {
@@ -98,7 +101,13 @@ export function BottomSheet({
         if (gesture.dy > 0) dragY.setValue(gesture.dy);
       },
       onPanResponderRelease: (_event, gesture) => {
-        if (gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY) {
+        const isDismiss = gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY;
+        if (isDismiss && isCloseConfirmed) {
+          Animated.spring(dragY, { toValue: 0, bounciness: 0, useNativeDriver: false }).start();
+          onRequestClose();
+          return;
+        }
+        if (isDismiss) {
           Animated.timing(dragY, {
             toValue: EXIT_DISTANCE,
             duration: 160,
@@ -113,7 +122,7 @@ export function BottomSheet({
       },
       onPanResponderTerminationRequest: () => false,
     }).panHandlers;
-  }, [dragY, isGrabberVisible, onRequestClose]);
+  }, [dragY, isGrabberVisible, isCloseConfirmed, onRequestClose]);
 
   return (
     <NativeModal
