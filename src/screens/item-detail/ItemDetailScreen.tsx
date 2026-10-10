@@ -14,7 +14,9 @@ import { FallbackImg } from "@/components/FallbackImg";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
 import { WishLevel } from "@/components/WishLevel";
+import { TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
+import { useToast } from "@/hooks/useToast";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { EditChip } from "./components/EditChip";
@@ -78,6 +80,7 @@ export function ItemDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const guide = useFirstVisitGuide("item-detail");
+  const showToast = useToast();
   const wishGuideRef = useRef<View>(null);
   const voteGuideRef = useRef<View>(null);
   // TODO: API 연결 시 이 id 로 아이템을 조회한다.
@@ -186,6 +189,7 @@ export function ItemDetailScreen() {
           setItem(values);
           setFailed(false);
           setEditOpen(false);
+          showToast(TOAST_MESSAGES.ALL_004);
         }}
       />
 
@@ -204,6 +208,7 @@ export function ItemDetailScreen() {
           onComplete={(ids) => {
             setSelectedFolderIds(ids);
             setFolderOpen(false);
+            showToast(selectFolderSavedMessage(ids.length));
           }}
         />
       )}

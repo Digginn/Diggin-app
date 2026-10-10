@@ -31,6 +31,10 @@ export const DIGGLE_TOAST_MESSAGES = {
 
 export type ToastMessageKey = keyof typeof TOAST_MESSAGES;
 
+// 폴더를 하나만 고르면 추가했다고, 여러 개면 설정이 끝났다고 알린다.
+export const selectFolderSavedMessage = (count: number) =>
+  count <= 1 ? "아이템을 폴더에 추가했습니다." : "폴더 설정이 완료되었습니다.";
+
 // 문구 확정 전이라 바뀔 수 있음
 export const selectDeletedMessage = (count: number) => `${count}개 아이템을 삭제했습니다.`;
 
