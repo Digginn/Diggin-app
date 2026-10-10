@@ -2,6 +2,7 @@ import { type Ref, useEffect, useState } from "react";
 import {
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
+  Platform,
   Pressable,
   Text,
   TextInput,
@@ -179,7 +180,8 @@ export function TextField({
         textAlignVertical={growsTo ? "top" : props.textAlignVertical}
         value={inputValue}
       />
-      {growsTo ? <ScrollIndicator {...scroll.bar} /> : null}
+      {/* iOS 는 입력칸이 자기 막대를 그리고 RN 에 끌 옵션이 없어서, 같이 그리면 막대가 둘이 된다. */}
+      {growsTo && Platform.OS !== "ios" ? <ScrollIndicator {...scroll.bar} /> : null}
     </View>
   );
 }
