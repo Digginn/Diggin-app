@@ -30,7 +30,11 @@ const ShareIcon = cssInterop(ShareSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
 
-const HERO_FRAME = "h-[440px] w-full bg-gray-10 ";
+const HERO_FRAME = "h-[520px] w-full bg-gray-10 ";
+
+// MVP 에서 추천 아이템을 빼기로 하면서 그만큼 이미지가 커졌다.
+// 다시 넣을 때 true 로 바꾸면 된다.
+const SHOWS_RECOMMEND = false;
 
 // TODO: API 연결 전까지 쓰는 임시 데이터.
 const MOCK_ITEM: ItemEditValues = {
@@ -162,10 +166,12 @@ export function ItemDetailScreen() {
             </View>
             <ItemInfo name={item.name} price={Number(item.price)} sourceUrl={item.sourceUrl} />
           </View>
-          <RecommendSection
-            items={MOCK_RECOMMENDS}
-            onItemPress={(recommend) => router.push(`/items/${recommend.id}`)}
-          />
+          {SHOWS_RECOMMEND ? (
+            <RecommendSection
+              items={MOCK_RECOMMENDS}
+              onItemPress={(recommend) => router.push(`/items/${recommend.id}`)}
+            />
+          ) : null}
         </View>
       </ScrollView>
 
