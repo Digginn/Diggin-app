@@ -151,7 +151,10 @@ test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 �
       .length,
     1,
   );
-  assert.equal(tree.props.height, 556);
+  // 폴더 수만큼 자라다 702 에서 멈추고 목록이 스크롤된다.
+  assert.equal(tree.props.height, undefined);
+  assert.equal(tree.props.maxHeight, 702);
+  assert.equal(findAll(tree, "ScrollView")[0].props.className, "grow-0");
   assert.equal(row(tree, "선물 리스트").props.accessibilityState.checked, false);
   assert.equal(row(tree, "나의 소장템").props.accessibilityState.checked, false);
   row(tree, "선물 리스트").props.onPress();

@@ -31,6 +31,10 @@ type BottomSheetProps = {
   visible: boolean;
   onRequestClose: () => void;
   height?: number;
+  /** 내용만큼 자라다 이 높이에서 멈춘다. 작은 화면에서는 상태 표시줄 아래까지만 올라온다. */
+  maxHeight?: number;
+  /** 그래버 아래에 붙어 함께 끌어내리는 손잡이가 된다. 스크롤 목록이 있는 시트의 제목 자리. */
+  header?: ReactNode;
   className?: string;
   handleClassName?: string;
   scrimOpacity?: number;
@@ -50,6 +54,8 @@ export function BottomSheet({
   visible,
   onRequestClose,
   height,
+  maxHeight,
+  header,
   className,
   handleClassName,
   scrimOpacity = 0.4,
@@ -136,7 +142,9 @@ export function BottomSheet({
             className={`rounded-t-2xl bg-gray-0 ${className ?? ""}`}
             style={{
               height,
-              maxHeight: MAX_HEIGHT,
+              maxHeight: maxHeight
+                ? Math.min(maxHeight, Dimensions.get("window").height - insets.top)
+                : MAX_HEIGHT,
               paddingBottom: Math.max(insets.bottom, BOTTOM_PADDING),
               boxShadow: `0px -4px 4px ${colors.gray[1000]}1F`,
             }}
@@ -153,6 +161,7 @@ export function BottomSheet({
                   importantForAccessibility="no"
                 />
               ) : null}
+              {header}
             </View>
             {children}
           </View>
