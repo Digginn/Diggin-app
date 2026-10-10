@@ -80,12 +80,14 @@ const FIELD_HEIGHT = 44;
 const BAR_WIDTH = 3;
 const BAR_INSET = 4;
 const BAR_MIN_LENGTH = 24;
+// 칸 높이는 픽셀 격자로 반올림되고 iOS 내용 높이는 소수점 그대로라, 한 줄이어도 내용이 살짝 커 보인다.
+const ROUNDING_SLACK = 1;
 
 type ScrollBar = { length: number; offset: number } | null;
 
 /** 넘치지 않으면 null 이다. 끝까지 찬 막대는 알려주는 게 없다. */
 export function measureScrollBar(viewport: number, content: number, scrolled: number): ScrollBar {
-  if (viewport <= 0 || content <= viewport) return null;
+  if (viewport <= 0 || content - viewport < ROUNDING_SLACK) return null;
   const track = viewport - BAR_INSET * 2;
   const length = Math.min(track, Math.max(BAR_MIN_LENGTH, track * (viewport / content)));
   const progress = Math.min(1, Math.max(0, scrolled / (content - viewport)));

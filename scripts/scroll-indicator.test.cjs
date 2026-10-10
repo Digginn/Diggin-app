@@ -36,6 +36,8 @@ test("내용이 넘치지 않으면 막대를 그리지 않는다", () => {
   assert.equal(measureScrollBar(88, 44, 0), null);
   assert.equal(measureScrollBar(88, 88, 0), null);
   assert.equal(measureScrollBar(0, 200, 0), null);
+  // 3배수 화면에서 22.4 줄 높이가 칸은 22.33 으로, 내용은 22.4 로 잡힌다.
+  assert.equal(measureScrollBar(67 / 3, 22.4, 0), null);
 });
 
 test("막대 길이는 보이는 높이 비율을 따르고 트랙을 넘지 않는다", () => {
