@@ -14,7 +14,7 @@ export const layout = {
 };
 
 export const fieldShape = {
-  borderRadius: "5px",
+  borderRadius: "4px",
   borderWidth: "1.5px",
 } as const;
 

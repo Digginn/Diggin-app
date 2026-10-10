@@ -56,14 +56,14 @@ export function PostItemInfoSheet({
         <View className="w-full flex-row items-start gap-3">
           <Pressable
             accessibilityRole="button"
-            className="h-[52px] flex-1 items-center justify-center overflow-hidden rounded-lg bg-gray-100 active:opacity-75"
+            className="h-[52px] flex-1 items-center justify-center overflow-hidden rounded bg-gray-100 active:opacity-75"
             onPress={onOpenWebsite}
           >
             <Text className="text-gray-900 font-label-16-semibold">웹사이트 이동</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            className="h-[52px] flex-1 items-center justify-center overflow-hidden rounded-lg bg-gray-900 active:opacity-75"
+            className="h-[52px] flex-1 items-center justify-center overflow-hidden rounded bg-gray-900 active:opacity-75"
             onPress={onSaveToAll}
           >
             <Text className="text-gray-0 font-label-16-semibold">내 ALL에 저장</Text>
