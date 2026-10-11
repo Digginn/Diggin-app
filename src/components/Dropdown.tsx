@@ -61,7 +61,7 @@ export function Dropdown({
           isOpen
             ? {
                 backgroundColor: colors.gray[0],
-                borderRadius: 5,
+                borderRadius: 4,
                 shadowColor: colors.gray[1000],
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.1,
@@ -71,7 +71,7 @@ export function Dropdown({
             : undefined
         }
       >
-        <View style={isOpen ? { borderRadius: 5, overflow: "hidden" } : undefined}>
+        <View style={isOpen ? { borderRadius: 4, overflow: "hidden" } : undefined}>
           <Pressable
             onPress={() => setIsOpen((open) => !open)}
             accessibilityRole="button"
@@ -88,7 +88,7 @@ export function Dropdown({
                     borderWidth: 1,
                     borderBottomWidth: 1,
                     borderColor: colors.gray[300],
-                    borderRadius: 5,
+                    borderRadius: 4,
                   }
             }
           >

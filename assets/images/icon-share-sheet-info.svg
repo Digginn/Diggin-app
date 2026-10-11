@@ -1,3 +1,5 @@
-<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path id="Vector" d="M10 20C15.51 20 20 15.51 20 10C20 4.49 15.51 0 10 0C4.49 0 0 4.49 0 10C0 15.51 4.49 20 10 20ZM9 5H11V7H9V5ZM9 9H11V15H9V9Z" fill="currentColor"/>
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="boxicons:info-circle-filled">
+<path id="Vector" d="M12 22C17.51 22 22 17.51 22 12C22 6.49 17.51 2 12 2C6.49 2 2 6.49 2 12C2 17.51 6.49 22 12 22ZM11 7H13V9H11V7ZM11 11H13V17H11V11Z" fill="black"/>
+</g>
 </svg>

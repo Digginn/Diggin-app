@@ -180,13 +180,13 @@ test("버튼 연타로 시스템 선택기를 중복 실행하지 않는다", as
   await next;
 });
 
-test("상품 정보가 없는 처리 결과는 에러 토스트를 표시하고 다시 파일을 선택할 수 있다", async () => {
+test("아이템 정보가 없는 처리 결과는 에러 토스트를 표시하고 다시 파일을 선택할 수 있다", async () => {
   const { select, render, find, toasts, alerts } = setup(async () => ({
     canceled: false,
     assets: [{ name: "wishlist.csv" }],
   }));
   await select({ onSelectCsv: async () => ({ error: "missing-product-info" }) });
-  assert.deepEqual(toasts, [["파일에서 상품 정보를 찾을 수 없습니다.", "error"]]);
+  assert.deepEqual(toasts, [["파일에서 아이템 정보를 찾을 수 없습니다.", "error"]]);
   assert.equal(alerts.length, 0);
   assert.equal(find(render(), "CsvImportResultModal").props.result, null);
   assert.equal(find(render(), "Button").props.isDisabled, false);
@@ -292,11 +292,11 @@ test("완료·중복 제외·전체 성공·전체 실패의 제목과 개수를
     [
       42,
       [...failed, ...duplicates],
-      "총 42개의 상품을 가져왔습니다.\n가져오지 못한 상품 8개와\n중복 상품 3개는 제외했습니다.",
+      "총 42개의 아이템을 가져왔습니다.\n가져오지 못한 아이템 8개와\n중복 아이템 3개는 제외했습니다.",
     ],
-    [50, duplicates, "총 50개의 상품을 가져왔습니다.\n중복 상품 3개는 제외했습니다."],
-    [53, [], "총 53개의 상품을 가져왔습니다."],
-    [0, [...failed, ...duplicates], "가져올 수 있는 상품이 없습니다."],
+    [50, duplicates, "총 50개의 아이템을 가져왔습니다.\n중복 아이템 3개는 제외했습니다."],
+    [53, [], "총 53개의 아이템을 가져왔습니다."],
+    [0, [...failed, ...duplicates], "가져올 수 있는 아이템이 없습니다."],
   ]) {
     const node = render({
       result: { importedCount: count, excludedProducts: excluded },
@@ -304,11 +304,13 @@ test("완료·중복 제외·전체 성공·전체 실패의 제목과 개수를
     });
     const text = textContent(node).replace(/\s+\n/g, "\n");
     assert.ok(text.includes(expected), text);
-    assert.equal(text.includes("제외된 상품 보기"), excluded.length > 0);
+    assert.equal(text.includes("제외된 아이템 보기"), excluded.length > 0);
     assert.ok(
-      text.includes(count === 0 ? "상품을 가져오지 못했습니다" : "상품 가져오기가 완료되었습니다"),
+      text.includes(
+        count === 0 ? "아이템을 가져오지 못했습니다" : "아이템 가져오기가 완료되었습니다",
+      ),
     );
-    if (count === 0) assert.ok(text.includes("제외된 상품 11개를 확인해주세요."));
+    if (count === 0) assert.ok(text.includes("제외된 아이템 11개를 확인해주세요."));
   }
 });
 
@@ -329,7 +331,7 @@ test("제외 목록은 모든 항목·사유를 렌더링하고 X와 확인은 �
   assert.equal(node.props.onRequestClose, onCloseExcluded);
   assert.equal(node.props.scrimOpacity, 0.36);
   const text = textContent(node);
-  assert.ok(text.includes("제외된 상품 11개"));
+  assert.ok(text.includes("제외된 아이템 11개"));
   assert.ok(text.includes("상품 10사유 10"));
   const children = React.Children.toArray(node.props.children.props.children);
   assert.equal(children[2].type, "ScrollView");

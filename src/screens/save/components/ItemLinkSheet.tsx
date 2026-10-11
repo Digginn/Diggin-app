@@ -21,7 +21,8 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
   function handleSubmit() {
     if (!isItemLink(url)) {
       setError(true);
-      setToast(TOAST_MESSAGES.SAVE_004);
+      // 시안 MSG-SAVE-004: 형식이 틀린 링크는 다른 링크를 넣으라고 안내한다.
+      setToast(TOAST_MESSAGES.SAVE_005);
       return;
     }
     onSubmit(url.trim());
@@ -32,6 +33,7 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
       visible={visible}
       isScrimClosable={false}
       toastMessage={toast}
+      toastVariant="error"
       onToastDismiss={() => setToast(undefined)}
       onRequestClose={onRequestClose}
     >
@@ -57,7 +59,7 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
               placeholder="아이템 링크를 붙여넣어 주세요."
               value={url}
               onChangeText={(next) => {
-                // 상품명과 링크를 같이 복사하는 앱이 많아 링크만 남긴다.
+                // 아이템명과 링크를 같이 복사하는 앱이 많아 링크만 남긴다.
                 setUrl(findItemLink(next) ?? next);
                 setError(false);
               }}

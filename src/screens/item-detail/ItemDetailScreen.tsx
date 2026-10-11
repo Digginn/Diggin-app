@@ -14,7 +14,9 @@ import { FallbackImg } from "@/components/FallbackImg";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
 import { WishLevel } from "@/components/WishLevel";
+import { TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
+import { useToast } from "@/hooks/useToast";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { EditChip } from "./components/EditChip";
@@ -30,7 +32,11 @@ const ShareIcon = cssInterop(ShareSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
 
-const HERO_FRAME = "h-[440px] w-full bg-gray-10 ";
+const HERO_FRAME = "h-[520px] w-full bg-gray-10 ";
+
+// MVP 에서 추천 아이템을 빼기로 하면서 그만큼 이미지가 커졌다.
+// 다시 넣을 때 true 로 바꾸면 된다.
+const SHOWS_RECOMMEND = false;
 
 // TODO: API 연결 전까지 쓰는 임시 데이터.
 const MOCK_ITEM: ItemEditValues = {
@@ -74,6 +80,7 @@ export function ItemDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const guide = useFirstVisitGuide("item-detail");
+  const showToast = useToast();
   const wishGuideRef = useRef<View>(null);
   const voteGuideRef = useRef<View>(null);
   // TODO: API 연결 시 이 id 로 아이템을 조회한다.
@@ -126,6 +133,8 @@ export function ItemDetailScreen() {
               icon={IconBack}
               accessibilityLabel="뒤로 가기"
               onPress={() => router.back()}
+              disabled={isEditOpen || isFolderOpen}
+              className={isEditOpen || isFolderOpen ? "text-gray-400" : "text-gray-900"}
             />
           </View>
 
@@ -156,16 +165,20 @@ export function ItemDetailScreen() {
 
         <View className="gap-6 pt-4">
           <View className="gap-[13px] px-4">
-            <View className="w-full flex-row items-center justify-between">
-              <Text className="text-gray-1000 font-label-14">{BRAND}</Text>
+            <View className="w-full flex-row items-center justify-between gap-2">
+              <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
+                {BRAND}
+              </Text>
               <EditChip onPress={() => setEditOpen(true)} />
             </View>
             <ItemInfo name={item.name} price={Number(item.price)} sourceUrl={item.sourceUrl} />
           </View>
-          <RecommendSection
-            items={MOCK_RECOMMENDS}
-            onItemPress={(recommend) => router.push(`/items/${recommend.id}`)}
-          />
+          {SHOWS_RECOMMEND ? (
+            <RecommendSection
+              items={MOCK_RECOMMENDS}
+              onItemPress={(recommend) => router.push(`/items/${recommend.id}`)}
+            />
+          ) : null}
         </View>
       </ScrollView>
 
@@ -178,10 +191,11 @@ export function ItemDetailScreen() {
           setItem(values);
           setFailed(false);
           setEditOpen(false);
+          showToast(TOAST_MESSAGES.ALL_004);
         }}
       />
 
-      <LoadingDialog visible={isLoading} message="상품 정보를 불러오는 중입니다." />
+      <LoadingDialog visible={isLoading} message="아이템 정보를 불러오는 중입니다." />
 
       {isFolderOpen && (
         <FolderManageSheet
@@ -196,6 +210,7 @@ export function ItemDetailScreen() {
           onComplete={(ids) => {
             setSelectedFolderIds(ids);
             setFolderOpen(false);
+            showToast(selectFolderSavedMessage(ids.length));
           }}
         />
       )}

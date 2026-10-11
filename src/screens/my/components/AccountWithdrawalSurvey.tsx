@@ -67,7 +67,7 @@ export function AccountWithdrawalSurvey({
       onRequestClose={onClose}
       scrimOpacity={0.36}
       isScrimClosable={false}
-      className="rounded-t-[20px] px-margin"
+      className="px-margin"
       handleClassName="mb-5 h-1 w-8 self-center rounded-full bg-gray-500 opacity-40"
       overlay={
         toastMessage ? (

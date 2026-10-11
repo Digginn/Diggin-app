@@ -64,7 +64,7 @@ export function useCsvIllustrationMotion(isEnabled: boolean) {
         });
       animation = Animated.loop(
         Animated.sequence([
-          // delay만 첫 자식이면 loop가 상품 Value를 초기화하지 않아 5→1로 역주행합니다.
+          // delay만 첫 자식이면 loop가 아이템 Value를 초기화하지 않아 5→1로 역주행합니다.
           move(0, 0, false),
           Animated.delay(800),
           move(1, 550, true),
@@ -106,7 +106,7 @@ export function useCsvIllustrationMotion(isEnabled: boolean) {
     const base = poses[0];
     const loop = [...poses, base];
     return {
-      // 반투명 폴더 앞면 뒤로 상품 잔상이 비치지 않도록 흡수 중 먼저 사라집니다.
+      // 반투명 폴더 앞면 뒤로 아이템 잔상이 비치지 않도록 흡수 중 먼저 사라집니다.
       opacity: step.interpolate({
         inputRange: [0, 1, 1.2, 2, 3, 4, 5],
         outputRange: [1, 1, 0, 0, 0, 0, 1],

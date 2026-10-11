@@ -9,6 +9,7 @@ import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
 import { TextField } from "@/components/Field";
+import { ActionModal } from "@/components/modal";
 import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
 import type { WishLevelKey } from "@/types/wish-item";
@@ -52,6 +53,7 @@ export function ItemEditSheet({
   const [values, setValues] = useState(initialValues);
   const [isLevelOpen, setLevelOpen] = useState(false);
   const [isHintOpen, setHintOpen] = useState(false);
+  const [isExitOpen, setExitOpen] = useState(false);
   const hintRef = useRef<View>(null);
   const [hintAnchor, setHintAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -93,8 +95,38 @@ export function ItemEditSheet({
     onRequestClose();
   }
 
+  // 원본 유지하기는 버리겠다는 뜻이 분명해서 묻지 않고, 끌어내리기·뒤로가기만 묻는다.
+  function requestClose() {
+    if (!isDirty) return handleClose();
+    setLevelOpen(false);
+    setHintOpen(false);
+    setExitOpen(true);
+  }
+
   return (
-    <BottomSheet visible={visible} isScrimClosable={false} onRequestClose={handleClose}>
+    <BottomSheet
+      visible={visible}
+      isScrimClosable={false}
+      isCloseConfirmed={isDirty}
+      onRequestClose={requestClose}
+      overlay={
+        <ActionModal
+          visible={isExitOpen}
+          type="2Btn"
+          title="작성을 그만두시겠습니까?"
+          description="작성 중인 내용은 저장되지 않습니다."
+          secondaryAction={{ label: "계속 작성", onPress: () => setExitOpen(false) }}
+          primaryAction={{
+            label: "나가기",
+            onPress: () => {
+              setExitOpen(false);
+              handleClose();
+            },
+          }}
+          onRequestClose={() => setExitOpen(false)}
+        />
+      }
+    >
       <ScrollView
         className="px-margin"
         contentContainerStyle={{ gap: 25 }}
@@ -132,7 +164,7 @@ export function ItemEditSheet({
 
               <View className="gap-2">
                 <Text className="text-gray-900 font-b3">아이템 이름</Text>
-                <TextField value={values.name} onChangeText={update("name")} />
+                <TextField growsTo={88} value={values.name} onChangeText={update("name")} />
               </View>
 
               <View className="gap-2">

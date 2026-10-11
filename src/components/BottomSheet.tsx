@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ToastText } from "@/components/ToastText";
+import { ToastText, type ToastVariant } from "@/components/ToastText";
 import { colors } from "@/theme";
 
 const BOTTOM_PADDING = 32;
@@ -31,6 +31,10 @@ type BottomSheetProps = {
   visible: boolean;
   onRequestClose: () => void;
   height?: number;
+  /** 내용만큼 자라다 이 높이에서 멈춘다. 작은 화면에서는 상태 표시줄 아래까지만 올라온다. */
+  maxHeight?: number;
+  /** 그래버 아래에 붙어 함께 끌어내리는 손잡이가 된다. 스크롤 목록이 있는 시트의 제목 자리. */
+  header?: ReactNode;
   className?: string;
   handleClassName?: string;
   scrimOpacity?: number;
@@ -40,8 +44,11 @@ type BottomSheetProps = {
   isGrabberVisible?: boolean;
   /** 입력이 있는 시트는 바깥을 눌러 닫으면 적던 내용이 날아간다. */
   isScrimClosable?: boolean;
+  /** 켜져 있으면 끌어내려도 내보내지 않고 제자리로 돌린 뒤 onRequestClose 로 확인을 맡긴다. */
+  isCloseConfirmed?: boolean;
   /** 시트가 네이티브 모달이라 바깥 토스트는 가려진다. 시트 위에 띄우려면 여기로 넘긴다. */
   toastMessage?: string;
+  toastVariant?: ToastVariant;
   onToastDismiss?: () => void;
 };
 
@@ -50,6 +57,8 @@ export function BottomSheet({
   visible,
   onRequestClose,
   height,
+  maxHeight,
+  header,
   className,
   handleClassName,
   scrimOpacity = 0.4,
@@ -57,16 +66,19 @@ export function BottomSheet({
   isKeyboardAvoiding = true,
   isGrabberVisible = true,
   isScrimClosable = true,
+  isCloseConfirmed = false,
   toastMessage,
+  toastVariant = "default",
   onToastDismiss,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!visible || !toastMessage) return;
-    const timer = setTimeout(() => onToastDismiss?.(), 2000);
+    // 에러는 원인을 읽을 시간이 필요해 시안대로 더 오래 둔다.
+    const timer = setTimeout(() => onToastDismiss?.(), toastVariant === "error" ? 4000 : 2000);
     return () => clearTimeout(timer);
-  }, [visible, toastMessage, onToastDismiss]);
+  }, [visible, toastMessage, toastVariant, onToastDismiss]);
   const [dragY] = useState(() => new Animated.Value(0));
 
   // 끌어내린 위치는 열 때만 되돌린다. 닫을 때 되돌리면 모달이 슬라이드로 사라지는 동안
@@ -92,7 +104,13 @@ export function BottomSheet({
         if (gesture.dy > 0) dragY.setValue(gesture.dy);
       },
       onPanResponderRelease: (_event, gesture) => {
-        if (gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY) {
+        const isDismiss = gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY;
+        if (isDismiss && isCloseConfirmed) {
+          Animated.spring(dragY, { toValue: 0, bounciness: 0, useNativeDriver: false }).start();
+          onRequestClose();
+          return;
+        }
+        if (isDismiss) {
           Animated.timing(dragY, {
             toValue: EXIT_DISTANCE,
             duration: 160,
@@ -107,7 +125,7 @@ export function BottomSheet({
       },
       onPanResponderTerminationRequest: () => false,
     }).panHandlers;
-  }, [dragY, isGrabberVisible, onRequestClose]);
+  }, [dragY, isGrabberVisible, isCloseConfirmed, onRequestClose]);
 
   return (
     <NativeModal
@@ -136,7 +154,9 @@ export function BottomSheet({
             className={`rounded-t-2xl bg-gray-0 ${className ?? ""}`}
             style={{
               height,
-              maxHeight: MAX_HEIGHT,
+              maxHeight: maxHeight
+                ? Math.min(maxHeight, Dimensions.get("window").height - insets.top)
+                : MAX_HEIGHT,
               paddingBottom: Math.max(insets.bottom, BOTTOM_PADDING),
               boxShadow: `0px -4px 4px ${colors.gray[1000]}1F`,
             }}
@@ -153,6 +173,7 @@ export function BottomSheet({
                   importantForAccessibility="no"
                 />
               ) : null}
+              {header}
             </View>
             {children}
           </View>
@@ -161,7 +182,7 @@ export function BottomSheet({
       {toastMessage ? (
         <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px] items-center">
           <View className="w-full max-w-[327px] items-center">
-            <ToastText message={toastMessage} />
+            <ToastText message={toastMessage} variant={toastVariant} />
           </View>
         </View>
       ) : null}

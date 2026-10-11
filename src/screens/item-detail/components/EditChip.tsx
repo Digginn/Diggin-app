@@ -16,7 +16,7 @@ export function EditChip({ onPress }: EditChipProps) {
     <Pressable
       accessibilityLabel="아이템 정보 수정"
       accessibilityRole="button"
-      className="w-[70px] flex-row items-center gap-0.5 rounded-field bg-gray-100 py-1 pl-1.5 pr-2 active:opacity-75"
+      className="h-[25px] w-[70px] flex-row items-center justify-center gap-0.5 rounded-field bg-gray-100 py-1 pl-1.5 pr-2 active:opacity-75"
       hitSlop={{ top: 12, bottom: 12 }}
       onPress={onPress}
     >

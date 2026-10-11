@@ -85,7 +85,7 @@ export default function ModalPreview() {
           visible
           onRequestClose={closeModal}
           title="제목"
-          productName="상품명"
+          productName="아이템명"
           description="소제목 혹은 설명글이 들어갑니다. 1줄만 노출"
           selectedFolderName="선물 리스트"
           onPressFolderSelect={() => Alert.alert("폴더 선택", "목록 UI는 추후 연결 예정입니다.")}

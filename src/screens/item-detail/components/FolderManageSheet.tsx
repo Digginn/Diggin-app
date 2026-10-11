@@ -44,11 +44,20 @@ export function FolderManageSheet({
     <BottomSheet
       visible
       onRequestClose={onClose}
-      height={556}
+      maxHeight={702}
       className="rounded-t-[20px]"
       handleClassName="mb-4 h-1 w-9 self-center rounded-sm bg-gray-300"
       scrimOpacity={0.36}
       isKeyboardAvoiding={false}
+      // 목록이 스크롤되니 끌어내리기는 핸들과 제목에서만 받는다.
+      header={
+        <View className="gap-1 px-margin pb-4">
+          <Text className="text-gray-900 font-label-20">{title}</Text>
+          <Text className="text-gray-600 font-label-14">
+            아이템을 담을 폴더를 모두 선택해 주세요.
+          </Text>
+        </View>
+      }
       overlay={
         isCreating ? (
           <FolderNameModal
@@ -63,13 +72,8 @@ export function FolderManageSheet({
         ) : undefined
       }
     >
-      <View className="flex-1 gap-gutter px-margin">
-        <View className="gap-1">
-          <Text className="text-gray-900 font-label-20">{title}</Text>
-          <Text className="text-gray-600 font-label-14">
-            아이템을 담을 폴더를 모두 선택해 주세요.
-          </Text>
-        </View>
+      {/* 높이를 정하지 않아 폴더 수만큼 자라고, maxHeight 에 닿으면 목록이 줄며 스크롤된다. */}
+      <View className="shrink gap-gutter px-margin">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="새 폴더 만들기"
@@ -80,7 +84,7 @@ export function FolderManageSheet({
         </Pressable>
         <ScrollView
           ref={listRef}
-          className="flex-1"
+          className="grow-0"
           contentContainerClassName="gap-2"
           showsVerticalScrollIndicator={false}
         >
@@ -94,7 +98,7 @@ export function FolderManageSheet({
                   accessibilityState={{ checked: isSelected }}
                   aria-checked={isSelected}
                   className={clsx(
-                    "h-[46px] flex-row items-center justify-between rounded pl-4 pr-1.5 active:opacity-75",
+                    "h-12 flex-row items-center justify-between rounded pl-4 pr-1.5 active:opacity-75",
                     isSelected && "bg-gray-100",
                   )}
                   onPress={() =>

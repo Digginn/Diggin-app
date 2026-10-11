@@ -44,11 +44,11 @@ export function CsvImportResultModal({
           <View className="flex-row items-center">
             <View className="size-12" />
             <Text className="flex-1 text-center text-gray-900 font-label-16-semibold">
-              제외된 상품 {excluded.length}개
+              제외된 아이템 {excluded.length}개
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="제외된 상품 목록 닫기"
+              accessibilityLabel="제외된 아이템 목록 닫기"
               className="size-12 items-center justify-center"
               onPress={onCloseExcluded}
             >
@@ -59,8 +59,8 @@ export function CsvImportResultModal({
           </View>
           <Text className="text-center text-gray-600 font-b3">
             {failedCount > 0
-              ? `가져오지 못한 상품 ${failedCount}개${duplicateCount > 0 ? `와 중복 상품 ${duplicateCount}개` : ""}입니다.`
-              : `중복 상품 ${duplicateCount}개입니다.`}
+              ? `가져오지 못한 아이템 ${failedCount}개${duplicateCount > 0 ? `와 중복 아이템 ${duplicateCount}개` : ""}입니다.`
+              : `중복 아이템 ${duplicateCount}개입니다.`}
           </Text>
           <ScrollView
             style={{
@@ -83,36 +83,36 @@ export function CsvImportResultModal({
           <View className="items-center gap-1">
             <View className={hasExcluded ? "h-12 justify-center" : ""}>
               <Text className="text-center text-gray-900 font-label-16-semibold">
-                {isSuccess ? "상품 가져오기가 완료되었습니다" : "상품을 가져오지 못했습니다"}
+                {isSuccess ? "아이템 가져오기가 완료되었습니다" : "아이템을 가져오지 못했습니다"}
               </Text>
             </View>
             <Text className="text-center text-gray-700 font-b3">
               {isSuccess ? (
                 <>
-                  총 <Text className="font-pretendard-bold">{result.importedCount}개</Text>의 상품을
-                  가져왔습니다.
+                  총 <Text className="font-pretendard-bold">{result.importedCount}개</Text>의
+                  아이템을 가져왔습니다.
                 </>
               ) : (
-                "가져올 수 있는 상품이 없습니다."
+                "가져올 수 있는 아이템이 없습니다."
               )}
               {!isSuccess && (
                 <>
                   {" "}
-                  {"\n"}제외된 상품{" "}
+                  {"\n"}제외된 아이템{" "}
                   <Text className="font-pretendard-bold">{excluded.length}개</Text>를 확인해주세요.
                 </>
               )}
               {isSuccess && failedCount > 0 && (
                 <>
-                  {"\n"}가져오지 못한 상품{" "}
+                  {"\n"}가져오지 못한 아이템{" "}
                   <Text className="font-pretendard-bold">{failedCount}개</Text>
                   {duplicateCount > 0 ? "와" : "는 제외했습니다."}
                 </>
               )}
               {isSuccess && duplicateCount > 0 && (
                 <>
-                  {"\n"}중복 상품 <Text className="font-pretendard-bold">{duplicateCount}개</Text>는
-                  제외했습니다.
+                  {"\n"}중복 아이템 <Text className="font-pretendard-bold">{duplicateCount}개</Text>
+                  는 제외했습니다.
                 </>
               )}
             </Text>
@@ -121,7 +121,7 @@ export function CsvImportResultModal({
             {hasExcluded && (
               <View className="flex-1">
                 <Button variant="secondary" className="!px-2" onPress={onShowExcluded}>
-                  제외된 상품 보기
+                  제외된 아이템 보기
                 </Button>
               </View>
             )}

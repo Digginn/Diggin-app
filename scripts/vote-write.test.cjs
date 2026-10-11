@@ -106,7 +106,6 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
         "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
         "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
         "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
-        "./components/SaveToAllSheet": { SaveToAllSheet: "SaveToAllSheet" },
         "./components/VoteBlock": { VoteBlock: "VoteBlock" },
         "./components/VoteReasonScreen": { VoteReasonScreen: "VoteReasonScreen" },
         "./utils/voteTiming": load("../src/screens/diggle/utils/voteTiming.ts", {}),

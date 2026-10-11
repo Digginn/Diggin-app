@@ -1,8 +1,10 @@
 import { Text, View } from "react-native";
 
-import { IconToastError } from "@/assets/images/toast";
+import { IconToastError, IconToastSuccess } from "@/assets/images/toast";
 
-export type ToastVariant = "default" | "error";
+export type ToastVariant = "default" | "success" | "error";
+
+const ICONS = { success: IconToastSuccess, error: IconToastError };
 
 type ToastTextProps = {
   message: string;
@@ -10,21 +12,21 @@ type ToastTextProps = {
 };
 
 export function ToastText({ message, variant = "default" }: ToastTextProps) {
-  const isError = variant === "error";
+  const Icon = variant === "default" ? null : ICONS[variant];
   return (
     <View
       pointerEvents="none"
       accessibilityRole="alert"
       accessibilityLiveRegion="polite"
-      className={`max-w-full rounded border p-3 ${isError ? "flex-row items-start gap-2 border-semantic-errorOnDark bg-semantic-errorBgDark" : "items-center justify-center border-gray-800 bg-gray-700"}`}
+      className="max-w-full flex-row items-center gap-2 rounded bg-gray-700/[0.92] p-3"
     >
-      {isError && (
-        <View className="mt-[2.5px] size-4 shrink-0">
-          <IconToastError />
+      {Icon && (
+        <View className="size-4 shrink-0">
+          <Icon />
         </View>
       )}
       <Text
-        className={`font-label-14 ${isError ? "shrink text-left text-semantic-errorOnDark" : "text-center text-gray-200"}`}
+        className={`shrink text-gray-0 font-label-14 ${Icon ? "text-left" : "text-center"}`}
         lineBreakStrategyIOS="hangul-word"
         style={{ includeFontPadding: false }}
       >

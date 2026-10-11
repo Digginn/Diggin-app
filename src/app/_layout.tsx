@@ -33,7 +33,10 @@ export default function RootLayout() {
         <PostDraftProvider>
           <PostsProvider>
             <StatusBar style="auto" />
-            <Stack screenOptions={{ headerShown: false }} />
+            <Stack screenOptions={{ headerShown: false }}>
+              {/* 게시글 상세에서 아래에서 위로 올라오며 들어온다. */}
+              <Stack.Screen name="posts/save" options={{ animation: "slide_from_bottom" }} />
+            </Stack>
           </PostsProvider>
         </PostDraftProvider>
       </BlockedUsersProvider>

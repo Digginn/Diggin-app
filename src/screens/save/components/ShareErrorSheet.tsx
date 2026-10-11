@@ -1,15 +1,11 @@
 import { cssInterop } from "nativewind";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import CloseSvg from "@/assets/images/icon-modal-close.svg";
 import InfoSvg from "@/assets/images/icon-share-sheet-info.svg";
 import { Button } from "@/components/Button";
 
 const InfoIcon = cssInterop(InfoSvg, {
-  className: { target: "style", nativeStyleToProp: { width: true, height: true, color: true } },
-});
-const CloseIcon = cssInterop(CloseSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
 
@@ -19,9 +15,9 @@ const BOTTOM_PADDING = 32;
 export type ShareErrorReason = "no_url" | "deeplink" | "invalid_format";
 
 const MESSAGES: Record<ShareErrorReason, string> = {
-  no_url: "공유한 내용에서 상품 페이지 링크를 찾지 못했습니다.",
-  deeplink: "이 앱의 링크는 불러올 수 없습니다. 상품 페이지 링크를 다시 복사한 후 시도해 주세요.",
-  invalid_format: "올바른 아이템 링크인지 확인 후 다시 시도해 주세요.",
+  no_url: "공유한 내용에서 아이템 링크를 찾지 못했습니다.",
+  deeplink: "이 앱의 링크는 불러올 수 없습니다.\n아이템 페이지 링크를 다시 복사한 후 시도해 주세요.",
+  invalid_format: "올바른 링크인지 확인 후 다시 시도해 주세요.",
 };
 
 type ShareErrorSheetProps = {
@@ -53,8 +49,8 @@ export function ShareErrorSheet({ reason, onClose }: ShareErrorSheetProps) {
         <Text className="text-center text-gray-900 font-label-16-semibold">Diggin에 저장</Text>
       </View>
 
-      <View className="w-full flex-row items-start gap-2 overflow-hidden rounded bg-gray-100 p-4">
-        <InfoIcon className="size-6 text-gray-900" />
+      <View className="w-full flex-row items-center gap-2 overflow-hidden rounded bg-gray-100 p-4">
+        <InfoIcon className="size-6" />
         <Text className="flex-1 text-gray-900 font-b3">{MESSAGES[reason]}</Text>
       </View>
 
@@ -63,15 +59,6 @@ export function ShareErrorSheet({ reason, onClose }: ShareErrorSheetProps) {
           닫기
         </Button>
       </View>
-
-      <Pressable
-        accessibilityLabel="닫기"
-        accessibilityRole="button"
-        className="absolute right-2 top-2 size-12 items-center justify-center active:opacity-75"
-        onPress={onClose}
-      >
-        <CloseIcon className="size-6" />
-      </Pressable>
     </View>
   );
 }
