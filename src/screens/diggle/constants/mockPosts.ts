@@ -119,7 +119,6 @@ const MOCK_VOTE_COMMENTS: PostComment[] = [
     body: "가격 대비 품질이 좋아 보여요.",
     timeLabel: "5분 전",
     isMine: false,
-    vote: "buy",
   },
   {
     id: "vote-2-not",
@@ -128,7 +127,6 @@ const MOCK_VOTE_COMMENTS: PostComment[] = [
     body: "세일 기간까지 기다려 보세요!",
     timeLabel: "3분 전",
     isMine: false,
-    vote: "not",
   },
 ];
 
