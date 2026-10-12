@@ -409,6 +409,7 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
 
 test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰고 각 버튼이 올바르게 이동한다", () => {
   const routes = [];
+  const browsingModes = [];
   const source = readFileSync(
     path.join(__dirname, "../src/screens/onboarding/OnboardingFinishScreen.tsx"),
     "utf8",
@@ -423,6 +424,10 @@ test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰�
     require: (name) => {
       if (name === "expo-router")
         return { useRouter: () => ({ replace: (route) => routes.push(route) }) };
+      if (name === "@/contexts/BrowsingModeContext")
+        return {
+          useBrowsingMode: () => ({ setIsGuest: (isGuest) => browsingModes.push(isGuest) }),
+        };
       if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
       if (name === "react-native-safe-area-context")
         return { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) };
@@ -460,6 +465,7 @@ test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰�
   const guestButton = guest.find((node) => node.type === "Button");
   assert.equal(guestButton.props.children, "둘러보기");
   guestButton.props.onPress();
+  assert.equal(browsingModes.at(-1), true);
   assert.equal(routes.at(-1), "/(tabs)/all");
   guest.find((node) => node.type === "Pressable").props.onPress();
   assert.equal(routes.at(-1), "/login");
@@ -472,6 +478,8 @@ test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰�
     ),
   );
   assert.equal(complete.find((node) => node.type === "Button").props.children, "시작하기");
+  complete.find((node) => node.type === "Button").props.onPress();
+  assert.equal(browsingModes.at(-1), false);
   assert.equal(complete.filter((node) => node.type === "Pressable").length, 0);
   complete.find((node) => node.type === "Button").props.onPress();
   assert.equal(routes.at(-1), "/(tabs)/all");
