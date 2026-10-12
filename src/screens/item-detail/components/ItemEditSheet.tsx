@@ -178,7 +178,7 @@ export function ItemEditSheet({
 
               <View className="gap-2">
                 <Text className="text-gray-900 font-b3">아이템 출처</Text>
-                <TextField value={values.sourceUrl} onChangeText={update("sourceUrl")} />
+                <TextField editable={false} value={values.sourceUrl} />
               </View>
             </View>
           </View>
