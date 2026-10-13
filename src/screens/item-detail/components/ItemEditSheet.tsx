@@ -9,7 +9,9 @@ import { TextField } from "@/components/Field";
 import { ActionModal } from "@/components/modal";
 import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
-import type { WishLevelKey } from "@/types/wish-item";
+import type { ItemSaveValues } from "@/types/wish-item";
+
+import { formatPriceInput } from "../utils/formatPriceInput";
 
 const TooltipIcon = cssInterop(TooltipSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
@@ -20,27 +22,39 @@ const HINT = "얼마나 사고 싶은지를\n3단계로 기록해두어\nALL 탭
 const HINT_GAP = 10;
 const HINT_TOP_OFFSET = 4;
 
+function FieldLabel({ label, isMissing }: { label: string; isMissing: boolean }) {
+  return (
+    <View className="flex-row items-start gap-2">
+      <Text className="text-gray-900 font-b3">{label}</Text>
+      {isMissing && <Text className="text-semantic-error font-note">*필수 정보</Text>}
+    </View>
+  );
+}
+
 type Anchor = { x: number; y: number; width: number; height: number };
 
-export type ItemEditValues = {
-  name: string;
-  brand: string;
-  price: string;
-  sourceUrl: string;
-  thumbnailUrl: string | null;
-  wishLevel: WishLevelKey | null;
-};
+const DESCRIPTION = {
+  loaded: "불러온 정보를 확인하고 저장해 주세요.",
+  failed:
+    "아이템 정보를 불러오지 못했습니다.\n아이템 링크는 유지했어요. 정보를 직접 입력해 저장할 수 있어요.",
+} as const;
 
 type ItemEditSheetProps = {
   visible: boolean;
-  initialValues: ItemEditValues;
+  initialValues: ItemSaveValues;
+  /** 정보를 불러오지 못하면 안내 문구가 바뀌고 사용자가 직접 채운다. */
+  hasExtractionFailed?: boolean;
+  /** 이미 저장한 링크면 기존 아이템으로 갈지 묻는다. */
+  duplicate?: { onConfirm: () => void; onDismiss: () => void };
   onRequestClose: () => void;
-  onSubmit: (values: ItemEditValues) => void;
+  onSubmit: (values: ItemSaveValues) => void;
 };
 
 export function ItemEditSheet({
   visible,
   initialValues,
+  hasExtractionFailed = false,
+  duplicate,
   onRequestClose,
   onSubmit,
 }: ItemEditSheetProps) {
@@ -52,14 +66,16 @@ export function ItemEditSheet({
   const [hintAnchor, setHintAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
 
   const update =
-    <K extends keyof ItemEditValues>(key: K) =>
-    (value: ItemEditValues[K]) =>
+    <K extends keyof ItemSaveValues>(key: K) =>
+    (value: ItemSaveValues[K]) =>
       setValues((prev) => ({ ...prev, [key]: value }));
 
   // 위시 레벨은 필수가 아니라 값이 바뀌었는지로 판단한다.
-  const isDirty = (Object.keys(values) as (keyof ItemEditValues)[]).some(
+  const isDirty = (Object.keys(values) as (keyof ItemSaveValues)[]).some(
     (key) => values[key] !== initialValues[key],
   );
+  const isNameMissing = !values.name.trim();
+  const isPriceMissing = !values.price;
 
   function toggleHint() {
     if (isHintOpen) {
@@ -78,7 +94,7 @@ export function ItemEditSheet({
     onRequestClose();
   }
 
-  // 원본 유지하기는 버리겠다는 뜻이 분명해서 묻지 않고, 끌어내리기·뒤로가기만 묻는다.
+  // 취소는 버리겠다는 뜻이 분명해서 묻지 않고, 끌어내리기·뒤로가기만 묻는다.
   function requestClose() {
     if (!isDirty) return handleClose();
     setLevelOpen(false);
@@ -93,21 +109,32 @@ export function ItemEditSheet({
       isCloseConfirmed={isDirty}
       onRequestClose={requestClose}
       overlay={
-        <ActionModal
-          visible={isExitOpen}
-          type="2Btn"
-          title="작성을 그만두시겠습니까?"
-          description="작성 중인 내용은 저장되지 않습니다."
-          secondaryAction={{ label: "계속 작성", onPress: () => setExitOpen(false) }}
-          primaryAction={{
-            label: "나가기",
-            onPress: () => {
-              setExitOpen(false);
-              handleClose();
-            },
-          }}
-          onRequestClose={() => setExitOpen(false)}
-        />
+        <>
+          <ActionModal
+            visible={duplicate !== undefined}
+            type="2Btn"
+            title="이미 저장한 아이템입니다."
+            description="기존에 저장한 아이템을 확인하시겠습니까?"
+            secondaryAction={{ label: "괜찮아요", onPress: () => duplicate?.onDismiss() }}
+            primaryAction={{ label: "확인하기", onPress: () => duplicate?.onConfirm() }}
+            onRequestClose={() => duplicate?.onDismiss()}
+          />
+          <ActionModal
+            visible={isExitOpen}
+            type="2Btn"
+            title="작성을 그만두시겠습니까?"
+            description="작성 중인 내용은 저장되지 않습니다."
+            secondaryAction={{ label: "계속 작성", onPress: () => setExitOpen(false) }}
+            primaryAction={{
+              label: "나가기",
+              onPress: () => {
+                setExitOpen(false);
+                handleClose();
+              },
+            }}
+            onRequestClose={() => setExitOpen(false)}
+          />
+        </>
       }
     >
       <ScrollView
@@ -120,27 +147,39 @@ export function ItemEditSheet({
             <View className="items-center gap-1">
               <Text className="text-gray-1000 font-label-16-semibold">아이템 정보 수정</Text>
               <Text className="text-center text-gray-700 font-b3">
-                불러온 정보를 확인하고 저장해 주세요.
+                {hasExtractionFailed ? DESCRIPTION.failed : DESCRIPTION.loaded}
               </Text>
             </View>
 
             <View className="gap-4">
               <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템명</Text>
-                <TextField growsTo={88} value={values.name} onChangeText={update("name")} />
+                <FieldLabel label="아이템명" isMissing={isNameMissing} />
+                <TextField
+                  growsTo={88}
+                  isError={isNameMissing}
+                  placeholder="아이템명을 입력해 주세요."
+                  value={values.name}
+                  onChangeText={update("name")}
+                />
               </View>
 
               <View className="flex-row gap-4">
                 <View className="flex-1 gap-2">
                   <Text className="text-gray-900 font-b3">브랜드명</Text>
-                  <TextField value={values.brand} onChangeText={update("brand")} />
+                  <TextField
+                    placeholder="선택 입력"
+                    value={values.brand}
+                    onChangeText={update("brand")}
+                  />
                 </View>
                 <View className="flex-1 gap-2">
-                  <Text className="text-gray-900 font-b3">가격</Text>
+                  <FieldLabel label="가격" isMissing={isPriceMissing} />
                   <TextField
+                    isError={isPriceMissing}
                     keyboardType="number-pad"
-                    value={values.price}
-                    onChangeText={update("price")}
+                    placeholder="가격 입력"
+                    value={formatPriceInput(values.price)}
+                    onChangeText={(text) => update("price")(text.replace(/\D/g, ""))}
                   />
                 </View>
               </View>
@@ -174,12 +213,16 @@ export function ItemEditSheet({
           </View>
         </View>
 
-        <View className="flex-row justify-between">
-          <Button className="w-[155px]" variant="secondary" onPress={handleClose}>
-            원본 유지하기
+        <View className="flex-row gap-4">
+          <Button className="flex-1" variant="secondary" onPress={handleClose}>
+            취소
           </Button>
-          <Button className="w-[155px]" isDisabled={!isDirty} onPress={() => onSubmit(values)}>
-            수정 완료
+          <Button
+            className="flex-1"
+            isDisabled={isNameMissing || isPriceMissing}
+            onPress={() => onSubmit(values)}
+          >
+            저장하기
           </Button>
         </View>
       </ScrollView>

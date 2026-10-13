@@ -17,8 +17,8 @@ import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constant
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
+import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
-import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { DeleteBar } from "./components/DeleteBar";
@@ -191,7 +191,7 @@ export function AllScreen() {
         onDismiss={itemSave.openAfterLoading}
       />
 
-      <ItemSaveSheet
+      <ItemEditSheet
         key={`save-${itemSave.values?.sourceUrl ?? ""}`}
         visible={itemSave.values !== null}
         hasExtractionFailed={itemSave.hasFailed}
