@@ -73,7 +73,7 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
           </View>
         </View>
 
-        <View className="flex-row gap-[17px]">
+        <View className="flex-row gap-4">
           <Button className="flex-1" variant="secondary" onPress={onRequestClose}>
             취소
           </Button>

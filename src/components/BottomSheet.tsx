@@ -15,7 +15,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ToastText, type ToastVariant } from "@/components/ToastText";
 import { colors } from "@/theme";
 
-const BOTTOM_PADDING = 32;
+const BOTTOM_PADDING = 40;
+// 키보드가 홈 인디케이터 자리를 덮으니 그만큼 여백을 줄인다.
+const KEYBOARD_BOTTOM_PADDING = 16;
 // 이 거리 이상 끌어내리거나 이 속도 이상으로 튕기면 닫는다.
 const DISMISS_DISTANCE = 80;
 const DISMISS_VELOCITY = 0.5;
@@ -72,6 +74,22 @@ export function BottomSheet({
   onToastDismiss,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
+  const [isKeyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardVisible(true),
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardVisible(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!visible || !toastMessage) return;
@@ -157,7 +175,9 @@ export function BottomSheet({
               maxHeight: maxHeight
                 ? Math.min(maxHeight, Dimensions.get("window").height - insets.top)
                 : MAX_HEIGHT,
-              paddingBottom: Math.max(insets.bottom, BOTTOM_PADDING),
+              paddingBottom: isKeyboardVisible
+                ? KEYBOARD_BOTTOM_PADDING
+                : Math.max(insets.bottom, BOTTOM_PADDING),
               boxShadow: `0px -4px 4px ${colors.gray[1000]}1F`,
             }}
           >

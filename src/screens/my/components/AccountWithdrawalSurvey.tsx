@@ -140,7 +140,7 @@ export function AccountWithdrawalSurvey({
           </View>
         )}
       </ScrollView>
-      <View className="flex-row gap-modal-action pt-5">
+      <View className="flex-row gap-4 pt-5">
         <View className="flex-1">
           <Button
             variant="secondary"
