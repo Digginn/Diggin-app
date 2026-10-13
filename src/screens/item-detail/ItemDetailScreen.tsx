@@ -41,13 +41,12 @@ const SHOWS_RECOMMEND = false;
 // TODO: API 연결 전까지 쓰는 임시 데이터.
 const MOCK_ITEM: ItemEditValues = {
   name: "Real Good Pants 엄청 좋은 바지",
+  brand: "리얼굿",
   price: "70000",
   sourceUrl: "http://pf.kakao.com/_zIxnrX",
   thumbnailUrl: null,
   wishLevel: null,
 };
-
-const BRAND = "브랜드명";
 
 // TODO: 폴더 목록 API 연결 전까지 쓰는 임시 값.
 const MOCK_FOLDERS: ManagedFolder[] = [
@@ -167,7 +166,7 @@ export function ItemDetailScreen() {
           <View className="gap-[13px] px-4">
             <View className="w-full flex-row items-center justify-between gap-2">
               <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
-                {BRAND}
+                {item.brand}
               </Text>
               <EditChip onPress={() => setEditOpen(true)} />
             </View>

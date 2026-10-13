@@ -1,10 +1,7 @@
-import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
-import CameraSvg from "@/assets/images/icon-camera.svg";
 import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
@@ -14,10 +11,6 @@ import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
 import type { WishLevelKey } from "@/types/wish-item";
 
-const StyledImage = cssInterop(Image, { className: "style" });
-const CameraIcon = cssInterop(CameraSvg, {
-  className: { target: "style", nativeStyleToProp: { width: true, height: true } },
-});
 const TooltipIcon = cssInterop(TooltipSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
@@ -31,6 +24,7 @@ type Anchor = { x: number; y: number; width: number; height: number };
 
 export type ItemEditValues = {
   name: string;
+  brand: string;
   price: string;
   sourceUrl: string;
   thumbnailUrl: string | null;
@@ -66,17 +60,6 @@ export function ItemEditSheet({
   const isDirty = (Object.keys(values) as (keyof ItemEditValues)[]).some(
     (key) => values[key] !== initialValues[key],
   );
-
-  async function handlePickImage() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (result.canceled) return;
-    update("thumbnailUrl")(result.assets[0].uri);
-  }
 
   function toggleHint() {
     if (isHintOpen) {
@@ -129,56 +112,37 @@ export function ItemEditSheet({
     >
       <ScrollView
         className="px-margin"
-        contentContainerStyle={{ gap: 25 }}
+        contentContainerStyle={{ gap: 24 }}
         keyboardShouldPersistTaps="handled"
       >
         <View className="gap-4">
-          <View className="gap-[30px]">
+          <View className="gap-8">
             <View className="items-center gap-1">
               <Text className="text-gray-1000 font-label-16-semibold">아이템 정보 수정</Text>
               <Text className="text-center text-gray-700 font-b3">
-                아이템 정보를 직접 수정해 보세요.{"\n"}URL은 수정할 수 없습니다.
+                불러온 정보를 확인하고 저장해 주세요.
               </Text>
             </View>
 
             <View className="gap-4">
               <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템 이미지</Text>
-                <View className="w-[92px]">
-                  <StyledImage
-                    className="size-[92px] rounded-field bg-gray-100"
-                    contentFit="cover"
-                    source={values.thumbnailUrl ?? undefined}
-                  />
-                  <Pressable
-                    accessibilityLabel="아이템 이미지 변경"
-                    accessibilityRole="button"
-                    className="absolute bottom-0 right-0 size-6 items-center justify-center rounded-field bg-gray-0 active:opacity-75"
-                    hitSlop={12}
-                    onPress={handlePickImage}
-                  >
-                    <CameraIcon className="h-3 w-3.5" />
-                  </Pressable>
-                </View>
-              </View>
-
-              <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템 이름</Text>
+                <Text className="text-gray-900 font-b3">아이템명</Text>
                 <TextField growsTo={88} value={values.name} onChangeText={update("name")} />
               </View>
 
-              <View className="gap-2">
-                <Text className="text-gray-900 font-b3">가격</Text>
-                <TextField
-                  keyboardType="number-pad"
-                  value={values.price}
-                  onChangeText={update("price")}
-                />
-              </View>
-
-              <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템 출처</Text>
-                <TextField editable={false} value={values.sourceUrl} />
+              <View className="flex-row gap-4">
+                <View className="flex-1 gap-2">
+                  <Text className="text-gray-900 font-b3">브랜드명</Text>
+                  <TextField value={values.brand} onChangeText={update("brand")} />
+                </View>
+                <View className="flex-1 gap-2">
+                  <Text className="text-gray-900 font-b3">가격</Text>
+                  <TextField
+                    keyboardType="number-pad"
+                    value={values.price}
+                    onChangeText={update("price")}
+                  />
+                </View>
               </View>
             </View>
           </View>
