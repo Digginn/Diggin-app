@@ -129,6 +129,7 @@ test("공개 모달만 export하고 공용 껍데기의 바깥 영역은 닫힘 
   assert.deepEqual(Object.keys(modals).sort(), [
     "ActionModal",
     "FolderModal",
+    "LoginRequiredModal",
     "Modal",
     "ReportModal",
   ]);
