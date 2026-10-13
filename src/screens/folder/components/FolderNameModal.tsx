@@ -66,7 +66,7 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
       onClose={handleClose}
       title={isEditing ? "이름 수정하기" : "새 폴더 만들기"}
       description={
-        isEditing ? "폴더의 이름을 수정해주세요." : "아이템을 담을 새 폴더를 만들어주세요."
+        isEditing ? "폴더의 이름을 수정해주세요." : "아이템을 담을 새 폴더를 만들어 주세요."
       }
       isPrimaryDisabled={!canSubmit}
       primaryAction={{ label: isEditing ? "수정 완료" : "폴더 만들기", onPress: handleSubmit }}
@@ -82,7 +82,7 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
             selectTextOnFocus={!isEditing}
             accessibilityLabel={isEditing ? "수정한 폴더 이름" : "폴더 이름"}
             value={name}
-            className="!border-gray-350 pr-14"
+            className="!h-12 !border-gray-350 pr-14"
             inputClassName="!text-gray-700"
             onChangeText={(text) => {
               const next = [...splitGraphemes(text)];
