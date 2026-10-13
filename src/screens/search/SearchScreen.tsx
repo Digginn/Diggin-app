@@ -38,7 +38,9 @@ export function SearchScreen() {
   const recentSearches = useRecentSearches();
 
   const submitted = history.at(-1) ?? "";
-  const results = submitted ? orderWishItems(MOCK_RESULTS) : [];
+  const results = submitted
+    ? orderWishItems(MOCK_RESULTS.filter((item) => item.name.includes(submitted.trim())))
+    : [];
 
   const handleSubmit = (text: string) => {
     const value = text.slice(0, MAX_SEARCH_LENGTH);
