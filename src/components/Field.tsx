@@ -149,7 +149,10 @@ export function TextField({
         : "border-gray-350";
 
   // 자라는 칸은 세로 가운데가 아니라 위에서부터 쌓인다.
-  const frameClassName = growsTo ? "items-start py-2.5" : "h-11 items-center";
+  // 비면 줄 간격 없는 placeholder 한 줄이라 위에 붙이면 떠 보인다. 그때만 가운데로 둔다.
+  const frameClassName = growsTo
+    ? `py-2.5 ${inputValue.length > 0 ? "items-start" : "items-center"}`
+    : "h-11 items-center";
   // 줄 간격 없는 -input 은 한 줄일 때만 맞다. 여러 줄은 줄 간격이 있어야 읽힌다.
   const fontClassName =
     growsTo && inputValue.length > 0 ? "font-label-16-medium" : "font-label-16-medium-input";
