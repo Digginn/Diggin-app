@@ -18,7 +18,7 @@ const PREVIEW_VALUES: ItemSaveValues = {
   wishLevel: null,
 };
 
-type PreviewKind = "link" | "loaded" | "failed" | "paste" | ShareErrorReason | null;
+type PreviewKind = "link" | "loaded" | "failed" | "price-error" | "paste" | ShareErrorReason | null;
 
 const EMPTY_VALUES: ItemSaveValues = {
   name: "",
@@ -41,6 +41,7 @@ export default function SavePreviewRoute() {
             ["link", "아이템 추가 (링크 입력)"],
             ["loaded", "아이템 정보 확인"],
             ["failed", "정보를 불러오지 못함"],
+            ["price-error", "가격 입력 오류"],
             ["paste", "붙여넣기 설정 안내"],
             ["no_url", "공유 오류 · URL 없음"],
             ["deeplink", "공유 오류 · 앱 전용 딥링크"],
@@ -67,9 +68,15 @@ export default function SavePreviewRoute() {
 
       <ItemSaveSheet
         key={`save-${open}`}
-        visible={open === "loaded" || open === "failed"}
+        visible={open === "loaded" || open === "failed" || open === "price-error"}
         hasExtractionFailed={open === "failed"}
-        initialValues={open === "failed" ? EMPTY_VALUES : PREVIEW_VALUES}
+        initialValues={
+          open === "failed"
+            ? EMPTY_VALUES
+            : open === "price-error"
+              ? { ...PREVIEW_VALUES, price: "0" }
+              : PREVIEW_VALUES
+        }
         onRequestClose={() => setOpen(null)}
         onSubmit={() => setOpen(null)}
       />

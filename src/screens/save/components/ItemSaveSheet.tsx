@@ -58,8 +58,19 @@ export function ItemSaveSheet({
   const [values, setValues] = useState(initialValues);
   const [isLevelOpen, setLevelOpen] = useState(false);
   const [isHintOpen, setHintOpen] = useState(false);
+  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
   const hintRef = useRef<View>(null);
   const [hintAnchor, setHintAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
+  const priceText = values.price.replace(/[,\s원]/g, "");
+  const price = Number(priceText);
+  const isPriceValid = /^\d+$/.test(priceText) && Number.isFinite(price) && price > 0;
+  const hasPriceError = hasAttemptedSave && !isPriceValid;
+
+  function handleSubmit() {
+    setHasAttemptedSave(true);
+    if (!values.name.trim() || !isPriceValid) return;
+    onSubmit(values);
+  }
 
   const update =
     <K extends keyof ItemSaveValues>(key: K) =>
@@ -174,10 +185,21 @@ export function ItemSaveSheet({
                   />
                 </View>
                 <View className="flex-1 gap-2">
-                  <Text className="text-gray-900 font-b3">가격</Text>
+                  <View className="flex-row items-start gap-2">
+                    <Text className="text-gray-900 font-b3">가격</Text>
+                    {hasPriceError && (
+                      <Text
+                        accessibilityLiveRegion="polite"
+                        className="text-semantic-error font-note"
+                      >
+                        *필수 정보
+                      </Text>
+                    )}
+                  </View>
                   <TextField
+                    isError={hasPriceError}
                     keyboardType="number-pad"
-                    placeholder="선택 입력"
+                    placeholder="가격을 입력해 주세요."
                     value={values.price}
                     onChangeText={update("price")}
                   />
@@ -227,7 +249,7 @@ export function ItemSaveSheet({
           <Button
             className="flex-1"
             isDisabled={values.name.trim().length === 0}
-            onPress={() => onSubmit(values)}
+            onPress={handleSubmit}
           >
             저장하기
           </Button>
