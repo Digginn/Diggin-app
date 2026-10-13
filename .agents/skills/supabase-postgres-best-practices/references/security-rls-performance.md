@@ -40,17 +40,21 @@ security definer
 set search_path = ''
 as $$
   select exists (
-    select 1 from public.team_members
+    select 1 from public.team_members as member
     -- always check the calling user's identity inside the function
-    where team_id = $1 and user_id = (select auth.uid())
+    where member.team_id = $1 and member.user_id = (select auth.uid())
   );
 $$;
 
--- Revoke direct execution from public roles
+-- Remove default access, then allow only the role that evaluates the policy.
 revoke execute on function private.is_team_member(bigint) from PUBLIC, anon, authenticated, service_role;
+grant usage on schema private to authenticated;
+grant execute on function private.is_team_member(bigint) to authenticated;
 
--- Use in policy (indexed lookup, not per-row check)
-create policy team_orders_policy on orders
+-- Keep private outside the Data API's exposed schemas.
+-- This check depends on each row's team_id; it is not a once-per-query initPlan.
+create policy team_orders_policy on public.orders
+  for select to authenticated
   using ((select private.is_team_member(team_id)));
 ```
 

@@ -7,7 +7,7 @@ tags: prepared-statements, connection-pooling, transaction-mode
 
 ## Use Prepared Statements Correctly with Pooling
 
-Prepared statements are tied to individual database connections. In transaction-mode pooling, connections are shared, causing conflicts.
+Prepared statements are tied to individual database connections. Supabase's Supavisor transaction mode does not support named prepared statements. Direct connections and session-mode pooling support them.
 
 **Incorrect (named prepared statements with transaction pooling):**
 
@@ -22,25 +22,23 @@ execute get_user(123);
 
 **Correct (use unnamed statements or session mode):**
 
-```sql
--- Option 1: Use unnamed prepared statements (most ORMs do this automatically)
--- The query is prepared and executed in a single protocol message
-
--- Option 2: Deallocate after use in transaction mode
-prepare get_user as select * from users where id = $1;
-execute get_user(123);
-deallocate get_user;
-
--- Option 3: Use session mode pooling (port 5432 vs 6543)
--- Connection is held for entire session, prepared statements persist
+```javascript
+// node-postgres (pg): omit the query config's `name` to use an unnamed statement.
+await client.query({
+  text: 'select * from public.users where id = $1',
+  values: [123],
+});
 ```
 
-Check your driver settings:
+Alternatively, use a direct connection or session-mode pooling when named prepared statements are required. `DEALLOCATE` after execution does not make them safe in transaction mode: separate statements can be routed to different backend connections.
 
-```sql
--- Many drivers use prepared statements by default
--- Node.js pg: { prepare: false } to disable
--- JDBC: prepareThreshold=0 to disable
+Check your driver settings; they are not interchangeable:
+
+```javascript
+// Postgres.js (also used by Drizzle's postgres-js driver):
+const sql = postgres(connectionString, { prepare: false });
 ```
 
-Reference: [Prepared Statements with Pooling](https://supabase.com/docs/guides/database/connecting-to-postgres#connection-pool-modes)
+For JDBC, set `prepareThreshold=0`. For node-postgres, omit `name`; `prepare: false` is not a node-postgres option. Always keep values parameterized.
+
+References: [Supabase: Disabling Prepared Statements](https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL), [node-postgres: Queries](https://node-postgres.com/features/queries)
