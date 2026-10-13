@@ -129,6 +129,20 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
       assert.equal(screen.props.style.flex, 1);
       assert.ok(!screen.props.className.includes("flex-1"));
       assert.equal(findAll(screen, "CommentInput").length, 1);
+      const initialComments = findAll(render(), "Comment").length;
+      findAll(render(), "CommentInput")[0].props.onChangeText("a".repeat(30) + "\n");
+      findAll(render(), "CommentInput")[0].props.onSend();
+      assert.equal(
+        findAll(render(), "Comment").length,
+        initialComments,
+        "줄바꿈 포함 31자는 등록하지 않는다",
+      );
+      assert.equal(
+        findAll(render(), "CommentInput")[0].props.value.length,
+        31,
+        "초과 입력을 유지한다",
+      );
+      findAll(render(), "CommentInput")[0].props.onChangeText("");
       assert.equal(findAll(screen, "ScrollView")[0].props.keyboardShouldPersistTaps, "handled");
       assert.equal(
         findAll(screen, "View").filter((view) => view.props.className === "h-3 w-full bg-gray-100")
@@ -163,6 +177,45 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
       }
     }
   }
+});
+
+test("댓글 30자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {
+  const { CommentInput } = load("../src/components/CommentInput.tsx", {
+    "react": { forwardRef: (render) => render },
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable", TextInput: "TextInput" },
+    "@/assets/images/icon-send.svg": { __esModule: true, default: "SendSvg" },
+    "@/theme": {
+      colors: { gray: { 400: "gray", 900: "black" } },
+      typography: { "label-16-medium": { size: 16 } },
+    },
+  });
+  const longValue = "a".repeat(30) + "\n";
+  let changed;
+  const render = (value) =>
+    CommentInput(
+      {
+        value,
+        onChangeText: (next) => {
+          changed = next;
+        },
+        onSend() {},
+      },
+      null,
+    );
+  const tooLong = render(longValue);
+  assert.equal(findAll(tooLong, "Text")[0].props.children, "댓글은 30자 이하로 입력해 주세요.");
+  assert.ok(
+    findAll(tooLong, "View").some((view) => view.props.className.includes("border-semantic-error")),
+  );
+  assert.equal(findAll(tooLong, "Pressable")[0].props.disabled, true);
+  const field = findAll(tooLong, "TextInput")[0];
+  assert.equal(field.props.value, longValue);
+  assert.equal(field.props.maxLength, undefined, "입력을 잘라내지 않는다");
+  field.props.onChangeText("a".repeat(29) + "\n");
+  const recovered = render(changed);
+  assert.equal(findAll(recovered, "Text").length, 0);
+  assert.equal(findAll(recovered, "Pressable")[0].props.disabled, false);
+  assert.equal(findAll(render(" \n "), "Pressable")[0].props.disabled, true);
 });
 
 test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 교체한다", () => {

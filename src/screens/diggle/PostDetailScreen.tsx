@@ -72,7 +72,6 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const [infoItem, setInfoItem] = useState<PostItem | null>(null);
   // 내 ALL에 저장은 정보 입력 -> 폴더 선택 두 단계로 이어진다.
 
-  const isTooLong = draft.length > COMMENT_MAX_LENGTH;
   const menuComment = comments.find((comment) => comment.id === menuCommentId);
   const visibleComments = comments.filter((comment) => !isBlocked(comment.authorId));
   const isMyPost = post.authorId === CURRENT_USER_ID;
@@ -107,7 +106,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
 
   function submitComment() {
     const body = draft.trim();
-    if (!body) return;
+    if (!body || draft.length > COMMENT_MAX_LENGTH) return;
 
     if (editingComment) {
       const targetId = editingComment.id;
@@ -383,13 +382,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
 
       <View className="w-full">
         {editingComment ? <CommentEditBanner onCancel={cancelEdit} /> : null}
-        <CommentInput
-          ref={inputRef}
-          value={draft}
-          onChangeText={setDraft}
-          errorMessage={isTooLong ? "댓글은 1~30자로 입력해 주세요." : undefined}
-          onSend={submitComment}
-        />
+        <CommentInput ref={inputRef} value={draft} onChangeText={setDraft} onSend={submitComment} />
       </View>
     </KeyboardAvoidingView>
   );
