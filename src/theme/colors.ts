@@ -21,9 +21,11 @@ export const colors = {
     "menu-divider": "#F5F5F4",
   },
   semantic: {
-    link: "#0076AF",
-    error: "#EB2525",
-    focus: "#717171",
+    "link": "#0076AF",
+    "error": "#EB2525",
+    "error-on-dark": "#FF7E7E",
+    "toast": "rgba(93, 93, 93, 0.92)",
+    "focus": "#717171",
   },
   brand: {
     kakao: "#FBE300",
