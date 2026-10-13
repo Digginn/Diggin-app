@@ -10,7 +10,7 @@ import { baseFrame } from "@/theme";
 
 import { OnboardingIllustration } from "./components/OnboardingIllustration";
 
-const AUTO_ADVANCE_DELAYS_MS = [2500, 2500] as const;
+const AUTO_ADVANCE_DELAYS_MS = [2500, 2500, 2500] as const;
 
 const PAGES = [
   {
@@ -24,6 +24,10 @@ const PAGES = [
   {
     mainCopy: "살까 말까,\n혼자 고민하지 마세요.",
     subCopy: "고민되는 아이템을 올리고\n다른 사람들의 선택을 확인해보세요.",
+  },
+  {
+    mainCopy: "기존에 모아둔 아이템,\n그대로 옮겨 오세요.",
+    subCopy: "로그인 후 MY탭에서 위시리스트 CSV 파일로\n저장해둔 아이템을 간편하게 옮겨올 수 있어요.",
   },
 ] as const;
 

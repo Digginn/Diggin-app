@@ -42,7 +42,7 @@ export function PostsProvider({ children }: { children: ReactNode }) {
         items: post.items.slice(0, 1),
         buyCount: 12,
         notCount: 5,
-        myChoice: index === 1 || index === 2 ? "BUY" : null,
+        myChoice: index === 2 ? "BUY" : null,
         ...getVoteTiming(createdAt, now),
       };
     });

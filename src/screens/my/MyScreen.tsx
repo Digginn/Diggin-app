@@ -37,11 +37,12 @@ function MySection({ title, Icon, rows }: MySectionProps) {
 }
 
 type MyScreenProps = {
+  isGuest?: boolean;
   onLogout?: () => Promise<void>;
   onWithdraw?: (survey: WithdrawalSurvey) => Promise<void>;
 };
 
-export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
+export function MyScreen({ isGuest = false, onLogout, onWithdraw }: MyScreenProps = {}) {
   const router = useRouter();
   const [modalToast, setModalToast] = useState<string>();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
@@ -88,11 +89,15 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
       onLongPress: __DEV__ ? () => router.push("/customer-support" as Href) : undefined,
     },
     { label: "이용약관", onPress: () => router.push("/terms" as Href) },
-    {
-      label: "CSV 파일로 위시 아이템 불러오기",
-      onPress: () => router.push("/csv-import" as Href),
-      onLongPress: __DEV__ ? () => router.push("/csv-import-preview" as Href) : undefined,
-    },
+    ...(!isGuest
+      ? [
+          {
+            label: "CSV 파일로 위시 아이템 불러오기",
+            onPress: () => router.push("/csv-import" as Href),
+            onLongPress: __DEV__ ? () => router.push("/csv-import-preview" as Href) : undefined,
+          },
+        ]
+      : []),
     { label: "앱 정보", value: "1.0.0 (100)", hasChevron: false },
   ];
   const settingsRows: MyMenuRow[] = [
@@ -121,13 +126,17 @@ export function MyScreen({ onLogout, onWithdraw }: MyScreenProps = {}) {
         <MySection
           title="프로필"
           Icon={IconMyProfile}
-          rows={[
-            { label: "프로필 수정", onPress: () => router.push("/profile-edit" as Href) },
-            { label: "내 활동", onPress: () => router.push("/my-activity" as Href) },
-          ]}
+          rows={
+            isGuest
+              ? [{ label: "로그인", onPress: () => router.push("/login") }]
+              : [
+                  { label: "프로필 수정", onPress: () => router.push("/profile-edit" as Href) },
+                  { label: "내 활동", onPress: () => router.push("/my-activity" as Href) },
+                ]
+          }
         />
         <MySection title="고객지원" Icon={IconMySupport} rows={supportRows} />
-        <MySection title="설정" Icon={IconMySettings} rows={settingsRows} />
+        {!isGuest && <MySection title="설정" Icon={IconMySettings} rows={settingsRows} />}
       </ScrollView>
       <LogoutModal
         isVisible={isLogoutOpen}

@@ -15,8 +15,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { IconProfileCamera, IconProfileKakao, ImageProfilePlaceholder } from "@/assets/images/my";
+import { IconProfileCamera, ImageProfilePlaceholder } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
+import { AuthProviderIcon, type AuthProvider } from "@/components/AuthProviderIcon";
 import { Button } from "@/components/Button";
 import { HelperText, TextField } from "@/components/Field";
 import { useToast } from "@/hooks/useToast";
@@ -27,11 +28,18 @@ import { NICKNAME_HELPER_MESSAGE, validateNickname } from "./utils/validateNickn
 const Image = cssInterop(ExpoImage, { className: "style" });
 
 type ProfileEditScreenProps = {
+  authProvider?: AuthProvider;
   onSaveNickname?: (nickname: string) => Promise<void>;
   onSavePhoto?: (uri: string) => Promise<void>;
 };
 
-export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditScreenProps = {}) {
+const AUTH_PROVIDER_LABELS = { kakao: "카카오", google: "Google", apple: "Apple" } as const;
+
+export function ProfileEditScreen({
+  authProvider = "kakao",
+  onSaveNickname,
+  onSavePhoto,
+}: ProfileEditScreenProps = {}) {
   const router = useRouter();
   const showToast = useToast();
   const insets = useSafeAreaInsets();
@@ -179,8 +187,10 @@ export function ProfileEditScreen({ onSaveNickname, onSavePhoto }: ProfileEditSc
         <View className="mt-5 h-12 flex-row items-center justify-between border-b border-gray-300">
           <Text className="text-gray-800 font-label-14">가입 수단</Text>
           <View className="flex-row items-center gap-1">
-            <Image source={IconProfileKakao} contentFit="contain" className="h-[15px] w-[15px]" />
-            <Text className="text-gray-600 font-b3">카카오 간편 인증</Text>
+            <AuthProviderIcon provider={authProvider} />
+            <Text className="text-gray-600 font-b3">
+              {AUTH_PROVIDER_LABELS[authProvider]} 간편 인증
+            </Text>
           </View>
         </View>
       </ScrollView>

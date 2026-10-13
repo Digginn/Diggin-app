@@ -4,6 +4,7 @@ import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from "r
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
+import { useBrowsingMode } from "@/contexts/BrowsingModeContext";
 
 type OnboardingFinishScreenProps = {
   mode: "guest" | "signed-up";
@@ -54,6 +55,7 @@ export function OnboardingFinishScreen({ mode }: OnboardingFinishScreenProps) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isGuest = mode === "guest";
+  const { setIsGuest } = useBrowsingMode();
 
   return (
     <>
@@ -85,7 +87,10 @@ export function OnboardingFinishScreen({ mode }: OnboardingFinishScreenProps) {
             <Button
               size="large"
               className="rounded-field"
-              onPress={() => router.replace("/(tabs)/all")}
+              onPress={() => {
+                setIsGuest(isGuest);
+                router.replace("/(tabs)/all");
+              }}
             >
               {isGuest ? "둘러보기" : "시작하기"}
             </Button>

@@ -54,13 +54,7 @@ export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) 
                   isLeading ? "bg-gray-900" : "bg-gray-300",
                 )}
                 style={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }}
-              >
-                {isLeading ? (
-                  <Text className="absolute right-4 top-3 text-gray-0 font-label-16-semibold">
-                    {count}명
-                  </Text>
-                ) : null}
-              </View>
+              />
               <View className="absolute bottom-0 left-4 top-0 flex-row items-center gap-1.5">
                 <Text
                   className={clsx(
@@ -81,22 +75,22 @@ export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) 
                   </Text>
                 ) : null}
               </View>
-              {!isLeading ? (
-                <Text className="absolute right-6 top-3 text-gray-900 font-label-16-semibold">
+              <View className="absolute bottom-0 right-4 top-0 justify-center">
+                <Text className="bg-gray-100 text-gray-900 font-label-16-semibold">
                   {count}명
                 </Text>
-              ) : null}
+              </View>
             </Pressable>
           );
         })
       ) : (
-        <View className="flex-row gap-3">
+        <View className="w-full gap-3">
           {CHOICES.map((choice) => (
             <Pressable
               key={choice}
               accessibilityRole="button"
               accessibilityLabel={choice}
-              className="h-12 flex-1 items-center justify-center rounded bg-gray-100 active:opacity-75"
+              className="h-12 w-full items-center justify-center rounded bg-gray-100 active:opacity-75"
               onPress={() => onChoose(choice)}
             >
               <Text className="text-gray-900 font-label-16-semibold">{choice}</Text>

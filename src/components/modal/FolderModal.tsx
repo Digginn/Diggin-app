@@ -39,7 +39,12 @@ export function FolderModal({
   onSave,
 }: FolderModalProps) {
   return (
-    <Modal visible={visible} onRequestClose={onRequestClose} onDismiss={onDismiss}>
+    <Modal
+      visible={visible}
+      onRequestClose={onRequestClose}
+      onDismiss={onDismiss}
+      className="px-2.5 pb-4 pt-[18px]"
+    >
       <View className="w-full items-center gap-1">
         <View className="flex-row items-start justify-center gap-1">
           {productName ? (

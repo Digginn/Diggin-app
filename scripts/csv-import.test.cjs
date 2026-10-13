@@ -131,16 +131,24 @@ test("CSV 대문자 확장자를 허용하고 선택한 파일을 부모 콜백�
 });
 
 test("파일 선택 취소는 콜백이나 오류 안내 없이 종료한다", async () => {
-  const { select, alerts } = setup(async () => ({ canceled: true, assets: null }));
+  const { select, alerts, toasts } = setup(async () => ({ canceled: true, assets: null }));
   await select({ onSelectCsv: () => assert.fail("취소된 파일을 전달하면 안 됩니다") });
   assert.equal(alerts.length, 0);
+  assert.equal(toasts.length, 0);
 });
 
 test("CSV가 아닌 파일과 비어 있는 선택 결과는 저장 콜백으로 넘기지 않는다", async () => {
-  for (const assets of [[{ name: "wishlist.csv.exe" }], []]) {
-    const { select, alerts } = setup(async () => ({ canceled: false, assets }));
+  for (const assets of [
+    [{ name: "wishlist.csv.exe" }],
+    [{ name: "photo.jpg" }],
+    [{ name: "wishlist.xlsx" }],
+    [],
+  ]) {
+    const { select, alerts, toasts, selecting } = setup(async () => ({ canceled: false, assets }));
     await select({ onSelectCsv: () => assert.fail("잘못된 파일을 전달하면 안 됩니다") });
-    assert.equal(alerts[0][0], "파일 형식 확인");
+    assert.equal(alerts.length, 0);
+    assert.deepEqual(toasts, [["CSV 파일만 가져올 수 있습니다.", "error"]]);
+    assert.deepEqual(selecting, [true, false]);
   }
 });
 
