@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, View } from "react-native";
 
-import { IconNotification, IconSearch } from "@/assets/images/appbar";
+import { IconNotification } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { Fab } from "@/components/Fab";
@@ -44,12 +44,7 @@ export function DiggleScreen() {
     <View className="flex-1 bg-gray-0">
       <AppBar
         left="logo"
-        right={
-          <>
-            <AppBar.IconButton icon={IconSearch} accessibilityLabel="검색" />
-            <AppBar.IconButton icon={IconNotification} accessibilityLabel="알림" />
-          </>
-        }
+        right={<AppBar.IconButton icon={IconNotification} accessibilityLabel="알림" />}
       />
       <TopTab items={TABS} activeKey={tab} onChange={(key) => router.setParams({ tab: key })} />
 
