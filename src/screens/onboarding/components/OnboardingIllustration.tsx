@@ -15,12 +15,16 @@ import Animated, {
 } from "react-native-reanimated";
 
 import CoupangIcon from "@/assets/images/icon-onboarding-coupang.svg";
+import CsvAppIcon from "@/assets/images/icon-onboarding-csv-app.svg";
 import HouseIcon from "@/assets/images/icon-onboarding-house.svg";
 import InstagramIcon from "@/assets/images/icon-onboarding-instagram.svg";
 import KakaoIcon from "@/assets/images/icon-onboarding-kakao.svg";
 import KurlyIcon from "@/assets/images/icon-onboarding-kurly.svg";
 import NaverIcon from "@/assets/images/icon-onboarding-naver.svg";
 import PhotoIcon from "@/assets/images/icon-onboarding-photo.svg";
+import { IconMySupport, IconMyChevron } from "@/assets/images/my";
+import CsvGlow from "@/assets/images/onboarding-csv-glow.svg";
+import CsvTap from "@/assets/images/onboarding-csv-tap.svg";
 import FolderFront from "@/assets/images/onboarding-folder-front.svg";
 
 // Figma의 세 일러스트는 같은 3.6초 타임라인을 반복한다.
@@ -279,19 +283,237 @@ function VoteIllustration({ time }: { time: SharedValue<number> }) {
   );
 }
 
+type CsvKeyframe = readonly [number, number, ((value: number) => number)?];
+const CSV_EASE_IN = Easing.bezierFn(0.42, 0, 1, 1);
+const CSV_COLLAPSE = Easing.bezierFn(0.55, 0, 0.85, 0.4);
+const CSV_MENU_EASE = Easing.bezierFn(0.4, 0, 0.2, 1);
+const CSV_ICON_MOVE = Easing.bezierFn(0.65, 0, 0.35, 1);
+const CSV_ICON_EXIT = Easing.bezierFn(0.5, 0, 0.9, 0.6);
+// Figma의 CSS linear()로 내보낸 스프링 곡선을 그대로 보간한다.
+const CSV_SPRING = [
+  0, 0.0242, 0.0871, 0.1757, 0.2793, 0.3892, 0.4987, 0.6028, 0.6982, 0.7827, 0.8552, 0.9156, 0.9641,
+  1.0017, 1.0295, 1.0486, 1.0606, 1.0666, 1.068, 1.0659, 1.0613, 1.0551, 1.048, 1.0405, 1.0331,
+  1.026, 1.0197, 1.014, 1.0092, 1.0052, 1.002, 0.9996, 0.9978, 0.9965, 0.9958, 0.9954, 0.9954,
+  0.9955, 0.9959, 0.9963, 0.9968, 0.9973, 0.9978, 0.9983, 0.9987, 0.9991, 0.9994, 0.9997, 0.9999,
+  1.0001, 1.0002,
+];
+
+function csvSpring(value: number) {
+  "worklet";
+  const position = value * (CSV_SPRING.length - 1);
+  const index = Math.min(Math.floor(position), CSV_SPRING.length - 2);
+  return CSV_SPRING[index] + (CSV_SPRING[index + 1] - CSV_SPRING[index]) * (position - index);
+}
+
+function csvTrack(time: number, frames: readonly CsvKeyframe[]) {
+  "worklet";
+  for (let index = 1; index < frames.length; index++) {
+    const [end, to] = frames[index];
+    const [start, from, ease = Easing.linear] = frames[index - 1];
+    if (time <= end) {
+      const value = Math.max(0, Math.min(1, (time - start) / (end - start)));
+      return from + (to - from) * ease(value);
+    }
+  }
+  return frames[frames.length - 1][1];
+}
+
+function CsvIllustration({ time }: { time: SharedValue<number> }) {
+  const fileStyle = useAnimatedStyle(() => ({
+    opacity: csvTrack(time.value, [
+      [0, 0],
+      [900, 0, EASE_OUT],
+      [1300, 1],
+      [2500, 1, CSV_EASE_IN],
+      [2680, 0],
+    ]),
+    transform: [
+      {
+        translateY: csvTrack(time.value, [
+          [0, -28],
+          [900, -28, EASE_OUT],
+          [1450, 0],
+          [2100, 0, EASE_OUT],
+          [2220, -8, CSV_COLLAPSE],
+          [2680, 95],
+        ]),
+      },
+      {
+        rotate: `${csvTrack(time.value, [
+          [0, 0],
+          [2220, 0, CSV_EASE_IN],
+          [2680, 0.14],
+        ])}rad`,
+      },
+      {
+        scale: csvTrack(time.value, [
+          [0, 1],
+          [2100, 1, EASE_OUT],
+          [2220, 1.04, CSV_COLLAPSE],
+          [2680, 0.12],
+        ]),
+      },
+    ],
+  }));
+  const menuStyle = useAnimatedStyle(() => ({
+    opacity: csvTrack(time.value, [
+      [0, 1],
+      [3000, 1, CSV_MENU_EASE],
+      [3450, 0],
+      [4150, 0, EASE_OUT],
+      [4600, 1],
+    ]),
+    transform: [
+      {
+        translateY: csvTrack(time.value, [
+          [0, 0],
+          [3000, 0, CSV_MENU_EASE],
+          [3450, -12],
+          [4150, -20, EASE_OUT],
+          [4600, 0],
+        ]),
+      },
+    ],
+  }));
+  const iconStyle = useAnimatedStyle(() => ({
+    opacity: csvTrack(time.value, [
+      [0, 0],
+      [900, 0, EASE_OUT],
+      [1300, 1],
+      [3950, 1, CSV_ICON_EXIT],
+      [4400, 0],
+    ]),
+    transform: [
+      {
+        translateY: csvTrack(time.value, [
+          [0, -28],
+          [900, -28, EASE_OUT],
+          [1450, 0],
+          [3000, 0, CSV_ICON_MOVE],
+          [3550, -125],
+          [3950, -125, CSV_ICON_EXIT],
+          [4400, 70],
+        ]),
+      },
+      {
+        scale: csvTrack(time.value, [
+          [0, 1],
+          [2620, 1, EASE_OUT],
+          [2760, 1.12, csvSpring],
+          [3150, 1],
+          [3950, 1, CSV_ICON_EXIT],
+          [4400, 0.9],
+        ]),
+      },
+    ],
+  }));
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: csvTrack(time.value, [
+      [0, 0],
+      [900, 0, EASE_OUT],
+      [1450, 0.7],
+      [2150, 0.7, CSV_EASE_IN],
+      [2450, 0],
+    ]),
+  }));
+  const tapStyle = useAnimatedStyle(() => ({
+    opacity: csvTrack(time.value, [
+      [0, 0],
+      [550, 0, EASE_OUT],
+      [650, 0.5, EASE_OUT],
+      [1000, 0],
+    ]),
+    transform: [
+      {
+        scale: csvTrack(time.value, [
+          [0, 0.5],
+          [550, 0.5, EASE_OUT],
+          [1000, 1.2],
+        ]),
+      },
+    ],
+  }));
+  return (
+    <>
+      <AnimatedView className="absolute left-[165px] top-[210px]" style={glowStyle}>
+        <CsvGlow />
+      </AnimatedView>
+      <AnimatedView
+        className="absolute left-20 top-[143px] h-[171.478px] w-[136px] rounded-[17.739px] bg-gray-0"
+        style={[{ boxShadow: "0px 5.913px 11.826px rgba(0,0,0,0.06)" }, fileStyle]}
+      >
+        <View className="absolute left-[14.783px] top-[14.783px] rounded-[13.304px] bg-gray-900 px-[13.304px] py-[4.435px]">
+          <Text className="text-gray-0 font-nickname" style={{ includeFontPadding: false }}>
+            CSV
+          </Text>
+        </View>
+        {[0, 1, 2, 3].map((row) =>
+          [0, 1].map((column) => (
+            <View
+              key={`${row}-${column}`}
+              className={
+                row === 0
+                  ? "absolute rounded-[4.435px] bg-gray-300"
+                  : "absolute rounded-[4.435px] bg-gray-200"
+              }
+              style={{
+                left: column === 0 ? 14.783 : 70.957,
+                top: 62.087 + row * 25.13,
+                width: column === 0 ? 44.348 : 56.174,
+                height: 14.783,
+              }}
+            />
+          )),
+        )}
+      </AnimatedView>
+      <AnimatedView
+        className="absolute left-6 top-[27px] h-24 w-[248px] rounded-2xl bg-gray-0 p-3"
+        style={menuStyle}
+      >
+        <View className="gap-2.5">
+          <View className="flex-row items-start gap-2">
+            <IconMySupport width={24} height={24} />
+            <Text
+              className="text-gray-900 font-label-16-semibold"
+              style={{ includeFontPadding: false }}
+            >
+              고객지원
+            </Text>
+          </View>
+          <View className="h-0.5 w-full bg-gray-900" />
+        </View>
+        <View className="h-12 flex-row items-center justify-between pl-2">
+          <Text className="text-gray-800 font-b4" style={{ includeFontPadding: false }}>
+            CSV 파일로 위시 아이템 불러오기
+          </Text>
+          <View className="-scale-x-100">
+            <IconMyChevron width={18} height={18} />
+          </View>
+        </View>
+        <AnimatedView className="absolute left-[202px] top-[54px]" style={tapStyle}>
+          <CsvTap />
+        </AnimatedView>
+      </AnimatedView>
+      <AnimatedView
+        className="absolute left-[105px] top-[280px] size-[86px] overflow-hidden rounded-[21.5px]"
+        style={[{ boxShadow: "0px 5.375px 8.063px rgba(0,0,0,0.12)" }, iconStyle]}
+      >
+        <CsvAppIcon />
+      </AnimatedView>
+    </>
+  );
+}
+
 export function OnboardingIllustration({ page }: { page: number }) {
   const time = useSharedValue(0);
   const isReducedMotion = useReducedMotion();
+  const duration = page === 3 ? 4750 : DURATION_MS;
   useEffect(() => {
-    time.value = isReducedMotion ? DURATION_MS : 0;
+    time.value = isReducedMotion ? (page === 3 ? 1700 : DURATION_MS) : 0;
     if (!isReducedMotion)
-      time.value = withRepeat(
-        withTiming(DURATION_MS, { duration: DURATION_MS, easing: Easing.linear }),
-        -1,
-        false,
-      );
+      time.value = withRepeat(withTiming(duration, { duration, easing: Easing.linear }), -1, false);
     return () => cancelAnimation(time);
-  }, [page, isReducedMotion, time]);
+  }, [page, duration, isReducedMotion, time]);
   return (
     <View
       accessible={false}
@@ -303,8 +525,10 @@ export function OnboardingIllustration({ page }: { page: number }) {
         <PhoneIllustration time={time} />
       ) : page === 1 ? (
         <FolderIllustration time={time} />
-      ) : (
+      ) : page === 2 ? (
         <VoteIllustration time={time} />
+      ) : (
+        <CsvIllustration time={time} />
       )}
     </View>
   );
