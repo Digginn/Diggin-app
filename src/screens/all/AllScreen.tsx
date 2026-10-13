@@ -65,7 +65,9 @@ export function AllScreen() {
 
   // 선택 모드에서는 DeleteBar 가 탭바 자리를 대신한다.
   useLayoutEffect(() => {
-    navigation.setOptions({ tabBarStyle: isSelectMode ? { display: "none" } : undefined });
+    navigation
+      .getParent()
+      ?.setOptions({ tabBarStyle: isSelectMode ? { display: "none" } : undefined });
   }, [navigation, isSelectMode]);
 
   function exitSelectMode() {
@@ -114,7 +116,7 @@ export function AllScreen() {
               <AppBar.IconButton
                 icon={IconSearch}
                 accessibilityLabel="검색"
-                onPress={() => router.push("/search")}
+                onPress={() => router.push("/all/search")}
               />
               <AppBar.IconButton
                 icon={IconNotification}
