@@ -92,7 +92,7 @@ export function CsvImportScreen({
       if (result.canceled || !isMounted.current) return;
       const file = result.assets[0];
       if (!file || !/\.csv$/i.test(file.name)) {
-        Alert.alert("파일 형식 확인", "CSV 파일을 선택해 주세요.");
+        showToast("CSV 파일만 가져올 수 있습니다.", "error");
         return;
       }
       if (onSelectCsv) {
