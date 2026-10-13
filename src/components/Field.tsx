@@ -139,11 +139,14 @@ export function TextField({
   const { inputValue, handleChangeText } = useInputValue(value, defaultValue, onChangeText);
   const isActive = isFocused || inputValue.length > 0;
   const scroll = useScrollIndicator();
+  const isDisabled = props.editable === false;
   const borderClassName = isError
     ? "border-semantic-error"
-    : isActive
-      ? "border-semantic-focus"
-      : "border-gray-350";
+    : isDisabled
+      ? "border-gray-300"
+      : isActive
+        ? "border-semantic-focus"
+        : "border-gray-350";
 
   // 자라는 칸은 세로 가운데가 아니라 위에서부터 쌓인다.
   const frameClassName = growsTo ? "items-start py-2.5" : "h-11 items-center";
@@ -153,14 +156,14 @@ export function TextField({
 
   return (
     <View
-      className={`w-full flex-row rounded-field border bg-gray-0 px-4 ${frameClassName} ${borderClassName} ${className ?? ""}`}
+      className={`w-full flex-row rounded-field border ${isDisabled ? "bg-gray-100" : "bg-gray-0"} px-4 ${frameClassName} ${borderClassName} ${className ?? ""}`}
       style={growsTo ? { minHeight: FIELD_HEIGHT, maxHeight: growsTo } : undefined}
     >
       <TextInput
         ref={inputRef}
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? placeholder}
-        className={`flex-1 p-0 text-gray-900 ${fontClassName} ${inputClassName ?? ""}`}
+        className={`flex-1 p-0 ${isDisabled ? "text-gray-500" : "text-gray-900"} ${fontClassName} ${inputClassName ?? ""}`}
         cursorColor={colors.semantic.focus}
         multiline={growsTo ? true : props.multiline}
         onBlur={(event) => {
