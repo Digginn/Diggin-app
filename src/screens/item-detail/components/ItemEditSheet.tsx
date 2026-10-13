@@ -31,6 +31,7 @@ type Anchor = { x: number; y: number; width: number; height: number };
 
 export type ItemEditValues = {
   name: string;
+  brand: string;
   price: string;
   sourceUrl: string;
   thumbnailUrl: string | null;
@@ -167,13 +168,24 @@ export function ItemEditSheet({
                 <TextField growsTo={88} value={values.name} onChangeText={update("name")} />
               </View>
 
-              <View className="gap-2">
-                <Text className="text-gray-900 font-b3">가격</Text>
-                <TextField
-                  keyboardType="number-pad"
-                  value={values.price}
-                  onChangeText={update("price")}
-                />
+              <View className="flex-row gap-gutter">
+                <View className="min-w-0 flex-1 gap-2">
+                  <Text className="text-gray-900 font-b3">브랜드명</Text>
+                  <TextField
+                    accessibilityLabel="브랜드명"
+                    value={values.brand}
+                    onChangeText={update("brand")}
+                  />
+                </View>
+                <View className="min-w-0 flex-1 gap-2">
+                  <Text className="text-gray-900 font-b3">가격</Text>
+                  <TextField
+                    accessibilityLabel="가격"
+                    keyboardType="number-pad"
+                    value={values.price}
+                    onChangeText={update("price")}
+                  />
+                </View>
               </View>
 
               <View className="gap-2">
