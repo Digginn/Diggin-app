@@ -22,23 +22,27 @@ export const CommentInput = forwardRef<TextInput, CommentInputProps>(function Co
   { value, onChangeText, onSend, placeholder = "댓글을 입력해 주세요. (최대 30자)", errorMessage },
   ref,
 ) {
-  const canSend = value.length > 0 && !errorMessage;
+  const validationError =
+    value.length > COMMENT_MAX_LENGTH ? "댓글은 30자 이하로 입력해 주세요." : errorMessage;
+  const canSend = value.trim().length > 0 && !validationError;
 
   return (
     <View
       className={clsx(
         "w-full overflow-hidden border-t border-gray-200 bg-gray-0 px-margin pb-10 pt-3",
-        errorMessage ? "items-start gap-2" : "items-start justify-center",
+        validationError ? "items-start gap-2" : "items-start justify-center",
       )}
     >
-      {errorMessage ? (
-        <Text className="w-full text-semantic-error font-note">{errorMessage}</Text>
+      {validationError ? (
+        <Text accessibilityLiveRegion="polite" className="w-full text-semantic-error font-note">
+          {validationError}
+        </Text>
       ) : null}
 
       <View
         className={clsx(
           "min-h-12 w-full flex-row items-center justify-between rounded border-field bg-gray-0 pl-4 pr-1",
-          errorMessage ? "border-semantic-error" : value ? "border-gray-600" : "border-gray-300",
+          validationError ? "border-semantic-error" : value ? "border-gray-600" : "border-gray-300",
         )}
       >
         <TextInput

@@ -26,7 +26,6 @@ export type PostComment = {
   timeLabel: string;
   isMine: boolean;
   isDeleted?: boolean;
-  vote?: "buy" | "not";
 };
 
 export type PostDetail = {

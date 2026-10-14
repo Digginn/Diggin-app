@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 
 import { BlockedUsersProvider } from "@/contexts/BlockedUsersContext";
+import { BrowsingModeProvider } from "@/contexts/BrowsingModeContext";
 import { PostDraftProvider } from "@/contexts/PostDraftContext";
 import { PostsProvider } from "@/contexts/PostsContext";
 import { ToastProvider } from "@/contexts/ToastContext";
@@ -28,18 +29,20 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <ToastProvider>
-      <BlockedUsersProvider>
-        <PostDraftProvider>
-          <PostsProvider>
-            <StatusBar style="auto" />
-            <Stack screenOptions={{ headerShown: false }}>
-              {/* 게시글 상세에서 아래에서 위로 올라오며 들어온다. */}
-              <Stack.Screen name="posts/save" options={{ animation: "slide_from_bottom" }} />
-            </Stack>
-          </PostsProvider>
-        </PostDraftProvider>
-      </BlockedUsersProvider>
-    </ToastProvider>
+    <BrowsingModeProvider>
+      <ToastProvider>
+        <BlockedUsersProvider>
+          <PostDraftProvider>
+            <PostsProvider>
+              <StatusBar style="auto" />
+              <Stack screenOptions={{ headerShown: false }}>
+                {/* 게시글 상세에서 아래에서 위로 올라오며 들어온다. */}
+                <Stack.Screen name="posts/save" options={{ animation: "slide_from_bottom" }} />
+              </Stack>
+            </PostsProvider>
+          </PostDraftProvider>
+        </BlockedUsersProvider>
+      </ToastProvider>
+    </BrowsingModeProvider>
   );
 }

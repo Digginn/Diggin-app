@@ -53,11 +53,10 @@ export function ActionModal({
       onShow={onShow}
       onDismiss={onDismiss}
       overlay={overlay}
+      className={hasTallHeader ? undefined : "px-2.5 pb-4 pt-2"}
     >
-      <View
-        className={`w-[295px] items-center gap-[30px] ${hasCloseButton || hasTallHeader ? "-mt-2" : ""}`}
-      >
-        <View className={`w-[295px] items-center gap-1 ${hasCloseButton ? "pt-2.5" : ""}`}>
+      <View className={`w-[295px] items-center gap-[30px] ${hasTallHeader ? "-mt-2" : ""}`}>
+        <View className={`w-[295px] items-center gap-1 ${hasTallHeader ? "" : "pt-2.5"}`}>
           {hasCloseButton ? (
             <>
               <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>

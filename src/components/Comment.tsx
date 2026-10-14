@@ -10,20 +10,13 @@ const KEBAB_SIZE = 16;
 const URL_SPLIT = /(https?:\/\/[^\s]+)/g;
 const IS_URL = /^https?:\/\//;
 
-export type CommentVote = "none" | "buy" | "not";
 export type MenuAnchor = { x: number; y: number; width: number; height: number };
-
-const BADGE_LABELS: Record<Exclude<CommentVote, "none">, string> = {
-  buy: "BUY",
-  not: "NOT",
-};
 
 type CommentProps = {
   /** 글쓴이는 익명번호를 세지 않음. 익1 - 글쓴이 - 익2 */
   author: string;
   body: string;
   timeLabel: string;
-  vote?: CommentVote;
   isHighlighted?: boolean;
   /** 삭제된 댓글은 본문을 대체하고 메뉴를 막음 */
   isDeleted?: boolean;
@@ -51,12 +44,10 @@ export function Comment({
   author,
   body,
   timeLabel,
-  vote = "none",
   isHighlighted = false,
   isDeleted = false,
   onPressMenu,
 }: CommentProps) {
-  const badge = vote === "none" ? null : vote;
   const kebabRef = useRef<View>(null);
 
   function handlePressMenu() {
@@ -73,18 +64,6 @@ export function Comment({
       <View className="w-full flex-row items-center justify-between pl-margin pr-2">
         <View className="flex-row items-center gap-1">
           <Text className="text-gray-600 font-label-14">{author}</Text>
-          {badge ? (
-            <View
-              className={clsx(
-                "items-center overflow-hidden rounded px-1.5 py-0.5",
-                badge === "buy" ? "bg-gray-900" : "bg-gray-200",
-              )}
-            >
-              <Text className={clsx("font-tag", badge === "buy" ? "text-gray-0" : "text-gray-800")}>
-                {BADGE_LABELS[badge]}
-              </Text>
-            </View>
-          ) : null}
           <Text className="text-gray-500 font-label-12-regular">·</Text>
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>

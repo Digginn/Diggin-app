@@ -151,6 +151,37 @@ test("MY는 활동을 프로필의 2depth로 옮기고 CSV를 고객지원에 �
   assert.equal(context.routes[1], "/csv-import");
 });
 
+test("비로그인 MY는 로그인과 고객지원만 제공한다", async () => {
+  const context = setup("MyScreen");
+  const nodes = descendants(context.Screen({ isGuest: true }));
+  const sections = nodes.filter((node) => node.props.rows && node.props.title);
+  assert.deepEqual(
+    sections.map((node) => node.props.title),
+    ["프로필", "고객지원"],
+  );
+  const profileRows = sections[0].props.rows;
+  assert.deepEqual(
+    Array.from(profileRows, (row) => row.label),
+    ["로그인"],
+  );
+  profileRows[0].onPress();
+  assert.equal(context.routes.at(-1), "/login");
+  const supportRows = sections[1].props.rows;
+  assert.deepEqual(
+    Array.from(supportRows, (row) => row.label),
+    ["1:1 문의", "이용약관", "앱 정보"],
+  );
+  await supportRows[0].onPress();
+  assert.deepEqual(context.opened, [CHANNEL_URL]);
+  supportRows[1].onPress();
+  assert.equal(context.routes.at(-1), "/terms");
+  assert.equal(supportRows[2].hasChevron, false);
+  assert.equal(
+    nodes.some((node) => node.props.isVisible),
+    false,
+  );
+});
+
 test("내 활동은 쓴 글과 좋아요한 글만 표시하고 쓴 글 목록으로 이동한다", () => {
   const context = setup("MyActivityScreen");
   const nodes = descendants(context.Screen());

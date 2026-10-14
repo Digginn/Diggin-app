@@ -64,7 +64,6 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
           },
           useRef: (initial) => ({ current: initial }),
         },
-        "expo-blur": { BlurTargetView: "BlurTargetView" },
         "react-native": {
           KeyboardAvoidingView: "KeyboardAvoidingView",
           Platform: { OS: os },
@@ -107,7 +106,6 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
         "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
         "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
         "./components/VoteBlock": { VoteBlock: "VoteBlock" },
-        "./components/VoteReasonScreen": { VoteReasonScreen: "VoteReasonScreen" },
         "./utils/voteTiming": load("../src/screens/diggle/utils/voteTiming.ts", {}),
         "./constants/mockPosts": {
           CURRENT_USER_ID: "me",
@@ -131,6 +129,20 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
       assert.equal(screen.props.style.flex, 1);
       assert.ok(!screen.props.className.includes("flex-1"));
       assert.equal(findAll(screen, "CommentInput").length, 1);
+      const initialComments = findAll(render(), "Comment").length;
+      findAll(render(), "CommentInput")[0].props.onChangeText("a".repeat(30) + "\n");
+      findAll(render(), "CommentInput")[0].props.onSend();
+      assert.equal(
+        findAll(render(), "Comment").length,
+        initialComments,
+        "줄바꿈 포함 31자는 등록하지 않는다",
+      );
+      assert.equal(
+        findAll(render(), "CommentInput")[0].props.value.length,
+        31,
+        "초과 입력을 유지한다",
+      );
+      findAll(render(), "CommentInput")[0].props.onChangeText("");
       assert.equal(findAll(screen, "ScrollView")[0].props.keyboardShouldPersistTaps, "handled");
       assert.equal(
         findAll(screen, "View").filter((view) => view.props.className === "h-3 w-full bg-gray-100")
@@ -138,135 +150,72 @@ test("게시글·투표 상세는 iOS padding과 Android height로 댓글 입력
         1,
       );
       if (type === "vote") {
-        findAll(render(), "VoteBlock")[0].props.onChoose("BUY");
-        assert.equal(findAll(render(), "VoteReasonScreen")[0].props.choice, "BUY");
-        findAll(render(), "VoteReasonScreen")[0].props.onClose();
-        assert.equal(findAll(render(), "VoteReasonScreen").length, 0);
-        assert.equal(post.myChoice, null, "X는 투표 선택을 확정하지 않는다");
-        assert.equal(findAll(render(), "Comment").length, 3);
-        findAll(render(), "VoteBlock")[0].props.onChoose("NOT");
-        findAll(render(), "VoteReasonScreen")[0].props.onSubmit("좋은 선택");
-        assert.equal(findAll(render(), "Comment").at(-1).props.body, "좋은 선택");
-        assert.equal(findAll(render(), "Comment").at(-1).props.vote, "not");
-        assert.equal(findAll(render(), "Comment").at(-1).props.author, "디기 3 (나)");
-        assert.equal(findAll(render(), "VoteReasonScreen").length, 0);
-        assert.equal(post.myChoice, "NOT");
-        findAll(render(), "VoteBlock")[0].props.onChoose("BUY");
-        findAll(render(), "VoteReasonScreen")[0].props.onClose();
-        assert.equal(post.myChoice, "NOT");
-        findAll(render(), "VoteBlock")[0].props.onChoose("NOT");
-        assert.equal(findAll(render(), "VoteReasonScreen").length, 0);
-        findAll(render(), "VoteBlock")[0].props.onChoose("BUY");
-        findAll(render(), "VoteReasonScreen")[0].props.onSkip();
+        assert.ok(
+          findAll(render(), "Comment").every((comment) => comment.props.vote === undefined),
+          "이전 투표 댓글 데이터에도 태그를 표시하지 않는다",
+        );
+        const choose = (choice) => findAll(render(), "VoteBlock")[0].props.onChoose(choice);
+        choose("BUY");
+        assert.equal(post.myChoice, "BUY", "선택 즉시 투표한다");
+        assert.equal(findAll(render(), "Comment").length, 3, "이유 댓글을 추가하지 않는다");
+        choose("NOT");
+        assert.equal(post.myChoice, "NOT", "다른 선택지를 누르면 바로 변경한다");
+        choose("BUY");
         assert.equal(post.myChoice, "BUY");
-        assert.equal(findAll(render(), "Comment").length, 4);
+        post.isClosed = true;
+        choose("NOT");
+        assert.equal(post.myChoice, "BUY", "종료된 투표는 변경하지 않는다");
+        post.isClosed = false;
+        post.createdAt = Date.now() - 86400000;
+        choose("NOT");
+        assert.equal(post.myChoice, "BUY", "종료 상태 갱신 전에도 만료를 확인한다");
+        post.createdAt = Date.now();
+        post.authorId = "me";
+        choose("NOT");
+        assert.equal(post.myChoice, "BUY", "자신의 투표에는 참여할 수 없다");
+        assert.equal(findAll(render(), "Comment").length, 3);
       }
     }
   }
 });
 
-test("이유 입력은 BUY/NOT 칩, 30자 제한, 빈 의견 차단과 키보드 높이를 적용한다", () => {
-  for (const os of ["ios", "android"]) {
-    const state = [];
-    let index = 0;
-    let submitted;
-    let closed = 0;
-    const events = {};
-    const { VoteReasonScreen } = load("../src/screens/diggle/components/VoteReasonScreen.tsx", {
-      "react": {
-        useState: (initial) => {
-          const slot = index++;
-          if (!(slot in state)) state[slot] = typeof initial === "function" ? initial() : initial;
-          return [
-            state[slot],
-            (next) => {
-              state[slot] = next;
-            },
-          ];
+test("댓글 30자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {
+  const { CommentInput } = load("../src/components/CommentInput.tsx", {
+    "react": { forwardRef: (render) => render },
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable", TextInput: "TextInput" },
+    "@/assets/images/icon-send.svg": { __esModule: true, default: "SendSvg" },
+    "@/theme": {
+      colors: { gray: { 400: "gray", 900: "black" } },
+      typography: { "label-16-medium": { size: 16 } },
+    },
+  });
+  const longValue = "a".repeat(30) + "\n";
+  let changed;
+  const render = (value) =>
+    CommentInput(
+      {
+        value,
+        onChangeText: (next) => {
+          changed = next;
         },
-        useEffect: (effect) => effect(),
+        onSend() {},
       },
-      "expo-blur": { BlurView: "BlurView" },
-      "react-native": {
-        View: "View",
-        Text: "Text",
-        TextInput: "TextInput",
-        ScrollView: "ScrollView",
-        Pressable: "Pressable",
-        KeyboardAvoidingView: "KeyboardAvoidingView",
-        Platform: { OS: os },
-        Keyboard: {
-          isVisible: () => false,
-          addListener: (name, callback) => {
-            events[name] = callback;
-            return { remove: () => {} };
-          },
-        },
-        BackHandler: {
-          addEventListener: (_, callback) => {
-            events.back = callback;
-            return { remove: () => {} };
-          },
-        },
-      },
-      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) },
-      "@/assets/images/icon-vote-reason-close.svg": { __esModule: true, default: "CloseSvg" },
-      "@/components/Button": { Button: "Button" },
-      "@/components/CommentInput": { COMMENT_MAX_LENGTH: 30 },
-      "@/theme": {
-        colors: { gray: { 400: "#B9B9B9" } },
-        typography: { b2: { size: 15, ratio: 1.4 } },
-      },
-    });
-    const render = (choice = "BUY") => {
-      index = 0;
-      return VoteReasonScreen({
-        choice,
-        blurTarget: { current: null },
-        onClose: () => {
-          closed += 1;
-        },
-        onSkip: () => {
-          closed += 1;
-        },
-        onSubmit: (body) => {
-          submitted = body;
-        },
-      });
-    };
-    const field = () =>
-      findAll(render(), "View").find((view) => view.props.className?.includes("rounded-xl"));
-    assert.equal(findAll(render(), "Button")[0].props.isDisabled, true);
-    assert.ok(field().props.className.includes("h-32"));
-    assert.equal(
-      findAll(render(), "KeyboardAvoidingView")[0].props.behavior,
-      os === "ios" ? "padding" : "height",
+      null,
     );
-    findAll(render(), "TextInput")[0].props.onChangeText("  \n ");
-    assert.equal(findAll(render(), "Button")[0].props.isDisabled, true);
-    findAll(render(), "TextInput")[0].props.onChangeText("😀".repeat(31));
-    assert.equal(
-      Array.from(
-        require("unicode-segmenter/grapheme").splitGraphemes(
-          findAll(render(), "TextInput")[0].props.value,
-        ),
-      ).length,
-      30,
-    );
-    findAll(render(), "Button")[0].props.onPress();
-    assert.equal(submitted, "😀".repeat(30));
-    events[os === "ios" ? "keyboardWillShow" : "keyboardDidShow"]();
-    findAll(render(), "TextInput")[0].props.onFocus();
-    assert.ok(field().props.className.includes("h-24"));
-    assert.ok(field().props.className.includes("border-field"));
-    events[os === "ios" ? "keyboardWillHide" : "keyboardDidHide"]();
-    assert.ok(field().props.className.includes("h-32"));
-    assert.ok(!field().props.className.includes("border-field"));
-    findAll(render("NOT"), "Pressable").at(-1).props.onPress();
-    assert.equal(closed, 1);
-    assert.equal(events.back(), true);
-    assert.equal(closed, 2);
-  }
+  const tooLong = render(longValue);
+  assert.equal(findAll(tooLong, "Text")[0].props.children, "댓글은 30자 이하로 입력해 주세요.");
+  assert.ok(
+    findAll(tooLong, "View").some((view) => view.props.className.includes("border-semantic-error")),
+  );
+  assert.equal(findAll(tooLong, "Pressable")[0].props.disabled, true);
+  const field = findAll(tooLong, "TextInput")[0];
+  assert.equal(field.props.value, longValue);
+  assert.equal(field.props.maxLength, undefined, "입력을 잘라내지 않는다");
+  field.props.onChangeText("a".repeat(29) + "\n");
+  const recovered = render(changed);
+  assert.equal(findAll(recovered, "Text").length, 0);
+  assert.equal(findAll(recovered, "Pressable")[0].props.disabled, false);
+  assert.equal(findAll(render(" \n "), "Pressable")[0].props.disabled, true);
 });
 
 test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 교체한다", () => {

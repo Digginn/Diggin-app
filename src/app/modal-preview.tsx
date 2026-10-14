@@ -10,7 +10,7 @@ function FolderNameField() {
     <View className="w-[295px] gap-2">
       <Text className="text-gray-1000 font-b3">폴더 이름</Text>
       <TextInput
-        className="h-11 rounded-field border border-gray-300 px-4 py-0 text-gray-700 font-label-16-medium"
+        className="h-12 rounded-field border border-gray-300 px-4 py-0 text-gray-700 font-label-16-medium"
         defaultValue="새 폴더"
         textAlignVertical="center"
       />

@@ -23,7 +23,7 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   let cancellations = 0;
   runInNewContext(
     compiled +
-      "\nexports.AppCell=AppCell; exports.ItemTile=ItemTile; exports.ITEMS=ITEMS; exports.VoteResult=VoteResult; exports.FolderIllustration=FolderIllustration;",
+      "\nexports.AppCell=AppCell; exports.ItemTile=ItemTile; exports.ITEMS=ITEMS; exports.VoteResult=VoteResult; exports.FolderIllustration=FolderIllustration; exports.CsvIllustration=CsvIllustration;",
     {
       exports: componentModule.exports,
       module: componentModule,
@@ -65,6 +65,8 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
               cancellations++;
             },
           };
+        if (name === "@/assets/images/my")
+          return { IconMySupport: "SupportSvg", IconMyChevron: "ChevronSvg" };
         if (name.startsWith("@/assets/")) {
           assert.ok(readFileSync(path.join(__dirname, "..", name.slice(2))).length > 0);
           return name.endsWith(".svg") ? { default: () => React.createElement("Svg") } : name;
@@ -126,6 +128,26 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   effect();
   assert.equal(time.value, 3600);
   assert.equal(timings.length, 1, "모션 줄이기에서는 반복 애니메이션을 시작하지 않는다.");
+  OnboardingIllustration({ page: 3 });
+  effect();
+  assert.equal(
+    time.value,
+    1700,
+    "CSV 장은 모션 줄이기에서 파일과 앱 아이콘이 보이는 상태로 유지한다.",
+  );
+  const csv = () =>
+    React.Children.toArray(componentModule.exports.CsvIllustration({ time }).props.children);
+  assert.equal(csv()[1].props.style[1].opacity, 1);
+  assert.equal(csv()[3].props.style[1].opacity, 1);
+  time.value = 2680;
+  assert.equal(csv()[1].props.style[1].opacity, 0);
+  assert.equal(csv()[1].props.style[1].transform[2].scale, 0.12);
+  time.value = 4750;
+  assert.equal(csv()[2].props.style.opacity, 1);
+  isReducedMotion = false;
+  OnboardingIllustration({ page: 3 });
+  effect();
+  assert.equal(timings.at(-1).options.duration, 4750);
 });
 
 test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·접근성 이동을 처리한다", () => {
@@ -170,7 +192,7 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
   });
   function render() {
     const root = componentModule.exports.SwipeCarousel({
-      children: ["1", "2", "3"].map((key) => React.createElement("CardCarousel", { key })),
+      children: ["1", "2", "3", "4"].map((key) => React.createElement("CardCarousel", { key })),
       accessibilityLabel: "서비스 소개",
       onPageChange: (index) => pageChanges.push(index),
     });
@@ -183,8 +205,9 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
   assert.ok(
     React.Children.toArray(tree.root.props.children)[1].props.className.includes("top-[561px]"),
   );
-  assert.equal(Array.from(tree.scroll.props.snapToOffsets).join(","), "0,296,592");
-  assert.equal(React.Children.count(tree.scroll.props.children), 3);
+  assert.equal(Array.from(tree.scroll.props.snapToOffsets).join(","), "0,296,592,888");
+  assert.equal(React.Children.count(tree.scroll.props.children), 4);
+  assert.equal(tree.dots.length, 4);
   assert.equal(tree.dots[0].props.isActive, true);
   tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
   assert.equal(pageChanges.at(-1), 1);
@@ -196,16 +219,20 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
   assert.equal(scrollCalls.at(-1).x, 592);
   tree = render();
   tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
-  assert.equal(activeIndex, 2);
+  assert.equal(activeIndex, 3);
+  tree = render();
+  assert.equal(tree.dots[3].props.isActive, true);
+  tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
+  assert.equal(activeIndex, 3);
   tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "decrement" } });
-  assert.equal(activeIndex, 1);
+  assert.equal(activeIndex, 2);
   tree = render();
   tree.scroll.props.onLayout();
-  assert.equal(scrollCalls.at(-1).x, 296);
+  assert.equal(scrollCalls.at(-1).x, 592);
   tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: -296 } } });
   assert.equal(activeIndex, 0);
   tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 9999 } } });
-  assert.equal(activeIndex, 2);
+  assert.equal(activeIndex, 3);
   assert.equal(componentModule.exports.SwipeCarousel({ children: null }), null);
 });
 
@@ -392,15 +419,20 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
 
   const firstPage = render();
   assert.equal(firstPage.length, 1);
-  assert.equal(Array.from(firstPage[0].props.autoAdvanceDelays).join(","), "2500,2500");
+  assert.equal(Array.from(firstPage[0].props.autoAdvanceDelays).join(","), "2500,2500,2500");
+  const cards = React.Children.toArray(firstPage[0].props.children);
+  assert.equal(cards.length, 4);
+  assert.equal(cards[3].props.mainCopy, "기존에 모아둔 아이템,\n그대로 옮겨 오세요.");
   assert.equal(firstPage[0].props.media.type, "OnboardingIllustration");
   assert.equal(firstPage[0].props.media.props.page, 0);
   for (const card of React.Children.toArray(firstPage[0].props.children))
     assert.equal(card.props.children, undefined, "미디어는 고정하고 문구만 스와이프한다.");
   firstPage[0].props.onPageChange(2);
+  assert.equal(render().length, 1, "세 번째 장에는 시작하기 버튼이 없다.");
+  firstPage[0].props.onPageChange(3);
   const lastPage = render();
   assert.equal(lastPage.length, 2);
-  assert.equal(lastPage[0].props.media.props.page, 2);
+  assert.equal(lastPage[0].props.media.props.page, 3);
   const button = lastPage[1].props.children;
   assert.equal(button.props.children, "시작하기");
   button.props.onPress();
@@ -409,6 +441,7 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
 
 test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰고 각 버튼이 올바르게 이동한다", () => {
   const routes = [];
+  const browsingModes = [];
   const source = readFileSync(
     path.join(__dirname, "../src/screens/onboarding/OnboardingFinishScreen.tsx"),
     "utf8",
@@ -423,6 +456,10 @@ test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰�
     require: (name) => {
       if (name === "expo-router")
         return { useRouter: () => ({ replace: (route) => routes.push(route) }) };
+      if (name === "@/contexts/BrowsingModeContext")
+        return {
+          useBrowsingMode: () => ({ setIsGuest: (isGuest) => browsingModes.push(isGuest) }),
+        };
       if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
       if (name === "react-native-safe-area-context")
         return { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) };
@@ -460,6 +497,7 @@ test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰�
   const guestButton = guest.find((node) => node.type === "Button");
   assert.equal(guestButton.props.children, "둘러보기");
   guestButton.props.onPress();
+  assert.equal(browsingModes.at(-1), true);
   assert.equal(routes.at(-1), "/(tabs)/all");
   guest.find((node) => node.type === "Pressable").props.onPress();
   assert.equal(routes.at(-1), "/login");
@@ -472,6 +510,8 @@ test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰�
     ),
   );
   assert.equal(complete.find((node) => node.type === "Button").props.children, "시작하기");
+  complete.find((node) => node.type === "Button").props.onPress();
+  assert.equal(browsingModes.at(-1), false);
   assert.equal(complete.filter((node) => node.type === "Pressable").length, 0);
   complete.find((node) => node.type === "Button").props.onPress();
   assert.equal(routes.at(-1), "/(tabs)/all");
