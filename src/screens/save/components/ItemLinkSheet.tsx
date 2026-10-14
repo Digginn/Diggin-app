@@ -65,10 +65,7 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
               }}
             />
             {isError ? (
-              <HelperText
-                status="error"
-                message="http 또는 https로 시작하는 아이템 링크를 입력해 주세요."
-              />
+              <HelperText status="error" message="https로 시작하는 아이템 링크를 입력해 주세요." />
             ) : null}
           </View>
         </View>

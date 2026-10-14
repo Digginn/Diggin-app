@@ -13,12 +13,18 @@ test("쇼핑몰 주소는 통과하고 호스트가 성립하지 않는 값은 �
   for (const ok of [
     "https://www.musinsa.com/products/123",
     "https://m.29cm.co.kr/a/1",
-    "http://pf.kakao.com/_zIxnrX",
     "https://ohou.se/productions/123",
   ])
     assert.ok(ITEM_LINK_ONLY.test(ok), ok);
 
-  for (const no of ["https://ㅁㄴㅇㄹ", "https://.", "https://abc", "https://", "그냥 텍스트"])
+  for (const no of [
+    "http://www.musinsa.com/products/123",
+    "https://ㅁㄴㅇㄹ",
+    "https://.",
+    "https://abc",
+    "https://",
+    "그냥 텍스트",
+  ])
     assert.ok(!ITEM_LINK_ONLY.test(no), no);
 });
 
