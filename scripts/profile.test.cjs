@@ -25,6 +25,7 @@ function renderProfile(
   isCameraGranted = true,
   screenProps = {},
   isPickerFailure = false,
+  pickedAsset = { uri: "album.jpg" },
 ) {
   const calls = {
     library: 0,
@@ -68,7 +69,7 @@ function renderProfile(
     launchImageLibraryAsync: async () => {
       calls.library += 1;
       if (isPickerFailure) throw new Error("사진 선택 실패");
-      return { canceled: false, assets: [{ uri: "album.jpg" }] };
+      return { canceled: false, assets: [pickedAsset] };
     },
   };
   const source = readFileSync(
@@ -117,6 +118,25 @@ function renderProfile(
           TextField: "TextField",
         };
       if (name === "./utils/validateNickname") return { NICKNAME_HELPER_MESSAGE, validateNickname };
+      if (name === "@/api/avatar") return { AVATAR_UNREADABLE_ERROR: "avatar_unreadable" };
+      if (name === "./utils/validateProfileImage") {
+        const validator = { exports: {} };
+        runInNewContext(
+          ts.transpileModule(
+            readFileSync(
+              path.join(__dirname, "../src/screens/my/utils/validateProfileImage.ts"),
+              "utf8",
+            ),
+            { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+          ).outputText,
+          {
+            exports: validator.exports,
+            module: validator,
+            require: () => require("../src/screens/my/constants/profileMessages.ts"),
+          },
+        );
+        return validator.exports;
+      }
       if (name === "./constants/profileMessages")
         return require("../src/screens/my/constants/profileMessages.ts");
       return require(name);
@@ -305,22 +325,61 @@ test("닉네임 저장 실패 시 입력을 유지하고 이동하지 않는다"
   assert.deepEqual(calls.toasts, ["닉네임을 변경하지 못했습니다. 다시 시도해 주세요."]);
 });
 
-test("프로필 사진 저장 실패와 선택기 오류에 사진 실패 토스트를 표시한다", async () => {
-  const saving = renderProfile("android", true, {
+test("사진 오류는 원인별 문구를 보여 주고 기존 사진을 유지한다", async () => {
+  const uploadFailed = renderProfile("android", true, {
     onSavePhoto: async () => {
-      throw new Error("사진 저장 실패");
+      throw new Error("upload_failed");
     },
   });
-  saving.button("프로필 사진 변경").props.onPress();
-  await saving.button("앨범에서 선택").props.onPress();
-  await saving.save();
-  assert.deepEqual(saving.calls.dismissed, []);
-  assert.deepEqual(saving.calls.toasts, ["프로필 사진을 변경하지 못했습니다. 다시 시도해 주세요."]);
+  uploadFailed.button("프로필 사진 변경").props.onPress();
+  await uploadFailed.button("앨범에서 선택").props.onPress();
+  await uploadFailed.save();
+  assert.deepEqual(uploadFailed.calls.dismissed, []);
+  assert.deepEqual(uploadFailed.calls.toasts, [
+    "이미지를 변경하지 못했습니다. 다시 시도해 주세요.",
+  ]);
+
+  const unreadable = "사용할 수 없는 이미지입니다. 다시 선택해 주세요.";
+  const convertFailed = renderProfile("android", true, {
+    onSavePhoto: async () => {
+      throw new Error("avatar_unreadable");
+    },
+  });
+  convertFailed.button("프로필 사진 변경").props.onPress();
+  await convertFailed.button("앨범에서 선택").props.onPress();
+  await convertFailed.save();
+  assert.deepEqual(convertFailed.calls.toasts, [unreadable]);
 
   const picking = renderProfile("android", true, {}, true);
   picking.button("프로필 사진 변경").props.onPress();
   await picking.button("앨범에서 선택").props.onPress();
-  assert.deepEqual(picking.calls.toasts, saving.calls.toasts);
+  assert.deepEqual(picking.calls.toasts, [unreadable]);
+
+  for (const [asset, message] of [
+    [{ uri: "a.gif", mimeType: "image/gif" }, "JPG, PNG, WEBP 이미지만 선택할 수 있습니다."],
+    [{ uri: "a.bmp" }, "JPG, PNG, WEBP 이미지만 선택할 수 있습니다."],
+    [
+      { uri: "a.jpg", mimeType: "image/jpeg", fileSize: 10 * 1024 * 1024 + 1 },
+      "10MB 이하 이미지만 선택할 수 있습니다.",
+    ],
+  ]) {
+    const rejected = renderProfile("android", true, {}, false, asset);
+    rejected.button("프로필 사진 변경").props.onPress();
+    await rejected.button("앨범에서 선택").props.onPress();
+    assert.deepEqual(rejected.calls.toasts, [message]);
+    assert.deepEqual(rejected.calls.images, [], "기존 사진을 유지한다");
+  }
+
+  for (const asset of [
+    { uri: "a.heic", mimeType: "image/heic", fileSize: 10 * 1024 * 1024 },
+    { uri: "a.webp" },
+  ]) {
+    const accepted = renderProfile("android", true, {}, false, asset);
+    accepted.button("프로필 사진 변경").props.onPress();
+    await accepted.button("앨범에서 선택").props.onPress();
+    assert.deepEqual(accepted.calls.toasts, []);
+    assert.deepEqual(accepted.calls.images, [asset.uri]);
+  }
 });
 
 test("닉네임 검증 오류는 저장 콜백이나 성공 토스트를 실행하지 않는다", async () => {
