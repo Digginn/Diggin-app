@@ -47,6 +47,7 @@ test("저장 시 가격 오류를 표시하고 유효한 가격으로 수정하�
     "@/components/Field": { TextField: "TextField" },
     "@/components/modal": { ActionModal: "ActionModal" },
     "@/components/Tooltip": { Tooltip: "Tooltip" },
+    "@/hooks/useNativeModalVisible": { useNativeModalVisible: (visible) => visible },
     "@/components/WishLevelSelect": { WishLevelSelect: "WishLevelSelect" },
   };
   runInNewContext(

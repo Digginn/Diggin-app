@@ -210,17 +210,19 @@ test("폴더 메뉴는 화면 경계 안에 열리고 동작 전에 닫힌다", 
     exports: loaded.exports,
     module: loaded,
     require: (name) =>
-      name === "react-native"
-        ? {
-            Modal: "Modal",
-            Pressable: "Pressable",
-            Text: "Text",
-            View: "View",
-            useWindowDimensions: () => ({ width: 375, height: 812 }),
-          }
-        : name.endsWith(".svg")
-          ? { default: name }
-          : require(name),
+      name === "@/hooks/useNativeModalVisible"
+        ? { useNativeModalVisible: (visible) => visible }
+        : name === "react-native"
+          ? {
+              Modal: "Modal",
+              Pressable: "Pressable",
+              Text: "Text",
+              View: "View",
+              useWindowDimensions: () => ({ width: 375, height: 812 }),
+            }
+          : name.endsWith(".svg")
+            ? { default: name }
+            : require(name),
   });
   const events = [];
   const tree = loaded.exports.FolderMenu({
