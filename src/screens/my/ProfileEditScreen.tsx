@@ -29,7 +29,10 @@ const Image = cssInterop(ExpoImage, { className: "style" });
 
 type ProfileEditScreenProps = {
   authProvider?: AuthProvider;
-  onSaveNickname?: (nickname: string) => Promise<void>;
+  currentNickname?: string;
+  avatarUrl?: string;
+  /** 서버 검사에 걸리면 입력칸 아래에 보여줄 문구를 돌려준다. */
+  onSaveNickname?: (nickname: string) => Promise<string | void>;
   onSavePhoto?: (uri: string) => Promise<void>;
 };
 
@@ -37,6 +40,8 @@ const AUTH_PROVIDER_LABELS = { kakao: "카카오", google: "Google", apple: "App
 
 export function ProfileEditScreen({
   authProvider = "kakao",
+  currentNickname,
+  avatarUrl,
   onSaveNickname,
   onSavePhoto,
 }: ProfileEditScreenProps = {}) {
@@ -119,11 +124,19 @@ export function ProfileEditScreen({
     }
 
     setIsSaving(true);
-    let failureMessage: string = PROFILE_MESSAGES.photoFailure;
+    // 닉네임은 서버 검사에 걸릴 수 있어 사진보다 먼저 저장한다.
+    let failureMessage: string = PROFILE_MESSAGES.nicknameFailure;
     try {
+      if (nickname) {
+        const nicknameError = await onSaveNickname?.(nickname);
+        if (nicknameError) {
+          setHelperStatus("error");
+          setHelperMessage(nicknameError);
+          return;
+        }
+      }
+      failureMessage = PROFILE_MESSAGES.photoFailure;
       if (profileImageUri) await onSavePhoto?.(profileImageUri);
-      failureMessage = PROFILE_MESSAGES.nicknameFailure;
-      if (nickname) await onSaveNickname?.(nickname);
       router.dismissTo("/(tabs)/my" as Href);
       showToast(nickname ? PROFILE_MESSAGES.nicknameSuccess : PROFILE_MESSAGES.photoSuccess);
     } catch {
@@ -151,7 +164,11 @@ export function ProfileEditScreen({
             onPress={handlePhotoMenu}
           >
             <Image
-              source={profileImageUri ? { uri: profileImageUri } : ImageProfilePlaceholder}
+              source={
+                profileImageUri || avatarUrl
+                  ? { uri: profileImageUri ?? avatarUrl }
+                  : ImageProfilePlaceholder
+              }
               contentFit="cover"
               className="h-full w-full"
               onError={() => {
@@ -177,7 +194,7 @@ export function ProfileEditScreen({
               setHelperMessage(NICKNAME_HELPER_MESSAGE);
             }}
             onSubmitEditing={handleSave}
-            placeholder="현재 닉네임"
+            placeholder={currentNickname ?? "현재 닉네임"}
             returnKeyType="done"
             value={nickname}
           />

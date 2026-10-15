@@ -149,6 +149,7 @@ function renderProfile(
     calls,
     button,
     save: () => find(render(), (node) => node.type === "Button").props.onPress(),
+    helper: () => find(render(), (node) => node.type === "HelperText"),
   };
 }
 
@@ -235,6 +236,25 @@ test("유효한 닉네임 저장 성공 시 MY로 이동하고 성공 토스트�
   assert.equal(savedNickname, "변경닉네임");
   assert.deepEqual(calls.dismissed, ["/(tabs)/my"]);
   assert.deepEqual(calls.toasts, ["닉네임이 변경되었습니다."]);
+});
+
+test("서버 닉네임 검사에 걸리면 문구를 입력칸 아래에 보여주고 사진은 저장하지 않는다", async () => {
+  let photoSaves = 0;
+  const { calls, button, save, helper } = renderProfile("android", true, {
+    onSaveNickname: async () => "이미 사용 중인 닉네임입니다.",
+    onSavePhoto: async () => {
+      photoSaves++;
+    },
+  });
+  button("프로필 사진 변경").props.onPress();
+  await button("앨범에서 선택").props.onPress();
+  button("닉네임").props.onChangeText("위시러버");
+  await save();
+  assert.equal(helper().props.status, "error");
+  assert.equal(helper().props.message, "이미 사용 중인 닉네임입니다.");
+  assert.equal(photoSaves, 0);
+  assert.deepEqual(calls.dismissed, []);
+  assert.deepEqual(calls.toasts, []);
 });
 
 test("저장 콜백이 없는 실제 화면은 저장 성공을 표시하지 않는다", async () => {
