@@ -1,5 +1,5 @@
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactNode } from "react";
@@ -10,6 +10,7 @@ import { BrowsingModeProvider } from "@/contexts/BrowsingModeContext";
 import { PostDraftProvider } from "@/contexts/PostDraftContext";
 import { PostsProvider } from "@/contexts/PostsContext";
 import { ToastProvider } from "@/contexts/ToastContext";
+import { SessionExpiredModal } from "@/screens/login/components/SessionExpiredModal";
 
 import "@/global.css";
 
@@ -25,6 +26,22 @@ function SplashGate({ isFontReady, children }: { isFontReady: boolean; children:
   }, [isReady]);
 
   return isReady ? children : null;
+}
+
+// AUTH-010·SYS-004 어느 화면에서든 안내하고, 확인하면 로그아웃과 같이 앱 시작 Flow로 보낸다.
+function SessionExpiredNotice() {
+  const router = useRouter();
+  const { isSessionExpired, confirmSessionExpired } = useAuth();
+
+  return (
+    <SessionExpiredModal
+      visible={isSessionExpired}
+      onConfirm={() => {
+        confirmSessionExpired();
+        router.replace("/");
+      }}
+    />
+  );
 }
 
 export default function RootLayout() {
@@ -48,6 +65,7 @@ export default function RootLayout() {
                     {/* 게시글 상세에서 아래에서 위로 올라오며 들어온다. */}
                     <Stack.Screen name="posts/save" options={{ animation: "slide_from_bottom" }} />
                   </Stack>
+                  <SessionExpiredNotice />
                 </PostsProvider>
               </PostDraftProvider>
             </BlockedUsersProvider>

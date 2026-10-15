@@ -1,5 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { supabase } from "@/lib/supabase";
 
@@ -7,6 +7,9 @@ type Auth = {
   session: Session | null;
   /** 저장된 세션을 아직 읽는 중이다(AUTH-009). 끝나기 전에는 첫 화면을 정하지 않는다. */
   isRestoring: boolean;
+  /** 사용자가 로그아웃하지 않았는데 세션이 끊겼다(AUTH-010). */
+  isSessionExpired: boolean;
+  confirmSessionExpired: () => void;
   signOut: () => Promise<void>;
 };
 
@@ -15,25 +18,42 @@ const AuthContext = createContext<Auth | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const isSigningOutRef = useRef(false);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setIsRestoring(false);
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    // 갱신 토큰이 만료·철회되면 SDK가 SIGNED_OUT을 보낸다. 네트워크 오류는 세션을 유지한다.
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      if (event === "SIGNED_OUT" && !isSigningOutRef.current) setIsSessionExpired(true);
     });
     return () => data.subscription.unsubscribe();
   }, []);
 
   async function signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    isSigningOutRef.current = true;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } finally {
+      isSigningOutRef.current = false;
+    }
   }
 
   return (
-    <AuthContext.Provider value={{ session, isRestoring, signOut }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        isRestoring,
+        isSessionExpired,
+        confirmSessionExpired: () => setIsSessionExpired(false),
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
