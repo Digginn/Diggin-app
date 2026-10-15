@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AVATAR_UNREADABLE_ERROR } from "@/api/avatar";
 import { IconProfileCamera, ImageProfilePlaceholder } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
 import { AuthProviderIcon, type AuthProvider } from "@/components/AuthProviderIcon";
@@ -24,6 +25,7 @@ import { useToast } from "@/hooks/useToast";
 
 import { PROFILE_MESSAGES } from "./constants/profileMessages";
 import { NICKNAME_HELPER_MESSAGE, validateNickname } from "./utils/validateNickname";
+import { validateProfileImage } from "./utils/validateProfileImage";
 
 const Image = cssInterop(ExpoImage, { className: "style" });
 
@@ -75,11 +77,17 @@ export function ProfileEditScreen({
           ? await ImagePicker.launchCameraAsync(options)
           : await ImagePicker.launchImageLibraryAsync(options);
 
-      if (!result.canceled && result.assets[0]) {
-        setProfileImageUri(result.assets[0].uri);
+      const asset = result.canceled ? undefined : result.assets[0];
+      if (!asset) return;
+      // MY-003 쓸 수 없는 사진이면 기존 사진을 그대로 둔다.
+      const imageError = validateProfileImage(asset);
+      if (imageError) {
+        showToast(imageError);
+        return;
       }
+      setProfileImageUri(asset.uri);
     } catch {
-      showToast(PROFILE_MESSAGES.photoFailure);
+      showToast(PROFILE_MESSAGES.photoUnreadable);
     }
   };
 
@@ -139,8 +147,13 @@ export function ProfileEditScreen({
       if (profileImageUri) await onSavePhoto?.(profileImageUri);
       router.dismissTo("/(tabs)/my" as Href);
       showToast(nickname ? PROFILE_MESSAGES.nicknameSuccess : PROFILE_MESSAGES.photoSuccess);
-    } catch {
-      showToast(failureMessage);
+    } catch (error) {
+      const isUnreadable =
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        error.message === AVATAR_UNREADABLE_ERROR;
+      showToast(isUnreadable ? PROFILE_MESSAGES.photoUnreadable : failureMessage);
     } finally {
       setIsSaving(false);
     }
@@ -174,7 +187,7 @@ export function ProfileEditScreen({
               onError={() => {
                 if (!profileImageUri) return;
                 setProfileImageUri(undefined);
-                showToast(PROFILE_MESSAGES.photoFailure);
+                showToast(PROFILE_MESSAGES.photoUnreadable);
               }}
             />
             <View pointerEvents="none" className="absolute left-[72px] top-[73px] h-6 w-6">
