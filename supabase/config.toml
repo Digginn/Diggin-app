@@ -321,6 +321,18 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+[auth.external.google]
+enabled = true
+# 웹 클라이언트 ID가 먼저, 이어서 iOS 클라이언트 ID(쉼표 구분). 기기 로그인 토큰의 대상이 iOS 클라이언트 ID다.
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+# iOS 기기 구글 로그인은 nonce를 넘기지 않는다(Supabase 구글 로그인 iOS 안내).
+skip_nonce_check = true
+email_optional = false
+
 [auth.external.kakao]
 enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID)"
