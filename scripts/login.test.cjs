@@ -366,10 +366,9 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.equal(render().isSessionExpired, false);
 });
 
-test("가입 1분 안에 다시 로그인해도 가입 완료 안내는 사용자별로 한 번만 보여 준다", async () => {
+function loadSignIn({ getUser, kakao = {}, saveAvatar = async () => {} }) {
   const storage = new Map();
-  let user;
-  const { signIn } = load("screens/login/api/signIn.ts", {
+  return load("screens/login/api/signIn.ts", {
     "@react-native-async-storage/async-storage": {
       __esModule: true,
       default: {
@@ -388,20 +387,30 @@ test("가입 1분 안에 다시 로그인해도 가입 완료 안내는 사용�
       statusCodes: {},
     },
     "@react-native-kakao/core": { initializeKakaoSDK: async () => {} },
-    "@react-native-kakao/user": {},
+    "@react-native-kakao/user": {
+      login: async () => ({ idToken: "kakao-token" }),
+      me: async () => ({ profileImageUrl: "" }),
+      ...kakao,
+    },
     "expo-apple-authentication": {},
     "expo-linking": {},
     "expo-web-browser": {},
     "react-native": { Platform: { OS: "ios" } },
+    "@/api/avatar": { saveAvatar },
     "@/lib/supabase": {
       supabase: {
         auth: {
           signInWithIdToken: async () => ({ error: null }),
-          getUser: async () => ({ data: { user }, error: null }),
+          getUser: async () => ({ data: { user: getUser() }, error: null }),
         },
       },
     },
   });
+}
+
+test("가입 1분 안에 다시 로그인해도 가입 완료 안내는 사용자별로 한 번만 보여 준다", async () => {
+  let user;
+  const { signIn } = loadSignIn({ getUser: () => user });
   const signedUpAt = "2026-10-16T00:00:00Z";
   user = { id: "a", created_at: signedUpAt, last_sign_in_at: signedUpAt };
   assert.equal((await signIn("google")).isNewUser, true);
@@ -411,4 +420,40 @@ test("가입 1분 안에 다시 로그인해도 가입 완료 안내는 사용�
   assert.equal((await signIn("google")).isNewUser, true);
   user = { id: "c", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:01:00Z" };
   assert.equal((await signIn("google")).isNewUser, false);
+});
+
+test("카카오 신규 가입만 카카오 프로필 사진을 복사하고, 실패해도 로그인은 이어 간다", async () => {
+  const signedUpAt = "2026-10-16T00:00:00Z";
+  let user = { id: "k1", created_at: signedUpAt, last_sign_in_at: signedUpAt };
+  const saved = [];
+  let photoUrl = "https://k.kakaocdn.net/photo.jpg";
+  const { signIn } = loadSignIn({
+    getUser: () => user,
+    kakao: { me: async () => ({ profileImageUrl: photoUrl }) },
+    saveAvatar: async (uri) => {
+      if (uri.includes("broken")) throw new Error("load_failed");
+      saved.push(uri);
+    },
+  });
+  assert.equal((await signIn("kakao")).isNewUser, true);
+  assert.deepEqual(saved, ["https://k.kakaocdn.net/photo.jpg"]);
+
+  user = { id: "k2", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:05:00Z" };
+  assert.equal((await signIn("kakao")).isNewUser, false);
+  assert.equal(saved.length, 1, "기존 회원은 복사하지 않는다");
+
+  user = { id: "k3", created_at: signedUpAt, last_sign_in_at: signedUpAt };
+  photoUrl = "";
+  await signIn("kakao");
+  assert.equal(saved.length, 1, "카카오 사진이 없으면 기본 이미지로 둔다");
+
+  user = { id: "k4", created_at: signedUpAt, last_sign_in_at: signedUpAt };
+  photoUrl = "https://k.kakaocdn.net/broken.jpg";
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    assert.equal((await signIn("kakao")).status, "success", "사진 실패가 로그인을 막지 않는다");
+  } finally {
+    console.warn = warn;
+  }
 });
