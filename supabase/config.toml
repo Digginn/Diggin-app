@@ -345,8 +345,9 @@ skip_nonce_check = false
 email_optional = true
 
 [auth.external.apple]
-enabled = false
-client_id = ""
+enabled = true
+# iOS 기기 애플 로그인은 번들 ID가 토큰의 대상이다. Android 애플(브라우저)을 붙이면 Services ID를 쉼표로 추가한다.
+client_id = "env(SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID)"
 # DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
 secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
 # Overrides the default auth callback URL derived from auth.external_url.
