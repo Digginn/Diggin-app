@@ -12,6 +12,7 @@ import { TextField } from "@/components/Field";
 import { ActionModal } from "@/components/modal";
 import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 import type { WishLevelKey } from "@/types/wish-item";
 
 const StyledImage = cssInterop(Image, { className: "style" });
@@ -57,6 +58,7 @@ export function ItemEditSheet({
   const [isExitOpen, setExitOpen] = useState(false);
   const hintRef = useRef<View>(null);
   const [hintAnchor, setHintAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
+  const isHintVisible = useNativeModalVisible(isHintOpen);
 
   const update =
     <K extends keyof ItemEditValues>(key: K) =>
@@ -233,7 +235,7 @@ export function ItemEditSheet({
       </ScrollView>
 
       <Modal
-        visible={isHintOpen}
+        visible={isHintVisible}
         transparent
         animationType="none"
         onRequestClose={() => setHintOpen(false)}
