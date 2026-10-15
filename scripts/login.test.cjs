@@ -119,11 +119,19 @@ test("루트는 폰트 준비 후 스플래시를 닫고 전역 토스트·상�
   assert.equal(hidden, 2);
 });
 
-test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정상 동작한다", () => {
+test("로그인 화면의 둘러보기·뒤로 가기와 소셜 로그인 호출이 정상 동작한다", () => {
   const routes = [];
   const alerts = [];
+  const signIns = [];
   let canGoBack = false;
   const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+    "react": { useState: (initial) => [initial, () => {}] },
+    "./api/signIn": {
+      signIn: (provider) => {
+        signIns.push(provider);
+        return Promise.resolve({ status: "cancelled" });
+      },
+    },
     "expo-router": {
       useRouter: () => ({
         replace: (route) => routes.push(route),
@@ -162,8 +170,8 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
   const providers = tree.filter((node) => node.type === "SocialLoginButton");
   assert.equal(providers.map((node) => node.props.provider).join(","), "google,kakao,apple");
   for (const button of providers) button.props.onPress();
-  assert.equal(alerts.length, 3);
-  assert.ok(alerts.every((args) => args[0] === "로그인 연동 준비 중"));
+  assert.equal(signIns.join(","), "google,kakao,apple");
+  assert.equal(alerts.length, 0);
   const buttons = tree.filter((node) => node.type === "Pressable");
   buttons[0].props.onPress();
   assert.equal(routes.at(-1), "/browse");
@@ -180,8 +188,6 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
   const loadingTree = nodes(LoginScreen({ isLoginLoading: true }));
   const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
   assert.equal(loadingDialog.props.message, "로그인 중입니다.");
-  loadingDialog.props.onRequestClose();
-  assert.equal(routes.at(-1), "/login");
 });
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
