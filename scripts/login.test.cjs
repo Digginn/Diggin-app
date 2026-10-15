@@ -14,6 +14,7 @@ function load(relativePath, mocks = {}) {
   }).outputText;
   const componentModule = { exports: {} };
   runInNewContext(compiled, {
+    process: { env: {} },
     exports: componentModule.exports,
     module: componentModule,
     require: (name) => {
@@ -313,6 +314,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const state = [];
   let cursor = 0;
   let emit;
+  const signOutOptions = [];
   const supabase = {
     auth: {
       getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
@@ -320,7 +322,8 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
         emit = listener;
         return { data: { subscription: { unsubscribe() {} } } };
       },
-      signOut: async () => {
+      signOut: async (options) => {
+        signOutOptions.push(options);
         emit("SIGNED_OUT", null);
         return { error: null };
       },
@@ -352,6 +355,8 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     return AuthProvider({ children: null }).props.value;
   };
   await render().signOut();
+  assert.equal(signOutOptions.length, 1);
+  assert.equal(signOutOptions[0].scope, "local", "이 기기 세션만 끊는다");
   assert.equal(render().isSessionExpired, false);
   emit("TOKEN_REFRESHED", { id: "s2" });
   assert.equal(render().isSessionExpired, false);
@@ -359,4 +364,51 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.equal(render().isSessionExpired, true);
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);
+});
+
+test("가입 1분 안에 다시 로그인해도 가입 완료 안내는 사용자별로 한 번만 보여 준다", async () => {
+  const storage = new Map();
+  let user;
+  const { signIn } = load("screens/login/api/signIn.ts", {
+    "@react-native-async-storage/async-storage": {
+      __esModule: true,
+      default: {
+        getItem: async (key) => storage.get(key) ?? null,
+        setItem: async (key, value) => storage.set(key, value),
+      },
+    },
+    "@react-native-google-signin/google-signin": {
+      GoogleSignin: {
+        configure() {},
+        hasPlayServices: async () => true,
+        signIn: async () => ({ type: "success", data: { idToken: "token" } }),
+      },
+      isCancelledResponse: (response) => response.type === "cancelled",
+      isErrorWithCode: () => false,
+      statusCodes: {},
+    },
+    "@react-native-kakao/core": { initializeKakaoSDK: async () => {} },
+    "@react-native-kakao/user": {},
+    "expo-apple-authentication": {},
+    "expo-linking": {},
+    "expo-web-browser": {},
+    "react-native": { Platform: { OS: "ios" } },
+    "@/lib/supabase": {
+      supabase: {
+        auth: {
+          signInWithIdToken: async () => ({ error: null }),
+          getUser: async () => ({ data: { user }, error: null }),
+        },
+      },
+    },
+  });
+  const signedUpAt = "2026-10-16T00:00:00Z";
+  user = { id: "a", created_at: signedUpAt, last_sign_in_at: signedUpAt };
+  assert.equal((await signIn("google")).isNewUser, true);
+  user = { id: "a", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:00:30Z" };
+  assert.equal((await signIn("google")).isNewUser, false);
+  user = { id: "b", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:00:10Z" };
+  assert.equal((await signIn("google")).isNewUser, true);
+  user = { id: "c", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:01:00Z" };
+  assert.equal((await signIn("google")).isNewUser, false);
 });
