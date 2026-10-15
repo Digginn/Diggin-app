@@ -1,5 +1,4 @@
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
-
+import { AVATAR_BUCKET } from "@/api/avatar";
 import type { AuthProvider } from "@/components/AuthProviderIcon";
 import { supabase } from "@/lib/supabase";
 
@@ -19,8 +18,6 @@ const NICKNAME_ERROR_MESSAGES: Record<string, string> = {
   duplicate: "이미 사용 중인 닉네임입니다.",
 };
 
-const AVATAR_BUCKET = "avatars";
-const AVATAR_SIZE = 512;
 const AVATAR_URL_TTL_SECONDS = 60 * 60;
 
 async function getUser() {
@@ -60,23 +57,4 @@ export async function saveNickname(nickname: string): Promise<string | undefined
   if (error) throw error;
   if (!data) return undefined;
   return NICKNAME_ERROR_MESSAGES[data] ?? NICKNAME_ERROR_MESSAGES.invalid_characters;
-}
-
-// MY-003 원본은 올리지 않고 512×512 WebP로 줄여 사용자당 한 장만 둔다.
-export async function saveAvatar(uri: string) {
-  const user = await getUser();
-  const image = await ImageManipulator.manipulate(uri)
-    .resize({ width: AVATAR_SIZE, height: AVATAR_SIZE })
-    .renderAsync();
-  const webp = await image.saveAsync({ format: SaveFormat.WEBP, compress: 0.8 });
-  const body = await (await fetch(webp.uri)).arrayBuffer();
-
-  const path = `${user.id}/avatar.webp`;
-  const { error: uploadError } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .upload(path, body, { contentType: "image/webp", upsert: true });
-  if (uploadError) throw uploadError;
-
-  const { error } = await supabase.rpc("set_avatar", { new_path: path });
-  if (error) throw error;
 }

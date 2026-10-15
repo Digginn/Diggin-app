@@ -6,12 +6,13 @@ import {
   statusCodes,
 } from "@react-native-google-signin/google-signin";
 import { initializeKakaoSDK } from "@react-native-kakao/core";
-import { login as loginWithKakao } from "@react-native-kakao/user";
+import { me as getKakaoProfile, login as loginWithKakao } from "@react-native-kakao/user";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
 
+import { saveAvatar } from "@/api/avatar";
 import { supabase } from "@/lib/supabase";
 
 import type { LoginProvider } from "../components/SocialLoginButton";
@@ -89,6 +90,17 @@ async function signInWithGoogle(): Promise<SignInResult> {
   }
 }
 
+// AUTH-006 카카오 프로필 사진을 우리 Storage에 복사해 둔다. 없거나 실패하면 기본 이미지로 둔다.
+// shortcut: SDK가 카카오 기본 이미지 여부(is_default_image)를 주지 않아 기본 이미지도 복사된다. 구분이 필요하면 카카오 REST API로 확인한다.
+async function importKakaoAvatar() {
+  try {
+    const { profileImageUrl } = await getKakaoProfile();
+    if (profileImageUrl) await saveAvatar(profileImageUrl);
+  } catch (error) {
+    console.warn("카카오 프로필 사진을 가져오지 못했습니다.", error);
+  }
+}
+
 // AUTH-004 카카오 SDK로 로그인한다. 카카오톡이 있으면 카카오톡으로, 없으면 카카오 계정 화면으로 연다.
 // Supabase 브라우저 로그인은 이메일 동의항목을 항상 요청해 비즈 앱이 아니면 KOE205로 막힌다.
 // ID 토큰 방식은 요청 항목을 카카오 동의항목 설정대로 받는다(MY-010 이메일 미수집).
@@ -102,7 +114,9 @@ async function signInWithKakao(): Promise<SignInResult> {
       token: token.idToken,
     });
     if (error) throw error;
-    return finishSignIn();
+    const result = await finishSignIn();
+    if (result.status === "success" && result.isNewUser) await importKakaoAvatar();
+    return result;
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "Cancelled") {
       return { status: "cancelled" };

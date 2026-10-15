@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { fetchMyProfile, saveAvatar, saveNickname, type MyProfile } from "@/screens/my/api/profile";
+import { saveAvatar } from "@/api/avatar";
+import { fetchMyProfile, saveNickname, type MyProfile } from "@/screens/my/api/profile";
 import { ProfileEditScreen } from "@/screens/my/ProfileEditScreen";
 
 export default function ProfileEditRoute() {
