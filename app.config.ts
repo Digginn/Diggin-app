@@ -33,9 +33,14 @@ function withKakao(plugins: Plugins): Plugins {
   ];
 }
 
+// TestFlight 앱과 같은 번들 ID로 출시한다. 카카오·구글·애플 콘솔에도 이 값으로 등록돼 있다.
+// app.json에 값이 들어오면 그 값을 쓴다.
+const IOS_BUNDLE_ID = "com.diggin.app.preview";
+
 // app.json을 그대로 쓰고, 키가 필요한 플러그인만 .env 값으로 채운다.
 export default ({ config }: ConfigContext): ExpoConfig =>
   ({
     ...config,
+    ios: { ...config.ios, bundleIdentifier: config.ios?.bundleIdentifier ?? IOS_BUNDLE_ID },
     plugins: withKakao(withGoogleSignIn(config.plugins ?? [])),
   }) as ExpoConfig;
