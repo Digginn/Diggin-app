@@ -74,7 +74,7 @@ export function NavigationBar({ state, descriptors, navigation }: NavigationBarP
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
             accessibilityLabel={tab.label}
-            className="h-[80px] w-[72px] items-center pt-2"
+            className="h-[80px] flex-1 items-center pt-2"
           >
             <View className="h-[53px] items-center justify-center gap-1">
               <Icon
