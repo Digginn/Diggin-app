@@ -11,7 +11,8 @@
     "ios": {
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent"
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.diggin.app.preview",
@@ -46,7 +47,9 @@
           "imageWidth": 160,
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
