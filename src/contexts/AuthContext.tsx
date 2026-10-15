@@ -37,7 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     isSigningOutRef.current = true;
     try {
-      const { error } = await supabase.auth.signOut();
+      // MY-005 이 기기 세션만 끊는다. 기본값(global)은 다른 기기까지 로그아웃시킨다.
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
     } finally {
       isSigningOutRef.current = false;
