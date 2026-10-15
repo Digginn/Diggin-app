@@ -17,14 +17,14 @@ end;
 $$;
 
 -- 사용자 인식 문자 수. 앱(unicode-segmenter)과 같게 이모지 조합을 1자로 센다.
--- 피부색·변이 선택자·결합 문자는 빼고, ZWJ로 이어진 묶음과 국기(지역 표시 문자 2개)는 1자로 센다.
+-- 피부색·변이 선택자·결합 문자(1️⃣ 같은 키캡 포함)·태그 문자(잉글랜드 같은 지역 국기)는 빼고, ZWJ로 이어진 묶음과 국기(지역 표시 문자 2개)는 1자로 센다.
 create or replace function private.char_count(value text)
 returns integer
 language sql
 immutable
 set search_path = ''
 as $$
-  select char_length(regexp_replace(value, '[̀-ͯ︎️‍\U0001F3FB-\U0001F3FF]', '', 'g'))
+  select char_length(regexp_replace(value, '[̀-ͯ︎️‍\u20D0-\u20FF\U0001F3FB-\U0001F3FF\U000E0020-\U000E007F]', '', 'g'))
     - (char_length(value) - char_length(replace(value, U&'\200D', '')))
     - (char_length(value) - char_length(regexp_replace(value, '[\U0001F1E6-\U0001F1FF]', '', 'g'))) / 2;
 $$;

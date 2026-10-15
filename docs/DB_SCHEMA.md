@@ -55,7 +55,7 @@ private  API에 노출하지 않는 곳. 앱은 RPC로만 접근한다.
 
 ### 3-3. 글자 수와 문자열
 
-- 화면 기준 글자 수는 `private.char_count(text)`로 센다. 앱(unicode-segmenter)과 같게 👍🏻, 가족 이모지, 국기를 1자로 센다. 폴더명·게시글·투표 질문·댓글에 쓴다.
+- 화면 기준 글자 수는 `private.char_count(text)`로 센다. 앱(unicode-segmenter)과 같게 👍🏻, 가족 이모지, 국기, 1️⃣ 같은 키캡을 1자로 센다. 폴더명·게시글·투표 질문·댓글에 쓴다.
 - 상품명·브랜드명은 명세가 "NFC 정규화 후 문자 수"라서 `char_length`로 센다.
 - 사용자 입력 문자열은 before insert/update 트리거에서 `normalize(btrim(...), NFC)`로 정리한 뒤 제약으로 검사한다(예: `private.normalize_folder_name()`).
 

@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(36);
+select plan(40);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'a@test.dev'),
@@ -33,6 +33,8 @@ select is(private.char_count('👍🏻'), 1, '피부색 이모지는 1자');
 select is(private.char_count('👨‍👩‍👧'), 1, 'ZWJ 가족 이모지는 1자');
 select is(private.char_count('🇰🇷'), 1, '국기는 1자');
 select is(private.char_count('맥북 파우치'), 6, '한글과 공백은 그대로 센다');
+select is(private.char_count('1️⃣2️⃣3️⃣4️⃣'), 4, '키캡 이모지는 1자');
+select is(private.char_count('🏴󠁧󠁢󠁥󠁮󠁧󠁿'), 1, '태그 국기는 1자');
 
 -- AUTH-008 검사 순서
 insert into private.nickname_banned_words (word, kind) values ('바보', 'profanity');
@@ -42,6 +44,8 @@ select is(private.nickname_error('가 나다', null), 'whitespace', '공백 오�
 select is(private.nickname_error('가나!', null), 'invalid_characters', '특수문자 오류');
 select is(private.nickname_error('너바보야', null), 'profanity', '금칙어 오류');
 select is(private.nickname_error('바보온달', null), null, 'allowlist 단어는 통과');
+select is(private.nickname_error('바보온달바보', null), 'profanity', 'allowlist 밖의 금칙어는 걸린다');
+select is(private.nickname_error('바보바보온달', null), 'profanity', 'allowlist 앞의 금칙어도 걸린다');
 select is(private.nickname_error('DIGGIN', null), 'impersonation', '브랜드명과 정확히 같으면 사칭');
 select is(private.nickname_error('디긴공식', null), 'impersonation', '브랜드명+공식은 사칭');
 select is(private.nickname_error('디긴좋아요', null), null, '브랜드명+일반 단어는 허용');
