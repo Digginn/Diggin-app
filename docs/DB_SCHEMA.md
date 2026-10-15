@@ -96,7 +96,7 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 자세한 정의는 `supabase/schemas/`를 본다.
 
 - 가입 트리거 `private.handle_new_user()`: auth.users insert 시 profiles(랜덤 닉네임)와 나의 소장템 폴더를 만든다.
-- 랜덤 닉네임 `private.generate_nickname()`: '디깅' + 숫자 6자리. 직접 변경과 같은 검사를 통과한 후보만 쓴다(AUTH-005). 형식은 명세에 없어 임시로 정했다.
+- 랜덤 닉네임 `private.generate_nickname()`: 형용사 + 디기 + 숫자(예: 느긋한디기12). 형용사 40개(2~4자), 숫자 1~9999라 2~10자 안에 들어간다. 직접 변경과 같은 검사를 통과한 후보만 쓴다(AUTH-005).
 - 닉네임 검사 `private.nickname_error()`: 글자 수 → 공백 → 특수문자·이모지 → 금칙어 → 사칭 → 중복(AUTH-008). 사칭 규칙은 명세 문구대로 함수에 있고, 금칙어는 `private.nickname_banned_words`(korcen 사전, 아직 비어 있음), 오탐 보정은 `nickname_allowed_words`.
 - profiles: 앱은 본인 행 select만. 닉네임은 `update_nickname`, 이미지는 `set_avatar`, 제재 상태는 운영 API만 바꾼다.
 - folders: 사용자별 이름 중복 금지, 일반 폴더 최대 50개(프로필 행을 잠근 뒤 센다), 나의 소장템은 만들기·고치기·지우기 불가. `last_added_at`은 컬럼만 있고 갱신 트리거는 product_folders와 함께 만든다.
@@ -244,7 +244,6 @@ admin_actions  id, admin_id, action, target_type, target_id, report_id null, rea
 
 - 투표 결과를 투표할 수 없는 작성자와 마감 후 미참여자에게 보여줄지(VOTE-009)
 - 가입 시 약관 동의 화면이 명세에 없다. 처음 동의 기록을 언제 만들지(MY-009)
-- 랜덤 닉네임 형식(지금은 '디깅' + 숫자 6자리)
 - 닉네임 "한글"에 자음·모음 단독(ㄱ, ㅏ)을 허용할지. 지금은 허용하지 않는다
 - 카카오 프로필 이미지(AUTH-006)를 URL로 둘지 Storage에 복사할지
 - 차단 방향(단방향 명세 vs 앱 모달 문구 "서로의 게시글"), 차단 해제 화면 없음

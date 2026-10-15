@@ -201,10 +201,18 @@ CREATE OR REPLACE FUNCTION private.generate_nickname()
   SET search_path TO ''
   AS $function$
 declare
+  adjectives constant text[] := array[
+    '느긋한', '귀여운', '다정한', '상냥한', '용감한', '졸린', '배고픈', '신나는', '차분한', '수줍은',
+    '행복한', '씩씩한', '포근한', '말랑한', '똑똑한', '엉뚱한', '즐거운', '조용한', '부지런한', '명랑한',
+    '당당한', '산뜻한', '보송한', '든든한', '따뜻한', '유쾌한', '깜찍한', '새침한', '늠름한', '대담한',
+    '순한', '착한', '겸손한', '기특한', '날쌘', '동그란', '몽글한', '반짝이는', '싱그러운', '느릿한'
+  ];
   candidate text;
 begin
   for attempt in 1..50 loop
-    candidate := '디깅' || lpad(floor(random() * 1000000)::integer::text, 6, '0');
+    candidate := adjectives[1 + floor(random() * array_length(adjectives, 1))::integer]
+      || '디기'
+      || (1 + floor(random() * 9999))::integer::text;
     if private.nickname_error(candidate, null) is null then
       return candidate;
     end if;

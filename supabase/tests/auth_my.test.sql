@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(35);
+select plan(36);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'a@test.dev'),
@@ -17,6 +17,10 @@ select is(
 select ok(
   (select private.nickname_error(nickname, id) is null from public.profiles where id = '00000000-0000-0000-0000-00000000000a'),
   '랜덤 닉네임은 직접 변경 규칙을 통과한다'
+);
+select ok(
+  (select nickname ~ '^[가-힣]{2,4}디기[1-9][0-9]{0,3}$' from public.profiles where id = '00000000-0000-0000-0000-00000000000a'),
+  '랜덤 닉네임은 형용사 + 디기 + 숫자 형식이다'
 );
 select is(
   (select count(*) from public.folders where user_id = '00000000-0000-0000-0000-00000000000a' and kind = 'owned' and name = '나의 소장템'),
