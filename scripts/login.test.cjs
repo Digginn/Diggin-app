@@ -271,10 +271,9 @@ test("로그인 로딩 스피너는 한 바퀴에 약 0.8초가 걸린다", () =
   assert.equal((duration * 360) / degrees, 800);
 });
 
-test("인증 만료 안내의 나중에 버튼은 모달을 닫고 로그인 버튼은 로그인 화면으로 이동한다", () => {
+test("인증 만료 안내는 확인 버튼 하나만 두고 확인하면 앱 시작 화면으로 이동한다", () => {
   const { SessionExpiredModal } = load("screens/login/components/SessionExpiredModal.tsx", {
-    "@/components/Button": { Button: "Button" },
-    "@/components/modal": { Modal: "Modal" },
+    "@/components/modal": { ActionModal: "ActionModal" },
   });
   let isVisible = true;
   const routes = [];
@@ -294,17 +293,70 @@ test("인증 만료 안내의 나중에 버튼은 모달을 닫고 로그인 버
   });
   const previewModal = () => nodes(Preview()).find((node) => node.type === SessionExpiredModal);
   const modal = SessionExpiredModal(previewModal().props);
-  const buttons = nodes(modal).filter((node) => node.type === "Button");
+  assert.equal(modal.type, "ActionModal");
   assert.equal(modal.props.visible, true);
-  assert.equal(modal.props.scrimOpacity, 0.36);
-  assert.equal(modal.props.isFullScreen, true);
-  assert.deepEqual(
-    buttons.map((node) => node.props.children),
-    ["다음에 할게요", "로그인"],
-  );
-  buttons[0].props.onPress();
+  assert.equal(modal.props.title, "다시 로그인해 주세요.");
+  assert.equal(modal.props.description, "로그인 정보가 만료되어 다시 로그인이 필요합니다.");
+  assert.equal(modal.props.type, undefined, "기본값 1Btn을 쓴다");
+  assert.equal(modal.props.secondaryAction, undefined);
+  assert.equal(modal.props.onClose, undefined, "닫기(X) 버튼을 두지 않는다");
+  assert.equal(modal.props.isPrimaryDisabled, false);
+  assert.equal(modal.props.primaryAction.label, "확인");
+  modal.props.onRequestClose();
+  assert.equal(routes.length, 0, "뒤로가기로는 닫히지 않는다");
+  modal.props.primaryAction.onPress();
   assert.equal(previewModal().props.visible, false);
-  assert.equal(routes.length, 0);
-  buttons[1].props.onPress();
-  assert.deepEqual(routes, ["/login"]);
+  assert.deepEqual(routes, ["/"]);
+});
+
+test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인증 만료로 안내한다", async () => {
+  const state = [];
+  let cursor = 0;
+  let emit;
+  const supabase = {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
+      onAuthStateChange: (listener) => {
+        emit = listener;
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
+      signOut: async () => {
+        emit("SIGNED_OUT", null);
+        return { error: null };
+      },
+    },
+  };
+  const refs = [];
+  let refCursor = 0;
+  const { AuthProvider } = load("contexts/AuthContext.tsx", {
+    "react": {
+      ...React,
+      createContext: () => ({ Provider: "Provider" }),
+      useEffect: (effect) => effect(),
+      useRef: (initial) => {
+        const index = refCursor++;
+        if (!(index in refs)) refs[index] = { current: initial };
+        return refs[index];
+      },
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [state[index], (next) => (state[index] = next)];
+      },
+    },
+    "@/lib/supabase": { supabase },
+  });
+  const render = () => {
+    cursor = 0;
+    refCursor = 0;
+    return AuthProvider({ children: null }).props.value;
+  };
+  await render().signOut();
+  assert.equal(render().isSessionExpired, false);
+  emit("TOKEN_REFRESHED", { id: "s2" });
+  assert.equal(render().isSessionExpired, false);
+  emit("SIGNED_OUT", null);
+  assert.equal(render().isSessionExpired, true);
+  render().confirmSessionExpired();
+  assert.equal(render().isSessionExpired, false);
 });
