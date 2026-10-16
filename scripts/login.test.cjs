@@ -14,6 +14,7 @@ function load(relativePath, mocks = {}) {
   }).outputText;
   const componentModule = { exports: {} };
   runInNewContext(compiled, {
+    process: { env: {} },
     exports: componentModule.exports,
     module: componentModule,
     require: (name) => {
@@ -119,11 +120,19 @@ test("루트는 폰트 준비 후 스플래시를 닫고 전역 토스트·상�
   assert.equal(hidden, 2);
 });
 
-test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정상 동작한다", () => {
+test("로그인 화면의 둘러보기·뒤로 가기와 소셜 로그인 호출이 정상 동작한다", () => {
   const routes = [];
   const alerts = [];
+  const signIns = [];
   let canGoBack = false;
   const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+    "react": { useState: (initial) => [initial, () => {}] },
+    "./api/signIn": {
+      signIn: (provider) => {
+        signIns.push(provider);
+        return Promise.resolve({ status: "cancelled" });
+      },
+    },
     "expo-router": {
       useRouter: () => ({
         replace: (route) => routes.push(route),
@@ -162,8 +171,8 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
   const providers = tree.filter((node) => node.type === "SocialLoginButton");
   assert.equal(providers.map((node) => node.props.provider).join(","), "google,kakao,apple");
   for (const button of providers) button.props.onPress();
-  assert.equal(alerts.length, 3);
-  assert.ok(alerts.every((args) => args[0] === "로그인 연동 준비 중"));
+  assert.equal(signIns.join(","), "google,kakao,apple");
+  assert.equal(alerts.length, 0);
   const buttons = tree.filter((node) => node.type === "Pressable");
   buttons[0].props.onPress();
   assert.equal(routes.at(-1), "/browse");
@@ -180,8 +189,6 @@ test("로그인 화면의 둘러보기·뒤로 가기와 미연동 안내가 정
   const loadingTree = nodes(LoginScreen({ isLoginLoading: true }));
   const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
   assert.equal(loadingDialog.props.message, "로그인 중입니다.");
-  loadingDialog.props.onRequestClose();
-  assert.equal(routes.at(-1), "/login");
 });
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
@@ -265,10 +272,9 @@ test("로그인 로딩 스피너는 한 바퀴에 약 0.8초가 걸린다", () =
   assert.equal((duration * 360) / degrees, 800);
 });
 
-test("인증 만료 안내의 나중에 버튼은 모달을 닫고 로그인 버튼은 로그인 화면으로 이동한다", () => {
+test("인증 만료 안내는 확인 버튼 하나만 두고 확인하면 앱 시작 화면으로 이동한다", () => {
   const { SessionExpiredModal } = load("screens/login/components/SessionExpiredModal.tsx", {
-    "@/components/Button": { Button: "Button" },
-    "@/components/modal": { Modal: "Modal" },
+    "@/components/modal": { ActionModal: "ActionModal" },
   });
   let isVisible = true;
   const routes = [];
@@ -288,17 +294,166 @@ test("인증 만료 안내의 나중에 버튼은 모달을 닫고 로그인 버
   });
   const previewModal = () => nodes(Preview()).find((node) => node.type === SessionExpiredModal);
   const modal = SessionExpiredModal(previewModal().props);
-  const buttons = nodes(modal).filter((node) => node.type === "Button");
+  assert.equal(modal.type, "ActionModal");
   assert.equal(modal.props.visible, true);
-  assert.equal(modal.props.scrimOpacity, 0.36);
-  assert.equal(modal.props.isFullScreen, true);
-  assert.deepEqual(
-    buttons.map((node) => node.props.children),
-    ["다음에 할게요", "로그인"],
-  );
-  buttons[0].props.onPress();
+  assert.equal(modal.props.title, "다시 로그인해 주세요.");
+  assert.equal(modal.props.description, "로그인 정보가 만료되어 다시 로그인이 필요합니다.");
+  assert.equal(modal.props.type, undefined, "기본값 1Btn을 쓴다");
+  assert.equal(modal.props.secondaryAction, undefined);
+  assert.equal(modal.props.onClose, undefined, "닫기(X) 버튼을 두지 않는다");
+  assert.equal(modal.props.isPrimaryDisabled, false);
+  assert.equal(modal.props.primaryAction.label, "확인");
+  modal.props.onRequestClose();
+  assert.equal(routes.length, 0, "뒤로가기로는 닫히지 않는다");
+  modal.props.primaryAction.onPress();
   assert.equal(previewModal().props.visible, false);
-  assert.equal(routes.length, 0);
-  buttons[1].props.onPress();
-  assert.deepEqual(routes, ["/login"]);
+  assert.deepEqual(routes, ["/"]);
+});
+
+test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인증 만료로 안내한다", async () => {
+  const state = [];
+  let cursor = 0;
+  let emit;
+  const signOutOptions = [];
+  const supabase = {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
+      onAuthStateChange: (listener) => {
+        emit = listener;
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
+      signOut: async (options) => {
+        signOutOptions.push(options);
+        emit("SIGNED_OUT", null);
+        return { error: null };
+      },
+    },
+  };
+  const refs = [];
+  let refCursor = 0;
+  const { AuthProvider } = load("contexts/AuthContext.tsx", {
+    "react": {
+      ...React,
+      createContext: () => ({ Provider: "Provider" }),
+      useEffect: (effect) => effect(),
+      useRef: (initial) => {
+        const index = refCursor++;
+        if (!(index in refs)) refs[index] = { current: initial };
+        return refs[index];
+      },
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [state[index], (next) => (state[index] = next)];
+      },
+    },
+    "@/lib/supabase": { supabase },
+  });
+  const render = () => {
+    cursor = 0;
+    refCursor = 0;
+    return AuthProvider({ children: null }).props.value;
+  };
+  await render().signOut();
+  assert.equal(signOutOptions.length, 1);
+  assert.equal(signOutOptions[0].scope, "local", "이 기기 세션만 끊는다");
+  assert.equal(render().isSessionExpired, false);
+  emit("TOKEN_REFRESHED", { id: "s2" });
+  assert.equal(render().isSessionExpired, false);
+  emit("SIGNED_OUT", null);
+  assert.equal(render().isSessionExpired, true);
+  render().confirmSessionExpired();
+  assert.equal(render().isSessionExpired, false);
+});
+
+function loadSignIn({ getUser, kakao = {}, saveAvatar = async () => {} }) {
+  const storage = new Map();
+  return load("screens/login/api/signIn.ts", {
+    "@react-native-async-storage/async-storage": {
+      __esModule: true,
+      default: {
+        getItem: async (key) => storage.get(key) ?? null,
+        setItem: async (key, value) => storage.set(key, value),
+      },
+    },
+    "@react-native-google-signin/google-signin": {
+      GoogleSignin: {
+        configure() {},
+        hasPlayServices: async () => true,
+        signIn: async () => ({ type: "success", data: { idToken: "token" } }),
+      },
+      isCancelledResponse: (response) => response.type === "cancelled",
+      isErrorWithCode: () => false,
+      statusCodes: {},
+    },
+    "@react-native-kakao/core": { initializeKakaoSDK: async () => {} },
+    "@react-native-kakao/user": {
+      login: async () => ({ idToken: "kakao-token" }),
+      me: async () => ({ profileImageUrl: "" }),
+      ...kakao,
+    },
+    "expo-apple-authentication": {},
+    "expo-linking": {},
+    "expo-web-browser": {},
+    "react-native": { Platform: { OS: "ios" } },
+    "@/api/avatar": { saveAvatar },
+    "@/lib/supabase": {
+      supabase: {
+        auth: {
+          signInWithIdToken: async () => ({ error: null }),
+          getUser: async () => ({ data: { user: getUser() }, error: null }),
+        },
+      },
+    },
+  });
+}
+
+test("가입 1분 안에 다시 로그인해도 가입 완료 안내는 사용자별로 한 번만 보여 준다", async () => {
+  let user;
+  const { signIn } = loadSignIn({ getUser: () => user });
+  const signedUpAt = "2026-10-16T00:00:00Z";
+  user = { id: "a", created_at: signedUpAt, last_sign_in_at: signedUpAt };
+  assert.equal((await signIn("google")).isNewUser, true);
+  user = { id: "a", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:00:30Z" };
+  assert.equal((await signIn("google")).isNewUser, false);
+  user = { id: "b", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:00:10Z" };
+  assert.equal((await signIn("google")).isNewUser, true);
+  user = { id: "c", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:01:00Z" };
+  assert.equal((await signIn("google")).isNewUser, false);
+});
+
+test("카카오 신규 가입만 카카오 프로필 사진을 복사하고, 실패해도 로그인은 이어 간다", async () => {
+  const signedUpAt = "2026-10-16T00:00:00Z";
+  let user = { id: "k1", created_at: signedUpAt, last_sign_in_at: signedUpAt };
+  const saved = [];
+  let photoUrl = "https://k.kakaocdn.net/photo.jpg";
+  const { signIn } = loadSignIn({
+    getUser: () => user,
+    kakao: { me: async () => ({ profileImageUrl: photoUrl }) },
+    saveAvatar: async (uri) => {
+      if (uri.includes("broken")) throw new Error("load_failed");
+      saved.push(uri);
+    },
+  });
+  assert.equal((await signIn("kakao")).isNewUser, true);
+  assert.deepEqual(saved, ["https://k.kakaocdn.net/photo.jpg"]);
+
+  user = { id: "k2", created_at: signedUpAt, last_sign_in_at: "2026-10-16T00:05:00Z" };
+  assert.equal((await signIn("kakao")).isNewUser, false);
+  assert.equal(saved.length, 1, "기존 회원은 복사하지 않는다");
+
+  user = { id: "k3", created_at: signedUpAt, last_sign_in_at: signedUpAt };
+  photoUrl = "";
+  await signIn("kakao");
+  assert.equal(saved.length, 1, "카카오 사진이 없으면 기본 이미지로 둔다");
+
+  user = { id: "k4", created_at: signedUpAt, last_sign_in_at: signedUpAt };
+  photoUrl = "https://k.kakaocdn.net/broken.jpg";
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    assert.equal((await signIn("kakao")).status, "success", "사진 실패가 로그인을 막지 않는다");
+  } finally {
+    console.warn = warn;
+  }
 });

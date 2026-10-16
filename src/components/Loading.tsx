@@ -11,6 +11,7 @@ import Animated, {
 
 import IndicatorSvg from "@/assets/images/icon-spinner-indicator.svg";
 import TrackSvg from "@/assets/images/icon-spinner-track.svg";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 
 const TrackIcon = cssInterop(TrackSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
@@ -60,9 +61,10 @@ type LoadingDialogProps = {
 };
 
 export function LoadingDialog({ visible, message, onDismiss }: LoadingDialogProps) {
+  const isNativeVisible = useNativeModalVisible(visible);
   return (
     <Modal
-      visible={visible}
+      visible={isNativeVisible}
       transparent
       animationType="fade"
       statusBarTranslucent

@@ -161,7 +161,8 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# 카카오 로그인(브라우저 방식)은 앱 딥링크로 돌아온다.
+additional_redirect_urls = ["https://127.0.0.1:3000", "diggin://**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -320,9 +321,33 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+[auth.external.google]
+enabled = true
+# 웹 클라이언트 ID가 먼저, 이어서 iOS 클라이언트 ID(쉼표 구분). 기기 로그인 토큰의 대상이 iOS 클라이언트 ID다.
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+# iOS 기기 구글 로그인은 nonce를 넘기지 않는다(Supabase 구글 로그인 iOS 안내).
+skip_nonce_check = true
+email_optional = false
+
+[auth.external.kakao]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_SECRET)"
+redirect_uri = ""
+url = ""
+skip_nonce_check = false
+# MY-010 최소 수집: 카카오 이메일은 비즈 앱 승인이 필요해 요청하지 않는다.
+email_optional = true
+
 [auth.external.apple]
-enabled = false
-client_id = ""
+enabled = true
+# iOS 기기 애플 로그인은 번들 ID가 토큰의 대상이다. Android 애플(브라우저)을 붙이면 Services ID를 쉼표로 추가한다.
+client_id = "env(SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID)"
 # DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
 secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
 # Overrides the default auth callback URL derived from auth.external_url.
@@ -333,7 +358,8 @@ url = ""
 # If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
-email_optional = false
+# MY-010 최소 수집: 이메일을 요청하지 않아도 가입할 수 있게 한다.
+email_optional = true
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.

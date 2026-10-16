@@ -104,6 +104,7 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 - push_tokens: 등록은 `register_push_token(token, platform)`만(같은 토큰은 마지막 로그인 계정으로 옮김), 앱은 본인 토큰 select·delete.
 - withdrawal_surveys(private, user_id 없음): 탈퇴 Edge Function이 service_role로만 쓴다.
 - Storage avatars 버킷: 비공개, WebP, 512KB 이하, 경로 `{user_id}/파일명`, 본인 폴더만 select·insert·update·delete.
+- 카카오 프로필 이미지(AUTH-006)는 URL로 두지 않고 신규 가입 때 앱이 받아 avatars에 512 WebP로 복사한다(`set_avatar`). 카카오에서 사진을 바꾸거나 지워도 앱 사진이 깨지지 않는다.
 
 ## 6. 남은 테이블 설계
 
@@ -245,7 +246,6 @@ admin_actions  id, admin_id, action, target_type, target_id, report_id null, rea
 - 투표 결과를 투표할 수 없는 작성자와 마감 후 미참여자에게 보여줄지(VOTE-009)
 - 가입 시 약관 동의 화면이 명세에 없다. 처음 동의 기록을 언제 만들지(MY-009)
 - 닉네임 "한글"에 자음·모음 단독(ㄱ, ㅏ)을 허용할지. 지금은 허용하지 않는다
-- 카카오 프로필 이미지(AUTH-006)를 URL로 둘지 Storage에 복사할지
 - 차단 방향(단방향 명세 vs 앱 모달 문구 "서로의 게시글"), 차단 해제 화면 없음
 - 관리자 인증 방식, CSV 처리 위치(Edge Function / 클라이언트 + RPC), import 실패 사유 코드 추가 여부
 - 운영자가 숨긴 글을 작성자 본인에게 보여줄지, 작성자가 지운 글·댓글 원문 보관 기간

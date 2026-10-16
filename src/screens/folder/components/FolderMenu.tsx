@@ -2,6 +2,7 @@ import { Modal, Pressable, Text, View, useWindowDimensions } from "react-native"
 
 import DeleteIcon from "@/assets/images/folder/icon-folder-delete.svg";
 import EditIcon from "@/assets/images/folder/icon-folder-edit.svg";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 
 const MENU_WIDTH = 92;
 const MENU_HEIGHT = 96;
@@ -24,6 +25,7 @@ export function FolderMenu({
   onDelete,
   placement = "card",
 }: FolderMenuProps) {
+  const isNativeVisible = useNativeModalVisible(true);
   const { width, height } = useWindowDimensions();
   // 선택한 폴더 중심에서 우측 24px. 가장자리에서는 메뉴가 화면 밖으로 잘리지 않게 합니다.
   const left = Math.max(
@@ -45,7 +47,7 @@ export function FolderMenu({
 
   return (
     <Modal
-      visible
+      visible={isNativeVisible}
       transparent
       statusBarTranslucent={placement === "header"}
       animationType="none"

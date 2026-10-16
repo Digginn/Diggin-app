@@ -1,5 +1,6 @@
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,6 +10,7 @@ import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
 
+import { signIn } from "./api/signIn";
 import { SocialLoginButton, type LoginProvider } from "./components/SocialLoginButton";
 
 const LOGIN_PROVIDERS: LoginProvider[] = ["google", "kakao", "apple"];
@@ -25,12 +27,24 @@ export function LoginScreen({
   const router = useRouter();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const [hasError, setHasError] = useState(isLoginError);
+  const [isLoading, setIsLoading] = useState(isLoginLoading);
 
-  function handleLogin() {
-    Alert.alert(
-      "로그인 연동 준비 중",
-      "현재는 UI 확인용 화면입니다. 실제 로그인은 아직 연결되지 않았습니다.",
-    );
+  async function handleLogin(provider: LoginProvider) {
+    if (isLoading) return;
+    setHasError(false);
+    setIsLoading(true);
+    try {
+      const result = await signIn(provider);
+      if (result.status === "cancelled") return;
+      // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다.
+      router.replace((result.isNewUser ? "/signup-complete" : "/(tabs)/all") as Href);
+    } catch (error) {
+      console.warn("소셜 로그인에 실패했습니다.", error);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function handlePolicy(title: string) {
@@ -41,7 +55,7 @@ export function LoginScreen({
     <View className="flex-1 bg-gray-0">
       <StatusBar style="dark" />
       <AppBar
-        left={isLoginError ? "none" : "back"}
+        left={hasError ? "none" : "back"}
         backIcon={BackIcon}
         backIconSize={24}
         onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
@@ -74,7 +88,7 @@ export function LoginScreen({
           </Text>
         </View>
         <View className="mt-[60px] w-full gap-[10px] px-margin">
-          {isLoginError && (
+          {hasError && (
             <View
               pointerEvents="none"
               className="absolute inset-x-0 top-[-54px] items-center px-margin"
@@ -83,7 +97,11 @@ export function LoginScreen({
             </View>
           )}
           {LOGIN_PROVIDERS.map((provider) => (
-            <SocialLoginButton key={provider} provider={provider} onPress={handleLogin} />
+            <SocialLoginButton
+              key={provider}
+              provider={provider}
+              onPress={() => handleLogin(provider)}
+            />
           ))}
         </View>
         <Pressable
@@ -119,9 +137,7 @@ export function LoginScreen({
           </View>
         </View>
       </ScrollView>
-      {isLoginLoading && (
-        <LoadingDialog message="로그인 중입니다." onRequestClose={() => router.replace("/login")} />
-      )}
+      {isLoading && <LoadingDialog message="로그인 중입니다." />}
     </View>
   );
 }

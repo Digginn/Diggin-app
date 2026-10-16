@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AVATAR_UNREADABLE_ERROR } from "@/api/avatar";
 import { IconProfileCamera, ImageProfilePlaceholder } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
 import { AuthProviderIcon, type AuthProvider } from "@/components/AuthProviderIcon";
@@ -24,12 +25,16 @@ import { useToast } from "@/hooks/useToast";
 
 import { PROFILE_MESSAGES } from "./constants/profileMessages";
 import { NICKNAME_HELPER_MESSAGE, validateNickname } from "./utils/validateNickname";
+import { validateProfileImage } from "./utils/validateProfileImage";
 
 const Image = cssInterop(ExpoImage, { className: "style" });
 
 type ProfileEditScreenProps = {
   authProvider?: AuthProvider;
-  onSaveNickname?: (nickname: string) => Promise<void>;
+  currentNickname?: string;
+  avatarUrl?: string;
+  /** 서버 검사에 걸리면 입력칸 아래에 보여줄 문구를 돌려준다. */
+  onSaveNickname?: (nickname: string) => Promise<string | void>;
   onSavePhoto?: (uri: string) => Promise<void>;
 };
 
@@ -37,6 +42,8 @@ const AUTH_PROVIDER_LABELS = { kakao: "카카오", google: "Google", apple: "App
 
 export function ProfileEditScreen({
   authProvider = "kakao",
+  currentNickname,
+  avatarUrl,
   onSaveNickname,
   onSavePhoto,
 }: ProfileEditScreenProps = {}) {
@@ -70,11 +77,17 @@ export function ProfileEditScreen({
           ? await ImagePicker.launchCameraAsync(options)
           : await ImagePicker.launchImageLibraryAsync(options);
 
-      if (!result.canceled && result.assets[0]) {
-        setProfileImageUri(result.assets[0].uri);
+      const asset = result.canceled ? undefined : result.assets[0];
+      if (!asset) return;
+      // MY-003 쓸 수 없는 사진이면 기존 사진을 그대로 둔다.
+      const imageError = validateProfileImage(asset);
+      if (imageError) {
+        showToast(imageError);
+        return;
       }
+      setProfileImageUri(asset.uri);
     } catch {
-      showToast(PROFILE_MESSAGES.photoFailure);
+      showToast(PROFILE_MESSAGES.photoUnreadable);
     }
   };
 
@@ -119,15 +132,28 @@ export function ProfileEditScreen({
     }
 
     setIsSaving(true);
-    let failureMessage: string = PROFILE_MESSAGES.photoFailure;
+    // 닉네임은 서버 검사에 걸릴 수 있어 사진보다 먼저 저장한다.
+    let failureMessage: string = PROFILE_MESSAGES.nicknameFailure;
     try {
+      if (nickname) {
+        const nicknameError = await onSaveNickname?.(nickname);
+        if (nicknameError) {
+          setHelperStatus("error");
+          setHelperMessage(nicknameError);
+          return;
+        }
+      }
+      failureMessage = PROFILE_MESSAGES.photoFailure;
       if (profileImageUri) await onSavePhoto?.(profileImageUri);
-      failureMessage = PROFILE_MESSAGES.nicknameFailure;
-      if (nickname) await onSaveNickname?.(nickname);
       router.dismissTo("/(tabs)/my" as Href);
       showToast(nickname ? PROFILE_MESSAGES.nicknameSuccess : PROFILE_MESSAGES.photoSuccess);
-    } catch {
-      showToast(failureMessage);
+    } catch (error) {
+      const isUnreadable =
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        error.message === AVATAR_UNREADABLE_ERROR;
+      showToast(isUnreadable ? PROFILE_MESSAGES.photoUnreadable : failureMessage);
     } finally {
       setIsSaving(false);
     }
@@ -151,13 +177,17 @@ export function ProfileEditScreen({
             onPress={handlePhotoMenu}
           >
             <Image
-              source={profileImageUri ? { uri: profileImageUri } : ImageProfilePlaceholder}
+              source={
+                profileImageUri || avatarUrl
+                  ? { uri: profileImageUri ?? avatarUrl }
+                  : ImageProfilePlaceholder
+              }
               contentFit="cover"
               className="h-full w-full"
               onError={() => {
                 if (!profileImageUri) return;
                 setProfileImageUri(undefined);
-                showToast(PROFILE_MESSAGES.photoFailure);
+                showToast(PROFILE_MESSAGES.photoUnreadable);
               }}
             />
             <View pointerEvents="none" className="absolute left-[72px] top-[73px] h-6 w-6">
@@ -177,7 +207,7 @@ export function ProfileEditScreen({
               setHelperMessage(NICKNAME_HELPER_MESSAGE);
             }}
             onSubmitEditing={handleSave}
-            placeholder="현재 닉네임"
+            placeholder={currentNickname ?? "현재 닉네임"}
             returnKeyType="done"
             value={nickname}
           />
