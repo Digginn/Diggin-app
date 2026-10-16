@@ -3,10 +3,22 @@
     "appVersionSource": "local"
   },
   "build": {
+    "production": {
+      "distribution": "store",
+      "environment": "production",
+      "autoIncrement": true
+    },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6821486710"
       }
     }
   }
