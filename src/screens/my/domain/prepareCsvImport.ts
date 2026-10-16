@@ -56,7 +56,15 @@ function truncateCharacters(value: string, limit: number): string {
 }
 
 function normalizeProductText(value: string, limit: number): string {
-  return truncateCharacters(value.normalize("NFC").trim(), limit);
+  let text = "";
+  let characterCount = 0;
+  for (const grapheme of splitGraphemes(value.normalize("NFC").trim())) {
+    const length = [...grapheme].length;
+    if (characterCount + length > limit) break;
+    text += grapheme;
+    characterCount += length;
+  }
+  return text.trim();
 }
 
 function parsePrice(value: string): string | null {
@@ -90,7 +98,7 @@ function folderNames(value: string): string[] {
     ...new Set(
       value
         .split(",")
-        .map((name) => name.trim())
+        .map((name) => name.normalize("NFC").trim())
         .filter(Boolean),
     ),
   ];
@@ -152,6 +160,10 @@ export function prepareCsvImport(
   function mapFolder(sourceName: string, rowNumber: number, productName: string): string | null {
     seenFolderSources.add(sourceName);
     let folderName = mappedFolders.get(sourceName);
+    if (!folderName && existingFolders.has(sourceName)) {
+      folderName = sourceName;
+      mappedFolders.set(sourceName, folderName);
+    }
     if (!folderName) {
       const base = truncateCharacters(sourceName, MAX_FOLDER_NAME_LENGTH);
       folderName = base;
@@ -248,6 +260,7 @@ export function prepareCsvImport(
         rowNumber,
         savedAtTime,
         product: {
+          rowNumber,
           name,
           url,
           brand: normalizeProductText(cell("브랜드명"), MAX_BRAND_NAME_LENGTH) || null,
@@ -258,6 +271,7 @@ export function prepareCsvImport(
           folderNames: folderNames(cell("버킷명"))
             .map((sourceName) => mapFolder(sourceName, rowNumber, name))
             .filter((folderName): folderName is string => folderName !== null),
+          sourceFolderNames: folderNames(cell("버킷명")),
           isOwned: cell("소장템 여부").trim() === "Y",
         },
       };
@@ -279,6 +293,9 @@ export function prepareCsvImport(
       candidate.savedAtTime > current.savedAtTime ? candidate : current,
     );
     const names = [...new Set(candidates.flatMap((candidate) => candidate.product.folderNames))];
+    const sourceNames = [
+      ...new Set(candidates.flatMap((candidate) => candidate.product.sourceFolderNames)),
+    ];
     const isOwned = candidates.some((candidate) => candidate.product.isOwned);
     const existing = existingByUrl.get(url);
     if (existing) {
@@ -289,7 +306,12 @@ export function prepareCsvImport(
         existingProductUpdates.push({ productId: existing.id, addFolderNames, addOwnedFolder });
       }
     } else {
-      products.push({ ...latest.product, folderNames: names, isOwned });
+      products.push({
+        ...latest.product,
+        folderNames: names,
+        sourceFolderNames: sourceNames,
+        isOwned,
+      });
     }
     for (const candidate of candidates) {
       if (existing || candidate !== latest) {

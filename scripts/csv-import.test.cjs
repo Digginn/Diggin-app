@@ -259,7 +259,7 @@ function loadResultModal() {
         if (name === "react-native")
           return {
             Pressable: "Pressable",
-            ScrollView: "ScrollView",
+            FlatList: "FlatList",
             Text: "Text",
             View: "View",
             useWindowDimensions: () => ({ height: 812 }),
@@ -304,6 +304,7 @@ test("완료·중복 제외·전체 성공·전체 실패의 제목과 개수를
     ],
     [50, duplicates, "총 50개의 아이템을 가져왔습니다.\n중복 아이템 3개는 제외했습니다."],
     [53, [], "총 53개의 아이템을 가져왔습니다."],
+    [0, duplicates, "파일의 모든 아이템이 이미 저장되어 있습니다."],
     [0, [...failed, ...duplicates], "가져올 수 있는 아이템이 없습니다."],
   ]) {
     const node = render({
@@ -315,14 +316,17 @@ test("완료·중복 제외·전체 성공·전체 실패의 제목과 개수를
     assert.equal(text.includes("제외된 아이템 보기"), excluded.length > 0);
     assert.ok(
       text.includes(
-        count === 0 ? "아이템을 가져오지 못했습니다" : "아이템 가져오기가 완료되었습니다",
+        count === 0 && excluded.some((item) => item.kind === "failed")
+          ? "아이템을 가져오지 못했습니다"
+          : "아이템 가져오기가 완료되었습니다",
       ),
     );
-    if (count === 0) assert.ok(text.includes("제외된 아이템 11개를 확인해주세요."));
+    if (count === 0 && excluded.some((item) => item.kind === "failed"))
+      assert.ok(text.includes("제외된 아이템 11개를 확인해주세요."));
   }
 });
 
-test("제외 목록은 모든 항목·사유를 렌더링하고 X와 확인은 서로 다른 콜백이다", () => {
+test("제외 목록은 필요한 행만 렌더링하고 X와 확인은 서로 다른 콜백이다", () => {
   const render = loadResultModal();
   const onCloseExcluded = () => {};
   const onConfirm = () => {};
@@ -340,9 +344,14 @@ test("제외 목록은 모든 항목·사유를 렌더링하고 X와 확인은 �
   assert.equal(node.props.scrimOpacity, 0.36);
   const text = textContent(node);
   assert.ok(text.includes("제외된 아이템 11개"));
-  assert.ok(text.includes("상품 10사유 10"));
   const children = React.Children.toArray(node.props.children.props.children);
-  assert.equal(children[2].type, "ScrollView");
-  assert.equal(React.Children.count(children[2].props.children), 11);
+  const list = children[2];
+  assert.equal(list.type, "FlatList");
+  assert.equal(list.props.data.length, 11);
+  assert.equal(list.props.keyExtractor(result.excludedProducts[10]), "10");
+  assert.equal(
+    textContent(list.props.renderItem({ item: result.excludedProducts[10] })),
+    "상품 10사유 10",
+  );
   assert.equal(children.at(-1).props.onPress, onConfirm);
 });

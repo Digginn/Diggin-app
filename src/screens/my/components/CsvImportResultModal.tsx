@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { FlatList, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconCsvClose } from "@/assets/images/my/csv";
@@ -30,6 +30,9 @@ export function CsvImportResultModal({
   const duplicateCount = excluded.length - failedCount;
   const hasExcluded = excluded.length > 0;
   const isSuccess = result.importedCount > 0;
+  const hasOnlyDuplicates = !isSuccess && failedCount === 0 && duplicateCount > 0;
+  const isCompleted = isSuccess || hasOnlyDuplicates;
+  const folderFailureCount = result.folderFailures?.length ?? 0;
 
   return (
     <Modal
@@ -62,20 +65,21 @@ export function CsvImportResultModal({
               ? `가져오지 못한 아이템 ${failedCount}개${duplicateCount > 0 ? `와 중복 아이템 ${duplicateCount}개` : ""}입니다.`
               : `중복 아이템 ${duplicateCount}개입니다.`}
           </Text>
-          <ScrollView
+          <FlatList
+            data={excluded}
+            keyExtractor={(product) => product.id}
             style={{
               height: Math.max(80, Math.min(363, height - insets.top - insets.bottom - 228)),
             }}
-          >
-            {excluded.map((product) => (
-              <View key={product.id} className="gap-1 border-b border-gray-100 px-1 py-3">
+            renderItem={({ item: product }) => (
+              <View className="gap-1 border-b border-gray-100 px-1 py-3">
                 <Text numberOfLines={1} className="text-gray-900 font-b3">
                   {product.productName}
                 </Text>
                 <Text className="text-gray-500 font-meta">{product.reason}</Text>
               </View>
-            ))}
-          </ScrollView>
+            )}
+          />
           <Button onPress={onConfirm}>확인</Button>
         </>
       ) : (
@@ -83,7 +87,7 @@ export function CsvImportResultModal({
           <View className="items-center gap-1">
             <View className={hasExcluded ? "h-12 justify-center" : ""}>
               <Text className="text-center text-gray-900 font-label-16-semibold">
-                {isSuccess ? "아이템 가져오기가 완료되었습니다" : "아이템을 가져오지 못했습니다"}
+                {isCompleted ? "아이템 가져오기가 완료되었습니다" : "아이템을 가져오지 못했습니다"}
               </Text>
             </View>
             <Text className="text-center text-gray-700 font-b3">
@@ -92,10 +96,12 @@ export function CsvImportResultModal({
                   총 <Text className="font-pretendard-bold">{result.importedCount}개</Text>의
                   아이템을 가져왔습니다.
                 </>
+              ) : hasOnlyDuplicates ? (
+                "파일의 모든 아이템이 이미 저장되어 있습니다."
               ) : (
                 "가져올 수 있는 아이템이 없습니다."
               )}
-              {!isSuccess && (
+              {!isCompleted && (
                 <>
                   {" "}
                   {"\n"}제외된 아이템{" "}
@@ -117,6 +123,11 @@ export function CsvImportResultModal({
               )}
             </Text>
           </View>
+          {folderFailureCount > 0 && (
+            <Text className="text-center text-gray-600 font-b3">
+              {`폴더에 담지 못한 항목이 ${folderFailureCount}건 있습니다.\n아이템은 ALL에서 확인할 수 있습니다.`}
+            </Text>
+          )}
           <View className="flex-row gap-modal-action">
             {hasExcluded && (
               <View className="flex-1">

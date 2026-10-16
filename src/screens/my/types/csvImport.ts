@@ -10,9 +10,12 @@ export type CsvExcludedProduct = {
 export type CsvImportResult = {
   importedCount: number;
   excludedProducts: CsvExcludedProduct[];
+  folderFailures?: CsvFolderFailure[];
 };
 
-export type CsvImportFailure = { error: "missing-product-info" };
+export type CsvImportFailure = {
+  error: "missing-product-info" | "file-too-large" | "invalid-encoding" | "login-required";
+};
 
 export type CsvFileError =
   "INVALID_FILE_TYPE" | "FILE_TOO_LARGE" | "INVALID_UTF8" | "INVALID_HEADERS";
@@ -33,15 +36,18 @@ export type CsvDuplicateRow = {
 };
 
 export type CsvPlannedProduct = {
+  rowNumber: number;
   name: string;
   url: string;
   brand: string | null;
-  // numeric 컬럼에 전달할 십진 문자열. 큰 가격도 Number로 변환하지 않는다.
+  // DB 정수 범위를 넘는 값은 서버가 가격 정보 없음으로 처리한다.
   price: string | null;
   savedAt: string;
   imageUrl: null;
   wishLevel: null;
   folderNames: string[];
+  // 서버가 실제 폴더 수를 확인한 뒤 연결하므로 한도로 제외된 버킷도 보존한다.
+  sourceFolderNames: string[];
   isOwned: boolean;
 };
 
@@ -67,7 +73,7 @@ export type CsvFolderFailure = {
   rowNumber: number;
   productName: string;
   sourceFolderName: string;
-  reason: "FOLDER_LIMIT_EXCEEDED";
+  reason: "FOLDER_LIMIT_EXCEEDED" | "FOLDER_SAVE_FAILED";
 };
 
 /** 저장 전 계획이다. 이 수치를 UI의 저장 성공 결과로 사용하지 않는다. */

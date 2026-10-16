@@ -279,16 +279,16 @@ test("기존 ALL 중복은 상품 정보를 건드리지 않고 누락 관계만
   assert.deepEqual(result.products, []);
   assert.equal(result.duplicateCount, 2);
   assert.deepEqual(result.existingProductUpdates, [
-    { productId: "product-1", addFolderNames: ["신발2", "선물", "여행"], addOwnedFolder: true },
+    { productId: "product-1", addFolderNames: ["선물", "여행"], addOwnedFolder: true },
   ]);
   assert.equal(JSON.stringify(existingProducts), before);
   assertCounts(result);
   const repeated = plan([product({ "버킷명": "신발", "소장템 여부": "Y" })], {
     ...OPTIONS,
-    existingFolderNames: ["신발", "신발2", "선물", "여행"],
+    existingFolderNames: ["신발", "선물", "여행"],
     previousFolderMappings: result.folderMappings,
     existingProducts: [
-      { ...existingProducts[0], folderNames: ["신발", "신발2", "선물", "여행"], isOwned: true },
+      { ...existingProducts[0], folderNames: ["신발", "선물", "여행"], isOwned: true },
     ],
   });
   assert.deepEqual(repeated.existingProductUpdates, []);
@@ -313,7 +313,7 @@ test("상품명·브랜드명은 NFC와 앞뒤 공백 제거 후 100자·30자�
   const result = plan([
     product({ 상품명: ` ${family.repeat(101)} `, 브랜드명: ` ${"e\u0301".repeat(31)} ` }),
   ]);
-  assert.equal(result.products[0].name, family.repeat(100));
+  assert.equal(result.products[0].name, family.repeat(Math.floor(100 / [...family].length)));
   assert.equal(result.products[0].brand, "é".repeat(30));
   assert.equal(result.failedCount, 0);
   assert.equal(plan([product({ 상품명: " \u1100\u1161 ", 브랜드명: " " })]).products[0].name, "가");
@@ -345,6 +345,86 @@ test("기존 폴더와 충돌 시 가장 작은 번호를 쓰고 두 자리 번�
   });
   assert.equal(second.products[0].folderNames[0], "abcde10");
   assert.equal(second.folderFailures.length, 0);
+});
+
+test("원본 버킷명이 기존 폴더명과 같으면 여러 행을 기존 폴더에 담는다", () => {
+  const result = plan(
+    [
+      product({ 버킷명: " 신발,선물,신발 " }),
+      product({ "버킷명": "신발", "상품 링크": "https://krw.example/item/2" }),
+    ],
+    { ...OPTIONS, existingFolderNames: ["신발"] },
+  );
+  assert.deepEqual(result.foldersToCreate, ["선물"]);
+  assert.deepEqual(
+    result.products.map((p) => p.folderNames),
+    [["신발", "선물"], ["신발"]],
+  );
+  assert.deepEqual(result.folderMappings, [
+    { sourceName: "신발", folderName: "신발" },
+    { sourceName: "선물", folderName: "선물" },
+  ]);
+  assert.deepEqual(result.folderFailures, []);
+  assertCounts(result);
+});
+
+test("50개일 때 기존 폴더 재사용은 허용하고 새 버킷의 상품은 ALL에만 남긴다", () => {
+  const existingFolderNames = Array.from({ length: 50 }, (_, i) => `폴더${i}`);
+  const rows = [
+    product({ 버킷명: "폴더0" }),
+    product({ "버킷명": "새폴더", "상품 링크": "https://krw.example/item/2" }),
+  ];
+  const full = plan(rows, { ...OPTIONS, existingFolderNames });
+  assert.deepEqual(full.foldersToCreate, []);
+  assert.deepEqual(
+    full.products.map((p) => p.folderNames),
+    [["폴더0"], []],
+  );
+  assert.deepEqual(
+    full.folderFailures.map((f) => f.sourceFolderName),
+    ["새폴더"],
+  );
+  assert.equal(full.newProductCount, 2);
+  assert.equal(full.failedCount, 0);
+  assertCounts(full);
+
+  const afterDeletion = plan(rows, {
+    ...OPTIONS,
+    existingFolderNames: existingFolderNames.slice(0, 49),
+  });
+  assert.deepEqual(afterDeletion.foldersToCreate, ["새폴더"]);
+  assert.deepEqual(
+    afterDeletion.products.map((p) => p.folderNames),
+    [["폴더0"], ["새폴더"]],
+  );
+  assert.deepEqual(afterDeletion.folderFailures, []);
+});
+
+test("45개에서 신규 버킷 7개 중 5개만 생성하고 기존 폴더는 계속 재사용한다", () => {
+  const existingFolderNames = Array.from({ length: 45 }, (_, i) => `폴더${i}`);
+  const rows = Array.from({ length: 7 }, (_, i) =>
+    product({ "버킷명": `신규${i}`, "상품 링크": `https://krw.example/item/new-${i}` }),
+  );
+  rows.push(product({ "버킷명": "폴더0", "상품 링크": "https://krw.example/item/existing" }));
+  const result = plan(rows, { ...OPTIONS, existingFolderNames });
+  assert.deepEqual(result.foldersToCreate, ["신규0", "신규1", "신규2", "신규3", "신규4"]);
+  assert.deepEqual(
+    result.products.slice(5, 7).map((p) => p.folderNames),
+    [[], []],
+  );
+  assert.deepEqual(result.products[7].folderNames, ["폴더0"]);
+  assert.equal(result.folderFailures.length, 2);
+  assert.equal(result.newProductCount, 8);
+  assertCounts(result);
+});
+
+test("잘린 이름이 기존 폴더와 같으면 번호를 붙이고 원본 일치는 기존 폴더로 보낸다", () => {
+  const result = plan([product({ 버킷명: "abcdefg-long,abcdefg,abcdef2" })], {
+    ...OPTIONS,
+    existingFolderNames: ["abcdefg", "abcdef2"],
+  });
+  assert.deepEqual(result.products[0].folderNames, ["abcdef3", "abcdefg", "abcdef2"]);
+  assert.deepEqual(result.foldersToCreate, ["abcdef3"]);
 });
 
 test("이모지·한글 조합을 중간에서 끊지 않고 모든 폴더 후보를 7자로 제한한다", () => {
