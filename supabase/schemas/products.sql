@@ -15,7 +15,6 @@ create table public.products (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint products_id_user_id_key unique (id, user_id),
-  -- SAVE-012 회원 단위로 같은 링크는 한 번만 저장한다.
   constraint products_user_id_url_key unique (user_id, url),
   constraint products_url_https check (url ~* '^https://'),
   -- 상품명·브랜드는 명세가 NFC 정규화 후 문자 수라 char_length로 센다.
@@ -24,7 +23,6 @@ create table public.products (
   constraint products_price_non_negative check (price >= 0)
 );
 
--- ALL-002 최신 순·오래된 순. 같은 시각이면 id 내림차순.
 create index products_user_id_saved_at_idx on public.products (user_id, saved_at desc, id desc);
 
 create table public.product_folders (
@@ -168,7 +166,6 @@ create trigger product_folders_reject_owned_wish_level
 before insert on public.product_folders
 for each row execute function private.reject_wish_level_in_owned_folder();
 
--- SAVE-012·013 상품과 폴더 관계를 한 번에 저장한다. 같은 링크가 있으면 저장하지 않고 기존 상품 id를 돌려준다.
 create or replace function private.save_product(
   product_url text,
   product_name text,
@@ -206,7 +203,6 @@ begin
     return;
   end if;
 
-  -- 나의 소장템을 같이 고르면 위시레벨을 비운다(PDT-008).
   is_owned := exists (
     select 1 from public.folders f
     where f.id = any (coalesce(folder_ids, '{}')) and f.user_id = current_user_id and f.kind = 'owned'
@@ -243,7 +239,6 @@ begin
 end;
 $$;
 
--- PDT-008 나의 소장템 추가·해제. 해제할 때는 새 위시레벨이 있어야 한다.
 create or replace function private.set_owned(
   target_product_id bigint,
   is_owned boolean,
@@ -351,7 +346,6 @@ grant execute on function public.set_owned(bigint, boolean, boolean, public.wish
 alter table public.products enable row level security;
 alter table public.product_folders enable row level security;
 
--- 상품은 save_product로만 만든다. 앱은 이름·브랜드·가격·위시레벨만 고치고, 링크·이미지는 고칠 수 없다(PDT-006).
 revoke all on table public.products from anon, authenticated;
 grant select, delete on table public.products to authenticated;
 grant update (name, brand, price, wish_level) on table public.products to authenticated;

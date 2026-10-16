@@ -172,7 +172,6 @@ begin
     return;
   end if;
 
-  -- 나의 소장템을 같이 고르면 위시레벨을 비운다(PDT-008).
   is_owned := exists (
     select 1 from public.folders f
     where f.id = any (coalesce(folder_ids, '{}')) and f.user_id = current_user_id and f.kind = 'owned'
