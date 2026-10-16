@@ -9,6 +9,7 @@
     "scheme": "diggin",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "buildNumber": "4",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent"
       },

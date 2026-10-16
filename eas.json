@@ -3,6 +3,11 @@
     "appVersionSource": "local"
   },
   "build": {
+    "production": {
+      "distribution": "store",
+      "environment": "production",
+      "autoIncrement": true
+    },
     "preview": {
       "distribution": "internal",
       "android": {
