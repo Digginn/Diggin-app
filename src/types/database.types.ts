@@ -90,6 +90,94 @@ export type Database = {
         };
         Relationships: [];
       };
+      product_folders: {
+        Row: {
+          created_at: string;
+          folder_id: number;
+          product_id: number;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          folder_id: number;
+          product_id: number;
+          user_id?: string;
+        };
+        Update: {
+          created_at?: string;
+          folder_id?: number;
+          product_id?: number;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_folders_folder_fkey";
+            columns: ["folder_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "folders";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "product_folders_product_fkey";
+            columns: ["product_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id", "user_id"];
+          },
+        ];
+      };
+      products: {
+        Row: {
+          brand: string | null;
+          created_at: string;
+          id: number;
+          image_url: string | null;
+          name: string;
+          price: number | null;
+          saved_at: string;
+          updated_at: string;
+          url: string;
+          user_id: string;
+          wish_level: Database["public"]["Enums"]["wish_level"] | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          brand?: string | null;
+          created_at?: string;
+          id?: never;
+          image_url?: string | null;
+          name: string;
+          price?: number | null;
+          saved_at?: string;
+          updated_at?: string;
+          url: string;
+          user_id?: string;
+          wish_level?: Database["public"]["Enums"]["wish_level"] | null;
+        };
+        Update: {
+          brand?: string | null;
+          created_at?: string;
+          id?: never;
+          image_url?: string | null;
+          name?: string;
+          price?: number | null;
+          saved_at?: string;
+          updated_at?: string;
+          url?: string;
+          user_id?: string;
+          wish_level?: Database["public"]["Enums"]["wish_level"] | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "products_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           avatar_path: string | null;
@@ -188,12 +276,37 @@ export type Database = {
         Args: { new_platform: string; new_token: string };
         Returns: undefined;
       };
+      save_product: {
+        Args: {
+          folder_ids?: number[];
+          product_brand?: string;
+          product_image_url?: string;
+          product_name: string;
+          product_price?: number;
+          product_url: string;
+          product_wish_level?: Database["public"]["Enums"]["wish_level"];
+        };
+        Returns: {
+          is_duplicate: boolean;
+          product_id: number;
+        }[];
+      };
       set_avatar: { Args: { new_path: string }; Returns: undefined };
+      set_owned: {
+        Args: {
+          is_owned: boolean;
+          keep_other_folders?: boolean;
+          new_wish_level?: Database["public"]["Enums"]["wish_level"];
+          target_product_id: number;
+        };
+        Returns: undefined;
+      };
       update_nickname: { Args: { new_nickname: string }; Returns: string };
     };
     Enums: {
       account_status: "active" | "warning" | "community_restricted" | "suspended";
       folder_kind: "custom" | "owned";
+      wish_level: "high" | "medium" | "low";
       withdrawal_reason:
         "rarely_used" | "missing_feature" | "other_service" | "hard_to_use" | "frequent_error";
     };
@@ -312,6 +425,7 @@ export const Constants = {
     Enums: {
       account_status: ["active", "warning", "community_restricted", "suspended"],
       folder_kind: ["custom", "owned"],
+      wish_level: ["high", "medium", "low"],
       withdrawal_reason: [
         "rarely_used",
         "missing_feature",

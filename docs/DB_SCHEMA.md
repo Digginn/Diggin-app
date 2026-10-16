@@ -9,13 +9,13 @@
 
 ## 1. 진행 상황
 
-| 영역           | 테이블                                                                                                                         | 상태                                                        |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                  |
-| 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다 |
-| 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | 미구현                                                      |
-| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | 미구현                                                      |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                      |
+| 영역           | 테이블                                                                                                                         | 상태                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                    |
+| 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다   |
+| 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*는 CSV 작업에서 |
+| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | 미구현                                                        |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                        |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -74,7 +74,7 @@ private  API에 노출하지 않는 곳. 앱은 RPC로만 접근한다.
 ## 4. Enum
 
 ```
-wish_level          high | medium | low
+wish_level          high | medium | low                               (구현)
 folder_kind         custom | owned                                    (구현)
 post_type           post | vote
 vote_choice         buy | not
@@ -99,12 +99,22 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 - 랜덤 닉네임 `private.generate_nickname()`: 형용사 + 디기 + 숫자(예: 느긋한디기12). 형용사 40개(2~4자), 숫자 1~9999라 2~10자 안에 들어간다. 직접 변경과 같은 검사를 통과한 후보만 쓴다(AUTH-005).
 - 닉네임 검사 `private.nickname_error()`: 글자 수 → 공백 → 특수문자·이모지 → 금칙어 → 사칭 → 중복(AUTH-008). 사칭 규칙은 명세 문구대로 함수에 있고, 금칙어는 `private.nickname_banned_words`(korcen 사전, 아직 비어 있음), 오탐 보정은 `nickname_allowed_words`.
 - profiles: 앱은 본인 행 select만. 닉네임은 `update_nickname`, 이미지는 `set_avatar`, 제재 상태는 운영 API만 바꾼다.
-- folders: 사용자별 이름 중복 금지, 일반 폴더 최대 50개(프로필 행을 잠근 뒤 센다), 나의 소장템은 만들기·고치기·지우기 불가. `last_added_at`은 컬럼만 있고 갱신 트리거는 product_folders와 함께 만든다.
+- folders: 사용자별 이름 중복 금지, 일반 폴더 최대 50개(프로필 행을 잠근 뒤 센다), 나의 소장템은 만들기·고치기·지우기 불가. `last_added_at`은 상품을 담을 때 트리거로 갱신한다(#78).
 - legal_policies(public, 비회원도 조회) / user_policy_consents(private): `get_pending_policies()`, `accept_policy(policy_id)`.
 - push_tokens: 등록은 `register_push_token(token, platform)`만(같은 토큰은 마지막 로그인 계정으로 옮김), 앱은 본인 토큰 select·delete.
 - withdrawal_surveys(private, user_id 없음): 탈퇴 Edge Function이 service_role로만 쓴다.
 - Storage avatars 버킷: 비공개, WebP, 512KB 이하, 경로 `{user_id}/파일명`, 본인 폴더만 select·insert·update·delete.
 - 카카오 프로필 이미지(AUTH-006)는 URL로 두지 않고 신규 가입 때 앱이 받아 avatars에 512 WebP로 복사한다(`set_avatar`). 카카오에서 사진을 바꾸거나 지워도 앱 사진이 깨지지 않는다.
+
+## 5-1. 구현된 영역 요약 (#78 아이템)
+
+- products: 앱은 본인 상품 select·delete, update는 name·brand·price·wish_level만. 링크·대표 이미지는 고칠 수 없다(PDT-006). 만들기는 `save_product`로만.
+- 입력 검사 `private.product_input_error(url, name, brand, price)`: `invalid_url | name_required | name_too_long | brand_too_long | invalid_price` 중 하나 또는 null. 저장과 CSV 가져오기가 같은 함수로 검사한다. 상한을 넘는 자동 추출·CSV 값은 호출하는 쪽이 잘라서 넘긴다.
+- 정규화 트리거: 링크는 앞뒤 공백 제거, 상품명·브랜드는 NFC + 앞뒤 공백 제거, 빈 브랜드는 null.
+- `save_product(url, name, brand?, price?, image_url?, wish_level?, folder_ids?)` → `(product_id, is_duplicate)`. 같은 링크면 저장하지 않고 기존 상품 id와 `is_duplicate = true`를 돌려준다(SAVE-012). 입력 오류는 `22023` 예외(메시지가 위 오류 코드). 나의 소장템을 같이 고르면 위시레벨을 비운다.
+- `set_owned(product_id, is_owned, keep_other_folders = true, new_wish_level?)`: 소장 추가 시 위시레벨을 비우고 나의 소장템에 담는다. `keep_other_folders = false`면 다른 폴더에서 뺀다(MSG-PDT-009). 해제는 `new_wish_level`이 필수(`wish_level_required`).
+- product_folders: 앱은 일반 폴더만 직접 담기(insert)·빼기(delete). 나의 소장템은 `set_owned`로만. 담으면 `folders.last_added_at`을 담은 시각으로 바꾸고, 빼도 되돌리지 않는다.
+- 소장템 상품에 위시레벨을 넣거나, 위시레벨 있는 상품을 소장템에 담으면 `owned_product_wish_level`(P0001)로 막는다.
 
 ## 6. 남은 테이블 설계
 
