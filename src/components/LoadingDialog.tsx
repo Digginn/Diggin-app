@@ -11,6 +11,7 @@ import Animated, {
 
 import SpinnerIcon from "@/assets/images/icon-loading-spinner.svg";
 import TrackIcon from "@/assets/images/icon-loading-track.svg";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 
 type LoadingDialogProps = {
   message: string;
@@ -56,10 +57,11 @@ function LoadingSpinner() {
 }
 
 export function LoadingDialog({ message, onRequestClose }: LoadingDialogProps) {
+  const isNativeVisible = useNativeModalVisible(true);
   return (
     <Modal
       transparent
-      visible
+      visible={isNativeVisible}
       statusBarTranslucent
       navigationBarTranslucent
       onRequestClose={onRequestClose ?? (() => {})}

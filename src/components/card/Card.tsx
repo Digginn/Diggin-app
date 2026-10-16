@@ -79,10 +79,17 @@ export function Card({
         </View>
       )}
       <View className="w-full gap-1.5">
-        <View className="w-full gap-0.5">
+        <View className="w-full gap-1.5">
+          <Text
+            className="w-full text-gray-900 font-label-12-regular"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {name}
+          </Text>
           <View className="flex-row">
             <Text
-              className="min-w-0 max-w-[94px] shrink text-gray-1000 font-price-s"
+              className="min-w-0 max-w-[94px] shrink text-gray-900 font-price-s"
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -96,9 +103,6 @@ export function Card({
               <Text className="shrink-0 text-gray-900 font-label-12-regular">원</Text>
             )}
           </View>
-          <Text className="w-full text-gray-900 font-name-s" numberOfLines={1} ellipsizeMode="tail">
-            {name}
-          </Text>
         </View>
         <View className="h-3 w-full flex-row items-center">
           {brand ? (

@@ -13,6 +13,7 @@ import { TextField } from "@/components/Field";
 import { ActionModal } from "@/components/modal";
 import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 import type { ItemSaveValues } from "@/types/wish-item";
 
 const StyledImage = cssInterop(Image, { className: "style" });
@@ -61,6 +62,7 @@ export function ItemSaveSheet({
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
   const hintRef = useRef<View>(null);
   const [hintAnchor, setHintAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
+  const isHintVisible = useNativeModalVisible(isHintOpen);
   const priceText = values.price.replace(/[,\s원]/g, "");
   const price = Number(priceText);
   const isPriceValid = /^\d+$/.test(priceText) && Number.isFinite(price) && price > 0;
@@ -257,7 +259,7 @@ export function ItemSaveSheet({
       </ScrollView>
 
       <Modal
-        visible={isHintOpen}
+        visible={isHintVisible}
         transparent
         animationType="none"
         onRequestClose={() => setHintOpen(false)}

@@ -401,12 +401,14 @@ test("공용 Card는 가격 없음과 0원을 구분하고 로컬 썸네일을 �
     brand: "Maison Lune Atelier Seoul Studio",
   });
   const texts = findAll(tree, "Text");
-  for (const text of [texts[0], texts[2], texts[3]]) {
+  for (const text of [texts[0], texts[1], texts[3]]) {
     assert.equal(text.props.numberOfLines, 1);
     assert.equal(text.props.ellipsizeMode, "tail");
   }
-  assert.ok(texts[0].props.className.includes("max-w-[94px]"));
-  assert.ok(texts[0].props.className.includes("shrink"));
-  assert.equal(texts[0].props.children, "1,234,567,890");
-  assert.equal(texts[1].props.children, "원");
+  assert.equal(texts[0].props.children, "아주 긴 아이템명이 한 줄을 초과할 때");
+  assert.ok(texts[0].props.className.includes("font-label-12-regular"));
+  assert.ok(texts[1].props.className.includes("max-w-[94px]"));
+  assert.ok(texts[1].props.className.includes("shrink"));
+  assert.equal(texts[1].props.children, "1,234,567,890");
+  assert.equal(texts[2].props.children, "원");
 });
