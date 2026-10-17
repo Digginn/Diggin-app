@@ -27,7 +27,7 @@ function load(file, mocks) {
   return module.exports;
 }
 
-test("아이템명·가격이 비면 바로 오류를 띄우고 저장을 막으며, 가격은 숫자만 저장한다", () => {
+test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가격은 선택값이고 숫자만 저장한다", () => {
   const state = [];
   let cursor = 0;
   const saved = [];
@@ -88,19 +88,19 @@ test("아이템명·가격이 비면 바로 오류를 띄우고 저장을 막으
   // 라벨 옆 *필수 정보는 FieldLabel 이 isMissing 일 때 그린다.
   const requiredCount = () => render().filter((node) => node.props.isMissing === true).length;
 
-  assert.equal(priceField().props.isError, true, "가격이 비면 처음부터 오류를 띄운다");
-  assert.equal(requiredCount(), 1);
-  assert.equal(saveButton().props.isDisabled, true);
+  // SAVE-005 가격은 선택값이라 비어 있어도 저장할 수 있고 null로 넘어간다.
+  assert.ok(!priceField().props.isError, "가격이 비어도 오류가 아니다");
+  assert.equal(requiredCount(), 0);
+  assert.equal(saveButton().props.isDisabled, false);
+  saveButton().props.onPress();
+  assert.equal(saved.at(-1).price, "", "빈 가격은 빈 값으로 넘겨 null로 저장한다");
 
   priceField().props.onChangeText("70,000원");
   assert.equal(priceField().props.value, "70,000", "숫자만 남기고 쉼표를 찍는다");
-  assert.equal(priceField().props.isError, false);
-  assert.equal(saveButton().props.isDisabled, false);
   saveButton().props.onPress();
   assert.equal(saved.at(-1).price, "70000", "저장 값은 쉼표 없는 숫자다");
 
   priceField().props.onChangeText("0");
-  assert.equal(priceField().props.isError, false, "직접 입력한 0원은 허용한다");
   saveButton().props.onPress();
   assert.equal(saved.at(-1).price, "0");
 
