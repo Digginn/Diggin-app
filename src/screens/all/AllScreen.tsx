@@ -46,6 +46,7 @@ export function AllScreen() {
   const deleteProducts = useDeleteProducts();
   const items = list.data?.pages.flat() ?? [];
   const totalCount = counts.data?.total ?? 0;
+  const shownCount = wishLevel ? (counts.data?.levels[wishLevel] ?? 0) : totalCount;
   // 빈 화면 시안에는 상단 영역이 없다. 개수로 먼저 판단해야 상단이 잠깐 보였다 사라지지 않는다.
   // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
   const isEmpty = wishLevel === null && totalCount === 0;
@@ -160,7 +161,7 @@ export function AllScreen() {
             <View className="gap-2 pt-4">
               <View className="h-[21px] flex-row items-center justify-between">
                 <Text className="text-gray-1000 font-label-12-semibold">
-                  저장한 아이템 {totalCount}개
+                  저장한 아이템 {shownCount}개
                 </Text>
                 {/* 선택 모드에서는 상단 바가 취소 · 전체 선택을 맡으므로 숨긴다. */}
                 {!isSelectMode && items.length > 0 ? (
