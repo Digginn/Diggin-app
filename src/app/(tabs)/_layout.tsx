@@ -6,7 +6,7 @@ import { NavigationBar } from "@/components/NavigationBar";
 import { TOAST_MESSAGES } from "@/constants/messages";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
-import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
+import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 
 export default function TabLayout() {
   const showToast = useToast();
@@ -30,7 +30,7 @@ export default function TabLayout() {
         onDismiss={itemSave.openAfterLoading}
       />
 
-      <ItemSaveSheet
+      <ItemEditSheet
         key={`save-${itemSave.values?.sourceUrl ?? ""}`}
         visible={itemSave.values !== null}
         hasExtractionFailed={itemSave.hasFailed}

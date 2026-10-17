@@ -17,12 +17,12 @@ import { WishLevel } from "@/components/WishLevel";
 import { TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useToast } from "@/hooks/useToast";
-import type { WishItem, WishLevelCounts } from "@/types/wish-item";
+import type { ItemSaveValues, WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { EditChip } from "./components/EditChip";
 import { FolderManageButton } from "./components/FolderManageButton";
 import { FolderManageSheet, type ManagedFolder } from "./components/FolderManageSheet";
-import { ItemEditSheet, type ItemEditValues } from "./components/ItemEditSheet";
+import { ItemEditSheet } from "./components/ItemEditSheet";
 import { ItemInfo } from "./components/ItemInfo";
 import { RecommendSection } from "./components/RecommendSection";
 import { VotePrompt } from "./components/VotePrompt";
@@ -39,9 +39,9 @@ const HERO_FRAME = "h-[520px] w-full bg-gray-10 ";
 const SHOWS_RECOMMEND = false;
 
 // TODO: API 연결 전까지 쓰는 임시 데이터.
-const MOCK_ITEM: ItemEditValues = {
-  brand: "브랜드명",
+const MOCK_ITEM: ItemSaveValues = {
   name: "Real Good Pants 엄청 좋은 바지",
+  brand: "리얼굿",
   price: "70000",
   sourceUrl: "http://pf.kakao.com/_zIxnrX",
   thumbnailUrl: null,
@@ -143,8 +143,14 @@ export function ItemDetailScreen() {
             className="absolute bottom-3 left-[17px] h-12 justify-center"
           >
             <WishLevel
-              levels={MOCK_LEVELS}
+              levels={
+                item.wishLevel
+                  ? { ...MOCK_LEVELS, [item.wishLevel]: MOCK_LEVELS[item.wishLevel] + 1 }
+                  : MOCK_LEVELS
+              }
               openDirection="up"
+              selected={item.wishLevel}
+              onSelect={(level) => setItem((prev) => ({ ...prev, wishLevel: level }))}
               hint={
                 "얼마나 사고 싶은지를 3단계로 기록해두어\nALL 탭에서 빠르게 분류할 수 있습니다."
               }

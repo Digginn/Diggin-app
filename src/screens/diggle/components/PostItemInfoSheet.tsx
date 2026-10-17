@@ -53,7 +53,7 @@ export function PostItemInfoSheet({
           작성자가 저장한 시점의 정보입니다. 실제 가격과 다를 수 있습니다.
         </Text>
 
-        <View className="w-full flex-row items-start gap-3">
+        <View className="w-full flex-row items-start gap-4">
           <Pressable
             accessibilityRole="button"
             className="h-[52px] flex-1 items-center justify-center overflow-hidden rounded bg-gray-100 active:opacity-75"

@@ -22,7 +22,7 @@ export function PasteGuideModal({ visible, onRequestClose, onOpenSettings }: Pas
         <View className="w-full items-center gap-1">
           <View className="flex-row items-start justify-center gap-1">
             <View className="size-6 items-center justify-center">
-              <InfoIcon className="size-5" />
+              <InfoIcon className="size-4" />
             </View>
             <Text className="text-gray-900 font-label-16-semibold">다음부터 바로 불러오기</Text>
           </View>

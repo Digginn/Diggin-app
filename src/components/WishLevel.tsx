@@ -1,3 +1,4 @@
+import { clsx } from "clsx";
 import { LinearGradient } from "expo-linear-gradient";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
@@ -30,9 +31,10 @@ type WishLevelProps = {
   openDirection?: OpenDirection;
   hint?: string;
   hasScrim?: boolean;
-  /** ALL-008 필터로 쓸 때 넘긴다. 고른 레벨을 다시 누르면 선택을 푼다. */
   selected?: WishLevelKey | null;
-  onSelect?: (level: WishLevelKey | null) => void;
+  onSelect?: (level: WishLevelKey) => void;
+  /** ALL 필터 시안(4207:62041): 닫혀 있을 때 칩에 고른 레벨 이름을 보여 준다. 상세는 "위시 레벨" 유지. */
+  showsSelectedLabel?: boolean;
 };
 
 const LEVEL_KEYS: WishLevelKey[] = ["high", "medium", "low"];
@@ -52,13 +54,14 @@ function LevelItem({
 }) {
   return (
     <Pressable
-      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityRole={onPress ? "menuitem" : undefined}
       accessibilityState={onPress ? { selected: isSelected } : undefined}
       disabled={!onPress}
-      className={`flex-row items-center gap-2 rounded-full bg-gray-0 px-3 py-2 ${
-        isSelected ? "border-[1.5px] border-gray-400" : "border border-gray-200"
-      }`}
       onPress={onPress}
+      className={clsx(
+        "flex-row items-center gap-2 rounded-full bg-gray-0 px-3 py-2 active:opacity-75",
+        isSelected ? "border-[1.5px] border-gray-400" : "border border-gray-200",
+      )}
       style={{
         shadowColor: colors.gray[1000],
         shadowOffset: { width: 0, height: 4 },
@@ -98,8 +101,8 @@ function LevelList({
           label={WISH_LEVEL_LABELS[key]}
           dotClassName={WISH_LEVEL_DOT_CLASSNAMES[key]}
           count={levels[key]}
-          isSelected={selected === key}
-          onPress={onSelect ? () => onSelect(key) : undefined}
+          isSelected={key === selected}
+          onPress={onSelect && (() => onSelect(key))}
         />
       ))}
     </View>
@@ -113,6 +116,7 @@ export function WishLevel({
   hint,
   hasScrim = false,
   selected = null,
+  showsSelectedLabel = false,
   onSelect,
 }: WishLevelProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -155,8 +159,8 @@ export function WishLevel({
       onLayout={(event) => setChipWidth(event.nativeEvent.layout.width)}
     >
       <Chip
-        // 시안: 닫혀 있을 때만 고른 레벨 이름을 보여 주고, 펼치면 "위시 레벨"로 돌아간다.
-        label={!isOpen && selected ? WISH_LEVEL_LABELS[selected] : label}
+        // 펼치면 시안대로 "위시 레벨"로 돌아간다.
+        label={showsSelectedLabel && !isOpen && selected ? WISH_LEVEL_LABELS[selected] : label}
         color="black"
         isOpen={isOpen}
         onPress={handlePress}
@@ -192,12 +196,11 @@ export function WishLevel({
             levels={levels}
             selected={selected}
             onSelect={
-              onSelect
-                ? (level) => {
-                    onSelect(selected === level ? null : level);
-                    handleClose();
-                  }
-                : undefined
+              onSelect &&
+              ((level) => {
+                onSelect(level);
+                handleClose();
+              })
             }
             onLayout={setListHeight}
           />
