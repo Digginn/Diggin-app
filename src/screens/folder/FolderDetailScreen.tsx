@@ -11,6 +11,7 @@ import { AppBar, SearchBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/card";
 import { WishLevel } from "@/components/WishLevel";
+import type { WishLevelKey } from "@/types/wish-item";
 
 import { FolderMenu } from "./components/FolderMenu";
 
@@ -21,6 +22,7 @@ export type FolderDetailItem = {
   brand?: string | null;
   thumbnailUrl?: string | null;
   thumbnailSource?: ImageSource | number;
+  isOwned?: boolean;
 };
 
 type FolderDetailScreenProps = {
@@ -28,6 +30,15 @@ type FolderDetailScreenProps = {
   items?: FolderDetailItem[];
   savedItemCount?: number;
   levels?: { high: number; medium: number; low: number };
+  /** FLD-004 나의 소장템은 위시레벨 필터와 더보기 메뉴를 숨기고 카드에 Dim을 넣지 않는다. */
+  isOwnedFolder?: boolean;
+  isOldestFirst?: boolean;
+  onToggleSort?: () => void;
+  /** 검색어를 확정하면 넘긴다. 빈 문자열이면 검색을 푼다. */
+  onSubmitSearch?: (query: string) => void;
+  wishLevel?: WishLevelKey | null;
+  onSelectWishLevel?: (level: WishLevelKey) => void;
+  onEndReached?: () => void;
   isError?: boolean;
   onRetry?: () => void;
   onBack?: () => void;
@@ -51,6 +62,13 @@ export function FolderDetailScreen({
   items = [],
   savedItemCount = items.length,
   levels = { high: 0, medium: 0, low: 0 },
+  isOwnedFolder = false,
+  isOldestFirst = false,
+  onToggleSort,
+  onSubmitSearch,
+  wishLevel = null,
+  onSelectWishLevel,
+  onEndReached,
   isError = false,
   onRetry,
   onBack,
@@ -60,7 +78,6 @@ export function FolderDetailScreen({
   onDeleteFolder,
   onOpenItem,
 }: FolderDetailScreenProps) {
-  const [isOldestFirst, setIsOldestFirst] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -68,17 +85,9 @@ export function FolderDetailScreen({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const hasSearchResults = submittedQuery.length > 0;
-  const visibleItems = hasSearchResults
-    ? items.filter((item) =>
-        `${item.name} ${item.brand ?? ""}`
-          .toLocaleLowerCase()
-          .includes(submittedQuery.toLocaleLowerCase()),
-      )
-    : items;
-  const sortedItems = isOldestFirst ? [...visibleItems].reverse() : visibleItems;
-  const fillerCount = (3 - (sortedItems.length % 3)) % 3;
+  const fillerCount = (3 - (items.length % 3)) % 3;
   const rows: (FolderDetailItem | null)[] = [
-    ...sortedItems,
+    ...items,
     ...Array.from({ length: fillerCount }, () => null),
   ];
 
@@ -91,16 +100,19 @@ export function FolderDetailScreen({
           onChangeText={(value) => {
             setSearchQuery(value);
             setSubmittedQuery("");
+            onSubmitSearch?.("");
           }}
           onClear={() => {
             setSearchQuery("");
             setSubmittedQuery("");
+            onSubmitSearch?.("");
           }}
           onSubmitEditing={() => {
             const query = searchQuery.trim();
             if (!query) return;
             setSearchQuery(query);
             setSubmittedQuery(query);
+            onSubmitSearch?.(query);
             Keyboard.dismiss();
           }}
           placeholder="찾고 싶은 아이템을 입력하세요"
@@ -109,6 +121,7 @@ export function FolderDetailScreen({
             Keyboard.dismiss();
             setSearchQuery("");
             setSubmittedQuery("");
+            onSubmitSearch?.("");
             if (!hasSearchResults) setIsSearching(false);
           }}
         />
@@ -127,15 +140,17 @@ export function FolderDetailScreen({
                   onSearch?.();
                 }}
               />
-              <AppBar.IconButton
-                icon={MoreIcon}
-                iconSize={16}
-                accessibilityLabel="폴더 상세 더보기"
-                onPress={() => {
-                  setIsMenuOpen(true);
-                  onPressMenu?.();
-                }}
-              />
+              {isOwnedFolder ? null : (
+                <AppBar.IconButton
+                  icon={MoreIcon}
+                  iconSize={16}
+                  accessibilityLabel="폴더 상세 더보기"
+                  onPress={() => {
+                    setIsMenuOpen(true);
+                    onPressMenu?.();
+                  }}
+                />
+              )}
             </>
           }
         />
@@ -164,17 +179,24 @@ export function FolderDetailScreen({
           <View className="gap-2 px-4 pt-4">
             <Text className="text-gray-1000 font-label-12-semibold">
               {hasSearchResults ? "검색된 아이템" : "저장한 아이템"}{" "}
-              {(hasSearchResults ? visibleItems.length : savedItemCount).toLocaleString("ko-KR")}개
+              {(hasSearchResults ? items.length : savedItemCount).toLocaleString("ko-KR")}개
             </Text>
             <View className="h-12 flex-row items-center justify-between">
               <View className="h-12 justify-center">
-                <WishLevel levels={levels} label="위시레벨" />
+                {isOwnedFolder ? null : (
+                  <WishLevel
+                    levels={levels}
+                    label="위시레벨"
+                    selected={wishLevel}
+                    onSelect={onSelectWishLevel}
+                  />
+                )}
               </View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${isOldestFirst ? "오래된 순" : "최신 순"}, 정렬 변경`}
                 className="h-12 flex-row items-center gap-1 active:opacity-75"
-                onPress={() => setIsOldestFirst(!isOldestFirst)}
+                onPress={onToggleSort}
               >
                 <Text className="text-gray-600 font-label-12-semibold">
                   {isOldestFirst ? "오래된 순" : "최신 순"}
@@ -190,10 +212,12 @@ export function FolderDetailScreen({
             keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
             columnWrapperClassName="gap-3"
             contentContainerClassName="gap-5 px-4 pb-6"
+            onEndReached={onEndReached}
             renderItem={({ item }) =>
               item ? (
                 <Card
                   {...item}
+                  hasOwnedDim={!isOwnedFolder}
                   className="h-40 flex-1"
                   onPress={onOpenItem ? () => onOpenItem(item) : undefined}
                 />

@@ -65,8 +65,23 @@ test("폴더 관리 버튼은 1개 이하 배지를 숨기고 100개 이상을 9
 test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연다", () => {
   let destination;
   const route = load("../src/app/folder-detail.tsx", {
+    "react": { ...React, useState: (initial) => [initial, () => {}] },
+    "@/components/modal": { ActionModal: "ActionModal" },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/screens/folder/components/FolderNameModal": { FolderNameModal: "FolderNameModal" },
+    "@/screens/folder/components/FolderToast": { FolderToast: "FolderToast" },
+    "@/screens/folder/constants/folderMessages": { FOLDER_MESSAGES: {} },
+    "@/screens/folder/constants/folderMessages": { FOLDER_MESSAGES: {} },
+    "@/screens/folder/mutations/useDeleteFolder": {
+      useDeleteFolder: () => ({ mutate: () => {}, isPending: false }),
+    },
+    "@/screens/folder/mutations/useRenameFolder": { useRenameFolder: () => ({}) },
+    "@/screens/folder/queries/useFolderItems": {
+      useFolderItems: () => ({ data: undefined, isError: false }),
+    },
+    "@/screens/folder/queries/useFolderCounts": { useFolderCounts: () => ({ data: undefined }) },
     "expo-router": {
-      useLocalSearchParams: () => ({ name: "내 폴더" }),
+      useLocalSearchParams: () => ({ id: "3", name: "내 폴더" }),
       useRouter: () => ({
         push: (value) => {
           destination = value;
@@ -76,8 +91,11 @@ test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연
     "@/screens/folder/FolderDetailScreen": { FolderDetailScreen: "FolderDetailScreen" },
     "@/assets/images/folder/image-item-preview.png": 123,
   });
-  const tree = route.default();
-  tree.props.onOpenItem({ id: "selected-item", name: "선택한 아이템", price: 0 });
+  const screen = React.Children.toArray(route.default().props.children).find(
+    (node) => node.type === "FolderDetailScreen",
+  );
+  assert.equal(screen.props.folderName, "내 폴더");
+  screen.props.onOpenItem({ id: "selected-item", name: "선택한 아이템", price: 0 });
   assert.equal(destination.pathname, "/items/[id]");
   assert.equal(destination.params.id, "selected-item");
 });
@@ -123,6 +141,8 @@ test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 �
       "@/components/BottomSheet": { BottomSheet: "BottomSheet" },
       "@/components/Button": { Button: "Button" },
       "@/screens/folder/components/FolderNameModal": { FolderNameModal: "FolderNameModal" },
+      "@/screens/folder/components/FolderToast": { FolderToast: "FolderToast" },
+      "@/screens/folder/constants/folderMessages": { FOLDER_MESSAGES: {} },
     },
   );
   const render = () => {
@@ -249,10 +269,15 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   list.props.renderItem({ item: items[0] }).props.onPress();
   assert.equal(selected, items[0]);
   assert.equal(list.props.renderItem({ item: null }).type, "View");
+  let sortToggled = false;
+  tree = render({
+    onToggleSort: () => {
+      sortToggled = true;
+    },
+  });
   findAll(tree, "Pressable")[0].props.onPress();
-  tree = render();
-  list = findAll(tree, "FlatList")[0];
-  assert.equal(list.props.data[0], items[3]);
+  assert.equal(sortToggled, true, "정렬은 서버에서 다시 불러오도록 라우트에 알린다");
+  tree = render({ isOldestFirst: true });
   assert.ok(findAll(tree, "Text").some((node) => node.props.children === "오래된 순"));
   let retried = false;
   tree = render({
@@ -273,6 +298,20 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   const headerButtons = React.Children.toArray(appBar.props.right.props.children);
   assert.equal(headerButtons.length, 2);
   assert.equal(headerButtons[1].props.accessibilityLabel, "폴더 상세 더보기");
+  tree = render({ isOwnedFolder: true });
+  const ownedAppBar = React.Children.toArray(tree.props.children).find(
+    (node) => node.props.isTitleLeftAligned,
+  );
+  assert.equal(
+    React.Children.toArray(ownedAppBar.props.right.props.children).length,
+    1,
+    "나의 소장템은 더보기 메뉴를 숨긴다(FLD-004)",
+  );
+  assert.equal(findAll(tree, "WishLevel").length, 0, "나의 소장템은 위시레벨 필터를 숨긴다");
+  assert.equal(
+    findAll(tree, "FlatList")[0].props.renderItem({ item: items[0] }).props.hasOwnedDim,
+    false,
+  );
   assert.equal(headerButtons[1].props.iconSize, 16);
   let menuOpened = false;
   const menuAppBar = React.Children.toArray(
@@ -311,7 +350,11 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   const searchBar = findAll(tree, "SearchBar")[0];
   assert.equal(searchBar.props.placeholder, "찾고 싶은 아이템을 입력하세요");
   assert.equal(searchBar.props.autoFocus, undefined);
-  assert.equal(findAll(tree, "FlatList")[0].props.data[0], items[3]);
+  assert.equal(
+    findAll(tree, "FlatList")[0].props.data[0],
+    items[0],
+    "순서는 받은 그대로 보여 준다",
+  );
   searchBar.props.onChangeText("검색어");
   assert.equal(findAll(render(), "SearchBar")[0].props.value, "검색어");
   searchBar.props.onBack();
@@ -327,19 +370,26 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
     { ...items[1], brand: "Good brand" },
     items[2],
   ];
-  const renderSearch = () => render({ items: searchItems });
+  let submitted;
+  const renderSearch = () =>
+    render({
+      items: searchItems,
+      onSubmitSearch: (value) => {
+        submitted = value;
+      },
+    });
   let bar = findAll(renderSearch(), "SearchBar")[0];
   bar.props.onChangeText(" GOOD ");
   bar = findAll(renderSearch(), "SearchBar")[0];
   bar.props.onSubmitEditing();
   tree = renderSearch();
   assert.equal(findAll(tree, "SearchBar")[0].props.value, "GOOD");
+  assert.equal(submitted, "GOOD", "검색은 서버에서 찾도록 라우트에 넘긴다");
   assert.ok(
     findAll(tree, "Text").some(
-      (node) => React.Children.toArray(node.props.children).join("") === "검색된 아이템 2개",
+      (node) => React.Children.toArray(node.props.children).join("") === "검색된 아이템 3개",
     ),
   );
-  assert.equal(findAll(tree, "FlatList")[0].props.data.filter(Boolean).length, 2);
   // 결과 화면의 뒤로가기와 X는 모두 검색 대기 화면으로 복귀한다.
   findAll(tree, "SearchBar")[0].props.onBack();
   tree = renderSearch();
@@ -348,12 +398,12 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   bar = findAll(tree, "SearchBar")[0];
   bar.props.onChangeText("없는 검색어");
   findAll(renderSearch(), "SearchBar")[0].props.onSubmitEditing();
-  assert.equal(findAll(renderSearch(), "FlatList")[0].props.data.length, 0);
+  assert.equal(submitted, "없는 검색어");
   findAll(renderSearch(), "SearchBar")[0].props.onClear();
-  assert.equal(findAll(renderSearch(), "FlatList")[0].props.data.filter(Boolean).length, 3);
+  assert.equal(submitted, "", "X는 검색을 푼다");
   findAll(renderSearch(), "SearchBar")[0].props.onChangeText("   ");
   findAll(renderSearch(), "SearchBar")[0].props.onSubmitEditing();
-  assert.equal(findAll(renderSearch(), "FlatList")[0].props.data.filter(Boolean).length, 3);
+  assert.equal(submitted, "", "공백만 입력하면 검색하지 않는다");
 });
 
 test("공용 Card는 가격 없음과 0원을 구분하고 로컬 썸네일을 표시한다", () => {

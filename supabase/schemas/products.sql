@@ -279,9 +279,7 @@ begin
       where product_id = target_product_id and folder_id <> owned_folder_id;
     end if;
   else
-    if new_wish_level is null then
-      raise exception 'wish_level_required' using errcode = '22023';
-    end if;
+    -- 해제할 때 위시레벨을 고르지 않으면 미선택(null)으로 둔다. 저장할 때 미선택을 허용하는 것(SAVE-011)과 같다.
     delete from public.product_folders
     where product_id = target_product_id and folder_id = owned_folder_id;
     update public.products set wish_level = new_wish_level where id = target_product_id;

@@ -8,6 +8,8 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
 import { ActionModal } from "@/components/modal";
 import { FolderNameModal } from "@/screens/folder/components/FolderNameModal";
+import { FolderToast } from "@/screens/folder/components/FolderToast";
+import { FOLDER_MESSAGES } from "@/screens/folder/constants/folderMessages";
 
 export type ManagedFolder = { id: string; name: string; isOwnedItems?: boolean };
 
@@ -15,7 +17,7 @@ type FolderManageSheetProps = {
   folders: ManagedFolder[];
   selectedFolderIds: string[];
   onClose: () => void;
-  onCreateFolder: (name: string) => ManagedFolder;
+  onCreateFolder: (name: string) => ManagedFolder | Promise<ManagedFolder>;
   onComplete: (ids: string[]) => void;
   /** 게시글 아이템 저장 흐름은 제목과 버튼이 다르고 앞 단계로 돌아갈 수 있다. */
   title?: string;
@@ -35,6 +37,7 @@ export function FolderManageSheet({
 }: FolderManageSheetProps) {
   const [selectedIds, setSelectedIds] = useState(selectedFolderIds);
   const [isCreating, setIsCreating] = useState(false);
+  const [hasCreateFailed, setHasCreateFailed] = useState(false);
   const [pendingOwnedFolderId, setPendingOwnedFolderId] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
   const orderedFolders = [
@@ -63,12 +66,28 @@ export function FolderManageSheet({
       overlay={
         isCreating ? (
           <FolderNameModal
-            onClose={() => setIsCreating(false)}
-            onSubmit={(name) => {
-              const folder = onCreateFolder(name);
-              setSelectedIds((previous) => [...previous, folder.id]);
-              listRef.current?.scrollTo({ y: 0, animated: false });
-              return true;
+            overlay={
+              hasCreateFailed ? (
+                <View pointerEvents="none" className="absolute inset-x-0 bottom-40">
+                  <FolderToast message={FOLDER_MESSAGES.createError} />
+                </View>
+              ) : undefined
+            }
+            onClose={() => {
+              setIsCreating(false);
+              setHasCreateFailed(false);
+            }}
+            onSubmit={async (name) => {
+              try {
+                const folder = await onCreateFolder(name);
+                setSelectedIds((previous) => [...previous, folder.id]);
+                listRef.current?.scrollTo({ y: 0, animated: false });
+                setHasCreateFailed(false);
+                return true;
+              } catch {
+                setHasCreateFailed(true);
+                return false;
+              }
             }}
           />
         ) : (

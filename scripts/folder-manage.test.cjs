@@ -41,6 +41,8 @@ test("소장템 선택 시 유지·제외·취소를 구분하고 완료 시에�
     "@/components/Button": { Button: "Button" },
     "@/components/modal": { ActionModal: "ActionModal" },
     "@/screens/folder/components/FolderNameModal": { FolderNameModal: "FolderNameModal" },
+    "@/screens/folder/components/FolderToast": { FolderToast: "FolderToast" },
+    "@/screens/folder/constants/folderMessages": { FOLDER_MESSAGES: {} },
   };
   runInNewContext(
     ts.transpileModule(

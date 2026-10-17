@@ -11,9 +11,15 @@ type ItemLinkSheetProps = {
   visible: boolean;
   onRequestClose: () => void;
   onSubmit: (url: string) => void;
+  onDismiss?: () => void;
 };
 
-export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkSheetProps) {
+export function ItemLinkSheet({
+  visible,
+  onRequestClose,
+  onSubmit,
+  onDismiss,
+}: ItemLinkSheetProps) {
   const [url, setUrl] = useState("");
   const [isError, setError] = useState(false);
   const [toast, setToast] = useState<string>();
@@ -36,6 +42,7 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
       toastVariant="error"
       onToastDismiss={() => setToast(undefined)}
       onRequestClose={onRequestClose}
+      onDismiss={onDismiss}
     >
       <ScrollView
         className="px-margin"

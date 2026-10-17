@@ -18,19 +18,12 @@ import { FolderMenu, type FolderMenuAnchor } from "./components/FolderMenu";
 import { FolderNameModal } from "./components/FolderNameModal";
 import { FolderSortFilter, type FolderSortOrder } from "./components/FolderSortFilter";
 import { FolderToast } from "./components/FolderToast";
+import { FOLDER_MESSAGES } from "./constants/folderMessages";
 
 const INITIAL_FOLDERS: FolderItem[] = [
   { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
 ];
 const TOAST_DURATION_MS = 2000;
-const FOLDER_MESSAGES = {
-  createSuccess: "폴더가 생성되었습니다.",
-  renameSuccess: "폴더 이름이 변경되었습니다.",
-  deleteSuccess: "폴더가 삭제되었습니다.",
-  createError: "폴더를 생성하지 못했습니다. 다시 시도해 주세요.",
-  renameError: "폴더 이름을 변경하지 못했습니다. 다시 시도해 주세요.",
-  deleteError: "폴더를 삭제하지 못했습니다. 다시 시도해 주세요.",
-} as const;
 
 type FolderScreenProps = {
   isError?: boolean;

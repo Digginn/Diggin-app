@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(39);
+select plan(41);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'a@test.dev'),
@@ -107,10 +107,14 @@ select throws_ok(
   $$ update public.products set wish_level = 'low' $$,
   'P0001', 'owned_product_wish_level', '소장템 상품에는 위시레벨을 넣을 수 없다'
 );
-select throws_ok(
-  $$ select public.set_owned((select id from public.products), false) $$,
-  '22023', 'wish_level_required', '소장 해제는 새 위시레벨이 있어야 한다'
+select lives_ok($$ select public.set_owned((select id from public.products), false) $$, '위시레벨 없이 소장을 해제할 수 있다');
+select is(
+  (select row(p.wish_level is null, (select count(*) from public.product_folders pf join public.folders f on f.id = pf.folder_id where f.kind = 'owned'))::text
+   from public.products p),
+  row(true, 0::bigint)::text,
+  '위시레벨 없이 해제하면 미선택으로 두고 소장템에서 뺀다'
 );
+select lives_ok($$ select public.set_owned((select id from public.products), true) $$, '다시 소장템에 넣는다');
 select lives_ok($$ select public.set_owned((select id from public.products), false, true, 'medium') $$, '새 위시레벨로 소장을 해제한다');
 select is(
   (select row(p.wish_level, (select count(*) from public.product_folders pf join public.folders f on f.id = pf.folder_id where f.kind = 'owned'))::text

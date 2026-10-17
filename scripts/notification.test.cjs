@@ -68,11 +68,15 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "./useRecentSearches": { useRecentSearches: () => ({ keywords: [] }) },
     "./constants": { MAX_SEARCH_LENGTH: 100 },
     "@/screens/folder/FolderScreen": { FolderScreen: "FolderScreen" },
+    "@/hooks/useFolders": { useFolders: () => ({ data: [], isError: false }) },
+    "@/hooks/useCreateFolder": { useCreateFolder: () => ({}) },
+    "@/screens/folder/mutations/useDeleteFolder": { useDeleteFolder: () => ({}) },
+    "@/screens/folder/mutations/useRenameFolder": { useRenameFolder: () => ({}) },
     "@/assets/images/folder/image-folder-item-preview.png": 1,
     "@/assets/images/folder/icon-folder-plus.svg": "PlusIcon",
     "@/assets/images/folder/image-fab-glow.svg": "FabGlow",
     "@/screens/save/components/ItemLinkSheet": { ItemLinkSheet: "ItemLinkSheet" },
-    "@/screens/item-detail/components/ItemEditSheet": { ItemEditSheet: "ItemEditSheet" },
+    "@/components/ItemSaveFlow": { ItemSaveFlow: "ItemSaveFlow" },
     "@/hooks/useItemSave": {
       useItemSave: () => ({
         values: null,
