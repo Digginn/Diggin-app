@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 
 type Auth = {
@@ -29,7 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 갱신 토큰이 만료·철회되면 SDK가 SIGNED_OUT을 보낸다. 네트워크 오류는 세션을 유지한다.
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
-      if (event === "SIGNED_OUT" && !isSigningOutRef.current) setIsSessionExpired(true);
+      if (event !== "SIGNED_OUT") return;
+      // 다음에 로그인한 계정에 이전 계정의 상품이 잠깐이라도 보이지 않게 비운다.
+      queryClient.clear();
+      if (!isSigningOutRef.current) setIsSessionExpired(true);
     });
     return () => data.subscription.unsubscribe();
   }, []);
