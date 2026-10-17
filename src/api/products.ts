@@ -3,7 +3,8 @@ import type { WishItem, WishLevelCounts, WishLevelKey } from "@/types/wish-item"
 
 export type ProductSort = "latest" | "oldest";
 
-export const PRODUCT_PAGE_SIZE = 30;
+// ISS-011 Feed·대량 목록은 20개 단위로 추가 Load한다.
+export const PRODUCT_PAGE_SIZE = 20;
 
 export const productKeys = {
   all: ["products"] as const,
