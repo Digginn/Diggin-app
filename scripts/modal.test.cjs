@@ -21,6 +21,8 @@ function loadModule(filename) {
     module: loaded,
     require: (name) => {
       if (name === "@/components/ToastText") return { ToastText: "ToastText" };
+      if (name === "@/hooks/useNativeModalVisible")
+        return { useNativeModalVisible: (visible) => visible };
       if (name === "react-native") {
         return {
           Modal: "NativeModal",
@@ -69,6 +71,8 @@ test("입력 모달은 iOS와 Android 모두 키보드 유무에 따라 중앙�
       module: loaded,
       require: (name) => {
         if (name === "@/components/ToastText") return { ToastText: "ToastText" };
+        if (name === "@/hooks/useNativeModalVisible")
+          return { useNativeModalVisible: (visible) => visible };
         if (name === "react")
           return {
             useState: () => [

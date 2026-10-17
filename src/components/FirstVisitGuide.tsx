@@ -8,6 +8,7 @@ import LinkIcon from "@/assets/images/first-visit/icon-link.svg";
 import ShareIcon from "@/assets/images/first-visit/icon-share.svg";
 import PointerDot from "@/assets/images/first-visit/image-pointer-dot.svg";
 import type { FirstVisitGuideKind } from "@/hooks/useFirstVisitGuide";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 import { colors } from "@/theme";
 
 type Target = "owned" | "fab" | "wish" | "vote";
@@ -103,6 +104,7 @@ export function FirstVisitGuide({
   targets?: GuideTargets;
   onClose: () => void;
 }) {
+  const isNativeVisible = useNativeModalVisible(true);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [viewport, setViewport] = useState({ width, height: height + insets.top + insets.bottom });
@@ -162,7 +164,7 @@ export function FirstVisitGuide({
 
   return (
     <Modal
-      visible
+      visible={isNativeVisible}
       transparent
       statusBarTranslucent
       navigationBarTranslucent

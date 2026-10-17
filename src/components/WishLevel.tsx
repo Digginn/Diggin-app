@@ -7,6 +7,7 @@ import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from "r
 import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { Chip } from "@/components/Chip";
 import { Tooltip } from "@/components/Tooltip";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 import { colors } from "@/theme";
 import { WISH_LEVEL_DOT_CLASSNAMES, WISH_LEVEL_LABELS, type WishLevelKey } from "@/types/wish-item";
 
@@ -122,6 +123,7 @@ export function WishLevel({
   const [isHintOpen, setHintOpen] = useState(false);
   const chipRef = useRef<View>(null);
   const { height: screenHeight } = useWindowDimensions();
+  const isNativeVisible = useNativeModalVisible(isOpen);
 
   function handleClose() {
     setIsOpen(false);
@@ -155,7 +157,12 @@ export function WishLevel({
         accessibilityLabel="위시 레벨 필터"
       />
 
-      <Modal visible={isOpen} transparent animationType="none" onRequestClose={handleClose}>
+      <Modal
+        visible={isNativeVisible}
+        transparent
+        animationType="none"
+        onRequestClose={handleClose}
+      >
         <Pressable className="absolute inset-0" onPress={handleClose}>
           {hasScrim ? (
             <LinearGradient colors={SCRIM_COLORS} style={StyleSheet.absoluteFill} />

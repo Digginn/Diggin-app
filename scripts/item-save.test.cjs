@@ -58,6 +58,7 @@ test("아이템명·가격이 비면 바로 오류를 띄우고 저장을 막으
     "@/components/Field": { TextField: "TextField" },
     "@/components/modal": { ActionModal: "ActionModal" },
     "@/components/Tooltip": { Tooltip: "Tooltip" },
+    "@/hooks/useNativeModalVisible": { useNativeModalVisible: (visible) => visible },
     "@/components/WishLevelSelect": { WishLevelSelect: "WishLevelSelect" },
     "../utils/formatPriceInput": load("../src/screens/item-detail/utils/formatPriceInput.ts", {}),
   });

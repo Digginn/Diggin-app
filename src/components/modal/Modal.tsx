@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { ToastText } from "@/components/ToastText";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 
 export type ModalProps = {
   children: ReactNode;
@@ -46,6 +47,7 @@ export function Modal({
   toastMessage,
   onToastDismiss,
 }: ModalProps) {
+  const isNativeVisible = useNativeModalVisible(visible);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(() => Keyboard.isVisible());
   useEffect(() => {
     if (!isKeyboardAvoiding) return;
@@ -76,7 +78,7 @@ export function Modal({
       onShow={onShow}
       onDismiss={onDismiss}
       transparent
-      visible={visible}
+      visible={isNativeVisible}
       statusBarTranslucent={isFullScreen}
       navigationBarTranslucent={isFullScreen}
     >

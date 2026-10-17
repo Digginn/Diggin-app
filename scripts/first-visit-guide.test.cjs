@@ -153,6 +153,7 @@ test("강조 영역은 측정 위치·Android 상태바를 반영하고 VoteProm
         useWindowDimensions: () => ({ width: 375, height: 762 }),
       },
       "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 0 }) },
+      "@/hooks/useNativeModalVisible": { useNativeModalVisible: (visible) => visible },
       "expo-image": { Image: "Image" },
       "react-native-svg": {
         __esModule: true,
