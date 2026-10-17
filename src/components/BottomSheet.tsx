@@ -32,6 +32,8 @@ type BottomSheetProps = {
   children: ReactNode;
   visible: boolean;
   onRequestClose: () => void;
+  /** iOS 는 닫히는 중에 다른 모달을 띄우면 무시한다. 이어서 띄울 때 이 시점을 쓴다. */
+  onDismiss?: () => void;
   height?: number;
   /** 내용만큼 자라다 이 높이에서 멈춘다. 작은 화면에서는 상태 표시줄 아래까지만 올라온다. */
   maxHeight?: number;
@@ -55,6 +57,7 @@ type BottomSheetProps = {
 };
 
 export function BottomSheet({
+  onDismiss,
   children,
   visible,
   onRequestClose,
@@ -149,6 +152,7 @@ export function BottomSheet({
     <NativeModal
       animationType="slide"
       onRequestClose={onRequestClose}
+      onDismiss={onDismiss}
       transparent
       visible={visible}
     >

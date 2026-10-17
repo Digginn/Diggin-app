@@ -1,6 +1,6 @@
 import { useNavigation, useRouter } from "expo-router";
 import { useLayoutEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { IconNotification, IconSearch } from "@/assets/images/appbar";
 import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
@@ -54,6 +54,10 @@ export function AllScreen() {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [confirming, setConfirming] = useState<"cancel" | "delete" | null>(null);
   const [isLinkSheetOpen, setLinkSheetOpen] = useState(false);
+  // 열 때마다 입력을 비우려고 키를 바꾼다. 닫을 때 바꾸면 닫힘 애니메이션 없이 사라져 onDismiss 가 오지 않는다.
+  const [linkSheetKey, setLinkSheetKey] = useState(0);
+  // 링크 시트가 다 닫힌 뒤 불러올 링크. iOS 는 닫히는 중에 띄운 로딩 모달을 무시한다.
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const itemSave = useItemSave();
 
   const selectedCount = selectedIds.size;
@@ -196,12 +200,19 @@ export function AllScreen() {
       ) : null}
 
       <ItemLinkSheet
-        key={`link-${isLinkSheetOpen}`}
+        key={`link-${linkSheetKey}`}
         visible={isLinkSheetOpen}
         onRequestClose={() => setLinkSheetOpen(false)}
         onSubmit={(url) => {
           setLinkSheetOpen(false);
-          void itemSave.start(url);
+          // 안드로이드는 이어서 띄워도 무시되지 않아 기다릴 필요가 없다.
+          if (Platform.OS === "ios") setPendingUrl(url);
+          else void itemSave.start(url);
+        }}
+        onDismiss={() => {
+          if (pendingUrl === null) return;
+          void itemSave.start(pendingUrl);
+          setPendingUrl(null);
         }}
       />
 
@@ -229,7 +240,10 @@ export function AllScreen() {
             accessibilityLabel="아이템 추가"
             accessibilityRole="button"
             className="absolute left-[73px] top-[73px] size-[54px] items-center justify-center rounded-full bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.1)] active:opacity-75"
-            onPress={() => setLinkSheetOpen(true)}
+            onPress={() => {
+              setLinkSheetKey((key) => key + 1);
+              setLinkSheetOpen(true);
+            }}
           >
             <PlusIcon />
           </Pressable>
