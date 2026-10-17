@@ -4,7 +4,8 @@ import LinkIcon from "@/assets/images/icon-link.svg";
 
 type ItemInfoProps = {
   name: string;
-  price: number;
+  /** null이면 가격 정보 없음(ALL-005). */
+  price: number | null;
   sourceUrl?: string | null;
 };
 
@@ -24,7 +25,9 @@ export function ItemInfo({ name, price, sourceUrl }: ItemInfoProps) {
           {name}
         </Text>
       </View>
-      <Text className="text-gray-1000 font-price-detail">{price.toLocaleString("ko-KR")}원</Text>
+      <Text className="text-gray-1000 font-price-detail">
+        {price === null ? "가격 정보 없음" : `${price.toLocaleString("ko-KR")}원`}
+      </Text>
     </View>
   );
 }

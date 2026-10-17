@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { WishItem, WishLevelCounts, WishLevelKey } from "@/types/wish-item";
+import type { ItemSaveValues, WishItem, WishLevelCounts, WishLevelKey } from "@/types/wish-item";
 
 export type ProductSort = "latest" | "oldest";
 
@@ -11,6 +11,7 @@ export const productKeys = {
   list: (sort: ProductSort, wishLevel: WishLevelKey | null) =>
     [...productKeys.all, "list", sort, wishLevel] as const,
   counts: () => [...productKeys.all, "counts"] as const,
+  detail: (id: string) => [...productKeys.all, "detail", id] as const,
 };
 
 type ProductRow = {
@@ -79,5 +80,51 @@ export async function fetchProductCounts(): Promise<{ total: number; levels: Wis
 
 export async function deleteProducts(ids: readonly string[]) {
   const { error } = await supabase.from("products").delete().in("id", ids.map(Number));
+  if (error) throw error;
+}
+
+export type ProductDetail = { values: ItemSaveValues; isOwned: boolean };
+
+/** PDT-001 상세는 진입 경로와 관계없이 같은 상품을 조회한다. */
+export async function fetchProduct(id: string): Promise<ProductDetail> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("name, brand, price, url, image_url, wish_level, product_folders(folders(kind))")
+    .eq("id", Number(id))
+    .single();
+  if (error) throw error;
+  const row = data as Omit<ProductRow, "id"> & {
+    url: string;
+    wish_level: WishLevelKey | null;
+  };
+  return {
+    isOwned: row.product_folders.some((relation) => relation.folders?.kind === "owned"),
+    values: {
+      name: row.name,
+      brand: row.brand ?? "",
+      price: row.price === null ? "" : String(row.price),
+      sourceUrl: row.url,
+      thumbnailUrl: row.image_url,
+      wishLevel: row.wish_level,
+    },
+  };
+}
+
+export type ProductPatch = Partial<Pick<ItemSaveValues, "name" | "brand" | "price" | "wishLevel">>;
+
+/** PDT-005·006 링크와 대표 이미지는 고칠 수 없어 넘기지 않는다. 넘긴 값만 바꾼다. */
+export async function updateProduct(id: string, patch: ProductPatch) {
+  const { error } = await supabase
+    .from("products")
+    .update({
+      ...(patch.name !== undefined && { name: patch.name }),
+      // 빈 브랜드는 null로 저장한다(브랜드 줄을 숨긴다).
+      ...(patch.brand !== undefined && { brand: patch.brand.trim() || null }),
+      ...(patch.price !== undefined && {
+        price: patch.price === "" ? null : Number(patch.price.replace(/\D/g, "")),
+      }),
+      ...(patch.wishLevel !== undefined && { wish_level: patch.wishLevel }),
+    })
+    .eq("id", Number(id));
   if (error) throw error;
 }

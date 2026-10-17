@@ -3,21 +3,23 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconBack } from "@/assets/images/appbar";
 import ShareSvg from "@/assets/images/icon-share.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
+import { ErrorState } from "@/components/ErrorState";
 import { FallbackImg } from "@/components/FallbackImg";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
 import { WishLevel } from "@/components/WishLevel";
-import { TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
+import { STATE_MESSAGES, TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
+import { useProductCounts } from "@/hooks/useProductCounts";
 import { useToast } from "@/hooks/useToast";
-import type { ItemSaveValues, WishItem, WishLevelCounts } from "@/types/wish-item";
+import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { EditChip } from "./components/EditChip";
 import { FolderManageButton } from "./components/FolderManageButton";
@@ -26,6 +28,8 @@ import { ItemEditSheet } from "./components/ItemEditSheet";
 import { ItemInfo } from "./components/ItemInfo";
 import { RecommendSection } from "./components/RecommendSection";
 import { VotePrompt } from "./components/VotePrompt";
+import { useUpdateProduct } from "./mutations/useUpdateProduct";
+import { useProduct } from "./queries/useProduct";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 const ShareIcon = cssInterop(ShareSvg, {
@@ -37,16 +41,6 @@ const HERO_FRAME = "h-[520px] w-full bg-gray-10 ";
 // MVP 에서 추천 아이템을 빼기로 하면서 그만큼 이미지가 커졌다.
 // 다시 넣을 때 true 로 바꾸면 된다.
 const SHOWS_RECOMMEND = false;
-
-// TODO: API 연결 전까지 쓰는 임시 데이터.
-const MOCK_ITEM: ItemSaveValues = {
-  name: "Real Good Pants 엄청 좋은 바지",
-  brand: "리얼굿",
-  price: "70000",
-  sourceUrl: "http://pf.kakao.com/_zIxnrX",
-  thumbnailUrl: null,
-  wishLevel: null,
-};
 
 // TODO: 폴더 목록 API 연결 전까지 쓰는 임시 값.
 const MOCK_FOLDERS: ManagedFolder[] = [
@@ -64,7 +58,7 @@ const MOCK_FOLDERS: ManagedFolder[] = [
   ].map((name, index) => ({ id: `folder-${index}`, name })),
 ];
 
-const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
+const EMPTY_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
 
 // TODO: 추천 아이템 API 연결 전까지 쓰는 임시 데이터.
 const MOCK_RECOMMENDS: WishItem[] = Array.from({ length: 9 }, (_, index) => ({
@@ -82,11 +76,12 @@ export function ItemDetailScreen() {
   const showToast = useToast();
   const wishGuideRef = useRef<View>(null);
   const voteGuideRef = useRef<View>(null);
-  // TODO: API 연결 시 이 id 로 아이템을 조회한다.
-  useLocalSearchParams<{ id: string }>();
-
-  // TODO: API 연결 시 수정 뮤테이션으로 바꾼다. 지금은 화면 안에서만 반영한다.
-  const [item, setItem] = useState(MOCK_ITEM);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const product = useProduct(id);
+  const counts = useProductCounts();
+  const updateProduct = useUpdateProduct(id);
+  const item = product.data?.values;
+  const isOwned = product.data?.isOwned ?? false;
   const [failed, setFailed] = useState(false);
   const [isEditOpen, setEditOpen] = useState(false);
   const [bottomHeight, setBottomHeight] = useState(0);
@@ -94,10 +89,28 @@ export function ItemDetailScreen() {
   // TODO: 저장 여부는 API 연결 시 서버 값으로 바꾼다.
   const [folders, setFolders] = useState(MOCK_FOLDERS);
   const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
-  // TODO: TanStack Query 연결 시 쿼리의 로딩 상태로 바꾼다.
-  const isLoading = false;
+  const thumbnail = item?.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
 
-  const thumbnail = item.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
+  if (product.isError) {
+    return (
+      <View className="flex-1 bg-gray-0" style={{ paddingTop: insets.top }}>
+        <AppBar.IconButton
+          icon={IconBack}
+          accessibilityLabel="뒤로 가기"
+          onPress={() => router.back()}
+        />
+        <ErrorState message={STATE_MESSAGES.loadFailed} onRetry={() => void product.refetch()} />
+      </View>
+    );
+  }
+
+  if (!item) {
+    return (
+      <View className="flex-1 bg-gray-0">
+        <LoadingDialog visible message="아이템 정보를 불러오는 중입니다." />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-gray-0">
@@ -137,24 +150,28 @@ export function ItemDetailScreen() {
             />
           </View>
 
+          {/* PDT-001 나의 소장템 상품은 위시레벨이 없어 표시하지 않는다. */}
           <View
             ref={wishGuideRef}
             collapsable={false}
             className="absolute bottom-3 left-[17px] h-12 justify-center"
           >
-            <WishLevel
-              levels={
-                item.wishLevel
-                  ? { ...MOCK_LEVELS, [item.wishLevel]: MOCK_LEVELS[item.wishLevel] + 1 }
-                  : MOCK_LEVELS
-              }
-              openDirection="up"
-              selected={item.wishLevel}
-              onSelect={(level) => setItem((prev) => ({ ...prev, wishLevel: level }))}
-              hint={
-                "얼마나 사고 싶은지를 3단계로 기록해두어\nALL 탭에서 빠르게 분류할 수 있습니다."
-              }
-            />
+            {isOwned ? null : (
+              <WishLevel
+                levels={counts.data?.levels ?? EMPTY_LEVELS}
+                openDirection="up"
+                selected={item.wishLevel}
+                onSelect={(level) =>
+                  updateProduct.mutate(
+                    { wishLevel: level },
+                    { onError: () => showToast(TOAST_MESSAGES.ALL_005) },
+                  )
+                }
+                hint={
+                  "얼마나 사고 싶은지를 3단계로 기록해두어\nALL 탭에서 빠르게 분류할 수 있습니다."
+                }
+              />
+            )}
           </View>
 
           <Pressable
@@ -176,7 +193,11 @@ export function ItemDetailScreen() {
               </Text>
               <EditChip onPress={() => setEditOpen(true)} />
             </View>
-            <ItemInfo name={item.name} price={Number(item.price)} sourceUrl={item.sourceUrl} />
+            <ItemInfo
+              name={item.name}
+              price={item.price === "" ? null : Number(item.price)}
+              sourceUrl={item.sourceUrl}
+            />
           </View>
           {SHOWS_RECOMMEND ? (
             <RecommendSection
@@ -192,15 +213,25 @@ export function ItemDetailScreen() {
         visible={isEditOpen}
         initialValues={item}
         onRequestClose={() => setEditOpen(false)}
-        onSubmit={(values) => {
-          setItem(values);
-          setFailed(false);
-          setEditOpen(false);
-          showToast(TOAST_MESSAGES.ALL_004);
-        }}
+        onSubmit={(values) =>
+          updateProduct.mutate(
+            {
+              name: values.name,
+              brand: values.brand,
+              price: values.price,
+              // 소장 상품에 위시레벨을 넣으면 서버가 거부한다(PDT-008).
+              wishLevel: isOwned ? undefined : values.wishLevel,
+            },
+            {
+              onSuccess: () => {
+                setEditOpen(false);
+                showToast(TOAST_MESSAGES.ALL_004);
+              },
+              onError: () => showToast(TOAST_MESSAGES.ALL_005),
+            },
+          )
+        }
       />
-
-      <LoadingDialog visible={isLoading} message="아이템 정보를 불러오는 중입니다." />
 
       {isFolderOpen && (
         <FolderManageSheet
@@ -230,7 +261,12 @@ export function ItemDetailScreen() {
 
         <View className="flex-row gap-gutter border-t border-gray-200 bg-gray-0 px-margin pb-10 pt-3">
           <View className="flex-1">
-            <Button variant="secondary" onPress={() => {}}>
+            <Button
+              variant="secondary"
+              onPress={() =>
+                Linking.openURL(item.sourceUrl).catch(() => showToast(TOAST_MESSAGES.ALL_009))
+              }
+            >
               웹사이트 이동
             </Button>
           </View>
