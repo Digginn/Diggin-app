@@ -30,6 +30,9 @@ type WishLevelProps = {
   openDirection?: OpenDirection;
   hint?: string;
   hasScrim?: boolean;
+  /** ALL-008 필터로 쓸 때 넘긴다. 고른 레벨을 다시 누르면 선택을 푼다. */
+  selected?: WishLevelKey | null;
+  onSelect?: (level: WishLevelKey | null) => void;
 };
 
 const LEVEL_KEYS: WishLevelKey[] = ["high", "medium", "low"];
@@ -38,14 +41,24 @@ function LevelItem({
   label,
   dotClassName,
   count,
+  isSelected,
+  onPress,
 }: {
   label: string;
   dotClassName: string;
   count: number;
+  isSelected: boolean;
+  onPress?: () => void;
 }) {
   return (
-    <View
-      className="flex-row items-center gap-2 rounded-full border border-gray-200 bg-gray-0 px-3 py-2"
+    <Pressable
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityState={onPress ? { selected: isSelected } : undefined}
+      disabled={!onPress}
+      className={`flex-row items-center gap-2 rounded-full bg-gray-0 px-3 py-2 ${
+        isSelected ? "border-[1.5px] border-gray-400" : "border border-gray-200"
+      }`}
+      onPress={onPress}
       style={{
         shadowColor: colors.gray[1000],
         shadowOffset: { width: 0, height: 4 },
@@ -59,11 +72,21 @@ function LevelItem({
         <Text className="text-gray-1000 font-b3">{label}</Text>
         <Text className="text-gray-900 font-label-14">{count >= 999 ? "999+" : String(count)}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-function LevelList({ levels, onLayout }: { levels: Levels; onLayout: (height: number) => void }) {
+function LevelList({
+  levels,
+  selected,
+  onSelect,
+  onLayout,
+}: {
+  levels: Levels;
+  selected: WishLevelKey | null;
+  onSelect?: (level: WishLevelKey) => void;
+  onLayout: (height: number) => void;
+}) {
   return (
     <View
       className="items-start gap-2 py-2.5"
@@ -75,6 +98,8 @@ function LevelList({ levels, onLayout }: { levels: Levels; onLayout: (height: nu
           label={WISH_LEVEL_LABELS[key]}
           dotClassName={WISH_LEVEL_DOT_CLASSNAMES[key]}
           count={levels[key]}
+          isSelected={selected === key}
+          onPress={onSelect ? () => onSelect(key) : undefined}
         />
       ))}
     </View>
@@ -87,6 +112,8 @@ export function WishLevel({
   openDirection = "auto",
   hint,
   hasScrim = false,
+  selected = null,
+  onSelect,
 }: WishLevelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isUp, setIsUp] = useState(false);
@@ -154,7 +181,19 @@ export function WishLevel({
         ) : null}
 
         <View className="absolute" style={listPosition}>
-          <LevelList levels={levels} onLayout={setListHeight} />
+          <LevelList
+            levels={levels}
+            selected={selected}
+            onSelect={
+              onSelect
+                ? (level) => {
+                    onSelect(selected === level ? null : level);
+                    handleClose();
+                  }
+                : undefined
+            }
+            onLayout={setListHeight}
+          />
         </View>
 
         {hint ? (

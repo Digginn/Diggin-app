@@ -18,6 +18,7 @@ type WishItemGridProps = {
   onItemPress?: (item: WishItem) => void;
   /** 선택 모드일 때만 넘긴다. 넘기면 모든 카드에 체크박스가 생긴다. */
   selectedIds?: ReadonlySet<string>;
+  onEndReached?: () => void;
 };
 
 function padToFullRows(items: WishItem[]): (WishItem | null)[] {
@@ -32,6 +33,7 @@ export function WishItemGrid({
   isLoading = false,
   onItemPress,
   selectedIds,
+  onEndReached,
 }: WishItemGridProps) {
   return (
     <FlatList
@@ -41,6 +43,7 @@ export function WishItemGrid({
       columnWrapperStyle={{ gap: COLUMN_GAP, marginBottom: ROW_GAP }}
       contentContainerStyle={{ paddingHorizontal: SCREEN_PADDING }}
       ListHeaderComponent={header}
+      onEndReached={onEndReached}
       renderItem={({ item }) =>
         isLoading ? (
           <CardSkeleton className="flex-1" />

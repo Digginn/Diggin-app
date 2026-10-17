@@ -19,25 +19,16 @@ import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
 import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
-import type { WishItem, WishLevelCounts } from "@/types/wish-item";
+import type { WishItem, WishLevelKey } from "@/types/wish-item";
 
 import { DeleteBar } from "./components/DeleteBar";
 import { SelectModeBar } from "./components/SelectModeBar";
 import { SortLabel, type SortOrder } from "./components/SortLabel";
-import { orderWishItems } from "./domain/orderWishItems";
+import { useDeleteProducts } from "./mutations/useDeleteProducts";
+import { useProductCounts } from "./queries/useProductCounts";
+import { useProductList } from "./queries/useProductList";
 
-// TODO: API 연결 전까지 쓰는 임시 데이터. 연결 시 TanStack Query 로 교체한다.
-const MOCK_ITEMS: WishItem[] = Array.from({ length: 11 }, (_, index) => ({
-  id: String(index),
-  name: "아이템명",
-  price: 0,
-  brand: "브랜드명",
-  thumbnailUrl: null,
-  isOwned: index === 0 || index === 2,
-  ownedAt: index === 0 ? 1_790_000_000_000 : index === 2 ? 1_791_000_000_000 : undefined,
-}));
-
-const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
+const EMPTY_LEVELS = { high: 0, medium: 0, low: 0 };
 
 const WISH_LEVEL_HINT =
   "아이템 상세 화면에서 얼마나 사고 싶은지를 3단계로 기록해두어 구매 고민을 빠르게 마칠 수 있습니다.";
@@ -48,11 +39,15 @@ export function AllScreen() {
   const showToast = useToast();
   const guide = useFirstVisitGuide("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
+  const [wishLevel, setWishLevel] = useState<WishLevelKey | null>(null);
 
-  // TODO: TanStack Query 연결 시 쿼리의 로딩 · 에러 상태와 뮤테이션으로 바꾼다.
-  const [items, setItems] = useState(MOCK_ITEMS);
-  const isLoading = false;
-  const hasError = false;
+  const list = useProductList(sortOrder, wishLevel);
+  const counts = useProductCounts();
+  const deleteProducts = useDeleteProducts();
+  const items = list.data?.pages.flat() ?? [];
+  const totalCount = counts.data?.total ?? 0;
+  // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
+  const isEmpty = !list.isPending && wishLevel === null && items.length === 0;
 
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -90,9 +85,17 @@ export function AllScreen() {
   }
 
   function handleDelete() {
-    setItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
-    showToast(selectDeletedMessage(selectedCount));
-    exitSelectMode();
+    deleteProducts.mutate([...selectedIds], {
+      onSuccess: () => {
+        showToast(selectDeletedMessage(selectedCount));
+        exitSelectMode();
+      },
+      // ALL-006 실패하면 선택 상태를 유지한다.
+      onError: () => {
+        setConfirming(null);
+        showToast(TOAST_MESSAGES.ALL_008);
+      },
+    });
   }
 
   return (
@@ -128,14 +131,17 @@ export function AllScreen() {
 
       {guide.isVisible ? (
         <View className="flex-1" />
-      ) : hasError ? (
-        <ErrorState message={STATE_MESSAGES.loadFailed} onRetry={() => {}} />
-      ) : items.length === 0 && !isLoading ? (
+      ) : list.isError ? (
+        <ErrorState message={STATE_MESSAGES.loadFailed} onRetry={() => void list.refetch()} />
+      ) : isEmpty ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
         <WishItemGrid
-          items={orderWishItems(items)}
-          isLoading={isLoading}
+          items={items}
+          isLoading={list.isPending}
+          onEndReached={() => {
+            if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
+          }}
           selectedIds={isSelectMode ? selectedIds : undefined}
           onItemPress={(item) =>
             isSelectMode ? toggleItem(item) : router.push(`/items/${item.id}`)
@@ -144,7 +150,7 @@ export function AllScreen() {
             <View className="gap-2 pt-4">
               <View className="h-[21px] flex-row items-center justify-between">
                 <Text className="text-gray-1000 font-label-12-semibold">
-                  저장한 아이템 {items.length}개
+                  저장한 아이템 {totalCount}개
                 </Text>
                 {/* 선택 모드에서는 상단 바가 취소 · 전체 선택을 맡으므로 숨긴다. */}
                 {!isSelectMode && items.length > 0 ? (
@@ -160,7 +166,13 @@ export function AllScreen() {
               </View>
               <View className="h-12 flex-row items-center justify-between">
                 <View>
-                  <WishLevel hasScrim levels={MOCK_LEVELS} hint={WISH_LEVEL_HINT} />
+                  <WishLevel
+                    hasScrim
+                    levels={counts.data?.levels ?? EMPTY_LEVELS}
+                    hint={WISH_LEVEL_HINT}
+                    selected={wishLevel}
+                    onSelect={setWishLevel}
+                  />
                 </View>
                 <SortLabel value={sortOrder} onChange={setSortOrder} />
               </View>
