@@ -46,8 +46,9 @@ export function AllScreen() {
   const deleteProducts = useDeleteProducts();
   const items = list.data?.pages.flat() ?? [];
   const totalCount = counts.data?.total ?? 0;
+  // 빈 화면 시안에는 상단 영역이 없다. 개수로 먼저 판단해야 상단이 잠깐 보였다 사라지지 않는다.
   // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
-  const isEmpty = !list.isPending && wishLevel === null && items.length === 0;
+  const isEmpty = wishLevel === null && totalCount === 0;
 
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -131,8 +132,16 @@ export function AllScreen() {
 
       {guide.isVisible ? (
         <View className="flex-1" />
-      ) : list.isError ? (
-        <ErrorState message={STATE_MESSAGES.loadFailed} onRetry={() => void list.refetch()} />
+      ) : list.isError || counts.isError ? (
+        <ErrorState
+          message={STATE_MESSAGES.loadFailed}
+          onRetry={() => {
+            void list.refetch();
+            void counts.refetch();
+          }}
+        />
+      ) : counts.isPending ? (
+        <View className="flex-1" />
       ) : isEmpty ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
