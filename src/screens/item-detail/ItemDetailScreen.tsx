@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconBack } from "@/assets/images/appbar";
@@ -30,6 +30,7 @@ import { ItemEditSheet } from "./components/ItemEditSheet";
 import { ItemInfo } from "./components/ItemInfo";
 import { RecommendSection } from "./components/RecommendSection";
 import { VotePrompt } from "./components/VotePrompt";
+import { useIsImageDark } from "./hooks/useIsImageDark";
 import { useSaveProductFolders } from "./mutations/useSaveProductFolders";
 import { useUpdateProduct } from "./mutations/useUpdateProduct";
 import { useProduct } from "./queries/useProduct";
@@ -40,6 +41,8 @@ const ShareIcon = cssInterop(ShareSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
 
+// HERO_FRAME의 높이와 같아야 한다. 뒤로가기 뒤 밝기를 잴 때 쓴다.
+const HERO_HEIGHT = 520;
 const HERO_FRAME = "h-[520px] w-full bg-gray-10 ";
 
 // MVP 에서 추천 아이템을 빼기로 하면서 그만큼 이미지가 커졌다.
@@ -80,6 +83,12 @@ export function ItemDetailScreen() {
   const saveFolders = useSaveProductFolders(id);
   const ownedFolderId = folders.data?.find((folder) => folder.isOwnedItems)?.id;
   const thumbnail = item?.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
+  const { width: windowWidth } = useWindowDimensions();
+  const isBackAreaDark = useIsImageDark(
+    thumbnail,
+    { width: windowWidth, height: HERO_HEIGHT },
+    { x: 0, y: insets.top, width: 48, height: 48 },
+  );
 
   if (product.isError) {
     return (
@@ -136,7 +145,13 @@ export function ItemDetailScreen() {
               accessibilityLabel="뒤로 가기"
               onPress={() => router.back()}
               disabled={isEditOpen || isFolderOpen}
-              className={isEditOpen || isFolderOpen ? "text-gray-400" : "text-gray-900"}
+              className={
+                isEditOpen || isFolderOpen
+                  ? "text-gray-400"
+                  : isBackAreaDark
+                    ? "text-gray-0"
+                    : "text-gray-900"
+              }
             />
           </View>
 
