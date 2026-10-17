@@ -1,3 +1,4 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -10,6 +11,7 @@ import { BrowsingModeProvider } from "@/contexts/BrowsingModeContext";
 import { PostDraftProvider } from "@/contexts/PostDraftContext";
 import { PostsProvider } from "@/contexts/PostsContext";
 import { ToastProvider } from "@/contexts/ToastContext";
+import { queryClient } from "@/lib/queryClient";
 import { SessionExpiredModal } from "@/screens/login/components/SessionExpiredModal";
 
 import "@/global.css";
@@ -53,25 +55,30 @@ export default function RootLayout() {
   });
 
   return (
-    <AuthProvider>
-      <SplashGate isFontReady={loaded || error !== null}>
-        <BrowsingModeProvider>
-          <ToastProvider>
-            <BlockedUsersProvider>
-              <PostDraftProvider>
-                <PostsProvider>
-                  <StatusBar style="auto" />
-                  <Stack screenOptions={{ headerShown: false }}>
-                    {/* 게시글 상세에서 아래에서 위로 올라오며 들어온다. */}
-                    <Stack.Screen name="posts/save" options={{ animation: "slide_from_bottom" }} />
-                  </Stack>
-                  <SessionExpiredNotice />
-                </PostsProvider>
-              </PostDraftProvider>
-            </BlockedUsersProvider>
-          </ToastProvider>
-        </BrowsingModeProvider>
-      </SplashGate>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <SplashGate isFontReady={loaded || error !== null}>
+          <BrowsingModeProvider>
+            <ToastProvider>
+              <BlockedUsersProvider>
+                <PostDraftProvider>
+                  <PostsProvider>
+                    <StatusBar style="auto" />
+                    <Stack screenOptions={{ headerShown: false }}>
+                      {/* 게시글 상세에서 아래에서 위로 올라오며 들어온다. */}
+                      <Stack.Screen
+                        name="posts/save"
+                        options={{ animation: "slide_from_bottom" }}
+                      />
+                    </Stack>
+                    <SessionExpiredNotice />
+                  </PostsProvider>
+                </PostDraftProvider>
+              </BlockedUsersProvider>
+            </ToastProvider>
+          </BrowsingModeProvider>
+        </SplashGate>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

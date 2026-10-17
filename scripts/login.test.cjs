@@ -315,6 +315,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   let cursor = 0;
   let emit;
   const signOutOptions = [];
+  const cacheClears = [];
   const supabase = {
     auth: {
       getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
@@ -348,6 +349,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
       },
     },
     "@/lib/supabase": { supabase },
+    "@/lib/queryClient": { queryClient: { clear: () => cacheClears.push(true) } },
   });
   const render = () => {
     cursor = 0;
@@ -362,6 +364,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.equal(render().isSessionExpired, false);
   emit("SIGNED_OUT", null);
   assert.equal(render().isSessionExpired, true);
+  assert.equal(cacheClears.length, 2, "로그아웃·만료 모두 상품 캐시를 비운다");
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);
 });
