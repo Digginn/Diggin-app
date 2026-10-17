@@ -24,6 +24,8 @@ type CardProps = {
   thumbnailSource?: ImageSource | number;
   brand?: string | null;
   isOwned?: boolean;
+  /** FLD-004 나의 소장템 폴더 안에서는 배지만 붙이고 흰색 Dim은 끈다. */
+  hasOwnedDim?: boolean;
   onPress?: () => void;
   select?: CardSelectState;
   className?: string;
@@ -36,6 +38,7 @@ export function Card({
   thumbnailSource,
   brand,
   isOwned = false,
+  hasOwnedDim = true,
   onPress,
   select = "none",
   className,
@@ -69,7 +72,10 @@ export function Card({
       {isOwned && (
         <View
           pointerEvents="none"
-          className="absolute inset-x-0 top-0 h-[106px] rounded-lg bg-gray-0/40"
+          className={clsx(
+            "absolute inset-x-0 top-0 h-[106px] rounded-lg",
+            hasOwnedDim && "bg-gray-0/40",
+          )}
         >
           <View className="absolute left-1.5 top-1.5 size-6 items-center justify-center rounded-full bg-gray-900 shadow-sm">
             <View className="size-4 items-center justify-center">

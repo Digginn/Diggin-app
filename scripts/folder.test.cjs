@@ -65,6 +65,8 @@ runInNewContext(compiled, {
     if (name.endsWith("FolderNameModal")) return { FolderNameModal: "FolderNameModal" };
     if (name.endsWith("FolderMenu")) return { FolderMenu: "FolderMenu" };
     if (name.endsWith("FolderToast")) return { FolderToast: "FolderToast" };
+    if (name.endsWith("constants/folderMessages"))
+      return require("../src/screens/folder/constants/folderMessages.ts");
     if (name.endsWith("FolderSortFilter")) return { FolderSortFilter: "FolderSortFilter" };
     if (name.endsWith("/modal")) return { ActionModal: "ActionModal" };
     if (name.endsWith("/Chip")) return { Chip: "Chip" };
