@@ -33,8 +33,6 @@ type WishLevelProps = {
   hasScrim?: boolean;
   selected?: WishLevelKey | null;
   onSelect?: (level: WishLevelKey) => void;
-  /** ALL 필터 시안(4207:62041): 닫혀 있을 때 칩에 고른 레벨 이름을 보여 준다. 상세는 "위시 레벨" 유지. */
-  showsSelectedLabel?: boolean;
 };
 
 const LEVEL_KEYS: WishLevelKey[] = ["high", "medium", "low"];
@@ -116,7 +114,6 @@ export function WishLevel({
   hint,
   hasScrim = false,
   selected = null,
-  showsSelectedLabel = false,
   onSelect,
 }: WishLevelProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -159,8 +156,8 @@ export function WishLevel({
       onLayout={(event) => setChipWidth(event.nativeEvent.layout.width)}
     >
       <Chip
-        // 펼치면 시안대로 "위시 레벨"로 돌아간다.
-        label={showsSelectedLabel && !isOpen && selected ? WISH_LEVEL_LABELS[selected] : label}
+        // 시안(4207:62041): 닫혀 있으면 고른 레벨 이름을, 펼치면 "위시 레벨"을 보여 준다.
+        label={!isOpen && selected ? WISH_LEVEL_LABELS[selected] : label}
         color="black"
         isOpen={isOpen}
         onPress={handlePress}

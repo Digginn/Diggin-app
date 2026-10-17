@@ -182,7 +182,6 @@ export function AllScreen() {
                     levels={counts.data?.levels ?? EMPTY_LEVELS}
                     hint={WISH_LEVEL_HINT}
                     selected={wishLevel}
-                    showsSelectedLabel
                     // 고른 레벨을 다시 누르면 필터를 푼다.
                     onSelect={(level) => setWishLevel((prev) => (prev === level ? null : level))}
                   />
