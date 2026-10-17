@@ -213,6 +213,7 @@ export function ItemDetailScreen() {
         visible={isEditOpen}
         initialValues={item}
         onRequestClose={() => setEditOpen(false)}
+        isSubmitting={updateProduct.isPending}
         onSubmit={(values) =>
           updateProduct.mutate(
             {

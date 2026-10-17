@@ -49,6 +49,8 @@ type ItemEditSheetProps = {
   duplicate?: { onConfirm: () => void; onDismiss: () => void };
   onRequestClose: () => void;
   onSubmit: (values: ItemSaveValues) => void;
+  /** 저장 요청 중에는 다시 누르지 못하게 막는다. */
+  isSubmitting?: boolean;
 };
 
 export function ItemEditSheet({
@@ -58,6 +60,7 @@ export function ItemEditSheet({
   duplicate,
   onRequestClose,
   onSubmit,
+  isSubmitting = false,
 }: ItemEditSheetProps) {
   const [values, setValues] = useState(initialValues);
   const [isLevelOpen, setLevelOpen] = useState(false);
@@ -221,7 +224,7 @@ export function ItemEditSheet({
           </Button>
           <Button
             className="flex-1"
-            isDisabled={isNameMissing || isPriceMissing}
+            isDisabled={isNameMissing || isPriceMissing || isSubmitting}
             onPress={() => onSubmit(values)}
           >
             저장하기

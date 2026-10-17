@@ -262,7 +262,11 @@ export function AllScreen() {
           "삭제한 아이템은 복구할 수 없습니다.\n게시글·투표에 올린 아이템 정보는 유지됩니다."
         }
         secondaryAction={{ label: "취소", onPress: () => setConfirming(null) }}
-        primaryAction={{ label: "삭제하기", onPress: handleDelete }}
+        primaryAction={{
+          label: "삭제하기",
+          isDisabled: deleteProducts.isPending,
+          onPress: handleDelete,
+        }}
       />
       {guide.isVisible && <FirstVisitGuide kind="all" onClose={guide.dismiss} />}
     </View>
