@@ -52,12 +52,17 @@ test("소장 카드는 썸네일만 흰색 40%로 덮고 배지·선택 체크·
   assert.equal(nodes(Card(props), "@/assets/images/icon-basket-check-white.svg").length, 0);
 });
 
-test("그리드는 소장 여부를 카드에 전달한다", () => {
+test("그리드는 소장 여부를 카드에 전달하고, 탭을 다시 누르면 맨 위로 올라가게 연결한다", () => {
+  const scrollTargets = [];
   const { WishItemGrid } = load("../src/components/WishItemGrid.tsx", {
+    "react": { ...React, useRef: (initial) => ({ current: initial }) },
     "react-native": { FlatList: "FlatList", View: "View" },
+    "expo-router": { useScrollToTop: (ref) => scrollTargets.push(ref) },
     "@/components/card": { Card: "Card", CardSkeleton: "CardSkeleton" },
   });
   const item = { id: "owned", name: "코트", price: 1, isOwned: true };
   const tree = WishItemGrid({ items: [item] });
   assert.equal(tree.props.renderItem({ item }).props.isOwned, true);
+  assert.equal(scrollTargets.length, 1);
+  assert.equal(tree.props.ref, scrollTargets[0], "목록에 붙인 ref로 맨 위로 올린다");
 });
