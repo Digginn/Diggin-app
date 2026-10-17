@@ -17,6 +17,7 @@ import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constant
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useProductCounts } from "@/hooks/useProductCounts";
+import { useProductList } from "@/hooks/useProductList";
 import { useToast } from "@/hooks/useToast";
 import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
@@ -26,7 +27,6 @@ import { DeleteBar } from "./components/DeleteBar";
 import { SelectModeBar } from "./components/SelectModeBar";
 import { SortLabel, type SortOrder } from "./components/SortLabel";
 import { useDeleteProducts } from "./mutations/useDeleteProducts";
-import { useProductList } from "./queries/useProductList";
 
 const EMPTY_LEVELS = { high: 0, medium: 0, low: 0 };
 
@@ -262,7 +262,11 @@ export function AllScreen() {
           "삭제한 아이템은 복구할 수 없습니다.\n게시글·투표에 올린 아이템 정보는 유지됩니다."
         }
         secondaryAction={{ label: "취소", onPress: () => setConfirming(null) }}
-        primaryAction={{ label: "삭제하기", onPress: handleDelete }}
+        primaryAction={{
+          label: "삭제하기",
+          isDisabled: deleteProducts.isPending,
+          onPress: handleDelete,
+        }}
       />
       {guide.isVisible && <FirstVisitGuide kind="all" onClose={guide.dismiss} />}
     </View>

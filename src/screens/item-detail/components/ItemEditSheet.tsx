@@ -49,6 +49,11 @@ type ItemEditSheetProps = {
   duplicate?: { onConfirm: () => void; onDismiss: () => void };
   onRequestClose: () => void;
   onSubmit: (values: ItemSaveValues) => void;
+  /** 저장 요청 중에는 다시 누르지 못하게 막는다. */
+  isSubmitting?: boolean;
+  /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
+  errorMessage?: string;
+  onErrorDismiss?: () => void;
 };
 
 export function ItemEditSheet({
@@ -58,6 +63,9 @@ export function ItemEditSheet({
   duplicate,
   onRequestClose,
   onSubmit,
+  isSubmitting = false,
+  errorMessage,
+  onErrorDismiss,
 }: ItemEditSheetProps) {
   const [values, setValues] = useState(initialValues);
   const [isLevelOpen, setLevelOpen] = useState(false);
@@ -77,7 +85,6 @@ export function ItemEditSheet({
     (key) => values[key] !== initialValues[key],
   );
   const isNameMissing = !values.name.trim();
-  const isPriceMissing = !values.price;
 
   function toggleHint() {
     if (isHintOpen) {
@@ -110,6 +117,9 @@ export function ItemEditSheet({
       isScrimClosable={false}
       isCloseConfirmed={isDirty}
       onRequestClose={requestClose}
+      toastMessage={errorMessage}
+      toastVariant="error"
+      onToastDismiss={onErrorDismiss}
       overlay={
         <>
           <ActionModal
@@ -175,9 +185,9 @@ export function ItemEditSheet({
                   />
                 </View>
                 <View className="flex-1 gap-2">
-                  <FieldLabel label="가격" isMissing={isPriceMissing} />
+                  <Text className="text-gray-900 font-b3">가격</Text>
+                  {/* SAVE-005 가격은 선택값이다. 비워 두면 null로 저장해 "가격 정보 없음"으로 보인다. */}
                   <TextField
-                    isError={isPriceMissing}
                     keyboardType="number-pad"
                     placeholder="가격 입력"
                     value={formatPriceInput(values.price)}
@@ -221,7 +231,7 @@ export function ItemEditSheet({
           </Button>
           <Button
             className="flex-1"
-            isDisabled={isNameMissing || isPriceMissing}
+            isDisabled={isNameMissing || isSubmitting}
             onPress={() => onSubmit(values)}
           >
             저장하기
