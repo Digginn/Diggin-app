@@ -17,6 +17,10 @@ function loadProductsApi(rows = [], counts = {}) {
         call.countOptions = options;
         return builder;
       },
+      or: (filter) => {
+        call.search = filter;
+        return builder;
+      },
       eq: (column, value) => {
         call.filters.push([column, value]);
         return call.patch ? Promise.resolve({ error: null }) : builder;
@@ -119,6 +123,22 @@ test("상단 개수는 전체와 레벨별 개수를 따로 센다", async () =>
     calls.every((call) => call.countOptions?.head === true),
     "개수만 받고 행은 받지 않는다",
   );
+});
+
+test("검색은 상품명·브랜드에서 찾고 개수도 같은 조건으로 센다(ALL-004)", async () => {
+  const { api, calls } = loadProductsApi();
+  await api.fetchProductPage({
+    sort: "latest",
+    wishLevel: "high",
+    query: "나이키, (신발)",
+    page: 0,
+  });
+  assert.equal(calls[0].search, "name.ilike.%나이키   신발%,brand.ilike.%나이키   신발%");
+  assert.equal(calls[0].filters[0][1], "high");
+  await api.fetchProductCounts("바지");
+  assert.ok(calls.slice(1).every((call) => call.search === "name.ilike.%바지%,brand.ilike.%바지%"));
+  await api.fetchProductPage({ sort: "latest", wishLevel: null, page: 0 });
+  assert.equal(calls.at(-1).search, undefined, "검색어가 없으면 거르지 않는다");
 });
 
 test("선택 삭제는 고른 상품 id를 숫자로 바꿔 한 번에 지운다", async () => {

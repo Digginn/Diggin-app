@@ -36,6 +36,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "react": {
       useState: (initial) => [initial, () => {}],
       useLayoutEffect: () => {},
+      useEffect: () => {},
     },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
     "expo-router": {
@@ -55,11 +56,12 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "@/hooks/useToast": { useToast: () => () => {} },
     "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: false }) },
     "@/components/FirstVisitGuide": { FirstVisitGuide: "FirstVisitGuide" },
+    "@/components/ErrorState": { ErrorState: "ErrorState" },
     "./components/DeleteBar": { DeleteBar: "DeleteBar" },
     "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
     "./components/SortLabel": { SortLabel: "SortLabel" },
     "@/screens/all/components/SortLabel": { SortLabel: "SortLabel" },
-    "./queries/useProductList": { useProductList: () => ({ isPending: false, data: undefined }) },
+    "@/hooks/useProductList": { useProductList: () => ({ isPending: false, data: undefined }) },
     "@/hooks/useProductCounts": { useProductCounts: () => ({ data: undefined }) },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({ mutate: () => {} }) },
     "./components/RecentSearches": { RecentSearches: "RecentSearches" },
