@@ -161,6 +161,7 @@ Codex와 Claude Code는 동일한 DB 관리 규칙을 따른다.
 - develop의 push 이벤트에서 관련 DB 파일 또는 워크플로가 변경됐을 때 실행한다. 실행 커밋이 develop에 병합된 PR의 병합 커밋과 일치하고 승인 상태가 `APPROVED`여야 배포한다. 직접 push는 배포 전에 차단한다.
 - 로컬 임시 DB에서 전체 마이그레이션·pgTAP·lint·Advisors 검증에 성공한 정확한 커밋만 배포한다.
 - GitHub Environment `shared-development`에 대상 프로젝트와 접속 정보를 보관하고 develop에서만 사용한다.
+- 원격 DB 연결은 명시적인 IPv4 Session pooler(5432, TLS)를 사용한다. 원격 이력 조회와 `db push --dry-run` 성공 후에만 실제 적용한다.
 - 배포는 한 번에 하나씩 실행하며 실행 중인 배포를 취소하지 않는다. 각 실행의 정확한 push 커밋을 검증·배포하며 대기 중 실행이 통합돼도 해당 커밋에 포함된 미적용 마이그레이션을 함께 반영한다.
 - 원격 적용은 대기 중인 마이그레이션의 `db push --dry-run` 확인 후 `db push`만 실행한다. 원격 reset·자동 repair·seed·Vault 설정 변경은 수행하지 않는다.
 - 실패하면 GitHub Actions에서 원인을 확인하고 해결 후 같은 실행을 다시 실행한다. 승인되지 않은 PR을 관리자 권한으로 먼저 병합한 경우 승인된 후속 PR로 정상 배포 경로를 복구한다.
