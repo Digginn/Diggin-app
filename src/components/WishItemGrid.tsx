@@ -1,4 +1,5 @@
-import type { ReactElement } from "react";
+import { useScrollToTop } from "expo-router";
+import { useRef, type ReactElement } from "react";
 import { FlatList, View } from "react-native";
 
 import { Card, CardSkeleton } from "@/components/card";
@@ -35,8 +36,13 @@ export function WishItemGrid({
   selectedIds,
   onEndReached,
 }: WishItemGridProps) {
+  const listRef = useRef<FlatList<WishItem | null>>(null);
+  // 보고 있는 탭을 다시 누르면 맨 위로 올린다. 다른 탭에 다녀오면 위치는 유지된다.
+  useScrollToTop(listRef);
+
   return (
     <FlatList
+      ref={listRef}
       data={isLoading ? Array.from({ length: SKELETON_COUNT }, () => null) : padToFullRows(items)}
       numColumns={COLUMN_COUNT}
       keyExtractor={(item, index) => item?.id ?? `empty-${index}`}
