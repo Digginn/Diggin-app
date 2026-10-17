@@ -51,6 +51,9 @@ type ItemEditSheetProps = {
   onSubmit: (values: ItemSaveValues) => void;
   /** 저장 요청 중에는 다시 누르지 못하게 막는다. */
   isSubmitting?: boolean;
+  /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
+  errorMessage?: string;
+  onErrorDismiss?: () => void;
 };
 
 export function ItemEditSheet({
@@ -61,6 +64,8 @@ export function ItemEditSheet({
   onRequestClose,
   onSubmit,
   isSubmitting = false,
+  errorMessage,
+  onErrorDismiss,
 }: ItemEditSheetProps) {
   const [values, setValues] = useState(initialValues);
   const [isLevelOpen, setLevelOpen] = useState(false);
@@ -113,6 +118,9 @@ export function ItemEditSheet({
       isScrimClosable={false}
       isCloseConfirmed={isDirty}
       onRequestClose={requestClose}
+      toastMessage={errorMessage}
+      toastVariant="error"
+      onToastDismiss={onErrorDismiss}
       overlay={
         <>
           <ActionModal

@@ -84,6 +84,7 @@ export function ItemDetailScreen() {
   const isOwned = product.data?.isOwned ?? false;
   const [failed, setFailed] = useState(false);
   const [isEditOpen, setEditOpen] = useState(false);
+  const [editError, setEditError] = useState<string>();
   const [bottomHeight, setBottomHeight] = useState(0);
   const [isFolderOpen, setFolderOpen] = useState(false);
   // TODO: 저장 여부는 API 연결 시 서버 값으로 바꾼다.
@@ -212,8 +213,13 @@ export function ItemDetailScreen() {
         key={isEditOpen ? "open" : "closed"}
         visible={isEditOpen}
         initialValues={item}
-        onRequestClose={() => setEditOpen(false)}
+        onRequestClose={() => {
+          setEditOpen(false);
+          setEditError(undefined);
+        }}
         isSubmitting={updateProduct.isPending}
+        errorMessage={editError}
+        onErrorDismiss={() => setEditError(undefined)}
         onSubmit={(values) =>
           updateProduct.mutate(
             {
@@ -228,7 +234,7 @@ export function ItemDetailScreen() {
                 setEditOpen(false);
                 showToast(TOAST_MESSAGES.ALL_004);
               },
-              onError: () => showToast(TOAST_MESSAGES.ALL_005),
+              onError: () => setEditError(TOAST_MESSAGES.ALL_005),
             },
           )
         }
