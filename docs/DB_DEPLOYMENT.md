@@ -5,17 +5,19 @@
 ## 동작 순서
 
 1. develop 대상 PR의 승인을 받고 병합한다.
-2. `supabase/**` 또는 배포 워크플로가 변경됐으면 `Deploy shared development database`가 실행된다. 닫기만 하고 병합하지 않은 PR, 다른 브랜치의 PR, 직접 push는 배포를 실행하지 않는다.
-3. GitHub의 PR 검토 상태가 `APPROVED`인지 확인한다. 현재 develop 보호 규칙은 승인 1개를 요구하며 새 커밋이 올라오면 기존 승인을 취소한다. 관리자 예외로 승인 없이 병합해도 이 워크플로는 중단된다.
-4. 실행 시점의 최신 develop을 체크아웃하고 정확한 커밋 ID를 기록한다. 동시에 여러 PR이 병합되면 아직 적용하지 않은 변경을 함께 처리할 수 있다.
+2. develop의 push 이벤트에서 `supabase/**` 또는 배포 워크플로가 변경됐으면 `Deploy shared development database`가 실행된다. 닫기만 하고 병합하지 않은 PR, 다른 브랜치의 push는 실행하지 않는다.
+3. 실행 커밋과 연결된 PR이 이 저장소의 develop에 병합됐고, PR의 병합 커밋이 실행 커밋과 일치하며, 검토 상태가 `APPROVED`인지 확인한다. 직접 push는 이 검사에서 차단한다. 현재 develop 보호 규칙은 승인 1개를 요구하며 새 커밋이 올라오면 기존 승인을 취소한다. 관리자 예외로 승인 없이 병합해도 이 워크플로는 중단된다.
+4. 해당 push의 정확한 커밋(`github.sha`)을 체크아웃하고 ID를 기록한다. 실행 대기 중 develop에 새 커밋이 추가돼도 검사한 커밋만 검증·배포한다.
 5. GitHub의 임시 로컬 DB에서 마이그레이션 전체 재적용, pgTAP, DB lint, Advisors 검사를 실행한다. 로컬 검증에는 공유 DB 접속 정보를 사용하지 않는다.
 6. 검증한 커밋을 다시 체크아웃해 공유 DB의 대기 중 마이그레이션을 확인하고 적용한다. 적용 후 이력을 출력하고 Actions 요약에 커밋 ID를 기록한다.
 
-Supabase CLI는 로컬에서 검증한 `2.120.0`으로 고정하며 외부 Actions도 커밋 SHA로 고정한다. 검증과 배포는 전체 워크플로 단위로 직렬화한다. 실행 중 배포는 취소하지 않으며, GitHub가 대기 중 실행을 최신 요청으로 통합해도 최신 develop 기준으로 마이그레이션 누락을 방지한다.
+Supabase CLI는 로컬에서 검증한 `2.120.0`으로 고정하며 외부 Actions도 커밋 SHA로 고정한다. 검증과 배포는 전체 워크플로 단위로 직렬화한다. 실행 중 배포는 취소하지 않으며, GitHub가 대기 중 실행을 최신 요청으로 통합해도 해당 실행 커밋에 포함된 미적용 마이그레이션을 함께 반영한다.
 
 ## 처음 한 번 설정할 것
 
 저장소 Settings → Environments → `shared-development`를 사용한다. 배포 허용 브랜치는 develop만 지정하고 별도 Environment 승인자는 두지 않는다. PR 승인을 받은 뒤 다시 승인을 요청하지 않도록 하기 위함이다.
+
+배포 트리거는 develop의 push 이벤트로 유지한다. `pull_request` 이벤트는 Environment 보호 규칙에서 `refs/pull/<번호>/merge`로 평가되므로 develop만 허용하는 설정과 충돌한다. 체크아웃 브랜치를 develop으로 지정하는 것만으로는 이 실행 ref가 바뀌지 않는다.
 
 Environment에 아래 값을 등록한다. 접속 토큰과 비밀번호는 코드·이슈·PR·채팅에 붙여 넣지 않는다.
 
@@ -44,11 +46,13 @@ Environment에 아래 값을 등록한다. 접속 토큰과 비밀번호는 코�
 1. 저장소 Actions → 해당 실행 → 실패한 단계를 확인한다. 설정 값이 없으면 Environment에 등록한다.
 2. 검증 실패는 코드를 수정해 새 PR을 승인·병합한다. 접속 정보 문제는 설정을 고친 뒤 해당 실행을 다시 실행한다.
 3. 마이그레이션 적용 중 실패했다면 원격 이력과 오류를 확인한다. 성공한 이전 마이그레이션은 적용돼 있을 수 있으며, 전체 배포가 한 트랜잭션으로 롤백된다고 가정하지 않는다.
-4. GitHub Actions의 `Re-run all jobs`로 다시 실행하면 최신 develop을 다시 검증하고, 원격에 아직 적용되지 않은 마이그레이션만 처리한다. 이미 적용된 변경을 되돌리지는 않는다.
+4. GitHub Actions의 `Re-run all jobs`로 다시 실행하면 해당 실행의 커밋을 다시 검증하고, 원격에 아직 적용되지 않은 마이그레이션만 처리한다. 이미 적용된 변경을 되돌리지는 않는다. 이전 커밋의 실행을 최신 배포 후 다시 실행하면 마이그레이션 이력 불일치로 중단될 수 있으므로 최신 실행을 사용한다.
+5. 이전 `pull_request` 방식으로 실패한 실행은 재실행해도 변경된 트리거가 적용되지 않는다. 수정된 워크플로를 승인된 PR로 develop에 병합해 새 push 실행을 생성한다.
 
 수동 원격 배포가 필요한 예외는 담당자와 협의한다. 공유 DB를 초기화하는 `db reset --linked` 또는 원격 URL 대상 reset은 사용하지 않는다.
 
 ## 참고
 
 - [Supabase: Managing Environments](https://supabase.com/docs/guides/deployment/managing-environments)
-- [GitHub: pull_request 이벤트](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)
+- [GitHub: push 이벤트](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push)
+- [GitHub: PR 이벤트의 Environment 보호 규칙 변경](https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/)

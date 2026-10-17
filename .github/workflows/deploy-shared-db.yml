@@ -1,9 +1,8 @@
 name: Deploy shared development database
 
 on:
-  pull_request:
+  push:
     branches: [develop]
-    types: [closed]
     paths:
       - "supabase/**"
       - ".github/workflows/deploy-shared-db.yml"
@@ -18,7 +17,6 @@ concurrency:
 
 jobs:
   validate:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -28,20 +26,34 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
+            const pullRequests = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              { ...context.repo, commit_sha: context.sha, per_page: 100 }
+            );
+            const mergedPr = pullRequests.find((pr) =>
+              pr.merged_at &&
+              pr.base.ref === "develop" &&
+              pr.base.repo.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+              pr.merge_commit_sha === context.sha
+            );
+            if (!mergedPr) {
+              core.setFailed("The deploy commit must be a pull request merged into develop. Direct pushes cannot deploy.");
+              return;
+            }
             const { repository } = await github.graphql(`
               query($owner: String!, $repo: String!, $number: Int!) {
                 repository(owner: $owner, name: $repo) {
                   pullRequest(number: $number) { reviewDecision }
                 }
               }
-            `, { ...context.repo, number: context.payload.pull_request.number });
+            `, { ...context.repo, number: mergedPr.number });
             if (repository.pullRequest.reviewDecision !== "APPROVED") {
               core.setFailed("An approved PR is required to deploy the shared database.");
             }
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: develop
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Record the exact commit to deploy
