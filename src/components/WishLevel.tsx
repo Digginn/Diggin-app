@@ -118,6 +118,8 @@ export function WishLevel({
   const [isOpen, setIsOpen] = useState(false);
   const [isUp, setIsUp] = useState(false);
   const [chipLayout, setChipLayout] = useState<ChipLayout>({ x: 0, y: 0, width: 0, height: 0 });
+  // 선택 상태에서는 펼치면서 칩 문구가 "높음" → "위시 레벨"로 바뀌어 너비가 달라진다.
+  const [chipWidth, setChipWidth] = useState(0);
   const [listHeight, setListHeight] = useState(140);
   const [isHintOpen, setHintOpen] = useState(false);
   const chipRef = useRef<View>(null);
@@ -147,9 +149,14 @@ export function WishLevel({
     : { top: chipLayout.y + chipLayout.height, left: chipLayout.x };
 
   return (
-    <View ref={chipRef} className="self-start">
+    <View
+      ref={chipRef}
+      className="self-start"
+      onLayout={(event) => setChipWidth(event.nativeEvent.layout.width)}
+    >
       <Chip
-        label={label}
+        // 시안: 닫혀 있을 때만 고른 레벨 이름을 보여 주고, 펼치면 "위시 레벨"로 돌아간다.
+        label={!isOpen && selected ? WISH_LEVEL_LABELS[selected] : label}
         color="black"
         isOpen={isOpen}
         onPress={handlePress}
@@ -201,7 +208,7 @@ export function WishLevel({
             className="absolute flex-row items-start"
             style={{
               top: chipLayout.y + chipLayout.height / 2 - HINT_BUTTON_SIZE / 2,
-              left: chipLayout.x + chipLayout.width,
+              left: chipLayout.x + chipWidth,
             }}
           >
             <Pressable
