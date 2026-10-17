@@ -85,7 +85,6 @@ export function ItemEditSheet({
     (key) => values[key] !== initialValues[key],
   );
   const isNameMissing = !values.name.trim();
-  const isPriceMissing = !values.price;
 
   function toggleHint() {
     if (isHintOpen) {
@@ -186,9 +185,9 @@ export function ItemEditSheet({
                   />
                 </View>
                 <View className="flex-1 gap-2">
-                  <FieldLabel label="가격" isMissing={isPriceMissing} />
+                  <Text className="text-gray-900 font-b3">가격</Text>
+                  {/* SAVE-005 가격은 선택값이다. 비워 두면 null로 저장해 "가격 정보 없음"으로 보인다. */}
                   <TextField
-                    isError={isPriceMissing}
                     keyboardType="number-pad"
                     placeholder="가격 입력"
                     value={formatPriceInput(values.price)}
@@ -232,7 +231,7 @@ export function ItemEditSheet({
           </Button>
           <Button
             className="flex-1"
-            isDisabled={isNameMissing || isPriceMissing || isSubmitting}
+            isDisabled={isNameMissing || isSubmitting}
             onPress={() => onSubmit(values)}
           >
             저장하기
