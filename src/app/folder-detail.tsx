@@ -1,36 +1,98 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 
-import { FolderDetailScreen, type FolderDetailItem } from "@/screens/folder/FolderDetailScreen";
-
-// Figma 시안 비교용 데이터이며 실제 폴더 조회 결과는 아닙니다.
-const PREVIEW_ITEMS: FolderDetailItem[] = Array.from({ length: 12 }, (_, index) => ({
-  id: `preview-${index}`,
-  name: index === 0 ? "Real Good Pants 엄청 좋은 바지" : "아이템명",
-  brand: "브랜드명",
-  price: index === 3 ? null : index === 5 ? 0 : "000,000",
-  thumbnailSource: require("@/assets/images/folder/image-item-preview.png"),
-}));
-const LONG_PREVIEW_ITEMS: FolderDetailItem[] = PREVIEW_ITEMS.map((item) => ({
-  ...item,
-  name: "[단독/리미티드] 오버핏 울 캐시미어 블렌드 싱글 브레스티드 롱 코트 - 멜란지 그레이 (남녀공용 FREE)",
-  brand: "Maison Lune Atelier Seoul Studio",
-  price: 1234567890,
-}));
+import { ActionModal } from "@/components/modal";
+import { useToast } from "@/hooks/useToast";
+import { FolderNameModal } from "@/screens/folder/components/FolderNameModal";
+import { FOLDER_MESSAGES } from "@/screens/folder/constants/folderMessages";
+import { FolderDetailScreen } from "@/screens/folder/FolderDetailScreen";
+import { useDeleteFolder } from "@/screens/folder/mutations/useDeleteFolder";
+import { useRenameFolder } from "@/screens/folder/mutations/useRenameFolder";
+import { useFolderCounts } from "@/screens/folder/queries/useFolderCounts";
+import { useFolderItems } from "@/screens/folder/queries/useFolderItems";
+import type { WishLevelKey } from "@/types/wish-item";
 
 export default function FolderDetailRoute() {
-  const { name, preview } = useLocalSearchParams<{ name?: string; preview?: string }>();
+  const params = useLocalSearchParams<{ id: string; name?: string; owned?: string }>();
   const router = useRouter();
-  const isError = __DEV__ && preview === "error";
-  const isLongPreview = __DEV__ && preview === "long";
+  const [name, setName] = useState(params.name ?? "");
+  const [isOldestFirst, setIsOldestFirst] = useState(false);
+  const [query, setQuery] = useState("");
+  const [wishLevel, setWishLevel] = useState<WishLevelKey | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const showToast = useToast();
+  const items = useFolderItems(params.id, isOldestFirst ? "oldest" : "latest", wishLevel, query);
+  const counts = useFolderCounts(params.id);
+  const renameFolder = useRenameFolder();
+  const deleteFolder = useDeleteFolder();
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"));
+
   return (
-    <FolderDetailScreen
-      folderName={name ?? (isLongPreview ? "가을겨울아우터" : "폴더명")}
-      items={__DEV__ ? (isLongPreview ? LONG_PREVIEW_ITEMS : PREVIEW_ITEMS) : []}
-      savedItemCount={isLongPreview ? 1234 : undefined}
-      isError={isError}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"))}
-      onOpenItem={(item) => router.push({ pathname: "/items/[id]", params: { id: item.id } })}
-      onRetry={isError ? () => router.setParams({ preview: undefined }) : undefined}
-    />
+    <>
+      <FolderDetailScreen
+        folderName={name}
+        isOwnedFolder={params.owned === "1"}
+        items={items.data?.pages.flat() ?? []}
+        savedItemCount={
+          wishLevel ? (counts.data?.levels[wishLevel] ?? 0) : (counts.data?.total ?? 0)
+        }
+        levels={counts.data?.levels}
+        isOldestFirst={isOldestFirst}
+        onToggleSort={() => setIsOldestFirst((prev) => !prev)}
+        onSubmitSearch={setQuery}
+        wishLevel={wishLevel}
+        onSelectWishLevel={(level) => setWishLevel((prev) => (prev === level ? null : level))}
+        onEndReached={() => {
+          if (items.hasNextPage && !items.isFetchingNextPage) void items.fetchNextPage();
+        }}
+        isError={items.isError}
+        onRetry={() => void items.refetch()}
+        onBack={goBack}
+        onOpenItem={(item) => router.push({ pathname: "/items/[id]", params: { id: item.id } })}
+        onEditFolder={() => setIsRenaming(true)}
+        onDeleteFolder={() => setIsDeleteConfirmOpen(true)}
+      />
+      {isRenaming && (
+        <FolderNameModal
+          initialName={name}
+          onClose={() => setIsRenaming(false)}
+          onSubmit={async (nextName) => {
+            try {
+              await renameFolder.mutateAsync({ id: params.id, name: nextName });
+              setName(nextName);
+              showToast(FOLDER_MESSAGES.renameSuccess);
+              return true;
+            } catch {
+              showToast(FOLDER_MESSAGES.renameError);
+              return false;
+            }
+          }}
+        />
+      )}
+      {/* FLD-006 폴더 탭과 같은 확인 모달. 폴더만 지우고 상품은 ALL에 남는다. */}
+      <ActionModal
+        visible={isDeleteConfirmOpen}
+        type="2Btn"
+        hasTallHeader
+        title="폴더 삭제하기"
+        description={"해당 폴더를 삭제하시겠습니까?\n삭제된 폴더는 복구할 수 없습니다."}
+        onRequestClose={() => setIsDeleteConfirmOpen(false)}
+        secondaryAction={{
+          label: "삭제하기",
+          isDisabled: deleteFolder.isPending,
+          onPress: () =>
+            deleteFolder.mutate(params.id, {
+              onSuccess: () => {
+                setIsDeleteConfirmOpen(false);
+                showToast(FOLDER_MESSAGES.deleteSuccess);
+                goBack();
+              },
+              onError: () => showToast(FOLDER_MESSAGES.deleteError),
+            }),
+        }}
+        primaryAction={{ label: "취소", onPress: () => setIsDeleteConfirmOpen(false) }}
+      />
+    </>
   );
 }
