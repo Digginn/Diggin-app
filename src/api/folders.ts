@@ -12,7 +12,6 @@ export const folderKeys = {
   ofProduct: (productId: string) => [...folderKeys.all, "of-product", productId] as const,
 };
 
-/** 서버가 거부한 이유. 화면이 문구를 고른다. */
 export class FolderError extends Error {
   constructor(public readonly reason: "limit" | "duplicate" | "unknown") {
     super(reason);
@@ -35,7 +34,6 @@ type FolderRow = {
   preview: { products: { image_url: string | null } | null }[];
 };
 
-/** FLD-001 폴더 목록. 미리보기는 최근 담은 아이템 3개다. */
 export async function fetchFolders(): Promise<FolderItem[]> {
   const { data, error } = await supabase
     .from("folders")
@@ -95,7 +93,6 @@ type FolderProductRow = {
   };
 };
 
-/** FLD-004 폴더에 담은 시각 순으로 한 페이지씩 가져온다. 검색은 상품명·브랜드에서 찾는다. */
 export async function fetchFolderItems({
   folderId,
   sort,
@@ -160,7 +157,6 @@ export async function fetchFolderCounts(
   return { total, levels: { high, medium, low } };
 }
 
-/** PDT-003 상품이 담긴 폴더 id. */
 export async function fetchProductFolderIds(productId: string): Promise<string[]> {
   const { data, error } = await supabase
     .from("product_folders")

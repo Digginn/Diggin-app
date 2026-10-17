@@ -70,7 +70,6 @@ export default function FolderDetailRoute() {
           }}
         />
       )}
-      {/* FLD-006 폴더 탭과 같은 확인 모달. 폴더만 지우고 상품은 ALL에 남는다. */}
       <ActionModal
         visible={isDeleteConfirmOpen}
         type="2Btn"
