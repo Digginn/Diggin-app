@@ -427,6 +427,18 @@ test("잘린 이름이 기존 폴더와 같으면 번호를 붙이고 원본 일
   assert.deepEqual(result.foldersToCreate, ["abcdef3"]);
 });
 
+test("긴 원본 버킷은 50개 한도에서도 저장된 현재 이름으로 재사용한다", () => {
+  const existingFolderNames = ["바꾼이름", ...Array.from({ length: 49 }, (_, i) => `폴더${i}`)];
+  const result = plan([product({ 버킷명: "맥북 파우치 케이스" })], {
+    ...OPTIONS,
+    existingFolderNames,
+    previousFolderMappings: [{ sourceName: "맥북 파우치 케이스", folderName: "바꾼이름" }],
+  });
+  assert.deepEqual(result.products[0].folderNames, ["바꾼이름"]);
+  assert.deepEqual(result.foldersToCreate, []);
+  assert.deepEqual(result.folderFailures, []);
+});
+
 test("이모지·한글 조합을 중간에서 끊지 않고 모든 폴더 후보를 7자로 제한한다", () => {
   const family = "👨‍👩‍👧‍👦";
   const result = plan([product({ 버킷명: family.repeat(8) })]);

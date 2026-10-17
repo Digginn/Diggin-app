@@ -56,6 +56,7 @@ declare
   entry jsonb;
   source_name text;
   final_name text;
+  stored_folder_name text;
   target_folder_id bigint;
   target_product_id bigint;
   folder_ids jsonb := '{}'::jsonb;
@@ -123,6 +124,16 @@ begin
       or folder_ids ? source_name or folder_errors ? source_name then
       raise exception 'invalid_folder_mapping' using errcode = '22023';
     end if;
+    -- 이전 Import에서 잘라 만든 이름보다 보존된 원본 버킷명을 먼저 확인한다.
+    select f.id, f.name into target_folder_id, stored_folder_name from public.folders f
+    where f.user_id = current_user_id and f.kind = 'custom' and f.csv_source_name = source_name;
+    if found then
+      if final_name <> stored_folder_name then
+        raise exception 'csv_folder_conflict' using errcode = '40001';
+      end if;
+      folder_ids := folder_ids || jsonb_build_object(source_name, target_folder_id);
+      continue;
+    end if;
     if existing_folder_ids ? source_name then
       target_folder_id := (existing_folder_ids->>source_name)::bigint;
       if final_name <> source_name then
@@ -140,7 +151,7 @@ begin
       continue;
     end if;
     begin
-      insert into public.folders (user_id, name) values (current_user_id, final_name)
+      insert into public.folders (user_id, name, csv_source_name) values (current_user_id, final_name, source_name)
       returning id into target_folder_id;
       folder_ids := folder_ids || jsonb_build_object(source_name, target_folder_id);
     exception
@@ -190,7 +201,9 @@ begin
       or (item->>'url') !~* '^https://[^/?#[:space:]]+') then input_error := 'invalid_url'; end if;
     begin
       saved_time := (item->>'savedAt')::timestamptz;
-      if saved_time is null or not isfinite(saved_time) then input_error := 'invalid_date'; end if;
+      if saved_time is null or not isfinite(saved_time) or saved_time > now() then
+        input_error := 'invalid_date';
+      end if;
     exception when invalid_datetime_format or datetime_field_overflow then
       input_error := 'invalid_date';
     end;

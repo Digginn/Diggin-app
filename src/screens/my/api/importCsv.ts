@@ -134,7 +134,7 @@ export async function importCsv(
   for (let attempt = 0; attempt < 3; attempt++) {
     const { data: folders, error: folderError } = await supabase
       .from("folders")
-      .select("name")
+      .select("name,csv_source_name")
       .eq("user_id", auth.user.id)
       .eq("kind", "custom");
     if (folderError) throw folderError;
@@ -144,6 +144,11 @@ export async function importCsv(
         ...options,
         importedAt: pending.importedAt,
         existingFolderNames: folders.map((folder) => folder.name),
+        previousFolderMappings: folders.flatMap((folder) =>
+          folder.csv_source_name === null
+            ? []
+            : [{ sourceName: folder.csv_source_name, folderName: folder.name }],
+        ),
       },
     );
     if (!prepared.ok) throw new Error("CSV 파일을 읽을 수 없습니다.");

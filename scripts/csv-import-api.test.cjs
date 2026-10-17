@@ -26,7 +26,14 @@ function load(relativePath, overrides = {}) {
 }
 
 const domain = load("../src/screens/my/domain/prepareCsvImport.ts");
-function setup({ folders = [], rpc, storage = new Map(), user = { id: "user-a" }, bytes } = {}) {
+function setup({
+  folders = [],
+  sources = {},
+  rpc,
+  storage = new Map(),
+  user = { id: "user-a" },
+  bytes,
+} = {}) {
   const calls = [];
   const progress = [];
   const fileBytes =
@@ -84,7 +91,10 @@ function setup({ folders = [], rpc, storage = new Map(), user = { id: "user-a" }
           assert.equal(table, "folders");
           const filters = [];
           const query = {
-            select: () => query,
+            select: (columns) => {
+              assert.equal(columns, "name,csv_source_name");
+              return query;
+            },
             eq: (...args) => {
               filters.push(args);
               return query;
@@ -95,7 +105,10 @@ function setup({ folders = [], rpc, storage = new Map(), user = { id: "user-a" }
                 ["kind", "custom"],
               ]);
               const names = typeof folders === "function" ? folders(folderQueryCount++) : folders;
-              return resolve({ data: names.map((name) => ({ name })), error: null });
+              return resolve({
+                data: names.map((name) => ({ name, csv_source_name: sources[name] ?? null })),
+                error: null,
+              });
             },
           };
           return query;
@@ -134,6 +147,18 @@ test("실제 파일 바이트를 파싱하고 한국 등록일·소장 관계·�
     { completed: 1, total: 1 },
   ]);
   assert.equal(storage.size, 0);
+});
+
+test("새 요청으로 재업로드해도 저장된 원본 버킷의 폴더를 재사용한다", async () => {
+  const { run, calls } = setup({
+    folders: ["바꾼이름"],
+    sources: { 바꾼이름: "abcdefg-long" },
+  });
+  await run();
+  assert.deepEqual(calls[0].import_plan.folderMappings, [
+    { sourceName: "abcdefg-long", folderName: "바꾼이름" },
+  ]);
+  assert.deepEqual(calls[0].import_plan.products[0].folderNames, ["바꾼이름"]);
 });
 
 test("서버 응답을 받지 못하면 완료로 표시하지 않고 같은 파일 재시도에 요청 ID를 유지한다", async () => {

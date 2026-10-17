@@ -65,7 +65,41 @@ select lives_ok($$select public.import_csv('10000000-0000-0000-0000-000000000002
 select is((select count(*) from public.product_folders pf join public.products p on p.id=pf.product_id where p.url='https://shop.test/collision'), 2::bigint, '다른 원본 버킷에 각각 연결한다');
 select ok((select price is null from public.products where url='https://shop.test/collision'), '정수 범위를 넘는 가격만 비우고 상품은 저장한다');
 
+select is((select csv_source_name from public.folders where name='abcdefg'), 'abcdefg-long', '잘린 폴더에 CSV 원본 버킷명을 보존한다');
+select is((select csv_source_name from public.folders where name='abcdef2'), 'abcdefg', '이름이 충돌한 서로 다른 원본을 각각 보존한다');
+select throws_ok($$update public.folders set csv_source_name='위조' where name='abcdefg'$$, '42501', null, '앱은 보존한 원본 버킷명을 바꿀 수 없다');
+select throws_ok($$insert into public.folders(name,csv_source_name) values('직접생성','위조')$$, '42501', null, '앱의 직접 생성으로 원본 버킷을 선점할 수 없다');
+
+select set_config('test.folder_count', (select count(*)::text from public.folders), true);
+select set_config('test.repeat_result', public.import_csv(gen_random_uuid(), pg_temp.csv_plan(
+  '[{"rowNumber":2,"name":"충돌 상품","url":"https://shop.test/collision","savedAt":"2026-10-12T00:00:00Z","isOwned":false,"sourceFolderNames":["abcdefg-long","abcdefg"]}]',
+  '[{"sourceName":"abcdefg-long","folderName":"abcdefg"},{"sourceName":"abcdefg","folderName":"abcdef2"}]'))::text, true);
+select is((select count(*)::text from public.folders), current_setting('test.folder_count'), '새 요청으로 재업로드해도 같은 원본의 폴더를 늘리지 않는다');
+select is(current_setting('test.repeat_result')::jsonb->>'importedCount', '0', '재업로드 상품은 중복으로 제외한다');
+select is(jsonb_array_length(current_setting('test.repeat_result')::jsonb->'folderFailures'), 0, '이미 폴더에 있는 중복 상품에 잘못된 경고를 만들지 않는다');
+
+update public.folders set name='바꾼이름' where csv_source_name='abcdefg-long';
+select lives_ok($$select public.import_csv(gen_random_uuid(), pg_temp.csv_plan(
+  '[{"rowNumber":2,"name":"이름 변경 후","url":"https://shop.test/renamed","savedAt":"2026-10-12T00:00:00Z","isOwned":false,"sourceFolderNames":["abcdefg-long"]}]',
+  '[{"sourceName":"abcdefg-long","folderName":"바꾼이름"}]'))$$, '표시 이름을 바꿔도 원본 버킷으로 폴더를 재사용한다');
+select is((select count(*)::text from public.folders), current_setting('test.folder_count'), '이름 변경 뒤에도 새 폴더를 만들지 않는다');
+select throws_ok($$select public.import_csv(gen_random_uuid(), pg_temp.csv_plan('[]',
+  '[{"sourceName":"abcdefg-long","folderName":"abcdefg"}]'))$$, '40001', 'csv_folder_conflict', '조회 뒤 폴더 이름이 바뀌면 최신 매핑을 요청한다');
+delete from public.folders where csv_source_name='abcdefg-long';
+select lives_ok($$select public.import_csv(gen_random_uuid(), pg_temp.csv_plan(
+  '[{"rowNumber":2,"name":"삭제 후","url":"https://shop.test/renamed","savedAt":"2026-10-12T00:00:00Z","isOwned":false,"sourceFolderNames":["abcdefg-long"]}]',
+  '[{"sourceName":"abcdefg-long","folderName":"abcdefg"}]'))$$, '폴더를 삭제한 뒤 재업로드하면 다시 만들 수 있다');
+select is((select f.name from public.product_folders pf join public.folders f on f.id=pf.folder_id join public.products p on p.id=pf.product_id where p.url='https://shop.test/renamed'), 'abcdefg', '재생성한 폴더에 기존 상품을 다시 연결한다');
+
+select set_config('test.future_result', public.import_csv(gen_random_uuid(), pg_temp.csv_plan(
+  jsonb_build_array(jsonb_build_object('rowNumber',2,'name','미래 상품','url','https://shop.test/future',
+    'savedAt',now()+interval '1 day','isOwned',false,'sourceFolderNames','[]'::jsonb))))::text, true);
+select is(current_setting('test.future_result')::jsonb->>'importedCount', '0', 'RPC를 직접 호출해도 미래 등록일 상품은 저장하지 않는다');
+select is(current_setting('test.future_result')::jsonb->'excludedProducts'->0->>'reason', 'INVALID_PRODUCT_DATA', '미래 등록일을 상품 검증 실패로 기록한다');
+select is((select count(*) from public.products where url='https://shop.test/future'), 0::bigint, '미래 등록일로 ALL 상단에 고정할 수 없다');
+
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}';
+select is((select count(*) from public.folders where csv_source_name is not null), 0::bigint, '다른 사용자의 원본 버킷명은 보이지 않는다');
 select is((select count(*) from public.import_jobs), 0::bigint, '다른 사용자의 작업 기록은 보이지 않는다');
 select is((select count(*) from public.import_failures), 0::bigint, '다른 사용자의 실패 기록은 보이지 않는다');
 select lives_ok($$select public.import_csv('10000000-0000-0000-0000-000000000001', pg_temp.csv_plan('[]'))$$, '요청 ID가 같아도 다른 계정 결과를 반환하지 않는다');
@@ -87,6 +121,11 @@ select is(jsonb_array_length(current_setting('test.limit_result')::jsonb->'folde
 select is((select count(*) from public.product_folders), 3::bigint, '기존 폴더·생성 성공 폴더·소장 관계를 유지한다');
 select is((select failed_count from public.import_jobs), 0, '폴더 한도 경고는 상품 실패 수에 포함하지 않는다');
 select throws_ok($$insert into public.folders(name) values('차단')$$, 'P0001', 'folder_limit_reached', '직접 만드는 폴더도 같은 한도로 막는다');
+
+select set_config('test.full_repeat', public.import_csv(gen_random_uuid(), pg_temp.csv_plan(
+  '[{"rowNumber":2,"name":"한도 상품","url":"https://shop.test/limit","savedAt":"2026-10-12T00:00:00Z","isOwned":false,"sourceFolderNames":["마지막"]}]',
+  '[{"sourceName":"마지막","folderName":"마지막"}]'))::text, true);
+select is(jsonb_array_length(current_setting('test.full_repeat')::jsonb->'folderFailures'), 0, '폴더 50개에서도 저장된 원본 버킷은 경고 없이 재사용한다');
 delete from public.folders where name='폴더48';
 select lives_ok($$insert into public.folders(name) values('삭제후생성')$$, '폴더를 하나 삭제하면 다시 만들 수 있다');
 

@@ -26,6 +26,7 @@ export type Database = {
       folders: {
         Row: {
           created_at: string;
+          csv_source_name: string | null;
           id: number;
           kind: Database["public"]["Enums"]["folder_kind"];
           last_added_at: string | null;
@@ -35,6 +36,7 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           created_at?: string;
+          csv_source_name?: string | null;
           id?: never;
           kind?: Database["public"]["Enums"]["folder_kind"];
           last_added_at?: string | null;
@@ -43,6 +45,7 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          csv_source_name?: string | null;
           id?: never;
           kind?: Database["public"]["Enums"]["folder_kind"];
           last_added_at?: string | null;

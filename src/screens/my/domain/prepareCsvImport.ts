@@ -38,7 +38,7 @@ type CsvImportOptions = {
   registeredAtUtcOffsetMinutes: number;
   // 소장템을 제외한 계정의 전체 일반 폴더 목록. 비어 있으면 []를 전달한다.
   existingFolderNames: readonly string[];
-  // 동일 Import의 재시도에서는 이전에 확정한 원본→최종 이름 매핑을 재사용한다.
+  // DB에 보존된 원본→현재 폴더명. 재업로드·동일 Import 재시도에서 재사용한다.
   previousFolderMappings?: readonly CsvFolderMapping[];
   existingProducts?: readonly CsvExistingProduct[];
   isKrw?: (source: { storeName: string; hostname: string }) => boolean;
