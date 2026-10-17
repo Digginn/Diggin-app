@@ -9,17 +9,16 @@ import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
-import { LoadingDialog } from "@/components/Loading";
+import { ItemSaveFlow } from "@/components/ItemSaveFlow";
 import { ActionModal } from "@/components/modal";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
 import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
-import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
+import { useItemSave } from "@/hooks/useItemSave";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useProductList } from "@/hooks/useProductList";
 import { useToast } from "@/hooks/useToast";
-import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
 import type { WishItem, WishLevelKey } from "@/types/wish-item";
 
@@ -206,23 +205,7 @@ export function AllScreen() {
         }}
       />
 
-      <LoadingDialog
-        visible={itemSave.isLoading}
-        message="아이템 정보를 불러오는 중입니다."
-        onDismiss={itemSave.openAfterLoading}
-      />
-
-      <ItemEditSheet
-        key={`save-${itemSave.values?.sourceUrl ?? ""}`}
-        visible={itemSave.values !== null}
-        hasExtractionFailed={itemSave.hasFailed}
-        initialValues={itemSave.values ?? EMPTY_ITEM_SAVE_VALUES}
-        onRequestClose={itemSave.close}
-        onSubmit={() => {
-          itemSave.close();
-          showToast(TOAST_MESSAGES.SAVE_011);
-        }}
-      />
+      <ItemSaveFlow itemSave={itemSave} />
 
       <ActionModal
         visible={confirming === "cancel"}
