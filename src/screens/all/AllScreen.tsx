@@ -17,8 +17,8 @@ import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constant
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
+import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
-import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { DeleteBar } from "./components/DeleteBar";
@@ -65,7 +65,9 @@ export function AllScreen() {
 
   // 선택 모드에서는 DeleteBar 가 탭바 자리를 대신한다.
   useLayoutEffect(() => {
-    navigation.setOptions({ tabBarStyle: isSelectMode ? { display: "none" } : undefined });
+    navigation
+      .getParent()
+      ?.setOptions({ tabBarStyle: isSelectMode ? { display: "none" } : undefined });
   }, [navigation, isSelectMode]);
 
   function exitSelectMode() {
@@ -114,7 +116,7 @@ export function AllScreen() {
               <AppBar.IconButton
                 icon={IconSearch}
                 accessibilityLabel="검색"
-                onPress={() => router.push("/search")}
+                onPress={() => router.push("/all/search")}
               />
               <AppBar.IconButton
                 icon={IconNotification}
@@ -189,7 +191,7 @@ export function AllScreen() {
         onDismiss={itemSave.openAfterLoading}
       />
 
-      <ItemSaveSheet
+      <ItemEditSheet
         key={`save-${itemSave.values?.sourceUrl ?? ""}`}
         visible={itemSave.values !== null}
         hasExtractionFailed={itemSave.hasFailed}

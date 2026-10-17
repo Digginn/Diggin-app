@@ -44,7 +44,11 @@ export function WishLevelSelect({
               key={key}
               accessibilityRole="menuitem"
               accessibilityLabel={WISH_LEVEL_LABELS[key]}
-              className="flex-row items-center gap-2 rounded-full border border-gray-200 bg-gray-0 px-3 py-2 active:opacity-75"
+              accessibilityState={{ selected: key === level }}
+              className={clsx(
+                "flex-row items-center gap-2 rounded-full bg-gray-0 px-3 py-2 active:opacity-75",
+                key === level ? "border-[1.5px] border-gray-400" : "border border-gray-200",
+              )}
               style={MENU_SHADOW}
               onPress={() => onSelect(key)}
             >
