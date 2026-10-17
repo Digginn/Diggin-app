@@ -67,7 +67,6 @@ async function countProducts(wishLevel?: WishLevelKey) {
   return count ?? 0;
 }
 
-/** ALL 상단 "저장한 아이템 N개"와 위시레벨별 개수(ALL-008). */
 export async function fetchProductCounts(): Promise<{ total: number; levels: WishLevelCounts }> {
   const [total, high, medium, low] = await Promise.all([
     countProducts(),
@@ -85,7 +84,6 @@ export async function deleteProducts(ids: readonly string[]) {
 
 export type ProductDetail = { values: ItemSaveValues; isOwned: boolean };
 
-/** PDT-001 상세는 진입 경로와 관계없이 같은 상품을 조회한다. */
 export async function fetchProduct(id: string): Promise<ProductDetail> {
   const { data, error } = await supabase
     .from("products")

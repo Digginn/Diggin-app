@@ -93,7 +93,6 @@ export function AllScreen() {
         showToast(selectDeletedMessage(selectedCount));
         exitSelectMode();
       },
-      // ALL-006 실패하면 선택 상태를 유지한다.
       onError: () => {
         setConfirming(null);
         showToast(TOAST_MESSAGES.ALL_008);
@@ -182,7 +181,6 @@ export function AllScreen() {
                     levels={counts.data?.levels ?? EMPTY_LEVELS}
                     hint={WISH_LEVEL_HINT}
                     selected={wishLevel}
-                    // 고른 레벨을 다시 누르면 필터를 푼다.
                     onSelect={(level) => setWishLevel((prev) => (prev === level ? null : level))}
                   />
                 </View>
