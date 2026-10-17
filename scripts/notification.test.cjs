@@ -60,7 +60,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "./components/SortLabel": { SortLabel: "SortLabel" },
     "@/screens/all/components/SortLabel": { SortLabel: "SortLabel" },
     "./queries/useProductList": { useProductList: () => ({ isPending: false, data: undefined }) },
-    "./queries/useProductCounts": { useProductCounts: () => ({ data: undefined }) },
+    "@/hooks/useProductCounts": { useProductCounts: () => ({ data: undefined }) },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({ mutate: () => {} }) },
     "./components/RecentSearches": { RecentSearches: "RecentSearches" },
     "./useRecentSearches": { useRecentSearches: () => ({ keywords: [] }) },
