@@ -8,9 +8,9 @@ export const PRODUCT_PAGE_SIZE = 20;
 
 export const productKeys = {
   all: ["products"] as const,
-  list: (sort: ProductSort, wishLevel: WishLevelKey | null) =>
-    [...productKeys.all, "list", sort, wishLevel] as const,
-  counts: () => [...productKeys.all, "counts"] as const,
+  list: (sort: ProductSort, wishLevel: WishLevelKey | null, query = "") =>
+    [...productKeys.all, "list", sort, wishLevel, query] as const,
+  counts: (query = "") => [...productKeys.all, "counts", query] as const,
   detail: (id: string) => [...productKeys.all, "detail", id] as const,
 };
 
@@ -22,6 +22,13 @@ type ProductRow = {
   image_url: string | null;
   product_folders: { folders: { kind: "custom" | "owned" } | null }[];
 };
+
+/** ALL-004 상품명·브랜드에서 찾는다. 브랜드가 없는 상품은 브랜드 검색에서 빠진다. */
+function searchFilter(query: string) {
+  // PostgREST or 필터는 쉼표·괄호를 구분자로 쓰니 검색어에서 뺀다.
+  const keyword = query.replace(/[,()]/g, " ").trim();
+  return `name.ilike.%${keyword}%,brand.ilike.%${keyword}%`;
+}
 
 function toWishItem(row: ProductRow): WishItem {
   return {
@@ -39,19 +46,22 @@ function toWishItem(row: ProductRow): WishItem {
 export async function fetchProductPage({
   sort,
   wishLevel,
+  query = "",
   page,
 }: {
   sort: ProductSort;
   wishLevel: WishLevelKey | null;
+  query?: string;
   page: number;
 }): Promise<WishItem[]> {
-  let query = supabase
+  let request = supabase
     .from("products")
     .select("id, name, brand, price, image_url, product_folders(folders(kind))");
   // 소장 상품은 위시레벨이 null이라 레벨 필터에서 자연히 빠진다(ALL-008).
-  if (wishLevel) query = query.eq("wish_level", wishLevel);
+  if (wishLevel) request = request.eq("wish_level", wishLevel);
+  if (query) request = request.or(searchFilter(query));
   const from = page * PRODUCT_PAGE_SIZE;
-  const { data, error } = await query
+  const { data, error } = await request
     .order("saved_at", { ascending: sort === "oldest" })
     .order("id", { ascending: false })
     .range(from, from + PRODUCT_PAGE_SIZE - 1);
@@ -59,20 +69,23 @@ export async function fetchProductPage({
   return (data as ProductRow[]).map(toWishItem);
 }
 
-async function countProducts(wishLevel?: WishLevelKey) {
-  let query = supabase.from("products").select("id", { count: "exact", head: true });
-  if (wishLevel) query = query.eq("wish_level", wishLevel);
-  const { count, error } = await query;
+async function countProducts(query: string, wishLevel?: WishLevelKey) {
+  let request = supabase.from("products").select("id", { count: "exact", head: true });
+  if (wishLevel) request = request.eq("wish_level", wishLevel);
+  if (query) request = request.or(searchFilter(query));
+  const { count, error } = await request;
   if (error) throw error;
   return count ?? 0;
 }
 
-export async function fetchProductCounts(): Promise<{ total: number; levels: WishLevelCounts }> {
+export async function fetchProductCounts(
+  query = "",
+): Promise<{ total: number; levels: WishLevelCounts }> {
   const [total, high, medium, low] = await Promise.all([
-    countProducts(),
-    countProducts("high"),
-    countProducts("medium"),
-    countProducts("low"),
+    countProducts(query),
+    countProducts(query, "high"),
+    countProducts(query, "medium"),
+    countProducts(query, "low"),
   ]);
   return { total, levels: { high, medium, low } };
 }

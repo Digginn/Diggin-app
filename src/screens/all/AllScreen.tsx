@@ -17,6 +17,7 @@ import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constant
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useProductCounts } from "@/hooks/useProductCounts";
+import { useProductList } from "@/hooks/useProductList";
 import { useToast } from "@/hooks/useToast";
 import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
@@ -26,7 +27,6 @@ import { DeleteBar } from "./components/DeleteBar";
 import { SelectModeBar } from "./components/SelectModeBar";
 import { SortLabel, type SortOrder } from "./components/SortLabel";
 import { useDeleteProducts } from "./mutations/useDeleteProducts";
-import { useProductList } from "./queries/useProductList";
 
 const EMPTY_LEVELS = { high: 0, medium: 0, low: 0 };
 
