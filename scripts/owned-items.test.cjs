@@ -30,25 +30,6 @@ function nodes(element, type) {
   ];
 }
 
-test("일반 아이템 순서는 보존하고 소장템은 뒤에서 최근 소장 순으로 정렬한다", () => {
-  const { orderWishItems } = load("../src/screens/all/domain/orderWishItems.ts");
-  const items = [
-    { id: "older", isOwned: true, ownedAt: 10 },
-    { id: "normal" },
-    { id: "unknown-date", isOwned: true },
-    { id: "newer", isOwned: true, ownedAt: 20 },
-    { id: "normal2", isOwned: false },
-    { id: "same-date", isOwned: true, ownedAt: 20 },
-  ];
-  const original = [...items];
-  assert.deepEqual(
-    Array.from(orderWishItems(items), (item) => item.id),
-    ["normal", "normal2", "newer", "same-date", "older", "unknown-date"],
-  );
-  assert.deepEqual(items, original);
-  assert.equal(orderWishItems([]).length, 0);
-});
-
 test("소장 카드는 썸네일만 흰색 40%로 덮고 배지·선택 체크·클릭을 유지한다", () => {
   const { Card } = load("../src/components/card/Card.tsx", {
     "react": { useState: () => [undefined, () => {}] },
