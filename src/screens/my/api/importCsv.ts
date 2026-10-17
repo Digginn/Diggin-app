@@ -6,6 +6,7 @@ import { File } from "expo-file-system";
 import { supabase } from "@/lib/supabase";
 import type { Json } from "@/types/database.types";
 
+import { isKrwCsvSource } from "../domain/isKrwCsvSource";
 import { MAX_CSV_BYTES, prepareCsvImport } from "../domain/prepareCsvImport";
 import type {
   CsvExcludedProduct,
@@ -90,8 +91,8 @@ export async function importCsv(
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (bytes.byteLength > MAX_CSV_BYTES) return { error: "file-too-large" };
 
-  // 알려진 통화 규칙이 없는 스토어는 가격을 임의로 원화라고 판단하지 않는다.
   const options = {
+    isKrw: isKrwCsvSource,
     importedAt: new Date().toISOString(),
     registeredAtUtcOffsetMinutes: REGISTERED_AT_UTC_OFFSET_MINUTES,
     existingFolderNames: [] as string[],

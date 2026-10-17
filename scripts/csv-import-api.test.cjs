@@ -26,6 +26,7 @@ function load(relativePath, overrides = {}) {
 }
 
 const domain = load("../src/screens/my/domain/prepareCsvImport.ts");
+const currency = load("../src/screens/my/domain/isKrwCsvSource.ts");
 function setup({
   folders = [],
   sources = {},
@@ -84,6 +85,7 @@ function setup({
       },
     },
     "../domain/prepareCsvImport": domain,
+    "../domain/isKrwCsvSource": currency,
     "@/lib/supabase": {
       supabase: {
         auth: { getUser: async () => ({ data: { user }, error: null }) },
@@ -159,6 +161,66 @@ test("새 요청으로 재업로드해도 저장된 원본 버킷의 폴더를 �
     { sourceName: "abcdefg-long", folderName: "바꾼이름" },
   ]);
   assert.deepEqual(calls[0].import_plan.products[0].folderNames, ["바꾼이름"]);
+});
+
+test("IMP-005 승인 판매처 가격을 실제 가져오기 RPC에 전달하고 미확인 통화는 비운다", async () => {
+  const cases = [
+    ["쿠팡", "https://www.coupang.com/vp/products/1", "12,000", "8,000", "8000"],
+    ["무신사", "https://www.musinsa.com/products/2", "12,000", "", "12000"],
+    ["29CM", "https://product.29cm.co.kr/catalog/3", "100", "0", "0"],
+    ["지그재그", "https://zigzag.kr/catalog/products/4", "100", "-1", "100"],
+    ["개별 판매자", "https://m.smartstore.naver.com/shop/products/5", "100", "1.5", "100"],
+    ["KREAM", "https://kream.co.kr/products/6", "-1", "1.5", null],
+    ["ABLY", "https://mobile.a-bly.com/goods/7", "100", "80", "80"],
+    ["4910", "https://www.4910.kr/desktop/goods/8", "100", "80", "80"],
+    ["무신사", "https://global.musinsa.com/products/9", "100", "80", null],
+    ["쿠팡", "https://www.tw.coupang.com/products/10", "100", "80", null],
+    ["쿠팡", "https://link.coupang.com/a/11", "100", "80", null],
+    ["ABLY", "https://click.linkprice.com/click?url=https://a-bly.com", "100", "80", null],
+    ["KREAM", "https://kream.co.kr.example.com/products/13", "100", "80", null],
+    ["알리익스프레스", "https://aliexpress.com/item/14", "100", "80", null],
+    ["", "https://WWW.MUSINSA.COM/products/15", "100", "80", "80"],
+  ];
+  const bytes = new TextEncoder().encode(
+    Papa.unparse([
+      domain.CSV_REQUIRED_HEADERS,
+      ...cases.map(([store, url, regular, sale], index) => [
+        `상품${index}`,
+        store,
+        "",
+        regular,
+        sale,
+        "2026-10-12 09:00:00",
+        "",
+        "N",
+        url,
+      ]),
+    ]),
+  );
+  const { run, calls } = setup({
+    bytes,
+    rpc: (_, attempt) =>
+      attempt === 1
+        ? { data: null, error: { code: "40001", message: "csv_folder_conflict" } }
+        : {
+            data: { importedCount: cases.length, excludedProducts: [], folderFailures: [] },
+            error: null,
+          },
+  });
+  const result = await run();
+  assert.equal(result.importedCount, cases.length);
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    assert.equal(call.import_plan.failures.length, 0);
+    assert.deepEqual(
+      call.import_plan.products.map((product) => product.price),
+      cases.map((entry) => entry[4]),
+    );
+    assert.deepEqual(
+      call.import_plan.products.map((product) => product.url),
+      cases.map((entry) => entry[1]),
+    );
+  }
 });
 
 test("서버 응답을 받지 못하면 완료로 표시하지 않고 같은 파일 재시도에 요청 ID를 유지한다", async () => {
