@@ -14,6 +14,8 @@ function load(filename, mocks) {
   }).outputText;
   runInNewContext(compiled, {
     __DEV__: true,
+    setTimeout,
+    clearTimeout,
     exports: loaded.exports,
     module: loaded,
     require: (name) =>
@@ -205,11 +207,15 @@ test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 �
   assert.deepEqual(Array.from(completed), ["gift", "pants", "new"]);
 });
 
-test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실패 재시도를 처리한다", () => {
+test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실패 재시도를 처리한다", async () => {
   const state = [];
   let cursor = 0;
+  let lastEffect;
   const { FolderDetailScreen } = load("../src/screens/folder/FolderDetailScreen.tsx", {
     "react": {
+      useEffect: (effect) => {
+        lastEffect = effect;
+      },
       useState: (initial) => {
         const index = cursor++;
         if (state[index] === undefined) state[index] = initial;
@@ -404,6 +410,12 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   findAll(renderSearch(), "SearchBar")[0].props.onChangeText("   ");
   findAll(renderSearch(), "SearchBar")[0].props.onSubmitEditing();
   assert.equal(submitted, "", "공백만 입력하면 검색하지 않는다");
+  // 입력을 멈추면 검색 버튼 없이도 검색한다(ALL-004와 같은 동작).
+  findAll(renderSearch(), "SearchBar")[0].props.onChangeText(" 바지 ");
+  renderSearch();
+  lastEffect();
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  assert.equal(submitted, "바지");
 });
 
 test("공용 Card는 가격 없음과 0원을 구분하고 로컬 썸네일을 표시한다", () => {
