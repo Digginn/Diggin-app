@@ -19,7 +19,7 @@ function loadProductsApi(rows = [], counts = {}) {
       },
       eq: (column, value) => {
         call.filters.push([column, value]);
-        return builder;
+        return call.patch ? Promise.resolve({ error: null }) : builder;
       },
       order: (column, options) => {
         call.orders.push([column, options.ascending]);
@@ -30,6 +30,11 @@ function loadProductsApi(rows = [], counts = {}) {
         return Promise.resolve({ data: rows, error: null });
       },
       delete: () => builder,
+      update: (patch) => {
+        call.patch = patch;
+        return builder;
+      },
+      single: () => Promise.resolve({ data: rows[0], error: null }),
       in: (column, values) => {
         call.deleted = [column, values];
         return Promise.resolve({ error: null });
@@ -121,4 +126,50 @@ test("선택 삭제는 고른 상품 id를 숫자로 바꿔 한 번에 지운다
   await api.deleteProducts(["3", "7"]);
   assert.equal(calls[0].deleted[0], "id");
   assert.deepEqual([...calls[0].deleted[1]], [3, 7]);
+});
+
+test("상세는 가격·브랜드가 없으면 빈 값으로, 소장 여부는 나의 소장템 관계로 넘긴다", async () => {
+  const { api, calls } = loadProductsApi([
+    {
+      name: "코트",
+      brand: null,
+      price: null,
+      url: "https://shop.com/1",
+      image_url: null,
+      wish_level: null,
+      product_folders: [{ folders: { kind: "owned" } }],
+    },
+  ]);
+  const detail = await api.fetchProduct("7");
+  assert.deepEqual(calls[0].filters, [["id", 7]]);
+  assert.equal(detail.isOwned, true);
+  assert.deepEqual(
+    { ...detail.values },
+    {
+      name: "코트",
+      brand: "",
+      price: "",
+      sourceUrl: "https://shop.com/1",
+      thumbnailUrl: null,
+      wishLevel: null,
+    },
+  );
+});
+
+test("수정은 넘긴 값만 바꾸고 빈 브랜드는 null, 가격은 숫자만 저장한다(PDT-005·006)", async () => {
+  const { api, calls } = loadProductsApi();
+  await api.updateProduct("7", {
+    name: "바지",
+    brand: "  ",
+    price: "70,000",
+    wishLevel: undefined,
+  });
+  assert.deepEqual({ ...calls[0].patch }, { name: "바지", brand: null, price: 70000 });
+  assert.deepEqual(calls[0].filters, [["id", 7]]);
+
+  await api.updateProduct("7", { price: "" });
+  assert.deepEqual({ ...calls[1].patch }, { price: null });
+
+  await api.updateProduct("7", { wishLevel: "low" });
+  assert.deepEqual({ ...calls[2].patch }, { wish_level: "low" }, "링크·이미지는 보내지 않는다");
 });
