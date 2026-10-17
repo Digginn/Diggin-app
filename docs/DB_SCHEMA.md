@@ -9,13 +9,13 @@
 
 ## 1. 진행 상황
 
-| 영역           | 테이블                                                                                                                         | 상태                                                          |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                    |
-| 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다   |
-| 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*는 CSV 작업에서 |
-| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | 미구현                                                        |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                        |
+| 영역           | 테이블                                                                                                                         | 상태                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                           |
+| 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다          |
+| 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69) |
+| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | 미구현                                                               |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                               |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -83,8 +83,8 @@ report_reason       abuse | spam | inappropriate | other
 report_status       received | reviewing | resolved | rejected
 account_status      active | warning | community_restricted | suspended   (구현)
 notification_type   vote_ended | post_commented | post_liked
-import_status       processing | completed | failed
-import_fail_reason  EMPTY_PRODUCT_NAME | EMPTY_PRODUCT_URL | INVALID_PRODUCT_URL | CSV_ROW_PARSE_ERROR
+import_status       processing | completed | failed                     (구현)
+import_fail_reason  EMPTY_PRODUCT_NAME | EMPTY_PRODUCT_URL | INVALID_PRODUCT_URL | CSV_ROW_PARSE_ERROR | INVALID_PRODUCT_DATA | FOLDER_LIMIT_EXCEEDED | FOLDER_SAVE_FAILED (구현)
 withdrawal_reason   rarely_used | missing_feature | other_service | hard_to_use | frequent_error   (구현)
 admin_role          operator | super_admin
 ```
@@ -116,7 +116,16 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 - product_folders: 앱은 일반 폴더만 직접 담기(insert)·빼기(delete). 나의 소장템은 `set_owned`로만. 담으면 `folders.last_added_at`을 담은 시각으로 바꾸고, 빼도 되돌리지 않는다.
 - 소장템 상품에 위시레벨을 넣거나, 위시레벨 있는 상품을 소장템에 담으면 `owned_product_wish_level`(P0001)로 막는다.
 
-## 6. 남은 테이블 설계
+## 5-2. 구현된 영역 요약 (#69 CSV 저장)
+
+- `import_csv(request_id uuid, import_plan jsonb)`는 본인 상품·폴더·관계를 저장하고 실제 성공 수·제외 상품·폴더 연결 경고를 반환한다. CSV 파싱은 앱에서 하고 상품 입력·URL 중복·계정·폴더 한도는 서버에서 다시 검사한다.
+- CSV로 생성한 폴더는 `folders.csv_source_name`에 원본 버킷명을 보존하고 다음 Import에서 우선 재사용한다. 표시 이름을 바꿔도 원본 매핑은 유지하고 삭제하면 함께 사라진다. 보존된 원본이 없으면 기존 일반 폴더명과 정확히 일치할 때 재사용한다. 다른 원본의 잘린 이름 충돌은 앱이 7자 내 번호로 구분하고, 조회 이후의 충돌은 서버가 `40001`로 취소해 최신 목록으로 다시 계산하게 한다. 프로필·기존 상품·폴더를 잠가 동시 생성과 소장 처리를 보호한다.
+- 상품은 저장하면서 `saved_at`에 CSV 등록일을 넣는다. 서버는 미래 날짜·유한하지 않은 날짜를 `INVALID_PRODUCT_DATA`로 제외한다. 중복 URL은 기존 정보를 유지하고 폴더·소장 관계만 추가한다. 선택 가격이 DB 정수 범위를 넘으면 가격만 null로 저장한다. 원화 판별 규칙은 미완료라 실사용 경로의 가격은 모두 null이다.
+- 새 일반 폴더가 50개 한도를 넘으면 관계 실패로 기록하고 상품은 ALL에 남긴다. 이미 있는 폴더에는 한도와 관계없이 연결한다. 소장 Y는 `private.set_owned`를 재사용한다.
+- 한 요청의 저장과 완료 결과는 같은 트랜잭션이다. 같은 계정·`request_id` 재시도는 최초 완료 결과를 반환하므로 응답 유실로 폴더를 다시 만들지 않는다. 앱은 `import_jobs`, `import_failures`에서 본인 기록 select만 가능하다.
+- 파싱 실패·상품 검증 실패와 폴더 관계 경고를 `import_failures`로 구분해 기록한다. 폴더 경고는 작업의 상품 실패 수에 더하지 않는다. 큰 CSV 처리를 위해 public RPC에만 `statement_timeout = '60s'`를 둔다.
+
+## 6. 도메인별 테이블 설계
 
 컬럼 옆 설명은 제약과 근거 명세다. FigJam 최종본과 같다.
 
@@ -136,6 +145,12 @@ products
   created_at, updated_at
   unique (user_id, url), unique (id, user_id), index (user_id, saved_at desc, id desc)
 
+folders (CSV 추가 컬럼)
+  csv_source_name text null, unique (user_id, csv_source_name)
+  null = 직접 생성 또는 원본을 보존하지 않은 기존 폴더
+  값이 있으면 custom만 허용, NFC·trim된 비어 있지 않은 원본 버킷명
+  앱은 본인 폴더에서 select만 가능하며 이 컬럼의 insert/update는 RPC만 수행
+
 product_folders
   product_id, folder_id  PK
   user_id     uuid not null
@@ -145,13 +160,18 @@ product_folders
   index (folder_id, created_at desc)
 
 import_jobs
-  id, user_id, status import_status default 'processing',
+  id bigint identity PK, user_id FK profiles on delete cascade,
+  request_id uuid not null, unique (user_id, request_id), unique (id, user_id),
+  status import_status default 'processing', result jsonb null,
   total_count, success_count, failed_count, duplicate_count (integer default 0),
   started_at timestamptz default now(), finished_at timestamptz null
+  완료 시 total_count = success_count + failed_count + duplicate_count
 
 import_failures
-  id, job_id FK import_jobs on delete cascade, user_id, row_number integer,
-  product_name text null, reason import_fail_reason
+  id bigint identity PK, job_id, user_id FK profiles on delete cascade, row_number integer >= 2,
+  FK (job_id, user_id) → import_jobs(id, user_id) on delete cascade,
+  product_name text null, source_folder_name text null, reason import_fail_reason,
+  index (job_id), index (user_id)
 ```
 
 - products 앱 grant: select, delete, update(name, brand, price, wish_level). insert는 RPC `save_product`로만(상품과 폴더 관계를 한 트랜잭션에, 중복 URL이면 기존 id 반환).
@@ -159,7 +179,7 @@ import_failures
 - 나의 소장템에 든 상품에 wish_level을 넣으면 트리거로 막는다. 소장 추가·해제는 RPC `set_owned`로만(PDT-008).
 - product_folders insert 시 folders.last_added_at을 now()로 갱신하고, 빼거나 지워도 되돌리지 않는다(FLD-001 "상품 삭제는 순서를 바꾸지 않는다"). 많이 담은 순은 관계 개수로 센다.
 - 복합 FK라 남의 폴더에 내 상품을 넣는 행은 DB가 거부한다.
-- CSV 폴더명은 서버가 들어오자마자 최종 이름으로 저장한다. 7자로 자르고, 기존 폴더나 먼저 만든 폴더와 겹치면 6자 + 2부터 번호(10번째부터 5자 + 두 자리). 원래 버킷명은 저장하지 않는다. 폴더 50개를 넘는 버킷은 폴더 없이 ALL에만 넣고, 50개 안에서는 상품 많은 버킷부터 만든다.
+- 보존된 CSV 원본 버킷명이 있으면 현재 표시 이름으로 재사용하고, 없으면 원본 버킷명이 기존 일반 폴더명과 정확히 같을 때 재사용한다. 반복되는 같은 원본 버킷명은 하나의 폴더에 담는다. 신규 이름은 공백 포함 7자로 자르고, 잘린 결과만 기존 폴더나 다른 버킷에 배정된 이름과 겹치면 2부터 번호를 붙이되 번호도 7자 안에 포함한다. CSV로 새로 만든 폴더의 원본명은 `csv_source_name`에 저장한다. 과거에 원본을 보존하지 않은 긴 버킷명은 추측해 연결하지 않는다. 직접 만든 일반 폴더와 CSV가 만든 일반 폴더를 합해 계정당 50개이며 나의 소장템은 제외한다. 기존 폴더 재사용은 한도와 무관하게 허용하고, 새로 만들 수 없는 버킷의 상품은 ALL에만 저장한다.
 
 ### 6-2. 커뮤니티 (전부 private, 앱 grant 없음)
 
@@ -203,6 +223,7 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 
 - 신고만으로 차단하지 않는다. 신고 후 모달에서 '차단하기'를 눌렀을 때만 user_blocks를 만든다(RPT-003).
 - 차단 RPC는 user id를 받지 않고 post_id나 comment_id를 받아 서버에서 작성자를 찾는다. 차단 목록은 앱에 열지 않는다.
+- RPT-004 차단은 단방향이다. 차단한 사용자에게만 차단 대상의 게시글·투표글·댓글·답글을 숨긴다. 차단당한 사용자에게는 차단한 사용자의 콘텐츠가 계속 보인다. 기존 콘텐츠와 이후 새 콘텐츠에 동일하게 적용한다.
 
 ### 6-4. 알림 (notifications는 public select만, 나머지 private)
 
@@ -256,8 +277,12 @@ admin_actions  id, admin_id, action, target_type, target_id, report_id null, rea
 - 투표 결과를 투표할 수 없는 작성자와 마감 후 미참여자에게 보여줄지(VOTE-009)
 - 가입 시 약관 동의 화면이 명세에 없다. 처음 동의 기록을 언제 만들지(MY-009)
 - 닉네임 "한글"에 자음·모음 단독(ㄱ, ㅏ)을 허용할지. 지금은 허용하지 않는다
-- 차단 방향(단방향 명세 vs 앱 모달 문구 "서로의 게시글"), 차단 해제 화면 없음
+- 차단 해제 화면 없음. 차단 방향은 RPT-004 단방향으로 확정했으며, 앱 모달의 "서로의 게시글" 문구는 후속 작업에서 맞춘다.
 - 관리자 인증 방식, CSV 처리 위치(Edge Function / 클라이언트 + RPC), import 실패 사유 코드 추가 여부
+- CSV 한도 초과 시 신규 버킷 선택 순서: 기존 DB 설계는 상품 많은 순, 현재 CSV 저장 계획은 최초 등장 순이다. 이번에 구체화된 기준에는 우선순위가 없어 추가 확인한다.
+- IMP-005 원화 판별 규칙 미완료: 검증된 스토어·도메인 목록을 PM과 확정해야 한다. 현재 실사용 CSV 가격은 모두 null이다.
+- IMP-006의 기존 정보 유지와 PDT-008의 소장 시 위시레벨 제거가 충돌한다. 현재 소장 Y를 추가하면 공통 규칙대로 위시레벨을 비우며, 명세 예외를 PM과 확인한다.
+- IMP-008 예시는 공백 포함 7자 구현과 다르다. 구현 기준은 사용자 확인을 받았으나 명세 예시·QA 기준은 PM과 통일한다.
 - 운영자가 숨긴 글을 작성자 본인에게 보여줄지, 작성자가 지운 글·댓글 원문 보관 기간
 - URL 정규화 규칙(쿼리스트링, 끝 슬래시)
 - comments.updated_at: 화면에 '수정됨' 표시가 없으면 뺀다

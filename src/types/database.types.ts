@@ -26,6 +26,7 @@ export type Database = {
       folders: {
         Row: {
           created_at: string;
+          csv_source_name: string | null;
           id: number;
           kind: Database["public"]["Enums"]["folder_kind"];
           last_added_at: string | null;
@@ -35,6 +36,7 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           created_at?: string;
+          csv_source_name?: string | null;
           id?: never;
           kind?: Database["public"]["Enums"]["folder_kind"];
           last_added_at?: string | null;
@@ -43,6 +45,7 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          csv_source_name?: string | null;
           id?: never;
           kind?: Database["public"]["Enums"]["folder_kind"];
           last_added_at?: string | null;
@@ -52,6 +55,103 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "folders_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      import_failures: {
+        Row: {
+          id: number;
+          job_id: number;
+          product_name: string | null;
+          reason: Database["public"]["Enums"]["import_fail_reason"];
+          row_number: number;
+          source_folder_name: string | null;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          id?: never;
+          job_id: number;
+          product_name?: string | null;
+          reason: Database["public"]["Enums"]["import_fail_reason"];
+          row_number: number;
+          source_folder_name?: string | null;
+          user_id: string;
+        };
+        Update: {
+          id?: never;
+          job_id?: number;
+          product_name?: string | null;
+          reason?: Database["public"]["Enums"]["import_fail_reason"];
+          row_number?: number;
+          source_folder_name?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "import_failures_job_id_user_id_fkey";
+            columns: ["job_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "import_jobs";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "import_failures_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      import_jobs: {
+        Row: {
+          duplicate_count: number;
+          failed_count: number;
+          finished_at: string | null;
+          id: number;
+          request_id: string;
+          result: Json | null;
+          started_at: string;
+          status: Database["public"]["Enums"]["import_status"];
+          success_count: number;
+          total_count: number;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          duplicate_count?: number;
+          failed_count?: number;
+          finished_at?: string | null;
+          id?: never;
+          request_id: string;
+          result?: Json | null;
+          started_at?: string;
+          status?: Database["public"]["Enums"]["import_status"];
+          success_count?: number;
+          total_count: number;
+          user_id: string;
+        };
+        Update: {
+          duplicate_count?: number;
+          failed_count?: number;
+          finished_at?: string | null;
+          id?: never;
+          request_id?: string;
+          result?: Json | null;
+          started_at?: string;
+          status?: Database["public"]["Enums"]["import_status"];
+          success_count?: number;
+          total_count?: number;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
@@ -272,6 +372,7 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
       register_push_token: {
         Args: { new_platform: string; new_token: string };
         Returns: undefined;
@@ -306,6 +407,15 @@ export type Database = {
     Enums: {
       account_status: "active" | "warning" | "community_restricted" | "suspended";
       folder_kind: "custom" | "owned";
+      import_fail_reason:
+        | "EMPTY_PRODUCT_NAME"
+        | "EMPTY_PRODUCT_URL"
+        | "INVALID_PRODUCT_URL"
+        | "CSV_ROW_PARSE_ERROR"
+        | "INVALID_PRODUCT_DATA"
+        | "FOLDER_LIMIT_EXCEEDED"
+        | "FOLDER_SAVE_FAILED";
+      import_status: "processing" | "completed" | "failed";
       wish_level: "high" | "medium" | "low";
       withdrawal_reason:
         "rarely_used" | "missing_feature" | "other_service" | "hard_to_use" | "frequent_error";
@@ -425,6 +535,16 @@ export const Constants = {
     Enums: {
       account_status: ["active", "warning", "community_restricted", "suspended"],
       folder_kind: ["custom", "owned"],
+      import_fail_reason: [
+        "EMPTY_PRODUCT_NAME",
+        "EMPTY_PRODUCT_URL",
+        "INVALID_PRODUCT_URL",
+        "CSV_ROW_PARSE_ERROR",
+        "INVALID_PRODUCT_DATA",
+        "FOLDER_LIMIT_EXCEEDED",
+        "FOLDER_SAVE_FAILED",
+      ],
+      import_status: ["processing", "completed", "failed"],
       wish_level: ["high", "medium", "low"],
       withdrawal_reason: [
         "rarely_used",
