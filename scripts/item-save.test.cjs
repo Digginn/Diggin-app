@@ -9,6 +9,8 @@ const ts = require("typescript");
 
 function nodes(node) {
   if (!React.isValidElement(node)) return [];
+  // 화면을 나눈 컴포넌트(ItemInfoFields 등)도 펼쳐서 안쪽 입력 칸까지 본다.
+  if (typeof node.type === "function") return [node, ...nodes(node.type(node.props))];
   return [node, ...React.Children.toArray(node.props.children).flatMap(nodes)];
 }
 
@@ -31,7 +33,7 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   const state = [];
   let cursor = 0;
   const saved = [];
-  const { ItemEditSheet } = load("../src/screens/item-detail/components/ItemEditSheet.tsx", {
+  const mocks = {
     "react": {
       useRef: (initial) => ({ current: initial }),
       useState: (initial) => {
@@ -61,7 +63,12 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
     "@/hooks/useNativeModalVisible": { useNativeModalVisible: (visible) => visible },
     "@/components/WishLevelSelect": { WishLevelSelect: "WishLevelSelect" },
     "../utils/formatPriceInput": load("../src/screens/item-detail/utils/formatPriceInput.ts", {}),
-  });
+  };
+  mocks["./ItemInfoFields"] = load(
+    "../src/screens/item-detail/components/ItemInfoFields.tsx",
+    mocks,
+  );
+  const { ItemEditSheet } = load("../src/screens/item-detail/components/ItemEditSheet.tsx", mocks);
 
   const render = () => {
     cursor = 0;
