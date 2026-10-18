@@ -5,6 +5,7 @@ import { TOAST_MESSAGES } from "@/constants/messages";
 import { EMPTY_ITEM_SAVE_VALUES, type useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
 import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
+import { ProductPageReader } from "@/screens/save/components/ProductPageReader";
 
 type ItemSaveFlowProps = { itemSave: ReturnType<typeof useItemSave> };
 
@@ -16,6 +17,14 @@ export function ItemSaveFlow({ itemSave }: ItemSaveFlowProps) {
 
   return (
     <>
+      {itemSave.readingUrl ? (
+        <ProductPageReader
+          key={itemSave.readingUrl}
+          url={itemSave.readingUrl}
+          onDone={itemSave.finishReading}
+        />
+      ) : null}
+
       <LoadingDialog
         visible={itemSave.isLoading}
         message="아이템 정보를 불러오는 중입니다."
