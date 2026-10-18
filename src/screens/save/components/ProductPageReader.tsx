@@ -46,7 +46,9 @@ export function ProductPageReader({ url, onDone }: ProductPageReaderProps) {
         }
       }}
       onError={() => finish(null)}
-      // 쇼핑몰이 딥링크로 앱을 열려고 해도 사용자 모르게 다른 앱이 뜨지 않게 웹 이동만 허용한다.
+      // 쇼핑몰이 딥링크(ably:// 등)로 앱을 열려고 해도 사용자 모르게 다른 앱이 뜨지 않게 웹 이동만 허용한다.
+      // originWhitelist 밖의 주소는 WebView가 Linking.openURL로 바깥 앱을 열어 버리므로 전부 아래 판단으로 보낸다.
+      originWhitelist={["*"]}
       onShouldStartLoadWithRequest={(request) => /^https?:\/\//i.test(request.url)}
       // 쿠키를 남기지 않아 매번 처음 방문처럼 연다.
       incognito
