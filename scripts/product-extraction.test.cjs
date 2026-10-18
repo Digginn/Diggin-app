@@ -660,3 +660,50 @@ test("컬리 공유 링크는 앱·App Store로 가기 전에 같은 상품 번�
   );
   assert.equal(hasFailed, true, "못 옮기고 중간 페이지에서 끝나면 그 정보를 쓰지 않는다");
 });
+
+test("컬리는 페이지 데이터에서 상품명·판매가·브랜드를 읽는다", () => {
+  const sent = [];
+  const nextData = {
+    props: {
+      pageProps: {
+        product: {
+          name: "[Dole] 스위티오 바나나 2종 (택1)",
+          showablePrices: { salesPrice: 3990, basePrice: 4200, retailPrice: null },
+          brandInfo: { nameGate: { brandCode: 1552, name: "Dole" } },
+          sellerName: "컬리",
+        },
+      },
+    },
+  };
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+    document: {
+      readyState: "complete",
+      querySelector: (selector) => {
+        const metas = {
+          "og:title": "[Dole] 스위티오 바나나 2종 (택1) - 마켓컬리",
+          "og:image": "https://product-image.kurly.com/a.jpg",
+        };
+        const key = /"([^"]+)"/.exec(selector)[1];
+        return metas[key] ? { getAttribute: () => metas[key] } : null;
+      },
+      querySelectorAll: () => [],
+      getElementById: (id) =>
+        id === "__NEXT_DATA__" ? { textContent: JSON.stringify(nextData) } : null,
+    },
+    location: {
+      href: "https://www.kurly.com/goods/5031442",
+      hostname: "www.kurly.com",
+      search: "",
+    },
+    URLSearchParams,
+    Date,
+    JSON,
+    setInterval: () => 1,
+    clearInterval: () => {},
+  });
+  const { values } = normalizeProductPage(sent[0], "https://www.kurly.com/goods/5031442");
+  assert.equal(values.name, "[Dole] 스위티오 바나나 2종 (택1)");
+  assert.equal(values.price, "3990", "정가가 아니라 판매가를 쓴다");
+  assert.equal(values.brand, "Dole", "판매자(컬리)가 아니라 브랜드를 쓴다");
+});
