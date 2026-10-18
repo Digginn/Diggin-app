@@ -529,3 +529,50 @@ test("페이지 시작에 넣어도 문서를 다 읽기 전에는 끝내지 않
   tick();
   assert.equal(sent.length, 1);
 });
+
+test("올리브영은 늦게 붙는 eg: 메타를 기다렸다가 브랜드와 판매가를 읽고 제목 끝 사이트 이름을 뗀다", () => {
+  const sent = [];
+  const metas = {
+    "og:title": "[오프체리 컬렉션]웨이크메이크 소프트 블러링 아이팔레트(단품) | 올리브영",
+    "og:image": "https://image.oliveyoung.co.kr/a.jpg",
+  };
+  let tick;
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+    document: {
+      readyState: "complete",
+      querySelector: (selector) => {
+        const key = /"([^"]+)"/.exec(selector)[1];
+        return metas[key] ? { getAttribute: () => metas[key] } : null;
+      },
+      querySelectorAll: () => [],
+      getElementById: () => null,
+    },
+    location: {
+      href: "https://m.oliveyoung.co.kr/m/goods/getGoodsDetail.do?goodsNo=A000000180532",
+      hostname: "m.oliveyoung.co.kr",
+      search: "",
+    },
+    URLSearchParams,
+    Date: { now: () => 3000 },
+    JSON,
+    setInterval: (callback) => {
+      tick = callback;
+      return 1;
+    },
+    clearInterval: () => {},
+  });
+  assert.equal(sent.length, 0, "eg: 메타가 붙기 전에는 보내지 않는다");
+
+  Object.assign(metas, {
+    "eg:brandName": "웨이크메이크",
+    "eg:originalPrice": "34000",
+    "eg:salePrice": "23800",
+  });
+  tick();
+  assert.equal(sent.length, 1);
+  const { values } = normalizeProductPage(sent[0], "https://oy.run/abc");
+  assert.equal(values.name, "[오프체리 컬렉션]웨이크메이크 소프트 블러링 아이팔레트(단품)");
+  assert.equal(values.brand, "웨이크메이크");
+  assert.equal(values.price, "23800");
+});
