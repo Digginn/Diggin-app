@@ -2,6 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 
+import { isLinkDetectionPaused } from "@/hooks/useLinkDetectionPause";
 import { findItemLink } from "@/utils/itemLink";
 
 export function useDetectedLink() {
@@ -28,6 +29,11 @@ export function useDetectedLink() {
 
       const url = findItemLink(text);
       if (!url || handledRef.current.has(url)) return;
+      // 사용자가 이미 링크를 직접 넣는 중이면 그 링크는 처리한 것으로 보고, 시트를 닫은 뒤에도 다시 묻지 않는다.
+      if (isLinkDetectionPaused()) {
+        handledRef.current.add(url);
+        return;
+      }
 
       setLink(url);
     } catch {
