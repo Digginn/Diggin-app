@@ -4,8 +4,9 @@ import { WebView } from "react-native-webview";
 
 import { PRODUCT_PAGE_SCRIPT, type ProductPageRaw } from "../domain/productPageScript";
 
-// 페이지 스크립트는 로드 뒤 최대 8초를 기다린다. 로드가 끝나지 않거나 스크립트가 못 돌면(쿠팡 빈 화면) 여기서 끊는다.
-const READER_TIMEOUT_MS = 12000;
+// 페이지 스크립트는 페이지마다 최대 8초를 기다린다. 앱 공유 링크는 중간 페이지를 한 번 더 거친다.
+// 로드가 끝나지 않거나 스크립트가 못 돌면(쿠팡 빈 화면) 여기서 끊는다.
+const READER_TIMEOUT_MS = 15000;
 
 type ProductPageReaderProps = {
   url: string;

@@ -23,14 +23,31 @@ function truncate(text: string | null, max: number) {
   return result;
 }
 
+// og:site_name이 없는 쇼핑몰도 제목 끝 사이트 이름을 떼려고 둔다. 정확히 일치할 때만 떼서 "저지 - 블랙" 같은 색상은 남긴다.
+const KNOWN_SITE_NAMES = [
+  "에이블리",
+  "에이블리 스토어",
+  "무신사",
+  "29cm",
+  "지그재그",
+  "오늘의집",
+  "kream",
+  "번개장터",
+  "쿠팡",
+];
+
 /** "상품명 - 에이블리", "상품명 | 무신사"처럼 뒤에 붙은 사이트 이름을 뗀다. 제목이 사이트 이름뿐이면 상품명이 아니다. */
 function cleanTitle(title: string | null, siteName: string | null) {
-  if (!title || !siteName) return title;
-  const site = siteName.toLowerCase();
+  if (!title) return null;
+  const site = siteName?.toLowerCase();
+  const isSiteName = (part: string) => {
+    const text = part.trim().toLowerCase();
+    return KNOWN_SITE_NAMES.includes(text) || (site !== undefined && text.includes(site));
+  };
   const parts = title.split(/\s[-|:]\s/);
-  while (parts.length > 1 && parts.at(-1)!.toLowerCase().includes(site)) parts.pop();
+  while (parts.length > 1 && isSiteName(parts.at(-1)!)) parts.pop();
   const cleaned = parts.join(" - ").trim();
-  return cleaned.toLowerCase() === site ? null : cleaned;
+  return isSiteName(cleaned) ? null : cleaned;
 }
 
 /** 원화로 확인된 값만 정수 문자열로 바꾼다. "25,080", 25800, "106000.0"을 받고 소수·음수·범위 밖은 버린다. */
@@ -62,7 +79,7 @@ function isSiteDefault(ogUrl: unknown) {
 
 // 광고·유입 추적용 이름이 확실한 값만 뗀다. 상품 옵션이나 쿠팡 vendorItemId처럼 상품을 가르는 값은 남긴다.
 const TRACKING_PARAM =
-  /^(utm_.*|nt_.*|airbridge.*|fbclid|gclid|igshid|napm|is_retargeting|source_caller|sourcetype|searchid)$/i;
+  /^(utm_.*|nt_.*|airbridge.*|fbclid|gclid|igshid|napm|is_retargeting|source_caller|sourcetype|searchid|tracking_content|https_deeplink|short_id)$/i;
 
 /** 같은 상품이 추적값만 달라 다른 링크로 저장되지 않게 한다(SAVE-012 중복 검사). */
 export function stripTrackingParams(url: string) {
@@ -105,7 +122,7 @@ export function normalizeProductPage(
     hasFailed,
     values: {
       name,
-      brand: truncate(asText(shop?.brand) ?? asText(ld?.brand), BRAND_MAX),
+      brand: truncate(asText(shop?.brand) ?? asText(ld?.brand) ?? asText(og.brand), BRAND_MAX),
       price: price ?? "",
       // SAVE-003 리다이렉트를 따라간 최종 주소. 못 읽었으면 로그인·만료 페이지일 수 있어 원래 링크를 둔다.
       sourceUrl: stripTrackingParams(

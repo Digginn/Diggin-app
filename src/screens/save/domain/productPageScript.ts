@@ -6,6 +6,7 @@ export type ProductPageRaw = {
     image: string | null;
     url: string | null;
     siteName: string | null;
+    brand: string | null;
     price: string | null;
     currency: string | null;
   };
@@ -25,6 +26,8 @@ export const PRODUCT_PAGE_WAIT_MS = 8000;
 /**
  * 숨긴 WebView에 넣어 실행한다. 문자열이라 타입 검사를 못 받으니 판단은 하지 않고 재료만 모은다.
  * 상품명과 이미지가 잡히면 바로, 못 잡으면 PRODUCT_PAGE_WAIT_MS가 지나서 그때까지 모은 값을 보낸다.
+ * 앱 공유 링크는 앱 연결 업체(Airbridge 등)의 중간 페이지를 거친다. 거기서도 제목·이미지가 보이지만 가격이 없고
+ * 곧 상품 페이지로 넘어가므로, 중간 페이지에서는 끝내지 않고 다음 페이지에서 새로 읽는다.
  */
 export const PRODUCT_PAGE_SCRIPT = `(() => {
   const meta = (key) =>
@@ -86,6 +89,7 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
       image: meta("og:image"),
       url: meta("og:url"),
       siteName: meta("og:site_name"),
+      brand: meta("product:brand"),
       price: meta("product:price:amount") || meta("og:price:amount"),
       currency: meta("product:price:currency") || meta("og:price:currency"),
     },
@@ -93,6 +97,7 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     shop: readShop(),
   });
 
+  const isAppLinkLanding = /(^|\\.)(airbridge\\.io|abr\\.ge|onelink\\.me|app\\.link|page\\.link)$|^applink\\./i.test(location.hostname);
   const startedAt = Date.now();
   let timer = null;
   const tick = () => {
@@ -100,7 +105,7 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     try { raw = read(); } catch (error) { return false; }
     const name = (raw.shop && raw.shop.name) || (raw.ld && raw.ld.name) || raw.og.title;
     const image = (raw.ld && raw.ld.image) || raw.og.image;
-    if (!(name && image) && Date.now() - startedAt < ${PRODUCT_PAGE_WAIT_MS}) return false;
+    if ((isAppLinkLanding || !(name && image)) && Date.now() - startedAt < ${PRODUCT_PAGE_WAIT_MS}) return false;
     if (timer) clearInterval(timer);
     window.ReactNativeWebView.postMessage(JSON.stringify(raw));
     return true;
