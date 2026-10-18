@@ -1,10 +1,19 @@
 name: Deploy shared development database
 
 on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - "supabase/**"
+      - "scripts/*shared_db*.py"
+      - "scripts/*migration_recovery*.py"
+      - ".github/workflows/deploy-shared-db.yml"
   push:
     branches: [develop]
     paths:
       - "supabase/**"
+      - "scripts/*shared_db*.py"
+      - "scripts/*migration_recovery*.py"
       - ".github/workflows/deploy-shared-db.yml"
 
 permissions:
@@ -12,7 +21,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: supabase-shared-development
+  group: supabase-shared-development-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
@@ -23,6 +32,7 @@ jobs:
       commit: ${{ steps.revision.outputs.commit }}
     steps:
       - name: Require an approved pull request
+        if: github.event_name == 'push'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
@@ -73,11 +83,18 @@ jobs:
           supabase db lint --local --schema public,private --fail-on error
           supabase db advisors --local --level warn --fail-on error
 
+      - name: Test shared database deployment guards
+        run: python3 -m unittest discover -s scripts -p 'test_deploy_shared_db.py'
+
       - name: Remove the disposable local database
         if: always() && steps.local_db.outcome != 'skipped' && steps.local_db.outcome != ''
         run: supabase stop --no-backup
 
+      - name: Validate folder-first CSV migration recovery
+        run: python3 scripts/validate_csv_migration_recovery.py
+
   deploy:
+    if: github.event_name == 'push'
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -120,10 +137,8 @@ jobs:
           PY
           )"
           echo "::add-mask::$DB_URL"
-          supabase migration list --db-url "$DB_URL"
-          supabase db push --db-url "$DB_URL" --dry-run --skip-vault
-          supabase db push --db-url "$DB_URL" --skip-vault --yes
-          supabase migration list --db-url "$DB_URL"
+          export DB_URL
+          python3 scripts/deploy_shared_db.py
 
       - name: Report the deployed commit
         env:
