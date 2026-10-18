@@ -5,6 +5,13 @@ create table public.folders (
   name text not null,
   created_at timestamptz not null default now(),
   last_added_at timestamptz,
+  -- CSV로 만든 폴더는 표시 이름을 바꿔도 원본 버킷으로 다시 찾는다.
+  csv_source_name text,
+  constraint folders_user_id_csv_source_name_key unique (user_id, csv_source_name),
+  constraint folders_csv_source_name_valid check (csv_source_name is null or (
+    kind = 'custom' and csv_source_name <> ''
+    and csv_source_name = normalize(btrim(csv_source_name), NFC)
+  )),
   constraint folders_id_user_id_key unique (id, user_id),
   -- 같은 이름이 둘이면 폴더 선택 시트에서 구분할 수 없다. 나의 소장템 이름도 포함한다.
   constraint folders_user_id_name_key unique (user_id, name),
