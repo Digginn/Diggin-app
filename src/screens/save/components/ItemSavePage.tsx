@@ -14,6 +14,8 @@ import { findProductIdByUrl } from "@/api/products";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { ActionModal } from "@/components/modal";
+import { ToastText } from "@/components/ToastText";
+import { TOAST_MESSAGES } from "@/constants/messages";
 import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFolders } from "@/hooks/useFolders";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
@@ -63,6 +65,7 @@ export function ItemSavePage({
   const isCheckingRef = useRef(false);
   const isOpeningDuplicateRef = useRef(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [toast, setToast] = useState<string>();
   const folders = useFolders();
   const createFolder = useCreateFolder();
 
@@ -74,6 +77,12 @@ export function ItemSavePage({
       hide.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(undefined), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const isDirty = (Object.keys(values) as (keyof ItemSaveValues)[]).some(
     (key) => values[key] !== initialValues[key],
@@ -98,10 +107,15 @@ export function ItemSavePage({
     setOverlay(null);
     Keyboard.dismiss();
     setChecking(true);
-    const productId = await findProductIdByUrl(values.sourceUrl).catch(() => null);
+    // 폴더 목록을 못 불러온 채 열면 빈 목록이라 폴더 없이 저장하게 된다. 다시 불러오고, 그래도 없으면 열지 않는다.
+    const [productId, folderResult] = await Promise.all([
+      findProductIdByUrl(values.sourceUrl).catch(() => null),
+      folders.data ? folders : folders.refetch(),
+    ]);
     isCheckingRef.current = false;
     setChecking(false);
     if (productId) setDuplicateId(productId);
+    else if (!folderResult.data) setToast(TOAST_MESSAGES.SYS_001);
     else setFolderOpen(true);
   }
 
@@ -143,12 +157,19 @@ export function ItemSavePage({
         </KeyboardAvoidingView>
       </View>
 
-      {visible && isFolderOpen && (
+      {/* 페이지가 네이티브 모달이라 앱 전체 토스트는 가려져 여기서 띄운다. */}
+      {toast ? (
+        <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px] items-center">
+          <ToastText message={toast} variant="error" />
+        </View>
+      ) : null}
+
+      {visible && isFolderOpen && folders.data && (
         <FolderManageSheet
           title="저장할 폴더 선택"
           completeLabel="저장하기"
           backLabel="취소"
-          folders={folders.data ?? []}
+          folders={folders.data}
           // 선택된 폴더 없이 시작하고, 미선택 저장도 허용한다(PDT-004).
           selectedFolderIds={[]}
           onBack={() => setFolderOpen(false)}
