@@ -326,6 +326,85 @@ as $$
   select private.set_owned(target_product_id, is_owned, keep_other_folders, new_wish_level);
 $$;
 
+-- PDT-003·008 폴더 관리 시트의 최종 선택을 한 트랜잭션으로 반영한다. 앱은 이전 상태를 들고 계산하지 않고
+-- 최종 폴더 목록만 넘긴다. 상품 행을 잠가 같은 상품을 동시에 저장해도 차례로 처리된다.
+create or replace function private.set_product_folders(
+  target_product_id bigint,
+  folder_ids bigint[]
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  current_user_id uuid := (select auth.uid());
+  selected bigint[] := coalesce(folder_ids, '{}');
+  owned_folder_id bigint;
+  is_owned boolean;
+begin
+  if current_user_id is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+
+  perform 1 from public.products
+  where id = target_product_id and user_id = current_user_id
+  for update;
+  if not found then
+    raise exception 'product_not_found' using errcode = '22023';
+  end if;
+
+  -- 남의 폴더나 없는 폴더가 섞이면 아무것도 바꾸지 않는다.
+  if exists (
+    select 1 from unnest(selected) as picked(id)
+    where not exists (
+      select 1 from public.folders f where f.id = picked.id and f.user_id = current_user_id
+    )
+  ) then
+    raise exception 'folder_not_found' using errcode = '22023';
+  end if;
+
+  select id into owned_folder_id
+  from public.folders
+  where user_id = current_user_id and kind = 'owned';
+
+  select exists (
+    select 1 from public.product_folders
+    where product_id = target_product_id and folder_id = owned_folder_id
+  ) into is_owned;
+
+  -- 나의 소장템은 위시레벨 규칙이 있어 set_owned로만 넣고 뺀다.
+  if (owned_folder_id = any(selected)) is distinct from is_owned then
+    perform private.set_owned(target_product_id, owned_folder_id = any(selected));
+  end if;
+
+  delete from public.product_folders pf
+  using public.folders f
+  where pf.product_id = target_product_id
+    and f.id = pf.folder_id
+    and f.kind = 'custom'
+    and not (pf.folder_id = any(selected));
+
+  insert into public.product_folders (product_id, folder_id, user_id)
+  select target_product_id, f.id, current_user_id
+  from public.folders f
+  where f.user_id = current_user_id and f.kind = 'custom' and f.id = any(selected)
+  on conflict do nothing;
+end;
+$$;
+
+create or replace function public.set_product_folders(
+  target_product_id bigint,
+  folder_ids bigint[]
+)
+returns void
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.set_product_folders(target_product_id, folder_ids);
+$$;
+
 revoke execute on function private.normalize_product() from public, anon, authenticated;
 revoke execute on function private.touch_folder_last_added() from public, anon, authenticated;
 revoke execute on function private.reject_owned_product_wish_level() from public, anon, authenticated;
@@ -333,11 +412,15 @@ revoke execute on function private.reject_wish_level_in_owned_folder() from publ
 revoke execute on function private.product_input_error(text, text, text, integer) from public, anon, authenticated;
 revoke execute on function private.save_product(text, text, text, integer, text, public.wish_level, bigint[]) from public, anon;
 revoke execute on function private.set_owned(bigint, boolean, boolean, public.wish_level) from public, anon;
+revoke execute on function private.set_product_folders(bigint, bigint[]) from public, anon;
+grant execute on function private.set_product_folders(bigint, bigint[]) to authenticated;
 grant execute on function private.save_product(text, text, text, integer, text, public.wish_level, bigint[]) to authenticated;
 grant execute on function private.set_owned(bigint, boolean, boolean, public.wish_level) to authenticated;
 
 revoke execute on function public.save_product(text, text, text, integer, text, public.wish_level, bigint[]) from public, anon;
 revoke execute on function public.set_owned(bigint, boolean, boolean, public.wish_level) from public, anon;
+revoke execute on function public.set_product_folders(bigint, bigint[]) from public, anon;
+grant execute on function public.set_product_folders(bigint, bigint[]) to authenticated;
 grant execute on function public.save_product(text, text, text, integer, text, public.wish_level, bigint[]) to authenticated;
 grant execute on function public.set_owned(bigint, boolean, boolean, public.wish_level) to authenticated;
 

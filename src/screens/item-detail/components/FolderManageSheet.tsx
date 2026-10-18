@@ -24,6 +24,7 @@ type FolderManageSheetProps = {
   completeLabel?: string;
   onBack?: () => void;
   backLabel?: string;
+  /** 저장 응답 전에 선택을 바꾸거나 다시 누르면 서버 상태와 마지막 선택이 어긋나 둘 다 막는다. */
   isCompleting?: boolean;
   /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
   errorMessage?: string;
@@ -136,6 +137,8 @@ export function FolderManageSheet({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="새 폴더 만들기"
+          accessibilityState={{ disabled: isCompleting }}
+          disabled={isCompleting}
           className="h-12 items-center justify-center rounded-lg border border-dashed border-gray-300 active:opacity-75"
           onPress={() => setIsCreating(true)}
         >
@@ -154,7 +157,8 @@ export function FolderManageSheet({
                 <Pressable
                   accessibilityRole="checkbox"
                   accessibilityLabel={folder.name}
-                  accessibilityState={{ checked: isSelected }}
+                  accessibilityState={{ checked: isSelected, disabled: isCompleting }}
+                  disabled={isCompleting}
                   aria-checked={isSelected}
                   className={clsx(
                     "h-12 flex-row items-center justify-between rounded pl-4 pr-1.5 active:opacity-75",

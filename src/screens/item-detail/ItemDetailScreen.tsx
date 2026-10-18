@@ -85,7 +85,6 @@ export function ItemDetailScreen() {
   const folderIds = useProductFolderIds(id);
   const createFolder = useCreateFolder();
   const saveFolders = useSaveProductFolders(id);
-  const ownedFolderId = folders.data?.find((folder) => folder.isOwnedItems)?.id;
   const thumbnail = item?.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
   const { width: windowWidth } = useWindowDimensions();
   const isBackAreaDark = useIsImageDark(
@@ -104,6 +103,19 @@ export function ItemDetailScreen() {
   const isHeaderDisabled = isEditOpen || isFolderOpen;
   const headerIconColor = (isDark: boolean) =>
     isHeaderDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900";
+
+  async function openFolderSheet() {
+    const [folderResult, folderIdsResult] = await Promise.all([
+      folders.data ? folders : folders.refetch(),
+      folderIds.data ? folderIds : folderIds.refetch(),
+    ]);
+    if (!folderResult.data || !folderIdsResult.data) {
+      showToast(TOAST_MESSAGES.SYS_001);
+      return;
+    }
+    saveFolders.reset();
+    setFolderOpen(true);
+  }
 
   // 삭제하면 목록을 새로 고치면서 이 상품도 다시 불러와 "없음" 오류가 나는데, 곧 나가는 화면이라 무시한다.
   if (product.isError && !deleteProduct.isPending && !deleteProduct.isSuccess) {
@@ -303,23 +315,22 @@ export function ItemDetailScreen() {
         }}
       />
 
-      {isFolderOpen && folders.data && folderIds.data && ownedFolderId && (
+      {isFolderOpen && folders.data && folderIds.data && (
         <FolderManageSheet
           folders={folders.data}
           selectedFolderIds={folderIds.data}
           onClose={() => setFolderOpen(false)}
           onCreateFolder={(name) => createFolder.mutateAsync(name)}
+          isCompleting={saveFolders.isPending}
+          errorMessage={saveFolders.isError ? TOAST_MESSAGES.SYS_002 : undefined}
+          onErrorDismiss={saveFolders.reset}
           onComplete={(ids) =>
-            saveFolders.mutate(
-              { ownedFolderId, before: folderIds.data, after: ids },
-              {
-                onSuccess: () => {
-                  setFolderOpen(false);
-                  showToast(selectFolderSavedMessage(ids.length));
-                },
-                onError: () => showToast(TOAST_MESSAGES.SYS_002),
+            saveFolders.mutate(ids, {
+              onSuccess: () => {
+                setFolderOpen(false);
+                showToast(selectFolderSavedMessage(ids.length));
               },
-            )
+            })
           }
         />
       )}
@@ -346,7 +357,7 @@ export function ItemDetailScreen() {
           <View className="flex-1">
             <FolderManageButton
               folderCount={folderIds.data?.length ?? 0}
-              onPress={() => setFolderOpen(true)}
+              onPress={openFolderSheet}
             />
           </View>
         </View>
