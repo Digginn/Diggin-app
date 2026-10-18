@@ -22,6 +22,21 @@ export type ProductPageRaw = {
 };
 
 export const PRODUCT_PAGE_WAIT_MS = 8000;
+
+/**
+ * 앱 공유 링크가 거치는 앱 연결 업체(Airbridge·AppsFlyer·Branch·Firebase) 중간 페이지의 호스트.
+ * 페이지 스크립트와 normalizeProductPage가 같이 쓴다.
+ */
+export const APP_LINK_HOST =
+  /(^|\.)(airbridge\.io|abr\.ge|onelink\.me|app\.link|page\.link)$|^applink\./i;
+// 중간 페이지 주소에 담긴 웹 대체 주소. Airbridge·AppsFlyer·Branch 순.
+const WEB_FALLBACK_PARAMS = [
+  "fallback_mobile",
+  "fallback_desktop",
+  "af_web_dp",
+  "$fallback_url",
+  "$desktop_url",
+];
 // 에이블리처럼 가격·브랜드 메타를 화면을 그린 뒤에 붙이는 쇼핑몰이 있어, 상품명·이미지가 잡혀도 가격을 잠깐 더 기다린다.
 export const PRODUCT_PAGE_PRICE_GRACE_MS = 2500;
 
@@ -68,6 +83,14 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
       };
     }
     const next = document.getElementById("__NEXT_DATA__");
+    // 오늘의집은 공개 메타에 브랜드가 없어 페이지 데이터에서 브랜드만 읽는다. 상품명·가격은 공개 메타가 정확하다.
+    if (location.hostname.endsWith("ohou.se") && next) {
+      try {
+        const queries = JSON.parse(next.textContent).props.pageProps.dehydratedState.queries;
+        const data = queries.map((query) => query.state.data).find((item) => item && item.production);
+        if (data) return { name: null, brand: data.production.brandName || null, price: null };
+      } catch (error) {}
+    }
     if (location.hostname.endsWith("zigzag.kr") && next) {
       try {
         const queries = JSON.parse(next.textContent).props.pageProps.dehydratedState.queries;
@@ -100,7 +123,16 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     shop: readShop(),
   });
 
-  const isAppLinkLanding = /(^|\\.)(airbridge\\.io|abr\\.ge|onelink\\.me|app\\.link|page\\.link)$|^applink\\./i.test(location.hostname);
+  const isAppLinkLanding = ${APP_LINK_HOST}.test(location.hostname);
+  // 중간 페이지가 웹으로 넘겨 주지 않는 경우(오늘의집)가 있어, 주소에 담긴 웹 대체 주소로 직접 옮긴다.
+  if (isAppLinkLanding) {
+    const params = new URLSearchParams(location.search);
+    const fallback = ${JSON.stringify(WEB_FALLBACK_PARAMS)}.map((key) => params.get(key)).find((url) => url && /^https:\\/\\//i.test(url));
+    if (fallback) {
+      location.replace(fallback);
+      return;
+    }
+  }
   const startedAt = Date.now();
   let timer = null;
   let foundAt = null;
@@ -119,5 +151,5 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     return true;
   };
   if (!tick()) timer = setInterval(tick, 500);
-  true;
-})();`;
+})();
+true;`;

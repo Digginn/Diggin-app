@@ -2,7 +2,7 @@ import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import type { ItemSaveValues } from "@/types/wish-item";
 
-import type { ProductPageRaw } from "./productPageScript";
+import { APP_LINK_HOST, type ProductPageRaw } from "./productPageScript";
 
 const NAME_MAX = 100;
 const BRAND_MAX = 30;
@@ -104,6 +104,20 @@ export function normalizeProductPage(
   raw: ProductPageRaw,
   sourceUrl: string,
 ): { values: ItemSaveValues; hasFailed: boolean } {
+  // 앱 연결 중간 페이지에서 끝났으면 그 정보는 사이트 기본값이다. 상품 정보로 쓰지 않고 직접 입력으로 넘긴다.
+  if (APP_LINK_HOST.test(/^https?:\/\/([^/?#]+)/i.exec(raw.finalUrl)?.[1] ?? "")) {
+    return {
+      hasFailed: true,
+      values: {
+        name: "",
+        brand: "",
+        price: "",
+        sourceUrl: stripTrackingParams(sourceUrl),
+        thumbnailUrl: null,
+        wishLevel: null,
+      },
+    };
+  }
   const { ld, shop } = raw;
   const og = isSiteDefault(raw.og.url)
     ? { ...raw.og, title: null, image: null, price: null }
