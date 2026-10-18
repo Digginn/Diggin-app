@@ -151,11 +151,11 @@ export function FolderManageSheet({
           })}
         </ScrollView>
         {onBack ? (
-          <View className="flex-row justify-between">
-            <Button className="w-[155px]" variant="secondary" onPress={onBack}>
+          <View className="flex-row gap-4">
+            <Button className="flex-1" variant="secondary" onPress={onBack}>
               이전으로
             </Button>
-            <Button className="w-[155px]" onPress={() => onComplete(selectedIds)}>
+            <Button className="flex-1" onPress={() => onComplete(selectedIds)}>
               {completeLabel}
             </Button>
           </View>

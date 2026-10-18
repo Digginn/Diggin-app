@@ -16,28 +16,19 @@ import { WishLevel } from "@/components/WishLevel";
 import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
+import { useProductCounts } from "@/hooks/useProductCounts";
+import { useProductList } from "@/hooks/useProductList";
 import { useToast } from "@/hooks/useToast";
+import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
-import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
-import type { WishItem, WishLevelCounts } from "@/types/wish-item";
+import type { WishItem, WishLevelKey } from "@/types/wish-item";
 
 import { DeleteBar } from "./components/DeleteBar";
 import { SelectModeBar } from "./components/SelectModeBar";
 import { SortLabel, type SortOrder } from "./components/SortLabel";
-import { orderWishItems } from "./domain/orderWishItems";
+import { useDeleteProducts } from "./mutations/useDeleteProducts";
 
-// TODO: API 연결 전까지 쓰는 임시 데이터. 연결 시 TanStack Query 로 교체한다.
-const MOCK_ITEMS: WishItem[] = Array.from({ length: 11 }, (_, index) => ({
-  id: String(index),
-  name: "아이템명",
-  price: 0,
-  brand: "브랜드명",
-  thumbnailUrl: null,
-  isOwned: index === 0 || index === 2,
-  ownedAt: index === 0 ? 1_790_000_000_000 : index === 2 ? 1_791_000_000_000 : undefined,
-}));
-
-const MOCK_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
+const EMPTY_LEVELS = { high: 0, medium: 0, low: 0 };
 
 const WISH_LEVEL_HINT =
   "아이템 상세 화면에서 얼마나 사고 싶은지를 3단계로 기록해두어 구매 고민을 빠르게 마칠 수 있습니다.";
@@ -48,11 +39,17 @@ export function AllScreen() {
   const showToast = useToast();
   const guide = useFirstVisitGuide("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
+  const [wishLevel, setWishLevel] = useState<WishLevelKey | null>(null);
 
-  // TODO: TanStack Query 연결 시 쿼리의 로딩 · 에러 상태와 뮤테이션으로 바꾼다.
-  const [items, setItems] = useState(MOCK_ITEMS);
-  const isLoading = false;
-  const hasError = false;
+  const list = useProductList(sortOrder, wishLevel);
+  const counts = useProductCounts();
+  const deleteProducts = useDeleteProducts();
+  const items = list.data?.pages.flat() ?? [];
+  const totalCount = counts.data?.total ?? 0;
+  const shownCount = wishLevel ? (counts.data?.levels[wishLevel] ?? 0) : totalCount;
+  // 빈 화면 시안에는 상단 영역이 없다. 개수로 먼저 판단해야 상단이 잠깐 보였다 사라지지 않는다.
+  // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
+  const isEmpty = wishLevel === null && totalCount === 0;
 
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -65,7 +62,9 @@ export function AllScreen() {
 
   // 선택 모드에서는 DeleteBar 가 탭바 자리를 대신한다.
   useLayoutEffect(() => {
-    navigation.setOptions({ tabBarStyle: isSelectMode ? { display: "none" } : undefined });
+    navigation
+      .getParent()
+      ?.setOptions({ tabBarStyle: isSelectMode ? { display: "none" } : undefined });
   }, [navigation, isSelectMode]);
 
   function exitSelectMode() {
@@ -90,9 +89,16 @@ export function AllScreen() {
   }
 
   function handleDelete() {
-    setItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
-    showToast(selectDeletedMessage(selectedCount));
-    exitSelectMode();
+    deleteProducts.mutate([...selectedIds], {
+      onSuccess: () => {
+        showToast(selectDeletedMessage(selectedCount));
+        exitSelectMode();
+      },
+      onError: () => {
+        setConfirming(null);
+        showToast(TOAST_MESSAGES.ALL_008);
+      },
+    });
   }
 
   return (
@@ -114,7 +120,7 @@ export function AllScreen() {
               <AppBar.IconButton
                 icon={IconSearch}
                 accessibilityLabel="검색"
-                onPress={() => router.push("/search")}
+                onPress={() => router.push("/all/search")}
               />
               <AppBar.IconButton
                 icon={IconNotification}
@@ -128,14 +134,25 @@ export function AllScreen() {
 
       {guide.isVisible ? (
         <View className="flex-1" />
-      ) : hasError ? (
-        <ErrorState message={STATE_MESSAGES.loadFailed} onRetry={() => {}} />
-      ) : items.length === 0 && !isLoading ? (
+      ) : list.isError || counts.isError ? (
+        <ErrorState
+          message={STATE_MESSAGES.loadFailed}
+          onRetry={() => {
+            void list.refetch();
+            void counts.refetch();
+          }}
+        />
+      ) : counts.isPending ? (
+        <View className="flex-1" />
+      ) : isEmpty ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
         <WishItemGrid
-          items={orderWishItems(items)}
-          isLoading={isLoading}
+          items={items}
+          isLoading={list.isPending}
+          onEndReached={() => {
+            if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
+          }}
           selectedIds={isSelectMode ? selectedIds : undefined}
           onItemPress={(item) =>
             isSelectMode ? toggleItem(item) : router.push(`/items/${item.id}`)
@@ -144,7 +161,7 @@ export function AllScreen() {
             <View className="gap-2 pt-4">
               <View className="h-[21px] flex-row items-center justify-between">
                 <Text className="text-gray-1000 font-label-12-semibold">
-                  저장한 아이템 {items.length}개
+                  저장한 아이템 {shownCount}개
                 </Text>
                 {/* 선택 모드에서는 상단 바가 취소 · 전체 선택을 맡으므로 숨긴다. */}
                 {!isSelectMode && items.length > 0 ? (
@@ -160,7 +177,13 @@ export function AllScreen() {
               </View>
               <View className="h-12 flex-row items-center justify-between">
                 <View>
-                  <WishLevel hasScrim levels={MOCK_LEVELS} hint={WISH_LEVEL_HINT} />
+                  <WishLevel
+                    hasScrim
+                    levels={counts.data?.levels ?? EMPTY_LEVELS}
+                    hint={WISH_LEVEL_HINT}
+                    selected={wishLevel}
+                    onSelect={(level) => setWishLevel((prev) => (prev === level ? null : level))}
+                  />
                 </View>
                 <SortLabel value={sortOrder} onChange={setSortOrder} />
               </View>
@@ -189,7 +212,7 @@ export function AllScreen() {
         onDismiss={itemSave.openAfterLoading}
       />
 
-      <ItemSaveSheet
+      <ItemEditSheet
         key={`save-${itemSave.values?.sourceUrl ?? ""}`}
         visible={itemSave.values !== null}
         hasExtractionFailed={itemSave.hasFailed}
@@ -239,7 +262,11 @@ export function AllScreen() {
           "삭제한 아이템은 복구할 수 없습니다.\n게시글·투표에 올린 아이템 정보는 유지됩니다."
         }
         secondaryAction={{ label: "취소", onPress: () => setConfirming(null) }}
-        primaryAction={{ label: "삭제하기", onPress: handleDelete }}
+        primaryAction={{
+          label: "삭제하기",
+          isDisabled: deleteProducts.isPending,
+          onPress: handleDelete,
+        }}
       />
       {guide.isVisible && <FirstVisitGuide kind="all" onClose={guide.dismiss} />}
     </View>

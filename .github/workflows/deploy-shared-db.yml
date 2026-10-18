@@ -1,0 +1,132 @@
+name: Deploy shared development database
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/deploy-shared-db.yml"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: supabase-shared-development
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      commit: ${{ steps.revision.outputs.commit }}
+    steps:
+      - name: Require an approved pull request
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const pullRequests = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              { ...context.repo, commit_sha: context.sha, per_page: 100 }
+            );
+            const mergedPr = pullRequests.find((pr) =>
+              pr.merged_at &&
+              pr.base.ref === "develop" &&
+              pr.base.repo.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+              pr.merge_commit_sha === context.sha
+            );
+            if (!mergedPr) {
+              core.setFailed("The deploy commit must be a pull request merged into develop. Direct pushes cannot deploy.");
+              return;
+            }
+            const { repository } = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) { reviewDecision }
+                }
+              }
+            `, { ...context.repo, number: mergedPr.number });
+            if (repository.pullRequest.reviewDecision !== "APPROVED") {
+              core.setFailed("An approved PR is required to deploy the shared database.");
+            }
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Record the exact commit to deploy
+        id: revision
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
+        with:
+          version: 2.120.0
+
+      - name: Validate migrations on a disposable local database
+        id: local_db
+        run: |
+          supabase db start
+          supabase db reset --local --no-seed
+          supabase test db --local
+          supabase db lint --local --schema public,private --fail-on error
+          supabase db advisors --local --level warn --fail-on error
+
+      - name: Remove the disposable local database
+        if: always() && steps.local_db.outcome != 'skipped' && steps.local_db.outcome != ''
+        run: supabase stop --no-backup
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: shared-development
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
+        with:
+          version: 2.120.0
+
+      - name: Apply pending migrations to the shared development database
+        env:
+          SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+          SUPABASE_DB_POOLER_HOST: ${{ vars.SUPABASE_DB_POOLER_HOST }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          for name in SUPABASE_PROJECT_ID SUPABASE_DB_POOLER_HOST SUPABASE_DB_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing $name in the shared-development environment. See docs/DB_DEPLOYMENT.md."
+              exit 1
+            fi
+          done
+          DB_URL="$(python3 - <<'PY'
+          import os
+          import re
+          from urllib.parse import quote
+
+          project = os.environ["SUPABASE_PROJECT_ID"]
+          host = os.environ["SUPABASE_DB_POOLER_HOST"]
+          if not re.fullmatch(r"[a-z]{20}", project):
+              raise SystemExit("Invalid SUPABASE_PROJECT_ID: expected a project ref.")
+          if not re.fullmatch(r"[a-z0-9-]+\.pooler\.supabase\.com", host):
+              raise SystemExit("Invalid SUPABASE_DB_POOLER_HOST: copy the Session pooler hostname from Connect.")
+          password = quote(os.environ["SUPABASE_DB_PASSWORD"], safe="")
+          print(f"postgresql://postgres.{project}:{password}@{host}:5432/postgres?sslmode=require")
+          PY
+          )"
+          echo "::add-mask::$DB_URL"
+          supabase migration list --db-url "$DB_URL"
+          supabase db push --db-url "$DB_URL" --dry-run --skip-vault
+          supabase db push --db-url "$DB_URL" --skip-vault --yes
+          supabase migration list --db-url "$DB_URL"
+
+      - name: Report the deployed commit
+        env:
+          DEPLOY_COMMIT: ${{ needs.validate.outputs.commit }}
+        run: |
+          printf '### Shared DB deployment completed\n\nCommit: `%s`\n' "$DEPLOY_COMMIT" >> "$GITHUB_STEP_SUMMARY"

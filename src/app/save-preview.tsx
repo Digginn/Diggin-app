@@ -3,8 +3,8 @@ import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PasteGuideModal } from "@/components/PasteGuideModal";
+import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
-import { ItemSaveSheet } from "@/screens/save/components/ItemSaveSheet";
 import { ShareErrorSheet, type ShareErrorReason } from "@/screens/save/components/ShareErrorSheet";
 import type { ItemSaveValues } from "@/types/wish-item";
 
@@ -66,7 +66,7 @@ export default function SavePreviewRoute() {
         onSubmit={() => setOpen("loaded")}
       />
 
-      <ItemSaveSheet
+      <ItemEditSheet
         key={`save-${open}`}
         visible={open === "loaded" || open === "failed" || open === "price-error"}
         hasExtractionFailed={open === "failed"}

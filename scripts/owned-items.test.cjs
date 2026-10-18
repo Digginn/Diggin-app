@@ -30,25 +30,6 @@ function nodes(element, type) {
   ];
 }
 
-test("일반 아이템 순서는 보존하고 소장템은 뒤에서 최근 소장 순으로 정렬한다", () => {
-  const { orderWishItems } = load("../src/screens/all/domain/orderWishItems.ts");
-  const items = [
-    { id: "older", isOwned: true, ownedAt: 10 },
-    { id: "normal" },
-    { id: "unknown-date", isOwned: true },
-    { id: "newer", isOwned: true, ownedAt: 20 },
-    { id: "normal2", isOwned: false },
-    { id: "same-date", isOwned: true, ownedAt: 20 },
-  ];
-  const original = [...items];
-  assert.deepEqual(
-    Array.from(orderWishItems(items), (item) => item.id),
-    ["normal", "normal2", "newer", "same-date", "older", "unknown-date"],
-  );
-  assert.deepEqual(items, original);
-  assert.equal(orderWishItems([]).length, 0);
-});
-
 test("소장 카드는 썸네일만 흰색 40%로 덮고 배지·선택 체크·클릭을 유지한다", () => {
   const { Card } = load("../src/components/card/Card.tsx", {
     "react": { useState: () => [undefined, () => {}] },
@@ -71,12 +52,17 @@ test("소장 카드는 썸네일만 흰색 40%로 덮고 배지·선택 체크·
   assert.equal(nodes(Card(props), "@/assets/images/icon-basket-check-white.svg").length, 0);
 });
 
-test("그리드는 소장 여부를 카드에 전달한다", () => {
+test("그리드는 소장 여부를 카드에 전달하고, 탭을 다시 누르면 맨 위로 올라가게 연결한다", () => {
+  const scrollTargets = [];
   const { WishItemGrid } = load("../src/components/WishItemGrid.tsx", {
+    "react": { ...React, useRef: (initial) => ({ current: initial }) },
     "react-native": { FlatList: "FlatList", View: "View" },
+    "expo-router": { useScrollToTop: (ref) => scrollTargets.push(ref) },
     "@/components/card": { Card: "Card", CardSkeleton: "CardSkeleton" },
   });
   const item = { id: "owned", name: "코트", price: 1, isOwned: true };
   const tree = WishItemGrid({ items: [item] });
   assert.equal(tree.props.renderItem({ item }).props.isOwned, true);
+  assert.equal(scrollTargets.length, 1);
+  assert.equal(tree.props.ref, scrollTargets[0], "목록에 붙인 ref로 맨 위로 올린다");
 });

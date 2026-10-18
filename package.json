@@ -9,6 +9,7 @@
     "@react-native-kakao/core": "2.4.6",
     "@react-native-kakao/user": "2.4.6",
     "@supabase/supabase-js": "^2.117.3",
+    "@tanstack/react-query": "5.104.1",
     "aes-js": "3.1.2",
     "clsx": "^2.1.1",
     "expo": "~57.0.21",

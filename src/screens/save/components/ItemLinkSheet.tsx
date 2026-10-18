@@ -65,15 +65,12 @@ export function ItemLinkSheet({ visible, onRequestClose, onSubmit }: ItemLinkShe
               }}
             />
             {isError ? (
-              <HelperText
-                status="error"
-                message="http 또는 https로 시작하는 아이템 링크를 입력해 주세요."
-              />
+              <HelperText status="error" message="https로 시작하는 아이템 링크를 입력해 주세요." />
             ) : null}
           </View>
         </View>
 
-        <View className="flex-row gap-[17px]">
+        <View className="flex-row gap-4">
           <Button className="flex-1" variant="secondary" onPress={onRequestClose}>
             취소
           </Button>

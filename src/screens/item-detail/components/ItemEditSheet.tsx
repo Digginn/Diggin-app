@@ -1,10 +1,7 @@
-import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
-import CameraSvg from "@/assets/images/icon-camera.svg";
 import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
@@ -13,12 +10,10 @@ import { ActionModal } from "@/components/modal";
 import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
 import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
-import type { WishLevelKey } from "@/types/wish-item";
+import type { ItemSaveValues } from "@/types/wish-item";
 
-const StyledImage = cssInterop(Image, { className: "style" });
-const CameraIcon = cssInterop(CameraSvg, {
-  className: { target: "style", nativeStyleToProp: { width: true, height: true } },
-});
+import { formatPriceInput } from "../utils/formatPriceInput";
+
 const TooltipIcon = cssInterop(TooltipSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
@@ -28,29 +23,49 @@ const HINT = "얼마나 사고 싶은지를\n3단계로 기록해두어\nALL 탭
 const HINT_GAP = 10;
 const HINT_TOP_OFFSET = 4;
 
+function FieldLabel({ label, isMissing }: { label: string; isMissing: boolean }) {
+  return (
+    <View className="flex-row items-start gap-2">
+      <Text className="text-gray-900 font-b3">{label}</Text>
+      {isMissing && <Text className="text-semantic-error font-note">*필수 정보</Text>}
+    </View>
+  );
+}
+
 type Anchor = { x: number; y: number; width: number; height: number };
 
-export type ItemEditValues = {
-  name: string;
-  brand: string;
-  price: string;
-  sourceUrl: string;
-  thumbnailUrl: string | null;
-  wishLevel: WishLevelKey | null;
-};
+const DESCRIPTION = {
+  loaded: "불러온 정보를 확인하고 저장해 주세요.",
+  failed:
+    "아이템 정보를 불러오지 못했습니다.\n아이템 링크는 유지했어요. 정보를 직접 입력해 저장할 수 있어요.",
+} as const;
 
 type ItemEditSheetProps = {
   visible: boolean;
-  initialValues: ItemEditValues;
+  initialValues: ItemSaveValues;
+  /** 정보를 불러오지 못하면 안내 문구가 바뀌고 사용자가 직접 채운다. */
+  hasExtractionFailed?: boolean;
+  /** 이미 저장한 링크면 기존 아이템으로 갈지 묻는다. */
+  duplicate?: { onConfirm: () => void; onDismiss: () => void };
   onRequestClose: () => void;
-  onSubmit: (values: ItemEditValues) => void;
+  onSubmit: (values: ItemSaveValues) => void;
+  /** 저장 요청 중에는 다시 누르지 못하게 막는다. */
+  isSubmitting?: boolean;
+  /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
+  errorMessage?: string;
+  onErrorDismiss?: () => void;
 };
 
 export function ItemEditSheet({
   visible,
   initialValues,
+  hasExtractionFailed = false,
+  duplicate,
   onRequestClose,
   onSubmit,
+  isSubmitting = false,
+  errorMessage,
+  onErrorDismiss,
 }: ItemEditSheetProps) {
   const [values, setValues] = useState(initialValues);
   const [isLevelOpen, setLevelOpen] = useState(false);
@@ -61,25 +76,15 @@ export function ItemEditSheet({
   const isHintVisible = useNativeModalVisible(isHintOpen);
 
   const update =
-    <K extends keyof ItemEditValues>(key: K) =>
-    (value: ItemEditValues[K]) =>
+    <K extends keyof ItemSaveValues>(key: K) =>
+    (value: ItemSaveValues[K]) =>
       setValues((prev) => ({ ...prev, [key]: value }));
 
   // 위시 레벨은 필수가 아니라 값이 바뀌었는지로 판단한다.
-  const isDirty = (Object.keys(values) as (keyof ItemEditValues)[]).some(
+  const isDirty = (Object.keys(values) as (keyof ItemSaveValues)[]).some(
     (key) => values[key] !== initialValues[key],
   );
-
-  async function handlePickImage() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (result.canceled) return;
-    update("thumbnailUrl")(result.assets[0].uri);
-  }
+  const isNameMissing = !values.name.trim();
 
   function toggleHint() {
     if (isHintOpen) {
@@ -98,7 +103,7 @@ export function ItemEditSheet({
     onRequestClose();
   }
 
-  // 원본 유지하기는 버리겠다는 뜻이 분명해서 묻지 않고, 끌어내리기·뒤로가기만 묻는다.
+  // 취소는 버리겠다는 뜻이 분명해서 묻지 않고, 끌어내리기·뒤로가기만 묻는다.
   function requestClose() {
     if (!isDirty) return handleClose();
     setLevelOpen(false);
@@ -112,87 +117,83 @@ export function ItemEditSheet({
       isScrimClosable={false}
       isCloseConfirmed={isDirty}
       onRequestClose={requestClose}
+      toastMessage={errorMessage}
+      toastVariant="error"
+      onToastDismiss={onErrorDismiss}
       overlay={
-        <ActionModal
-          visible={isExitOpen}
-          type="2Btn"
-          title="작성을 그만두시겠습니까?"
-          description="작성 중인 내용은 저장되지 않습니다."
-          secondaryAction={{ label: "계속 작성", onPress: () => setExitOpen(false) }}
-          primaryAction={{
-            label: "나가기",
-            onPress: () => {
-              setExitOpen(false);
-              handleClose();
-            },
-          }}
-          onRequestClose={() => setExitOpen(false)}
-        />
+        <>
+          <ActionModal
+            visible={duplicate !== undefined}
+            type="2Btn"
+            title="이미 저장한 아이템입니다."
+            description="기존에 저장한 아이템을 확인하시겠습니까?"
+            secondaryAction={{ label: "괜찮아요", onPress: () => duplicate?.onDismiss() }}
+            primaryAction={{ label: "확인하기", onPress: () => duplicate?.onConfirm() }}
+            onRequestClose={() => duplicate?.onDismiss()}
+          />
+          <ActionModal
+            visible={isExitOpen}
+            type="2Btn"
+            title="작성을 그만두시겠습니까?"
+            description="작성 중인 내용은 저장되지 않습니다."
+            secondaryAction={{ label: "계속 작성", onPress: () => setExitOpen(false) }}
+            primaryAction={{
+              label: "나가기",
+              onPress: () => {
+                setExitOpen(false);
+                handleClose();
+              },
+            }}
+            onRequestClose={() => setExitOpen(false)}
+          />
+        </>
       }
     >
       <ScrollView
         className="px-margin"
-        contentContainerStyle={{ gap: 25 }}
+        contentContainerStyle={{ gap: 24 }}
         keyboardShouldPersistTaps="handled"
       >
         <View className="gap-4">
-          <View className="gap-[30px]">
+          <View className="gap-8">
             <View className="items-center gap-1">
               <Text className="text-gray-1000 font-label-16-semibold">아이템 정보 수정</Text>
               <Text className="text-center text-gray-700 font-b3">
-                아이템 정보를 직접 수정해 보세요.{"\n"}URL은 수정할 수 없습니다.
+                {hasExtractionFailed ? DESCRIPTION.failed : DESCRIPTION.loaded}
               </Text>
             </View>
 
             <View className="gap-4">
               <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템 이미지</Text>
-                <View className="w-[92px]">
-                  <StyledImage
-                    className="size-[92px] rounded-field bg-gray-100"
-                    contentFit="cover"
-                    source={values.thumbnailUrl ?? undefined}
-                  />
-                  <Pressable
-                    accessibilityLabel="아이템 이미지 변경"
-                    accessibilityRole="button"
-                    className="absolute bottom-0 right-0 size-6 items-center justify-center rounded-field bg-gray-0 active:opacity-75"
-                    hitSlop={12}
-                    onPress={handlePickImage}
-                  >
-                    <CameraIcon className="h-3 w-3.5" />
-                  </Pressable>
-                </View>
+                <FieldLabel label="아이템명" isMissing={isNameMissing} />
+                <TextField
+                  growsTo={88}
+                  isError={isNameMissing}
+                  placeholder="아이템명을 입력해 주세요."
+                  value={values.name}
+                  onChangeText={update("name")}
+                />
               </View>
 
-              <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템 이름</Text>
-                <TextField growsTo={88} value={values.name} onChangeText={update("name")} />
-              </View>
-
-              <View className="flex-row gap-gutter">
-                <View className="min-w-0 flex-1 gap-2">
+              <View className="flex-row gap-4">
+                <View className="flex-1 gap-2">
                   <Text className="text-gray-900 font-b3">브랜드명</Text>
                   <TextField
-                    accessibilityLabel="브랜드명"
+                    placeholder="선택 입력"
                     value={values.brand}
                     onChangeText={update("brand")}
                   />
                 </View>
-                <View className="min-w-0 flex-1 gap-2">
+                <View className="flex-1 gap-2">
                   <Text className="text-gray-900 font-b3">가격</Text>
+                  {/* SAVE-005 가격은 선택값이다. 비워 두면 null로 저장해 "가격 정보 없음"으로 보인다. */}
                   <TextField
-                    accessibilityLabel="가격"
                     keyboardType="number-pad"
-                    value={values.price}
-                    onChangeText={update("price")}
+                    placeholder="가격 입력"
+                    value={formatPriceInput(values.price)}
+                    onChangeText={(text) => update("price")(text.replace(/\D/g, ""))}
                   />
                 </View>
-              </View>
-
-              <View className="gap-2">
-                <Text className="text-gray-900 font-b3">아이템 출처</Text>
-                <TextField value={values.sourceUrl} onChangeText={update("sourceUrl")} />
               </View>
             </View>
           </View>
@@ -224,12 +225,16 @@ export function ItemEditSheet({
           </View>
         </View>
 
-        <View className="flex-row justify-between">
-          <Button className="w-[155px]" variant="secondary" onPress={handleClose}>
-            원본 유지하기
+        <View className="flex-row gap-4">
+          <Button className="flex-1" variant="secondary" onPress={handleClose}>
+            취소
           </Button>
-          <Button className="w-[155px]" isDisabled={!isDirty} onPress={() => onSubmit(values)}>
-            수정 완료
+          <Button
+            className="flex-1"
+            isDisabled={isNameMissing || isSubmitting}
+            onPress={() => onSubmit(values)}
+          >
+            저장하기
           </Button>
         </View>
       </ScrollView>

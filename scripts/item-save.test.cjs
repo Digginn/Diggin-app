@@ -12,12 +12,26 @@ function nodes(node) {
   return [node, ...React.Children.toArray(node.props.children).flatMap(nodes)];
 }
 
-test("저장 시 가격 오류를 표시하고 유효한 가격으로 수정하면 저장한다", () => {
+function load(file, mocks) {
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(readFileSync(path.join(__dirname, file), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText,
+    {
+      module,
+      exports: module.exports,
+      require: (name) => mocks[name] ?? (name.startsWith("@/assets/") ? name : require(name)),
+    },
+  );
+  return module.exports;
+}
+
+test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가격은 선택값이고 숫자만 저장한다", () => {
   const state = [];
   let cursor = 0;
   const saved = [];
-  const screen = { exports: {} };
-  const mocks = {
+  const { ItemEditSheet } = load("../src/screens/item-detail/components/ItemEditSheet.tsx", {
     "react": {
       useRef: (initial) => ({ current: initial }),
       useState: (initial) => {
@@ -38,38 +52,21 @@ test("저장 시 가격 오류를 표시하고 유효한 가격으로 수정하�
       Text: "Text",
       View: "View",
     },
-    "expo-image": { Image: "Image" },
-    "expo-image-picker": {},
     "nativewind": { cssInterop: (component) => component },
     "@/components/BottomSheet": { BottomSheet: "BottomSheet" },
     "@/components/Button": { Button: "Button" },
-    "@/components/FallbackImg": { FallbackImg: "FallbackImg" },
     "@/components/Field": { TextField: "TextField" },
     "@/components/modal": { ActionModal: "ActionModal" },
     "@/components/Tooltip": { Tooltip: "Tooltip" },
     "@/hooks/useNativeModalVisible": { useNativeModalVisible: (visible) => visible },
     "@/components/WishLevelSelect": { WishLevelSelect: "WishLevelSelect" },
-  };
-  runInNewContext(
-    ts.transpileModule(
-      readFileSync(
-        path.join(__dirname, "../src/screens/save/components/ItemSaveSheet.tsx"),
-        "utf8",
-      ),
-      {
-        compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
-      },
-    ).outputText,
-    {
-      module: screen,
-      exports: screen.exports,
-      require: (name) => mocks[name] ?? (name.startsWith("@/assets/") ? name : require(name)),
-    },
-  );
+    "../utils/formatPriceInput": load("../src/screens/item-detail/utils/formatPriceInput.ts", {}),
+  });
+
   const render = () => {
     cursor = 0;
     return nodes(
-      screen.exports.ItemSaveSheet({
+      ItemEditSheet({
         visible: true,
         initialValues: {
           name: "아이템",
@@ -85,27 +82,30 @@ test("저장 시 가격 오류를 표시하고 유효한 가격으로 수정하�
     );
   };
   const priceField = () => render().find((node) => node.props.keyboardType === "number-pad");
-  const save = () =>
-    render()
-      .find((node) => node.type === "Button" && node.props.children === "저장하기")
-      .props.onPress();
-  assert.equal(priceField().props.isError, false, "최초에는 오류를 표시하지 않는다");
-  for (const price of ["", "0", "-1", "abc", "1e3", "Infinity", "9".repeat(400)]) {
-    priceField().props.onChangeText(price);
-    save();
-    assert.equal(priceField().props.value, price, "입력값을 유지한다");
-    assert.equal(priceField().props.isError, true);
-    assert.equal(
-      render().filter((node) => node.type === "Text" && node.props.children === "*필수 정보")
-        .length,
-      2,
-    );
-    assert.equal(saved.length, 0);
-  }
-  for (const price of ["1", "70000", "70,000원"]) {
-    priceField().props.onChangeText(price);
-    assert.equal(priceField().props.isError, false, "가격을 수정하면 바로 오류가 해제된다");
-    save();
-    assert.equal(saved.at(-1).price, price);
-  }
+  const nameField = () => render().find((node) => node.props.growsTo === 88);
+  const saveButton = () =>
+    render().find((node) => node.type === "Button" && node.props.children === "저장하기");
+  // 라벨 옆 *필수 정보는 FieldLabel 이 isMissing 일 때 그린다.
+  const requiredCount = () => render().filter((node) => node.props.isMissing === true).length;
+
+  // SAVE-005 가격은 선택값이라 비어 있어도 저장할 수 있고 null로 넘어간다.
+  assert.ok(!priceField().props.isError, "가격이 비어도 오류가 아니다");
+  assert.equal(requiredCount(), 0);
+  assert.equal(saveButton().props.isDisabled, false);
+  saveButton().props.onPress();
+  assert.equal(saved.at(-1).price, "", "빈 가격은 빈 값으로 넘겨 null로 저장한다");
+
+  priceField().props.onChangeText("70,000원");
+  assert.equal(priceField().props.value, "70,000", "숫자만 남기고 쉼표를 찍는다");
+  saveButton().props.onPress();
+  assert.equal(saved.at(-1).price, "70000", "저장 값은 쉼표 없는 숫자다");
+
+  priceField().props.onChangeText("0");
+  saveButton().props.onPress();
+  assert.equal(saved.at(-1).price, "0");
+
+  nameField().props.onChangeText("   ");
+  assert.equal(nameField().props.isError, true, "공백만 있는 아이템명은 빈 값이다");
+  assert.equal(requiredCount(), 1);
+  assert.equal(saveButton().props.isDisabled, true);
 });
