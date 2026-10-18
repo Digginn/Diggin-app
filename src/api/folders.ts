@@ -41,6 +41,8 @@ export async function fetchFolders(): Promise<FolderItem[]> {
       "id, name, kind, created_at, last_added_at, items:product_folders(count), preview:product_folders(created_at, products(image_url))",
     )
     .order("created_at", { ascending: false })
+    // CSV로 한 번에 만든 폴더는 만든 시각이 같아 순서가 매번 바뀐다. 같으면 만든 순서(id)로 고정한다.
+    .order("id", { ascending: false })
     .order("created_at", { referencedTable: "preview", ascending: false })
     .limit(3, { referencedTable: "preview" });
   if (error) throw error;
