@@ -95,6 +95,9 @@ export function stripTrackingParams(url: string) {
   return beforeHash.slice(0, queryAt) + (kept.length ? `?${kept.join("&")}` : "") + hash;
 }
 
+// 회원 전용·성인 인증 상품은 로그인 페이지로 넘어가 그 제목이 상품명으로 들어간다. 쿼리의 돌아갈 주소는 보지 않는다.
+const LOGIN_PAGE = /^https?:\/\/[^?#]*[/.](?:log-?in|sign-?in)\b/i;
+
 /**
  * SAVE-005·006·007 페이지에서 모은 재료로 저장 시트 초안을 만든다.
  * 정확한 출처부터 쓴다: 쇼핑몰 전용 데이터 → JSON-LD 상품 정보 → Open Graph.
@@ -104,8 +107,11 @@ export function normalizeProductPage(
   raw: ProductPageRaw,
   sourceUrl: string,
 ): { values: ItemSaveValues; hasFailed: boolean } {
-  // 앱 연결 중간 페이지에서 끝났으면 그 정보는 사이트 기본값이다. 상품 정보로 쓰지 않고 직접 입력으로 넘긴다.
-  if (APP_LINK_HOST.test(/^https?:\/\/([^/?#]+)/i.exec(raw.finalUrl)?.[1] ?? "")) {
+  // 앱 연결 중간 페이지나 로그인 페이지에서 끝났으면 상품 정보가 아니다. 직접 입력으로 넘긴다.
+  if (
+    APP_LINK_HOST.test(/^https?:\/\/([^/?#]+)/i.exec(raw.finalUrl)?.[1] ?? "") ||
+    LOGIN_PAGE.test(raw.finalUrl)
+  ) {
     return {
       hasFailed: true,
       values: {

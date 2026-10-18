@@ -52,6 +52,11 @@ export function ProductPageReader({ url, onDone }: ProductPageReaderProps) {
           }
         }}
         onError={() => finish(null)}
+        // 삭제된 상품 페이지의 "찾을 수 없음" 제목이 상품명으로 들어가지 않게 한다.
+        // 403 등은 봇 확인 뒤 다시 열리는 쇼핑몰이 있어 끊지 않는다.
+        onHttpError={(event) => {
+          if ([404, 410].includes(event.nativeEvent.statusCode)) finish(null);
+        }}
         // 쇼핑몰이 딥링크(ably:// 등)로 앱을 열려고 해도 사용자 모르게 다른 앱이 뜨지 않게 웹 이동만 허용한다.
         // originWhitelist 밖의 주소는 WebView가 Linking.openURL로 바깥 앱을 열어 버리므로 전부 아래 판단으로 보낸다.
         originWhitelist={["*"]}
