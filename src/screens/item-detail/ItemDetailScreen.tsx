@@ -101,6 +101,8 @@ export function ItemDetailScreen() {
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
   const deleteProduct = useDeleteProducts();
+  // isPending은 다시 그린 뒤에야 버튼을 막아, 그 사이 들어온 연타·닫기는 여기서 막는다.
+  const isDeletingRef = useRef(false);
   // 시트·모달 위에 클립보드 감지 모달이 겹치면 iOS가 무시하고 투명한 창만 남아 화면이 멈춘다.
   useLinkDetectionPause(isEditOpen || isFolderOpen || isMenuOpen || isDeleteOpen);
   const isHeaderDisabled = isEditOpen || isFolderOpen;
@@ -298,13 +300,27 @@ export function ItemDetailScreen() {
         description={
           "삭제한 아이템은 복구할 수 없습니다.\n게시글·투표에 올린 아이템 정보는 유지됩니다."
         }
-        onRequestClose={() => setDeleteOpen(false)}
-        secondaryAction={{ label: "취소", onPress: () => setDeleteOpen(false) }}
+        // 이미 보낸 삭제는 닫아도 진행되니 삭제 중에는 닫지 못하게 한다.
+        onRequestClose={() => {
+          if (!isDeletingRef.current) setDeleteOpen(false);
+        }}
+        secondaryAction={{
+          label: "취소",
+          isDisabled: deleteProduct.isPending,
+          onPress: () => {
+            if (!isDeletingRef.current) setDeleteOpen(false);
+          },
+        }}
         primaryAction={{
           label: "삭제하기",
           isDisabled: deleteProduct.isPending,
-          onPress: () =>
+          onPress: () => {
+            if (isDeletingRef.current) return;
+            isDeletingRef.current = true;
             deleteProduct.mutate([id], {
+              onSettled: () => {
+                isDeletingRef.current = false;
+              },
               onSuccess: () => {
                 setDeleteOpen(false);
                 showToast(TOAST_MESSAGES.ALL_007);
@@ -314,7 +330,8 @@ export function ItemDetailScreen() {
                 setDeleteOpen(false);
                 showToast(TOAST_MESSAGES.ALL_008);
               },
-            }),
+            });
+          },
         }}
       />
 
