@@ -1,6 +1,6 @@
 import { type ImageSource } from "expo-image";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FlatList, Keyboard, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -34,7 +34,7 @@ type FolderDetailScreenProps = {
   isOwnedFolder?: boolean;
   isOldestFirst?: boolean;
   onToggleSort?: () => void;
-  /** 검색어를 확정하면 넘긴다. 빈 문자열이면 검색을 푼다. */
+  /** 입력이 멈추거나 검색을 누르면 넘긴다. 빈 문자열이면 검색을 푼다. */
   onSubmitSearch?: (query: string) => void;
   wishLevel?: WishLevelKey | null;
   onSelectWishLevel?: (level: WishLevelKey) => void;
@@ -48,6 +48,8 @@ type FolderDetailScreenProps = {
   onDeleteFolder?: () => void;
   onOpenItem?: (item: FolderDetailItem) => void;
 };
+
+const SEARCH_DELAY_MS = 300;
 
 function DetailSearchIcon() {
   return (
@@ -85,6 +87,16 @@ export function FolderDetailScreen({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const hasSearchResults = submittedQuery.length > 0;
+
+  // ALL 검색(ALL-004)처럼 입력을 멈추면 검색한다. 글자마다 요청하지 않도록 잠깐 기다린다.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const query = searchQuery.trim();
+      setSubmittedQuery(query);
+      onSubmitSearch?.(query);
+    }, SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [searchQuery, onSubmitSearch]);
   const fillerCount = (3 - (items.length % 3)) % 3;
   const rows: (FolderDetailItem | null)[] = [
     ...items,
@@ -97,11 +109,7 @@ export function FolderDetailScreen({
       {isSearching ? (
         <SearchBar
           value={searchQuery}
-          onChangeText={(value) => {
-            setSearchQuery(value);
-            setSubmittedQuery("");
-            onSubmitSearch?.("");
-          }}
+          onChangeText={setSearchQuery}
           onClear={() => {
             setSearchQuery("");
             setSubmittedQuery("");

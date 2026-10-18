@@ -41,6 +41,8 @@ export async function fetchFolders(): Promise<FolderItem[]> {
       "id, name, kind, created_at, last_added_at, items:product_folders(count), preview:product_folders(created_at, products(image_url))",
     )
     .order("created_at", { ascending: false })
+    // CSV로 한 번에 만든 폴더는 만든 시각이 같아 순서가 매번 바뀐다. 같으면 만든 순서(id)로 고정한다.
+    .order("id", { ascending: false })
     .order("created_at", { referencedTable: "preview", ascending: false })
     .limit(3, { referencedTable: "preview" });
   if (error) throw error;
@@ -167,46 +169,13 @@ export async function fetchProductFolderIds(productId: string): Promise<string[]
 }
 
 /**
- * PDT-003·008 폴더 관리 시트에서 고른 결과로 바꾼다.
- * 나의 소장템은 set_owned로만 넣고 빼고(위시레벨을 비운다), 일반 폴더는 관계를 직접 넣고 지운다.
+ * PDT-003·008 폴더 관리 시트의 최종 선택을 서버가 한 트랜잭션으로 반영한다.
+ * 이전 상태와의 차이는 서버가 계산해서, 중간에 실패해도 일부만 바뀌지 않는다.
  */
-export async function saveProductFolders({
-  productId,
-  ownedFolderId,
-  before,
-  after,
-}: {
-  productId: string;
-  ownedFolderId: string;
-  before: readonly string[];
-  after: readonly string[];
-}) {
-  const wasOwned = before.includes(ownedFolderId);
-  const isOwned = after.includes(ownedFolderId);
-  if (wasOwned !== isOwned) {
-    const { error } = await supabase.rpc("set_owned", {
-      target_product_id: Number(productId),
-      is_owned: isOwned,
-    });
-    if (error) throw error;
-  }
-
-  const added = after.filter((id) => id !== ownedFolderId && !before.includes(id));
-  const removed = before.filter((id) => id !== ownedFolderId && !after.includes(id));
-  if (added.length > 0) {
-    const { error } = await supabase
-      .from("product_folders")
-      .insert(
-        added.map((folderId) => ({ product_id: Number(productId), folder_id: Number(folderId) })),
-      );
-    if (error) throw error;
-  }
-  if (removed.length > 0) {
-    const { error } = await supabase
-      .from("product_folders")
-      .delete()
-      .eq("product_id", Number(productId))
-      .in("folder_id", removed.map(Number));
-    if (error) throw error;
-  }
+export async function saveProductFolders(productId: string, folderIds: readonly string[]) {
+  const { error } = await supabase.rpc("set_product_folders", {
+    target_product_id: Number(productId),
+    folder_ids: folderIds.map(Number),
+  });
+  if (error) throw error;
 }

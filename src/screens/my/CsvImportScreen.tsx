@@ -15,6 +15,12 @@ import { CsvImportResultModal } from "./components/CsvImportResultModal";
 import type { CsvImportFailure, CsvImportProgress, CsvImportResult } from "./types/csvImport";
 
 const MISSING_PRODUCT_MESSAGE = "파일에서 아이템 정보를 찾을 수 없습니다.";
+const IMPORT_ERROR_MESSAGES = {
+  "missing-product-info": MISSING_PRODUCT_MESSAGE,
+  "file-too-large": "CSV 파일은 5MB 이하만 가져올 수 있습니다.",
+  "invalid-encoding": "UTF-8로 저장된 CSV 파일을 선택해 주세요.",
+  "login-required": "로그인한 뒤 CSV 파일을 가져와 주세요.",
+};
 // Figma: 화면 812 - 버튼 top 720 - 버튼 높이 48.
 const MIN_BUTTON_BOTTOM_SPACING = 44;
 
@@ -55,7 +61,7 @@ export function CsvImportScreen({
     Alert.alert("불러오는 중", "불러오기가 완료될 때까지 기다려 주세요.");
 
   useEffect(() => {
-    if (error) showToast(MISSING_PRODUCT_MESSAGE, "error");
+    if (error) showToast(IMPORT_ERROR_MESSAGES[error], "error");
   }, [error, showToast]);
   useEffect(() => {
     isMounted.current = true;
@@ -102,7 +108,7 @@ export function CsvImportScreen({
           if (isMounted.current) setProgress(value);
         });
         if (isMounted.current && imported && typeof imported === "object") {
-          if ("error" in imported) showToast(MISSING_PRODUCT_MESSAGE, "error");
+          if ("error" in imported) showToast(IMPORT_ERROR_MESSAGES[imported.error], "error");
           else setResult(imported);
         }
       } else {

@@ -14,6 +14,8 @@ function load(filename, mocks) {
   }).outputText;
   runInNewContext(compiled, {
     __DEV__: true,
+    setTimeout,
+    clearTimeout,
     exports: loaded.exports,
     module: loaded,
     require: (name) =>
@@ -71,7 +73,6 @@ test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연
     "@/screens/folder/components/FolderNameModal": { FolderNameModal: "FolderNameModal" },
     "@/screens/folder/components/FolderToast": { FolderToast: "FolderToast" },
     "@/screens/folder/constants/folderMessages": { FOLDER_MESSAGES: {} },
-    "@/screens/folder/constants/folderMessages": { FOLDER_MESSAGES: {} },
     "@/screens/folder/mutations/useDeleteFolder": {
       useDeleteFolder: () => ({ mutate: () => {}, isPending: false }),
     },
@@ -100,8 +101,9 @@ test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연
   assert.equal(destination.params.id, "selected-item");
 });
 
-test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 폴더 선택 배경을 유지한다", () => {
+test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 폴더 선택 배경을 유지한다", async () => {
   const state = [];
+  const submittingRef = { current: false };
   let cursor = 0;
   let scrollPosition;
   let folders = [
@@ -114,13 +116,16 @@ test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 �
     "../src/screens/item-detail/components/FolderManageSheet.tsx",
     {
       "react": {
-        useRef: () => ({
-          current: {
-            scrollTo: (value) => {
-              scrollPosition = value.y;
-            },
-          },
-        }),
+        useRef: (initial) =>
+          initial === null
+            ? {
+                current: {
+                  scrollTo: (value) => {
+                    scrollPosition = value.y;
+                  },
+                },
+              }
+            : submittingRef,
         useState: (initial) => {
           const index = cursor++;
           if (state[index] === undefined) state[index] = initial;
@@ -140,14 +145,16 @@ test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 �
       },
       "@/components/BottomSheet": { BottomSheet: "BottomSheet" },
       "@/components/Button": { Button: "Button" },
+      "@/components/modal": { ActionModal: "ActionModal" },
       "@/screens/folder/components/FolderNameModal": { FolderNameModal: "FolderNameModal" },
       "@/screens/folder/components/FolderToast": { FolderToast: "FolderToast" },
       "@/screens/folder/constants/folderMessages": { FOLDER_MESSAGES: {} },
     },
   );
-  const render = () => {
+  const render = (props = {}) => {
     cursor = 0;
     return FolderManageSheet({
+      ...props,
       folders,
       selectedFolderIds: [],
       onClose: () => {},
@@ -159,6 +166,7 @@ test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 �
       onComplete: (ids) => {
         completed = ids;
       },
+      ...props,
     });
   };
   const row = (tree, name) =>
@@ -189,27 +197,67 @@ test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 �
   tree = render();
   assert.equal(tree.props.overlay.type, "FolderNameModal");
   tree.props.overlay.props.onClose();
-  assert.equal(render().props.overlay, undefined);
+  assert.equal(render().props.overlay.props.visible, false);
   row(render(), "새 폴더 만들기").props.onPress();
   const modal = render().props.overlay;
-  assert.equal(modal.props.onSubmit("캠핑"), true);
+  assert.equal(await modal.props.onSubmit("캠핑"), true);
   modal.props.onClose();
   tree = render();
-  assert.equal(tree.props.overlay, undefined);
+  assert.equal(tree.props.overlay.props.visible, false);
   assert.equal(listRows()[0].props.accessibilityLabel, "나의 소장템");
   assert.equal(listRows()[1].props.accessibilityLabel, "캠핑");
   assert.equal(row(tree, "캠핑").props.accessibilityState.checked, true);
   assert.ok(row(tree, "캠핑").props.className.includes("bg-gray-100"));
   assert.equal(scrollPosition, 0);
-  findAll(tree, "Button")[0].props.onPress();
+  await findAll(tree, "Button")[0].props.onPress();
   assert.deepEqual(Array.from(completed), ["gift", "pants", "new"]);
+
+  // 저장 응답 전 연타와 닫기는 막고, 끝나면 풀린다. 실패해도 풀린다.
+  let saveCount = 0;
+  let closeCount = 0;
+  let finishSave;
+  const saving = {
+    onComplete: () => {
+      saveCount += 1;
+      return new Promise((resolve) => {
+        finishSave = resolve;
+      });
+    },
+    onClose: () => {
+      closeCount += 1;
+    },
+  };
+  tree = render(saving);
+  const submitting = findAll(tree, "Button")[0].props.onPress();
+  findAll(tree, "Button")[0].props.onPress();
+  tree.props.onRequestClose();
+  assert.equal(saveCount, 1);
+  assert.equal(closeCount, 0);
+  finishSave();
+  await submitting;
+  render(saving).props.onRequestClose();
+  assert.equal(closeCount, 1);
+  await findAll(
+    render({ onComplete: () => Promise.reject(new Error("fail")) }),
+    "Button",
+  )[0].props.onPress();
+  assert.equal(submittingRef.current, false);
+
+  tree = render({ isCompleting: true, onBack: () => {} });
+  assert.equal(tree.props.isCloseConfirmed, true);
+  assert.equal(findAll(tree, "Button").length, 2);
+  assert.ok(findAll(tree, "Button").every((button) => button.props.isDisabled));
 });
 
-test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실패 재시도를 처리한다", () => {
+test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실패 재시도를 처리한다", async () => {
   const state = [];
   let cursor = 0;
+  let lastEffect;
   const { FolderDetailScreen } = load("../src/screens/folder/FolderDetailScreen.tsx", {
     "react": {
+      useEffect: (effect) => {
+        lastEffect = effect;
+      },
       useState: (initial) => {
         const index = cursor++;
         if (state[index] === undefined) state[index] = initial;
@@ -404,6 +452,12 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   findAll(renderSearch(), "SearchBar")[0].props.onChangeText("   ");
   findAll(renderSearch(), "SearchBar")[0].props.onSubmitEditing();
   assert.equal(submitted, "", "공백만 입력하면 검색하지 않는다");
+  // 입력을 멈추면 검색 버튼 없이도 검색한다(ALL-004와 같은 동작).
+  findAll(renderSearch(), "SearchBar")[0].props.onChangeText(" 바지 ");
+  renderSearch();
+  lastEffect();
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  assert.equal(submitted, "바지");
 });
 
 test("공용 Card는 가격 없음과 0원을 구분하고 로컬 썸네일을 표시한다", () => {
