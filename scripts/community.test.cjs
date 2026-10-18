@@ -133,6 +133,39 @@ test("계정·비회원·탭별 조회 캐시는 분리한다", () => {
   assert.notDeepEqual(communityKeys.feed("a", "all"), communityKeys.feed("a", "vote"));
 });
 
+test("조회 훅은 인증 복원을 기다리고 20개 미만이면 커서 요청을 종료한다", () => {
+  let options;
+  let auth = { session: null, isRestoring: true };
+  const hooks = load("src/screens/diggle/queries/useCommunity.ts", {
+    "@tanstack/react-query": {
+      useInfiniteQuery: (value) => {
+        options = value;
+      },
+      useQuery: (value) => {
+        options = value;
+      },
+    },
+    "@/contexts/AuthContext": { useAuth: () => auth },
+    "../api/community": api([]),
+  });
+  hooks.useCommunityFeed("all");
+  assert.equal(options.enabled, false);
+  auth = { session: null, isRestoring: false };
+  hooks.useCommunityFeed("all");
+  assert.equal(options.enabled, true);
+  assert.equal(options.getNextPageParam([]), undefined);
+  const page = Array.from({ length: 20 }, (_, index) => ({
+    id: String(index + 1),
+    createdAt: PREVIEW.created_at,
+  }));
+  assert.equal(options.getNextPageParam(page).id, "20");
+  hooks.useCommunityPost("12");
+  assert.equal(options.enabled, false);
+  auth = { session: { user: { id: "viewer" } }, isRestoring: false };
+  hooks.useCommunityPost("12");
+  assert.equal(options.enabled, true);
+});
+
 test("SYS-009 시간 경계와 네트워크/일반 실패 문구를 구분한다", () => {
   const { formatCommunityTime, communityErrorMessage } = load(
     "src/screens/diggle/utils/formatCommunityTime.ts",
@@ -211,6 +244,8 @@ function screenMocks({ session = {}, post = null, feed = {}, comments = [] } = {
     "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
     "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
     "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
+    "./components/VoteBlock": { VoteBlock: "VoteBlock" },
+    "./utils/voteTiming": load("src/screens/diggle/utils/voteTiming.ts"),
   };
   return { mocks, destination: () => destination };
 }
@@ -284,4 +319,22 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   assert.equal(comments[2].props.isDeleted, true);
   assert.equal(nodes(screen, "LikeCommentRow")[0].props.onPressLike, undefined);
   assert.equal(nodes(screen, "PostItemInfoSheet")[0].props.onSaveToAll, undefined);
+});
+
+test("서버가 비공개로 내려준 투표 집계는 작성자·마감 화면에서도 0명 결과로 노출하지 않는다", () => {
+  const { VoteBlock } = load("src/screens/diggle/components/VoteBlock.tsx", {
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+  });
+  const tree = VoteBlock({
+    vote: { buyCount: 0, notCount: 0, myChoice: null, isClosed: true, remainingLabel: "" },
+    isMyVote: true,
+    hasResults: false,
+    isReadOnly: true,
+  });
+  assert.equal(nodes(tree, "Pressable").length, 2);
+  assert.ok(nodes(tree, "Pressable").every((button) => button.props.disabled));
+  const text = nodes(tree, "Text")
+    .map((node) => React.Children.toArray(node.props.children).join(""))
+    .join(" ");
+  assert.ok(!text.includes("0명"));
 });

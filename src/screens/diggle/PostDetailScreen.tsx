@@ -14,9 +14,11 @@ import { useToast } from "@/hooks/useToast";
 import { LikeCommentRow } from "./components/LikeCommentRow";
 import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
+import { VoteBlock } from "./components/VoteBlock";
 import { useCommunityComments, useCommunityPost } from "./queries/useCommunity";
 import type { CommunityItem } from "./types/community";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
+import { getVoteTiming } from "./utils/voteTiming";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -88,24 +90,21 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               }
             />
             {post.type === "vote" && (
-              <View className="gap-3 py-4">
-                <Text className="text-gray-700 font-label-14">
-                  {post.endsAt &&
-                  post.serverNow &&
-                  Date.parse(post.endsAt) <= Date.parse(post.serverNow)
-                    ? "투표가 종료되었습니다."
-                    : "살까, 말까?"}
-                </Text>
-                {post.buyCount !== null && post.notCount !== null ? (
-                  <Text className="text-gray-900 font-b2">
-                    BUY {post.buyCount}명 · NOT {post.notCount}명
-                  </Text>
-                ) : (
-                  <Text className="text-gray-500 font-note">
-                    투표하면 지금까지의 결과를 볼 수 있어요.
-                  </Text>
-                )}
-              </View>
+              <VoteBlock
+                isReadOnly
+                isMyVote={post.isMine}
+                hasResults={post.buyCount !== null && post.notCount !== null}
+                vote={{
+                  buyCount: post.buyCount ?? 0,
+                  notCount: post.notCount ?? 0,
+                  myChoice:
+                    post.myChoice === "buy" ? "BUY" : post.myChoice === "not" ? "NOT" : null,
+                  ...getVoteTiming(
+                    Date.parse(post.createdAt),
+                    Date.parse(post.serverNow ?? post.createdAt),
+                  ),
+                }}
+              />
             )}
           </View>
           {/* 변경 Action은 #95~97에서 연결한다. 원격 글에 로컬 목업 변경을 적용하지 않는다. */}

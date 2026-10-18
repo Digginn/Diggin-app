@@ -4,16 +4,24 @@ import { Pressable, Text, View } from "react-native";
 import type { VoteChoice, VotePost } from "@/types/post";
 
 type VoteBlockProps = {
-  vote: VotePost;
-  onChoose: (choice: VoteChoice) => void;
+  vote: Pick<VotePost, "buyCount" | "notCount" | "myChoice" | "isClosed" | "remainingLabel">;
+  onChoose?: (choice: VoteChoice) => void;
   isMyVote?: boolean;
+  hasResults?: boolean;
+  isReadOnly?: boolean;
 };
 
 const CHOICES: VoteChoice[] = ["BUY", "NOT"];
 
-export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) {
+export function VoteBlock({
+  vote,
+  onChoose,
+  isMyVote = false,
+  hasResults: requestedResults,
+  isReadOnly = false,
+}: VoteBlockProps) {
   const total = vote.buyCount + vote.notCount;
-  const hasResults = isMyVote || vote.myChoice !== null || vote.isClosed;
+  const hasResults = requestedResults ?? (isMyVote || vote.myChoice !== null || vote.isClosed);
 
   return (
     <View className="w-full gap-2.5 px-margin pb-1 pt-4">
@@ -26,7 +34,7 @@ export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) 
               : "살까, 말까? 투표해 주세요."}
         </Text>
         <Text className="text-gray-500 font-note">
-          {vote.isClosed ? `총 ${total}명 참여` : vote.remainingLabel}
+          {vote.isClosed ? (hasResults ? `총 ${total}명 참여` : "") : vote.remainingLabel}
         </Text>
       </View>
       {hasResults ? (
@@ -34,7 +42,8 @@ export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) 
           const count = choice === "BUY" ? vote.buyCount : vote.notCount;
           const otherCount = choice === "BUY" ? vote.notCount : vote.buyCount;
           const isLeading = count > otherCount;
-          const isDisabled = vote.isClosed || (!isMyVote && vote.myChoice === choice);
+          const isDisabled =
+            isReadOnly || !onChoose || vote.isClosed || (!isMyVote && vote.myChoice === choice);
           return (
             <Pressable
               key={choice}
@@ -45,7 +54,7 @@ export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) 
                 disabled: isDisabled,
               }}
               disabled={isDisabled}
-              onPress={() => onChoose(choice)}
+              onPress={() => onChoose?.(choice)}
               className="h-12 w-full overflow-hidden rounded-lg bg-gray-100"
             >
               <View
@@ -76,9 +85,7 @@ export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) 
                 ) : null}
               </View>
               <View className="absolute bottom-0 right-4 top-0 justify-center">
-                <Text className="bg-gray-100 text-gray-900 font-label-16-semibold">
-                  {count}명
-                </Text>
+                <Text className="bg-gray-100 text-gray-900 font-label-16-semibold">{count}명</Text>
               </View>
             </Pressable>
           );
@@ -91,7 +98,9 @@ export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) 
               accessibilityRole="button"
               accessibilityLabel={choice}
               className="h-12 w-full items-center justify-center rounded bg-gray-100 active:opacity-75"
-              onPress={() => onChoose(choice)}
+              accessibilityState={{ disabled: isReadOnly || !onChoose || vote.isClosed }}
+              disabled={isReadOnly || !onChoose || vote.isClosed}
+              onPress={() => onChoose?.(choice)}
             >
               <Text className="text-gray-900 font-label-16-semibold">{choice}</Text>
             </Pressable>
@@ -100,11 +109,13 @@ export function VoteBlock({ vote, onChoose, isMyVote = false }: VoteBlockProps) 
       )}
       {!isMyVote ? (
         <Text className="text-gray-500 font-note">
-          {vote.isClosed
+          {vote.isClosed && hasResults
             ? "종료된 투표는 결과만 확인할 수 있어요."
-            : hasResults
-              ? "투표 종료 전까지 다른 선택지를 눌러 다시 투표할 수 있어요."
-              : "투표하면 지금까지의 결과를 볼 수 있어요."}
+            : vote.isClosed
+              ? "투표가 종료되었습니다."
+              : hasResults
+                ? "투표 종료 전까지 다른 선택지를 눌러 다시 투표할 수 있어요."
+                : "투표하면 지금까지의 결과를 볼 수 있어요."}
         </Text>
       ) : null}
     </View>
