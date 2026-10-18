@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { folderKeys } from "@/api/folders";
 import { productKeys, saveProduct } from "@/api/products";
@@ -56,10 +56,21 @@ export function useItemSave() {
   );
 
   // 로딩 다이얼로그가 완전히 닫힌 뒤에 시트를 연다.
+  // 앱이 뒤에 가 있으면 iOS가 시트를 띄우지 않는데 RN은 떠 있다고 보고 투명한 창이 터치를 막는다. 앞으로 돌아오면 연다.
   const openAfterLoading = useCallback(() => {
-    setWaiting((pending) => {
-      if (pending) setLoaded(pending);
-      return null;
+    const open = () =>
+      setWaiting((pending) => {
+        if (pending) setLoaded(pending);
+        return null;
+      });
+    if (AppState.currentState === "active") {
+      open();
+      return;
+    }
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      subscription.remove();
+      open();
     });
   }, []);
 
