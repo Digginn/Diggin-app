@@ -22,7 +22,9 @@ function load(file) {
   return module.exports;
 }
 
-const { normalizeProductPage } = load("../src/screens/save/domain/normalizeProductPage.ts");
+const { normalizeProductPage, stripTrackingParams } = load(
+  "../src/screens/save/domain/normalizeProductPage.ts",
+);
 const { PRODUCT_PAGE_SCRIPT } = load("../src/screens/save/domain/productPageScript.ts");
 
 const og = (fields = {}) => ({
@@ -239,4 +241,33 @@ test("페이지 스크립트는 상품명과 이미지가 잡히면 재료를 �
   assert.equal(sent[0].shop.brand, "옵텐소");
   assert.equal(sent[0].shop.price, 25850);
   assert.equal(sent[0].og.image, "https://cf.product-image.s.zigzag.kr/a.jpeg");
+});
+
+test("광고 추적값만 떼고 상품을 가르는 쿼리 값은 남긴다", () => {
+  assert.equal(
+    stripTrackingParams(
+      "https://m.brand.naver.com/xenicsholic/products/10497985918?nt_source=meta&nt_medium=ad&utm_medium=paid&fbclid=PAZ",
+    ),
+    "https://m.brand.naver.com/xenicsholic/products/10497985918",
+  );
+  assert.equal(
+    stripTrackingParams(
+      "https://www.coupang.com/vp/products/9742886795?vendorItemId=96055843414&sourceType=HOME_GW&searchId=feed-1",
+    ),
+    "https://www.coupang.com/vp/products/9742886795?vendorItemId=96055843414",
+  );
+  assert.equal(
+    stripTrackingParams(
+      "https://product.29cm.co.kr/catalog/2028018?is_retargeting=true&source_caller=api#review",
+    ),
+    "https://product.29cm.co.kr/catalog/2028018#review",
+  );
+  assert.equal(
+    stripTrackingParams("https://zigzag.kr/catalog/products/1"),
+    "https://zigzag.kr/catalog/products/1",
+  );
+  assert.equal(
+    stripTrackingParams("https://shop.example.com/p?option=red&size=M"),
+    "https://shop.example.com/p?option=red&size=M",
+  );
 });
