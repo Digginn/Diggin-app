@@ -624,3 +624,39 @@ test("4910은 페이지 데이터에서 상품명·판매가·브랜드를 읽�
     "데일리룩",
   );
 });
+
+test("컬리 공유 링크는 앱·App Store로 가기 전에 같은 상품 번호의 웹 상품 페이지로 옮긴다", () => {
+  let replaced;
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: {
+      ReactNativeWebView: { postMessage: () => assert.fail("중간 페이지에서 보내면 안 된다") },
+    },
+    document: { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null },
+    location: {
+      href: "https://kurlink.kurly.com/products/1001464950",
+      hostname: "kurlink.kurly.com",
+      pathname: "/products/1001464950",
+      search: "",
+      replace: (url) => {
+        replaced = url;
+      },
+    },
+    URLSearchParams,
+    Date,
+    JSON,
+    setInterval: () => 1,
+    clearInterval: () => {},
+  });
+  assert.equal(replaced, "https://www.kurly.com/goods/1001464950");
+
+  const { hasFailed } = normalizeProductPage(
+    {
+      finalUrl: "https://kurlink.kurly.com/products/1001464950",
+      og: og({ title: "컬리", image: "https://www.kurly.com/logo.png" }),
+      ld: null,
+      shop: null,
+    },
+    "https://kurlink.kurly.com/products/1001464950",
+  );
+  assert.equal(hasFailed, true, "못 옮기고 중간 페이지에서 끝나면 그 정보를 쓰지 않는다");
+});
