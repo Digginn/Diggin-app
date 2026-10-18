@@ -417,6 +417,38 @@ test("중간 페이지에서 끝나면 사이트 기본 정보를 쓰지 않고 
   assert.equal(values.sourceUrl, "https://ozip.me/D7nPayR");
 });
 
+test("로그인 페이지로 넘어가면 그 제목을 상품명으로 쓰지 않고 원래 링크로 실패를 넘긴다", () => {
+  for (const finalUrl of [
+    "https://www.musinsa.com/auth/login?referer=/products/913589",
+    "https://login.coupang.com/login/login.pang",
+    "https://m.29cm.co.kr/member/sign-in",
+  ]) {
+    const { values, hasFailed } = normalizeProductPage(
+      {
+        finalUrl,
+        og: og({ title: "로그인", image: "https://cdn.shop.com/og.png" }),
+        ld: null,
+        shop: null,
+      },
+      "https://www.musinsa.com/products/913589",
+    );
+    assert.equal(hasFailed, true, finalUrl);
+    assert.equal(values.name, "");
+    assert.equal(values.thumbnailUrl, null);
+    assert.equal(values.sourceUrl, "https://www.musinsa.com/products/913589");
+  }
+  const { hasFailed } = normalizeProductPage(
+    {
+      finalUrl: "https://shop.example.com/products/catalogin-bag?next=/login",
+      og: og({ title: "캐털로그 가방", image: "https://cdn.shop.com/bag.png" }),
+      ld: null,
+      shop: null,
+    },
+    "https://shop.example.com/products/catalogin-bag",
+  );
+  assert.equal(hasFailed, false, "주소 중간의 login 글자나 돌아갈 주소는 로그인 페이지가 아니다");
+});
+
 test("오늘의집은 페이지 데이터에서 브랜드만 읽고 상품명·가격은 공개 메타를 쓴다", () => {
   const sent = [];
   const metas = {

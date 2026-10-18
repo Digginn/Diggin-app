@@ -116,3 +116,93 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   assert.equal(requiredCount(), 1);
   assert.equal(saveButton().props.isDisabled, true);
 });
+
+test("폴더 선택하기는 폴더 목록이 없으면 다시 불러오고, 그래도 없으면 시트 대신 안내를 띄운다", async () => {
+  const state = [];
+  let cursor = 0;
+  let folders;
+  let refetchResult;
+  const { ItemSavePage } = load("../src/screens/save/components/ItemSavePage.tsx", {
+    "react": {
+      useEffect: () => {},
+      useRef: (initial) => ({ current: initial }),
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [
+          state[index],
+          (next) => {
+            state[index] = typeof next === "function" ? next(state[index]) : next;
+          },
+        ];
+      },
+    },
+    "react-native": {
+      Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
+      KeyboardAvoidingView: "KeyboardAvoidingView",
+      Modal: "Modal",
+      Platform: { OS: "ios" },
+      ScrollView: "ScrollView",
+      Text: "Text",
+      View: "View",
+    },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
+    "@/api/products": { findProductIdByUrl: async () => null },
+    "@/components/app-bar": { AppBar: "AppBar" },
+    "@/components/Button": { Button: "Button" },
+    "@/components/modal": { ActionModal: "ActionModal" },
+    "@/components/ToastText": { ToastText: "ToastText" },
+    "@/constants/messages": { TOAST_MESSAGES: { SYS_001: "연결 확인" } },
+    "@/hooks/useCreateFolder": { useCreateFolder: () => ({}) },
+    "@/hooks/useFolders": {
+      useFolders: () => ({ data: folders, refetch: async () => refetchResult }),
+    },
+    "@/screens/item-detail/components/FolderManageSheet": {
+      FolderManageSheet: "FolderManageSheet",
+    },
+    "@/screens/item-detail/components/ItemEditSheet": { ITEM_INFO_DESCRIPTION: {} },
+    "@/screens/item-detail/components/ItemInfoFields": { ItemInfoFields: "ItemInfoFields" },
+  });
+  const render = () => {
+    cursor = 0;
+    return nodes(
+      ItemSavePage({
+        visible: true,
+        initialValues: {
+          name: "아이템",
+          brand: "",
+          price: "",
+          sourceUrl: "https://shop.com/p/1",
+          thumbnailUrl: null,
+          wishLevel: null,
+        },
+        hasExtractionFailed: false,
+        onRequestClose() {},
+        onSubmit: async () => {},
+        onOpenDuplicate() {},
+        isSubmitting: false,
+        onErrorDismiss() {},
+      }),
+    );
+  };
+  const openSheet = () =>
+    render()
+      .find((node) => node.type === "Button" && node.props.children === "폴더 선택하기")
+      .props.onPress();
+
+  folders = undefined;
+  refetchResult = { data: undefined };
+  await openSheet();
+  let tree = render();
+  assert.equal(
+    tree.find((node) => node.type === "FolderManageSheet"),
+    undefined,
+  );
+  assert.equal(tree.find((node) => node.type === "ToastText").props.message, "연결 확인");
+
+  refetchResult = { data: [{ id: "1", name: "바지" }] };
+  await openSheet();
+  folders = refetchResult.data;
+  tree = render();
+  assert.deepEqual(tree.find((node) => node.type === "FolderManageSheet").props.folders, folders);
+});
