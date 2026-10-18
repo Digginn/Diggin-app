@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -29,7 +29,7 @@ type ItemSavePageProps = {
   initialValues: ItemSaveValues;
   hasExtractionFailed: boolean;
   onRequestClose: () => void;
-  onSubmit: (values: ItemSaveValues, folderIds: string[]) => void;
+  onSubmit: (values: ItemSaveValues, folderIds: string[]) => Promise<unknown>;
   /** SAVE-012 이미 저장한 링크면 기존 아이템 상세로 보낸다. */
   onOpenDuplicate: (productId: string) => void;
   isSubmitting: boolean;
@@ -59,6 +59,9 @@ export function ItemSavePage({
   const [isFolderOpen, setFolderOpen] = useState(false);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [isChecking, setChecking] = useState(false);
+  // 상태는 다시 그린 뒤에야 버튼을 막아, 그 사이 들어온 연타는 ref로 막는다.
+  const isCheckingRef = useRef(false);
+  const isOpeningDuplicateRef = useRef(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const folders = useFolders();
   const createFolder = useCreateFolder();
@@ -90,10 +93,13 @@ export function ItemSavePage({
 
   // 폴더를 다 고른 뒤에 중복을 알리지 않도록 시트를 열기 전에 확인한다. 확인에 실패하면 저장 때 서버가 막는다.
   async function openFolderSheet() {
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
     setOverlay(null);
     Keyboard.dismiss();
     setChecking(true);
     const productId = await findProductIdByUrl(values.sourceUrl).catch(() => null);
+    isCheckingRef.current = false;
     setChecking(false);
     if (productId) setDuplicateId(productId);
     else setFolderOpen(true);
@@ -171,7 +177,9 @@ export function ItemSavePage({
         primaryAction={{
           label: "확인하기",
           onPress: () => {
-            if (duplicateId) onOpenDuplicate(duplicateId);
+            if (!duplicateId || isOpeningDuplicateRef.current) return;
+            isOpeningDuplicateRef.current = true;
+            onOpenDuplicate(duplicateId);
             setDuplicateId(null);
           },
         }}

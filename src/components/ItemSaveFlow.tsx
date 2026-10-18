@@ -45,18 +45,13 @@ export function ItemSaveFlow({ itemSave }: ItemSaveFlowProps) {
         onErrorDismiss={save.reset}
         onOpenDuplicate={openProduct}
         onSubmit={(values, folderIds) =>
-          save.mutate(
-            { values, folderIds },
-            {
-              onSuccess: ({ productId, isDuplicate }) => {
-                // 폴더를 고르기 전에 확인하지만, 그사이 같은 링크가 저장됐으면 기존 상품으로 보낸다.
-                if (isDuplicate) return openProduct(productId);
-                itemSave.close();
-                showToast(TOAST_MESSAGES.SAVE_011);
-                router.navigate("/all");
-              },
-            },
-          )
+          save.mutateAsync({ values, folderIds }).then(({ productId, isDuplicate }) => {
+            // 폴더를 고르기 전에 확인하지만, 그사이 같은 링크가 저장됐으면 기존 상품으로 보낸다.
+            if (isDuplicate) return openProduct(productId);
+            itemSave.close();
+            showToast(TOAST_MESSAGES.SAVE_011);
+            router.navigate("/all");
+          })
         }
       />
     </>

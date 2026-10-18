@@ -325,11 +325,9 @@ export function ItemDetailScreen() {
           errorMessage={saveFolders.isError ? TOAST_MESSAGES.SYS_002 : undefined}
           onErrorDismiss={saveFolders.reset}
           onComplete={(ids) =>
-            saveFolders.mutate(ids, {
-              onSuccess: () => {
-                setFolderOpen(false);
-                showToast(selectFolderSavedMessage(ids.length));
-              },
+            saveFolders.mutateAsync(ids).then(() => {
+              setFolderOpen(false);
+              showToast(selectFolderSavedMessage(ids.length));
             })
           }
         />
