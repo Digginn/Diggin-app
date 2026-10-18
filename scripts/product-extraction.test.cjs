@@ -300,6 +300,7 @@ test("앱 공유 링크의 중간 페이지에서는 제목·이미지가 있어
   const metas = {
     "og:title": "피프틴 셔링 퍼프 블라우스",
     "og:image": "https://cdn.example.com/a.gif",
+    "product:price:amount": "13,520",
   };
   const run = (hostname, now) =>
     runInNewContext(PRODUCT_PAGE_SCRIPT, {
@@ -339,4 +340,37 @@ test("사이트 이름 메타가 없어도 알려진 쇼핑몰 이름만 제목 
   assert.equal(name("피프틴 셔링 퍼프 블라우스 - 에이블리"), "피프틴 셔링 퍼프 블라우스");
   assert.equal(name("와플 반팔 저지 - 블랙"), "와플 반팔 저지 - 블랙");
   assert.equal(name("번개장터"), "");
+});
+
+test("상품명·이미지가 있어도 가격이 아직 없으면 잠깐 더 기다렸다가 보낸다", () => {
+  const sent = [];
+  const metas = { "og:title": "블라우스", "og:image": "https://cdn.example.com/a.gif" };
+  let now = 0;
+  let tick;
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+    document: {
+      querySelector: (selector) => {
+        const key = /"([^"]+)"/.exec(selector)[1];
+        return metas[key] ? { getAttribute: () => metas[key] } : null;
+      },
+      querySelectorAll: () => [],
+      getElementById: () => null,
+    },
+    location: { href: "https://mobile.a-bly.com/goods/1", hostname: "mobile.a-bly.com" },
+    Date: { now: () => now },
+    JSON,
+    setInterval: (callback) => {
+      tick = callback;
+      return 1;
+    },
+    clearInterval: () => {},
+  });
+  assert.equal(sent.length, 0, "가격이 없으면 바로 보내지 않는다");
+  now = 1000;
+  metas["product:price:amount"] = "13,520";
+  metas["product:price:currency"] = "KRW";
+  tick();
+  assert.equal(sent.length, 1, "가격이 붙으면 그때 보낸다");
+  assert.equal(sent[0].og.price, "13,520");
 });
