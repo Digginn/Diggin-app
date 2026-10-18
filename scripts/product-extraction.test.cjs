@@ -313,7 +313,8 @@ test("앱 공유 링크의 중간 페이지에서는 제목·이미지가 있어
         querySelectorAll: () => [],
         getElementById: () => null,
       },
-      location: { href: `https://${hostname}/goods/1`, hostname },
+      location: { href: `https://${hostname}/goods/1`, hostname, search: "" },
+      URLSearchParams,
       Date: { now },
       JSON,
       setInterval: () => 1,
@@ -373,4 +374,90 @@ test("상품명·이미지가 있어도 가격이 아직 없으면 잠깐 더 �
   tick();
   assert.equal(sent.length, 1, "가격이 붙으면 그때 보낸다");
   assert.equal(sent[0].og.price, "13,520");
+});
+
+test("앱 연결 중간 페이지 주소에 웹 대체 주소가 있으면 그 상품 페이지로 옮긴다", () => {
+  let replaced;
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: {
+      ReactNativeWebView: { postMessage: () => assert.fail("중간 페이지에서 보내면 안 된다") },
+    },
+    document: { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null },
+    location: {
+      href: "https://ohouse.airbridge.io/store.ohou.se/goods/3023027?x=1",
+      hostname: "ohouse.airbridge.io",
+      search:
+        "?deeplink_url=ohouseapp%3A%2F%2Fstore.ohou.se%2Fgoods%2F3023027&fallback_desktop=https%3A%2F%2Fstore.ohou.se%2Fgoods%2F3023027%3Futm_source%3Dexternalsharing",
+      replace: (url) => {
+        replaced = url;
+      },
+    },
+    URLSearchParams,
+    Date,
+    JSON,
+    setInterval: () => 1,
+    clearInterval: () => {},
+  });
+  assert.equal(replaced, "https://store.ohou.se/goods/3023027?utm_source=externalsharing");
+});
+
+test("중간 페이지에서 끝나면 사이트 기본 정보를 쓰지 않고 실패로 넘긴다", () => {
+  const { values, hasFailed } = normalizeProductPage(
+    {
+      finalUrl: "https://ohouse.airbridge.io/store.ohou.se/goods/3023027?channel=externalsharing",
+      og: og({ title: "오늘의집 - 라이프스타일 슈퍼앱", image: "https://cdn.ohou.se/og.png" }),
+      ld: null,
+      shop: null,
+    },
+    "https://ozip.me/D7nPayR",
+  );
+  assert.equal(hasFailed, true);
+  assert.equal(values.name, "");
+  assert.equal(values.thumbnailUrl, null);
+  assert.equal(values.sourceUrl, "https://ozip.me/D7nPayR");
+});
+
+test("오늘의집은 페이지 데이터에서 브랜드만 읽고 상품명·가격은 공개 메타를 쓴다", () => {
+  const sent = [];
+  const metas = {
+    "og:title": "트롬 오브제컬렉션 워시콤보",
+    "og:image": "https://prs.ohousecdn.com/a.jpg",
+    "product:price:amount": "2979250",
+    "product:price:currency": "KRW",
+  };
+  const nextData = {
+    props: {
+      pageProps: {
+        dehydratedState: {
+          queries: [{ state: { data: { production: { brandName: "LG전자" } } } }],
+        },
+      },
+    },
+  };
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+    document: {
+      querySelector: (selector) => {
+        const key = /"([^"]+)"/.exec(selector)[1];
+        return metas[key] ? { getAttribute: () => metas[key] } : null;
+      },
+      querySelectorAll: () => [],
+      getElementById: (id) =>
+        id === "__NEXT_DATA__" ? { textContent: JSON.stringify(nextData) } : null,
+    },
+    location: {
+      href: "https://store.ohou.se/goods/3023027",
+      hostname: "store.ohou.se",
+      search: "",
+    },
+    URLSearchParams,
+    Date,
+    JSON,
+    setInterval: () => 1,
+    clearInterval: () => {},
+  });
+  const { values } = normalizeProductPage(sent[0], "https://ozip.me/D7nPayR");
+  assert.equal(values.name, "트롬 오브제컬렉션 워시콤보");
+  assert.equal(values.brand, "LG전자");
+  assert.equal(values.price, "2979250");
 });
