@@ -7,7 +7,7 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
-function load(file, mocks = {}) {
+function load(file, mocks = {}, globals = {}) {
   const module = { exports: {} };
   runInNewContext(
     ts.transpileModule(readFileSync(path.join(__dirname, "..", file), "utf8"), {
@@ -17,6 +17,7 @@ function load(file, mocks = {}) {
       module,
       exports: module.exports,
       require: (name) => mocks[name] ?? (name.endsWith(".svg") ? name : require(name)),
+      ...globals,
     },
   );
   return module.exports;
@@ -184,6 +185,98 @@ test("SYS-009 시간 경계와 네트워크/일반 실패 문구를 구분한다
   assert.match(communityErrorMessage({ message: "HTTP 500" }), /게시글/);
 });
 
+function voteClock() {
+  let deviceNow = Date.parse("2026-10-18T16:59:00Z");
+  let state = deviceNow;
+  let tick;
+  let onAppState;
+  let cleanup;
+  const receivedAt = deviceNow;
+  const post = {
+    id: "12",
+    type: "vote",
+    createdAt: "2026-10-17T12:00:00Z",
+    serverNow: "2026-10-18T11:59:00Z",
+  };
+  const { useCommunityVoteTiming: renderTiming } = load(
+    "src/screens/diggle/hooks/useCommunityVoteTiming.ts",
+    {
+      "react": {
+        useState: () => [state, (update) => (state = update(state))],
+        useEffect: (effect) => {
+          cleanup = effect();
+        },
+      },
+      "react-native": {
+        AppState: {
+          addEventListener: (_, handler) => {
+            onAppState = handler;
+            return { remove: () => (onAppState = undefined) };
+          },
+        },
+      },
+      "../utils/voteTiming": load("src/screens/diggle/utils/voteTiming.ts"),
+    },
+    {
+      Date: class extends Date {
+        static now() {
+          return deviceNow;
+        }
+      },
+      setInterval: (handler) => {
+        tick = handler;
+        return 1;
+      },
+      clearInterval: () => (tick = undefined),
+    },
+  );
+  return {
+    render: (value = post, updatedAt = receivedAt) => renderTiming(value, updatedAt),
+    advance: (milliseconds) => (deviceNow += milliseconds),
+    tick: () => tick?.(),
+    activate: () => onAppState?.("active"),
+    unmount: () => cleanup?.(),
+    remount: () => {
+      cleanup?.();
+      state = deviceNow;
+    },
+    hasListeners: () => !!tick || !!onAppState,
+    post,
+  };
+}
+
+test("투표 상세는 서버 시각을 기준으로 남은 시간을 줄이고 24시간 경계에서 종료한다", () => {
+  const clock = voteClock();
+  assert.equal(clock.render().remainingLabel, "1분 남음");
+  clock.advance(60_000);
+  clock.tick();
+  assert.equal(clock.render().isClosed, true);
+  assert.equal(clock.render().remainingLabel, "투표가 종료되었습니다.");
+  clock.unmount();
+  assert.equal(clock.hasListeners(), false);
+});
+
+test("백그라운드에서 마감된 투표는 복귀 즉시 갱신한다", () => {
+  const clock = voteClock();
+  clock.render();
+  clock.advance(120_000);
+  clock.activate();
+  assert.equal(clock.render().isClosed, true);
+  clock.unmount();
+});
+
+test("오래된 캐시로 상세에 재진입해도 마감 상태를 유지하고 일반글은 타이머를 만들지 않는다", () => {
+  const clock = voteClock();
+  clock.render();
+  clock.advance(120_000);
+  clock.remount();
+  assert.equal(clock.render().isClosed, true);
+  clock.unmount();
+  const ordinaryPost = voteClock();
+  assert.equal(ordinaryPost.render({ ...ordinaryPost.post, type: "post" }), null);
+  assert.equal(ordinaryPost.hasListeners(), false);
+});
+
 function nodes(node, type) {
   if (!React.isValidElement(node)) return [];
   return [
@@ -246,6 +339,15 @@ function screenMocks({ session = {}, post = null, feed = {}, comments = [] } = {
     "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
     "./components/VoteBlock": { VoteBlock: "VoteBlock" },
     "./utils/voteTiming": load("src/screens/diggle/utils/voteTiming.ts"),
+    "./hooks/useCommunityVoteTiming": {
+      useCommunityVoteTiming: (post) =>
+        post?.type === "vote"
+          ? load("src/screens/diggle/utils/voteTiming.ts").getVoteTiming(
+              Date.parse(post.createdAt),
+              Date.parse(post.serverNow),
+            )
+          : null,
+    },
   };
   return { mocks, destination: () => destination };
 }

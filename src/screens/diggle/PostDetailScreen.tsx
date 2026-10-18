@@ -15,10 +15,10 @@ import { LikeCommentRow } from "./components/LikeCommentRow";
 import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
 import { VoteBlock } from "./components/VoteBlock";
+import { useCommunityVoteTiming } from "./hooks/useCommunityVoteTiming";
 import { useCommunityComments, useCommunityPost } from "./queries/useCommunity";
 import type { CommunityItem } from "./types/community";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
-import { getVoteTiming } from "./utils/voteTiming";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,6 +27,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const showToast = useToast();
   const result = useCommunityPost(id);
   const post = result.data;
+  const voteTiming = useCommunityVoteTiming(post, result.dataUpdatedAt);
   const comments = useCommunityComments(id, !!post);
   const [infoItem, setInfoItem] = useState<CommunityItem | null>(null);
   const [isLoginPromptVisible, setLoginPromptVisible] = useState(true);
@@ -89,7 +90,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                 setInfoItem(post.items.find((snapshot) => snapshot.id === item.id) ?? null)
               }
             />
-            {post.type === "vote" && (
+            {post.type === "vote" && voteTiming && (
               <VoteBlock
                 isReadOnly
                 isMyVote={post.isMine}
@@ -99,10 +100,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                   notCount: post.notCount ?? 0,
                   myChoice:
                     post.myChoice === "buy" ? "BUY" : post.myChoice === "not" ? "NOT" : null,
-                  ...getVoteTiming(
-                    Date.parse(post.createdAt),
-                    Date.parse(post.serverNow ?? post.createdAt),
-                  ),
+                  ...voteTiming,
                 }}
               />
             )}
