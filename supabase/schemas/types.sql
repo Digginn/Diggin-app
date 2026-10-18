@@ -4,6 +4,12 @@ create type public.folder_kind as enum ('custom', 'owned');
 
 create type public.wish_level as enum ('high', 'medium', 'low');
 
+create type public.post_type as enum ('post', 'vote');
+create type public.vote_choice as enum ('buy', 'not');
+create type public.report_target as enum ('post', 'comment');
+create type public.report_reason as enum ('abuse', 'spam', 'inappropriate', 'other');
+create type public.report_status as enum ('received', 'reviewing', 'resolved', 'rejected');
+
 create type public.import_status as enum ('processing', 'completed', 'failed');
 
 create type public.import_fail_reason as enum (
