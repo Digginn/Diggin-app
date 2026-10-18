@@ -39,6 +39,7 @@ function loadProductsApi(rows = [], counts = {}) {
         return builder;
       },
       single: () => Promise.resolve({ data: rows[0], error: null }),
+      maybeSingle: () => Promise.resolve({ data: rows[0] ?? null, error: null }),
       in: (column, values) => {
         call.deleted = [column, values];
         return Promise.resolve({ error: null });
@@ -193,6 +194,14 @@ test("같은 링크면 저장하지 않았다는 표시와 기존 상품 id를 �
   });
   assert.equal(result.isDuplicate, true);
   assert.equal(result.productId, "7");
+});
+
+test("폴더를 고르기 전에 같은 링크가 이미 저장됐는지 링크로 찾는다(SAVE-012)", async () => {
+  const saved = loadProductsApi([{ id: 42 }]);
+  assert.equal(await saved.api.findProductIdByUrl("https://shop.com/a"), "42");
+  assert.deepEqual([...saved.calls[0].filters[0]], ["url", "https://shop.com/a"]);
+  const empty = loadProductsApi([]);
+  assert.equal(await empty.api.findProductIdByUrl("https://shop.com/b"), null);
 });
 
 test("선택 삭제는 고른 상품 id를 숫자로 바꿔 한 번에 지운다", async () => {
