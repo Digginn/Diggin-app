@@ -23,6 +23,12 @@ type FolderManageSheetProps = {
   title?: string;
   completeLabel?: string;
   onBack?: () => void;
+  backLabel?: string;
+  /** 저장 응답 전에 선택을 바꾸거나 다시 누르면 서버 상태와 마지막 선택이 어긋나 둘 다 막는다. */
+  isCompleting?: boolean;
+  /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
+  errorMessage?: string;
+  onErrorDismiss?: () => void;
 };
 
 export function FolderManageSheet({
@@ -34,6 +40,10 @@ export function FolderManageSheet({
   title = "폴더 관리",
   completeLabel = "완료",
   onBack,
+  backLabel = "이전으로",
+  isCompleting = false,
+  errorMessage,
+  onErrorDismiss,
 }: FolderManageSheetProps) {
   const [selectedIds, setSelectedIds] = useState(selectedFolderIds);
   const [isCreating, setIsCreating] = useState(false);
@@ -47,6 +57,9 @@ export function FolderManageSheet({
 
   return (
     <BottomSheet
+      toastMessage={errorMessage}
+      toastVariant="error"
+      onToastDismiss={onErrorDismiss}
       visible
       onRequestClose={onClose}
       maxHeight={702}
@@ -124,6 +137,8 @@ export function FolderManageSheet({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="새 폴더 만들기"
+          accessibilityState={{ disabled: isCompleting }}
+          disabled={isCompleting}
           className="h-12 items-center justify-center rounded-lg border border-dashed border-gray-300 active:opacity-75"
           onPress={() => setIsCreating(true)}
         >
@@ -142,7 +157,8 @@ export function FolderManageSheet({
                 <Pressable
                   accessibilityRole="checkbox"
                   accessibilityLabel={folder.name}
-                  accessibilityState={{ checked: isSelected }}
+                  accessibilityState={{ checked: isSelected, disabled: isCompleting }}
+                  disabled={isCompleting}
                   aria-checked={isSelected}
                   className={clsx(
                     "h-12 flex-row items-center justify-between rounded pl-4 pr-1.5 active:opacity-75",
@@ -172,14 +188,18 @@ export function FolderManageSheet({
         {onBack ? (
           <View className="flex-row gap-4">
             <Button className="flex-1" variant="secondary" onPress={onBack}>
-              이전으로
+              {backLabel}
             </Button>
-            <Button className="flex-1" onPress={() => onComplete(selectedIds)}>
+            <Button
+              className="flex-1"
+              isDisabled={isCompleting}
+              onPress={() => onComplete(selectedIds)}
+            >
               {completeLabel}
             </Button>
           </View>
         ) : (
-          <Button size="large" onPress={() => onComplete(selectedIds)}>
+          <Button size="large" isDisabled={isCompleting} onPress={() => onComplete(selectedIds)}>
             {completeLabel}
           </Button>
         )}
