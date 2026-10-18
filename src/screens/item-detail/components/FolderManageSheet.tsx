@@ -18,13 +18,17 @@ type FolderManageSheetProps = {
   selectedFolderIds: string[];
   onClose: () => void;
   onCreateFolder: (name: string) => ManagedFolder | Promise<ManagedFolder>;
-  onComplete: (ids: string[]) => void;
+  /** 저장 요청이면 Promise를 돌려준다. 끝날 때까지 다시 누르거나 닫을 수 없다. */
+  onComplete: (ids: string[]) => void | Promise<unknown>;
   /** 게시글 아이템 저장 흐름은 제목과 버튼이 다르고 앞 단계로 돌아갈 수 있다. */
   title?: string;
   completeLabel?: string;
   onBack?: () => void;
   backLabel?: string;
-  /** 저장 응답 전에 선택을 바꾸거나 다시 누르면 서버 상태와 마지막 선택이 어긋나 둘 다 막는다. */
+  /**
+   * 저장 응답 전에 선택을 바꾸거나 다시 누르면 서버 상태와 마지막 선택이 어긋나 막는다.
+   * 이미 보낸 요청은 닫아도 저장되니 취소·끌어내리기도 막는다.
+   */
   isCompleting?: boolean;
   /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
   errorMessage?: string;
@@ -50,10 +54,28 @@ export function FolderManageSheet({
   const [hasCreateFailed, setHasCreateFailed] = useState(false);
   const [pendingOwnedFolderId, setPendingOwnedFolderId] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
+  // isCompleting은 다시 그린 뒤에야 버튼을 막아, 그 사이 들어온 연타는 여기서 막는다.
+  const isSubmittingRef = useRef(false);
   const orderedFolders = [
     ...folders.filter((folder) => folder.isOwnedItems),
     ...folders.filter((folder) => !folder.isOwnedItems),
   ];
+
+  async function complete() {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    try {
+      await onComplete(selectedIds);
+    } catch {
+      // 실패는 부모가 errorMessage로 알린다.
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
+  function close() {
+    if (!isSubmittingRef.current) onClose();
+  }
 
   return (
     <BottomSheet
@@ -61,7 +83,8 @@ export function FolderManageSheet({
       toastVariant="error"
       onToastDismiss={onErrorDismiss}
       visible
-      onRequestClose={onClose}
+      onRequestClose={close}
+      isCloseConfirmed={isCompleting}
       maxHeight={702}
       className="rounded-t-[20px]"
       handleClassName="mb-4 h-1 w-9 self-center rounded-sm bg-gray-300"
@@ -187,19 +210,22 @@ export function FolderManageSheet({
         </ScrollView>
         {onBack ? (
           <View className="flex-row gap-4">
-            <Button className="flex-1" variant="secondary" onPress={onBack}>
-              {backLabel}
-            </Button>
             <Button
               className="flex-1"
+              variant="secondary"
               isDisabled={isCompleting}
-              onPress={() => onComplete(selectedIds)}
+              onPress={() => {
+                if (!isSubmittingRef.current) onBack();
+              }}
             >
+              {backLabel}
+            </Button>
+            <Button className="flex-1" isDisabled={isCompleting} onPress={complete}>
               {completeLabel}
             </Button>
           </View>
         ) : (
-          <Button size="large" isDisabled={isCompleting} onPress={() => onComplete(selectedIds)}>
+          <Button size="large" isDisabled={isCompleting} onPress={complete}>
             {completeLabel}
           </Button>
         )}
