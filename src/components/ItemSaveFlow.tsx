@@ -50,7 +50,7 @@ export function ItemSaveFlow({ itemSave }: ItemSaveFlowProps) {
             if (isDuplicate) return openProduct(productId);
             itemSave.close();
             showToast(TOAST_MESSAGES.SAVE_011);
-            router.navigate("/all");
+            router.navigate({ pathname: "/all", params: { savedAt: String(Date.now()) } });
           })
         }
       />

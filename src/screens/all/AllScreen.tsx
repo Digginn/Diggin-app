@@ -1,4 +1,4 @@
-import { useNavigation, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useLayoutEffect, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
@@ -40,6 +40,14 @@ export function AllScreen() {
   const guide = useFirstVisitGuide("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
   const [wishLevel, setWishLevel] = useState<WishLevelKey | null>(null);
+  // SAVE-014 저장 직후에는 새 아이템이 정렬·필터에 가려지지 않게 기본으로 되돌리고 목록을 맨 위부터 다시 그린다.
+  const { savedAt } = useLocalSearchParams<{ savedAt?: string }>();
+  const [handledSavedAt, setHandledSavedAt] = useState(savedAt);
+  if (savedAt !== handledSavedAt) {
+    setHandledSavedAt(savedAt);
+    setSortOrder("latest");
+    setWishLevel(null);
+  }
 
   const list = useProductList(sortOrder, wishLevel);
   const counts = useProductCounts();
@@ -153,6 +161,7 @@ export function AllScreen() {
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
         <WishItemGrid
+          key={savedAt}
           items={items}
           isLoading={list.isPending}
           onEndReached={() => {
