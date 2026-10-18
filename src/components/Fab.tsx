@@ -8,13 +8,16 @@ const ICON_SIZE = 24;
 type FabProps = {
   accessibilityLabel: string;
   onPress: () => void;
+  isDisabled?: boolean;
 };
 
-export function Fab({ accessibilityLabel, onPress }: FabProps) {
+export function Fab({ accessibilityLabel, onPress, isDisabled = false }: FabProps) {
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}
+      disabled={isDisabled}
       className="size-[54px] items-center justify-center rounded-full bg-gray-900 active:opacity-75"
       style={{ boxShadow: `0px 4px 10px ${colors.gray[1000]}1A` }}
       onPress={onPress}

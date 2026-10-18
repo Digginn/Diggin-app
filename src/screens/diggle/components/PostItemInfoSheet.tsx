@@ -10,10 +10,10 @@ type PostItemInfoSheetProps = {
   visible: boolean;
   brand: string;
   name: string;
-  price: number;
+  price: number | null;
   imageUrl?: string | null;
   onOpenWebsite: () => void;
-  onSaveToAll: () => void;
+  onSaveToAll?: () => void;
   onRequestClose: () => void;
 };
 
@@ -44,7 +44,7 @@ export function PostItemInfoSheet({
               {name}
             </Text>
             <Text className="text-gray-900 font-label-16-bold">
-              {price.toLocaleString("ko-KR")}원
+              {price === null ? "가격 정보 없음" : `${price.toLocaleString("ko-KR")}원`}
             </Text>
           </View>
         </View>
@@ -65,6 +65,8 @@ export function PostItemInfoSheet({
             accessibilityRole="button"
             className="h-[52px] flex-1 items-center justify-center overflow-hidden rounded bg-gray-900 active:opacity-75"
             onPress={onSaveToAll}
+            disabled={!onSaveToAll}
+            accessibilityState={{ disabled: !onSaveToAll }}
           >
             <Text className="text-gray-0 font-label-16-semibold">내 ALL에 저장</Text>
           </Pressable>

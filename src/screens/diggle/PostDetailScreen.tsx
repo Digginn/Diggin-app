@@ -1,389 +1,172 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useRef, useState } from "react";
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
-import type { TextInput } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useEffect, useState } from "react";
+import { Linking, ScrollView, Text, View } from "react-native";
 
-import KebabSvg from "@/assets/images/icon-kebab.svg";
-import ReportSvg from "@/assets/images/icon-report.svg";
 import { AppBar } from "@/components/app-bar";
-import { Comment, type MenuAnchor } from "@/components/Comment";
-import { CommentEditBanner } from "@/components/CommentEditBanner";
-import { COMMENT_MAX_LENGTH, CommentInput } from "@/components/CommentInput";
+import { Button } from "@/components/Button";
+import { Comment } from "@/components/Comment";
 import { EmptyState } from "@/components/EmptyState";
-import { FloatingToolbar } from "@/components/FloatingToolbar";
-import { ActionModal } from "@/components/modal";
-import { ProductImg } from "@/components/ProductImg";
-import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
-import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
-import { useBlockedUsers } from "@/contexts/BlockedUsersContext";
-import { usePosts } from "@/contexts/PostsContext";
+import { Spinner } from "@/components/Loading";
+import { LoginRequiredModal } from "@/components/modal";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
-import { colors } from "@/theme";
-import type { PostComment, PostItem } from "@/types/post";
 
 import { LikeCommentRow } from "./components/LikeCommentRow";
 import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
-import { VoteBlock } from "./components/VoteBlock";
-import {
-  CURRENT_USER_ID,
-  findMockComments,
-  findMockVoteComments,
-  MOCK_POSTS,
-} from "./constants/mockPosts";
-import { getVoteTiming } from "./utils/voteTiming";
+import { useCommunityComments, useCommunityPost } from "./queries/useCommunity";
+import type { CommunityItem } from "./types/community";
+import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
-  const isVote = type === "vote";
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const showToast = useToast();
-  const { isBlocked, block } = useBlockedUsers();
-  const { findPost, deletePost, votes, chooseVote, deleteVote } = usePosts();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [storedPost, setPost] = useState(() => findPost(id) ?? MOCK_POSTS[0]);
-  const vote = votes.find((item) => item.id === id);
-  const post = isVote && vote ? vote : storedPost;
-  const [comments, setComments] = useState(() =>
-    isVote ? findMockVoteComments(id) : findMockComments(id),
-  );
-  const [draft, setDraft] = useState("");
-  const [menuCommentId, setMenuCommentId] = useState<string | null>(null);
-  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
-  const [editingComment, setEditingComment] = useState<PostComment | null>(null);
-  const inputRef = useRef<TextInput>(null);
-  const scrollRef = useRef<ScrollView>(null);
-  // 댓글마다 ScrollView 안에서의 y 좌표. 수정할 때 그 댓글로 스크롤하는 데 쓴다.
-  const commentOffsets = useRef<Record<string, number>>({});
-  const [isPostMenuOpen, setPostMenuOpen] = useState(false);
-  const [isDeleteOpen, setDeleteOpen] = useState(false);
-  // 삭제 확인을 받는 동안 어떤 댓글이었는지 들고 있는다.
-  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
-  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
-  const [infoItem, setInfoItem] = useState<PostItem | null>(null);
-  // 내 ALL에 저장은 정보 입력 -> 폴더 선택 두 단계로 이어진다.
+  const router = useRouter();
+  const { session, isRestoring } = useAuth();
+  const showToast = useToast();
+  const result = useCommunityPost(id);
+  const post = result.data;
+  const comments = useCommunityComments(id, !!post);
+  const [infoItem, setInfoItem] = useState<CommunityItem | null>(null);
+  const [isLoginPromptVisible, setLoginPromptVisible] = useState(true);
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/diggle"));
 
-  const menuComment = comments.find((comment) => comment.id === menuCommentId);
-  const visibleComments = comments.filter((comment) => !isBlocked(comment.authorId));
-  const isMyPost = post.authorId === CURRENT_USER_ID;
+  useEffect(() => {
+    const error = result.error ?? comments.error;
+    if (error) showToast(communityErrorMessage(error));
+  }, [result.error, comments.error, showToast]);
 
-  function getMyCommentAuthor() {
-    if (isMyPost) return "글쓴이 (나)";
-    const existingAuthor = comments.find((comment) => comment.authorId === CURRENT_USER_ID)?.author;
-    const anonymousAuthors = new Set(
-      comments
-        .filter((comment) => comment.authorId !== post.authorId)
-        .map((comment) => comment.authorId),
-    );
-    return existingAuthor ?? `디기 ${anonymousAuthors.size + 1} (나)`;
-  }
-
-  function startEdit(comment: PostComment) {
-    setMenuCommentId(null);
-    setEditingComment(comment);
-    setDraft(comment.body);
-    inputRef.current?.focus();
-    // 수정 배너가 그려진 뒤에 옮겨야 자리가 어긋나지 않는다.
-    requestAnimationFrame(() => {
-      const y = commentOffsets.current[comment.id];
-      if (y !== undefined) scrollRef.current?.scrollTo({ y, animated: true });
-    });
-  }
-
-  function deleteComment() {
-    setComments((prev) => prev.filter((comment) => comment.id !== deletingCommentId));
-    setDeletingCommentId(null);
-  }
-
-  function submitComment() {
-    const body = draft.trim();
-    if (!body || draft.length > COMMENT_MAX_LENGTH) return;
-
-    if (editingComment) {
-      const targetId = editingComment.id;
-      setComments((prev) =>
-        prev.map((comment) => (comment.id === targetId ? { ...comment, body } : comment)),
-      );
-    } else {
-      // TODO: 댓글 등록 API 연결. 지금은 화면 안에서만 더한다.
-      setComments((prev) => [
-        ...prev,
-        {
-          id: `local-${Date.now()}`,
-          authorId: CURRENT_USER_ID,
-          author: getMyCommentAuthor(),
-          body,
-          timeLabel: "방금 전",
-          isMine: true,
-        },
-      ]);
-    }
-
-    setDraft("");
-    setEditingComment(null);
-    inputRef.current?.blur();
-  }
-
-  // 글쓴이를 차단하면 이 게시글은 더 볼 수 없다
-  function handleBlock(authorId: string) {
-    block(authorId);
-    showToast(DIGGLE_TOAST_MESSAGES.REPORT_004);
-    if (authorId === post.authorId) router.back();
-  }
-
-  function cancelEdit() {
-    setEditingComment(null);
-    setDraft("");
-    inputRef.current?.blur();
-  }
-
-  if (isVote && !vote) {
+  if (!isRestoring && !session)
     return (
       <View className="flex-1 bg-gray-0">
-        <AppBar left="back" onBack={() => router.back()} />
-        <EmptyState variant="vote" message="투표글을 찾을 수 없습니다." />
+        <AppBar left="back" onBack={goBack} />
+        <LoginRequiredModal
+          visible={isLoginPromptVisible}
+          onClose={goBack}
+          onLogin={() => {
+            setLoginPromptVisible(false);
+            router.push("/login");
+          }}
+        />
       </View>
     );
-  }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="bg-gray-0"
-      // NativeWind의 flex가 키보드 회피 중 내부 flex: 0을 덮지 않게 한다.
-      style={{ flex: 1 }}
-    >
-      <AppBar
-        left="back"
-        onBack={() => router.back()}
-        isDisabled={infoItem !== null}
-        right={
-          isMyPost ? (
-            <Pressable
-              accessibilityLabel={isVote ? "투표글 메뉴" : "게시글 메뉴"}
-              accessibilityRole="button"
-              className="size-12 items-center justify-center active:opacity-75"
-              disabled={infoItem !== null}
-              onPress={() => setPostMenuOpen(true)}
-            >
-              <KebabSvg
-                width={16}
-                height={16}
-                color={infoItem !== null ? colors.gray[400] : colors.gray[900]}
-              />
-            </Pressable>
-          ) : (
-            <Pressable
-              accessibilityLabel="신고하기"
-              accessibilityRole="button"
-              className="h-[52px] w-[55px] items-center justify-center active:opacity-75"
-              disabled={infoItem !== null}
-              onPress={() => setReportTarget({ authorId: post.authorId })}
-            >
-              <ReportSvg width={18} height={18} color={colors.gray[400]} />
-            </Pressable>
-          )
-        }
-      />
-
-      <ScrollView ref={scrollRef} className="flex-1" keyboardShouldPersistTaps="handled">
-        <View className="w-full justify-center px-margin">
-          <View className="w-full flex-row items-center">
-            <View className="flex-row items-center gap-1">
-              <Text className="text-gray-800 font-label-16-semibold">{post.author}</Text>
-              <Text className="text-gray-500 font-b1">·</Text>
-              <Text className="text-gray-500 font-b4">{post.timeLabel}</Text>
+    <View className="flex-1 bg-gray-0">
+      <AppBar left="back" onBack={goBack} isDisabled={infoItem !== null} />
+      {isRestoring || result.isPending ? (
+        <View
+          accessibilityLabel="게시글 불러오는 중"
+          className="flex-1 items-center justify-center"
+        >
+          <Spinner />
+        </View>
+      ) : !post || post.type !== (type === "vote" ? "vote" : "post") ? (
+        <View className="flex-1 gap-4">
+          <EmptyState
+            variant={type === "vote" ? "vote" : "post"}
+            message={
+              result.isError ? communityErrorMessage(result.error) : "게시글을 찾을 수 없습니다."
+            }
+          />
+          {result.isError && (
+            <View className="self-center pb-6">
+              <Button onPress={() => void result.refetch()}>다시 시도</Button>
             </View>
-          </View>
+          )}
         </View>
-
-        <View className="w-full items-start gap-2.5 pt-2">
-          <View className="w-full flex-row items-center px-margin">
-            <Text className="w-full text-gray-800 font-b3">{post.body}</Text>
-          </View>
-
-          <View className="w-full px-margin">
-            {isVote ? (
-              <ProductImg
-                url={post.items[0]?.imageUrl}
-                onPressInfo={() => {
-                  const item = post.items[0];
-                  if (item) router.push(`/items/${item.id}`);
-                }}
-              />
-            ) : (
-              <ProductImgGrid items={post.items} onPressInfo={setInfoItem} />
+      ) : (
+        <ScrollView className="flex-1">
+          <View className="gap-3 px-margin pb-4">
+            <Text className="text-gray-500 font-b4">
+              {post.isMine ? "글쓴이 (나)" : "글쓴이"} · {formatCommunityTime(post.createdAt)}
+            </Text>
+            <Text className="text-gray-800 font-b3">{post.body}</Text>
+            <ProductImgGrid
+              items={post.items}
+              onPressInfo={(item) =>
+                setInfoItem(post.items.find((snapshot) => snapshot.id === item.id) ?? null)
+              }
+            />
+            {post.type === "vote" && (
+              <View className="gap-3 py-4">
+                <Text className="text-gray-700 font-label-14">
+                  {post.endsAt &&
+                  post.serverNow &&
+                  Date.parse(post.endsAt) <= Date.parse(post.serverNow)
+                    ? "투표가 종료되었습니다."
+                    : "살까, 말까?"}
+                </Text>
+                {post.buyCount !== null && post.notCount !== null ? (
+                  <Text className="text-gray-900 font-b2">
+                    BUY {post.buyCount}명 · NOT {post.notCount}명
+                  </Text>
+                ) : (
+                  <Text className="text-gray-500 font-note">
+                    투표하면 지금까지의 결과를 볼 수 있어요.
+                  </Text>
+                )}
+              </View>
             )}
           </View>
-
-          {isVote && vote ? (
-            <VoteBlock
-              vote={vote}
-              isMyVote={isMyPost}
-              onChoose={(choice) => {
-                if (isMyPost) showToast(DIGGLE_TOAST_MESSAGES.VOTE_002);
-                else if (
-                  !vote.isClosed &&
-                  !getVoteTiming(vote.createdAt).isClosed &&
-                  vote.myChoice !== choice
-                ) {
-                  Keyboard.dismiss();
-                  chooseVote(vote.id, choice);
-                }
-              }}
-            />
-          ) : null}
-
+          {/* 변경 Action은 #95~97에서 연결한다. 원격 글에 로컬 목업 변경을 적용하지 않는다. */}
           <LikeCommentRow
-            likeCount={post.likeCount}
-            commentCount={isVote ? comments.length : post.commentCount}
+            likeCount={post.likeCount ?? 0}
+            commentCount={post.commentCount ?? 0}
             isLiked={post.isLiked}
-            onPressLike={() => setPost((prev) => ({ ...prev, isLiked: !prev.isLiked }))}
-            hasLike={!isVote}
+            hasLike={post.type === "post"}
           />
-        </View>
-
-        <View className="h-3 w-full bg-gray-100" />
-
-        {visibleComments.map((comment) => (
-          <View
-            key={comment.id}
-            onLayout={(event) => {
-              commentOffsets.current[comment.id] = event.nativeEvent.layout.y;
-            }}
-          >
+          <View className="h-3 bg-gray-100" />
+          {comments.data?.pages.flat().map((comment) => (
             <Comment
-              author={comment.author}
-              body={comment.body}
-              timeLabel={comment.timeLabel}
-              isDeleted={comment.isDeleted}
-              isHighlighted={menuCommentId === comment.id || editingComment?.id === comment.id}
-              onPressMenu={(anchor) => {
-                setMenuAnchor(anchor);
-                setMenuCommentId(comment.id);
-              }}
+              key={comment.id}
+              author={
+                comment.isWithdrawn
+                  ? "(탈퇴한 사용자)"
+                  : comment.isPostAuthor
+                    ? "글쓴이"
+                    : `디기 ${comment.anonNumber ?? ""}${comment.isMine ? "(나)" : ""}`
+              }
+              body={comment.body?.replace(/\r?\n/g, " ") ?? ""}
+              timeLabel={formatCommunityTime(comment.createdAt)}
+              isDeleted={comment.isWithdrawn}
             />
-          </View>
-        ))}
-      </ScrollView>
-
-      {menuComment ? (
-        <>
-          <Pressable
-            accessibilityLabel="메뉴 닫기"
-            className="absolute inset-0"
-            onPress={() => setMenuCommentId(null)}
-          />
-          <View
-            className="absolute right-margin"
-            style={{ top: (menuAnchor?.y ?? 0) + (menuAnchor?.height ?? 0) - 6 }}
-          >
-            {menuComment.isMine ? (
-              <FloatingToolbar
-                onEdit={() => startEdit(menuComment)}
-                onDelete={() => {
-                  setDeletingCommentId(menuComment.id);
-                  setMenuCommentId(null);
-                }}
-              />
-            ) : (
-              <FloatingToolbar
-                onReport={() => {
-                  setReportTarget({ authorId: menuComment.authorId });
-                  setMenuCommentId(null);
-                }}
-              />
-            )}
-          </View>
-        </>
-      ) : null}
-
-      {isPostMenuOpen ? (
-        <>
-          <Pressable
-            accessibilityLabel="메뉴 닫기"
-            className="absolute inset-0"
-            onPress={() => setPostMenuOpen(false)}
-          />
-          <View className="absolute right-margin" style={{ top: insets.top + 50 }}>
-            <FloatingToolbar
-              onDelete={() => {
-                setPostMenuOpen(false);
-                setDeleteOpen(true);
-              }}
-            />
-          </View>
-        </>
-      ) : null}
-
+          ))}
+          {comments.isPending && (
+            <View className="items-center py-4">
+              <Spinner />
+            </View>
+          )}
+          {comments.isError && (
+            <Button onPress={() => void comments.refetch()}>댓글 다시 불러오기</Button>
+          )}
+          {comments.hasNextPage && (
+            <Button
+              isDisabled={comments.isFetchingNextPage}
+              onPress={() => void comments.fetchNextPage()}
+            >
+              댓글 더 보기
+            </Button>
+          )}
+        </ScrollView>
+      )}
       <PostItemInfoSheet
         visible={infoItem !== null}
-        // TODO: API 연결 시 아이템 상세 정보를 받아 넣는다.
-        brand="브랜드명"
-        name="Real Good Pants 엄청 좋은 바지"
-        price={70000}
+        brand={infoItem?.brand ?? ""}
+        name={infoItem?.name ?? ""}
+        price={infoItem?.price ?? null}
         imageUrl={infoItem?.imageUrl}
-        onOpenWebsite={() => setInfoItem(null)}
-        onSaveToAll={() => {
-          setInfoItem(null);
-          router.push("/posts/save");
-        }}
         onRequestClose={() => setInfoItem(null)}
-      />
-
-      <ReportFlow
-        target={reportTarget}
-        onClose={() => setReportTarget(null)}
-        onBlock={handleBlock}
-      />
-
-      <ActionModal
-        visible={deletingCommentId !== null}
-        type="2Btn"
-        title="댓글을 삭제하시겠습니까?"
-        description="삭제한 댓글은 복구할 수 없습니다."
-        secondaryAction={{ label: "취소", onPress: () => setDeletingCommentId(null) }}
-        primaryAction={{ label: "삭제하기", onPress: deleteComment }}
-        onRequestClose={() => setDeletingCommentId(null)}
-      />
-
-      <ActionModal
-        visible={isDeleteOpen}
-        type="2Btn"
-        title={isVote ? "투표글을 삭제하시겠습니까?" : "게시글을 삭제하시겠습니까?"}
-        description={
-          isVote
-            ? "삭제한 투표글은 복구할 수 없습니다.\n투표글의 댓글도 함께 삭제됩니다."
-            : "삭제한 게시글은 복구할 수 없습니다.\n게시글의 댓글도 함께 삭제됩니다."
-        }
-        secondaryAction={{ label: "취소", onPress: () => setDeleteOpen(false) }}
-        primaryAction={{
-          label: "삭제하기",
-          onPress: () => {
-            // TODO: 게시글 삭제 API 연결.
-            setDeleteOpen(false);
-            if (isVote) deleteVote(post.id);
-            else deletePost(post.id);
-            showToast(DIGGLE_TOAST_MESSAGES.DIGGLE_009);
-            router.back();
-          },
+        onOpenWebsite={() => {
+          const url = infoItem?.url;
+          if (!url || !/^https:\/\//i.test(url)) {
+            showToast("아이템 링크를 확인하고 다시 시도해 주세요.");
+            return;
+          }
+          void Linking.openURL(url).catch(() =>
+            showToast("아이템 페이지를 열지 못했습니다. 다시 시도해 주세요."),
+          );
         }}
-        onRequestClose={() => setDeleteOpen(false)}
       />
-
-      <View className="w-full">
-        {editingComment ? <CommentEditBanner onCancel={cancelEdit} /> : null}
-        <CommentInput ref={inputRef} value={draft} onChangeText={setDraft} onSend={submitComment} />
-      </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

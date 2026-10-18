@@ -354,6 +354,15 @@ export type Database = {
     };
     Functions: {
       accept_policy: { Args: { target_policy_id: number }; Returns: undefined };
+      get_community_comments: {
+        Args: { after_created_at?: string; after_id?: number; target_post_id: number };
+        Returns: Json;
+      };
+      get_community_feed: {
+        Args: { after_created_at?: string; after_id?: number; feed_type?: string };
+        Returns: Json;
+      };
+      get_community_post: { Args: { target_post_id: number }; Returns: Json };
       get_pending_policies: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -420,6 +429,11 @@ export type Database = {
         | "FOLDER_LIMIT_EXCEEDED"
         | "FOLDER_SAVE_FAILED";
       import_status: "processing" | "completed" | "failed";
+      post_type: "post" | "vote";
+      report_reason: "abuse" | "spam" | "inappropriate" | "other";
+      report_status: "received" | "reviewing" | "resolved" | "rejected";
+      report_target: "post" | "comment";
+      vote_choice: "buy" | "not";
       wish_level: "high" | "medium" | "low";
       withdrawal_reason:
         "rarely_used" | "missing_feature" | "other_service" | "hard_to_use" | "frequent_error";
@@ -549,6 +563,11 @@ export const Constants = {
         "FOLDER_SAVE_FAILED",
       ],
       import_status: ["processing", "completed", "failed"],
+      post_type: ["post", "vote"],
+      report_reason: ["abuse", "spam", "inappropriate", "other"],
+      report_status: ["received", "reviewing", "resolved", "rejected"],
+      report_target: ["post", "comment"],
+      vote_choice: ["buy", "not"],
       wish_level: ["high", "medium", "low"],
       withdrawal_reason: [
         "rarely_used",
