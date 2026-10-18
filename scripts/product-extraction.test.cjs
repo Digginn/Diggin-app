@@ -461,3 +461,39 @@ test("오늘의집은 페이지 데이터에서 브랜드만 읽고 상품명·�
   assert.equal(values.brand, "LG전자");
   assert.equal(values.price, "2979250");
 });
+
+test("페이지 시작에 넣어도 문서를 다 읽기 전에는 끝내지 않는다", () => {
+  const sent = [];
+  const metas = {
+    "og:title": "트롬 워시콤보",
+    "og:image": "https://prs.ohousecdn.com/a.jpg",
+    "product:price:amount": "2979250",
+  };
+  const document = {
+    readyState: "loading",
+    querySelector: (selector) => {
+      const key = /"([^"]+)"/.exec(selector)[1];
+      return metas[key] ? { getAttribute: () => metas[key] } : null;
+    },
+    querySelectorAll: () => [],
+    getElementById: () => null,
+  };
+  let tick;
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+    document,
+    location: { href: "https://store.ohou.se/goods/1", hostname: "store.ohou.se", search: "" },
+    URLSearchParams,
+    Date: { now: () => 0 },
+    JSON,
+    setInterval: (callback) => {
+      tick = callback;
+      return 1;
+    },
+    clearInterval: () => {},
+  });
+  assert.equal(sent.length, 0, "문서를 읽는 중에는 보내지 않는다");
+  document.readyState = "interactive";
+  tick();
+  assert.equal(sent.length, 1);
+});
