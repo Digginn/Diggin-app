@@ -21,6 +21,7 @@ import { STATE_MESSAGES, TOAST_MESSAGES, selectFolderSavedMessage } from "@/cons
 import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useFolders } from "@/hooks/useFolders";
+import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useToast } from "@/hooks/useToast";
 import { useDeleteProducts } from "@/screens/all/mutations/useDeleteProducts";
@@ -100,6 +101,8 @@ export function ItemDetailScreen() {
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
   const deleteProduct = useDeleteProducts();
+  // 시트·모달 위에 클립보드 감지 모달이 겹치면 iOS가 무시하고 투명한 창만 남아 화면이 멈춘다.
+  useLinkDetectionPause(isEditOpen || isFolderOpen || isMenuOpen || isDeleteOpen);
   const isHeaderDisabled = isEditOpen || isFolderOpen;
   const headerIconColor = (isDark: boolean) =>
     isHeaderDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900";
