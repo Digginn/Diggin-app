@@ -74,7 +74,15 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     return null;
   };
 
+  // 올리브영은 공개 메타에 가격·브랜드가 없고, 추천 서비스용 eg: 메타를 페이지가 뜬 뒤 늦게 붙인다.
+  const isOliveYoung = location.hostname.endsWith("oliveyoung.co.kr");
   const readShop = () => {
+    if (isOliveYoung) {
+      const brand = meta("eg:brandName");
+      // 정가(eg:originalPrice)가 아니라 지금 파는 값을 쓴다.
+      const price = meta("eg:salePrice");
+      return brand || price ? { name: null, brand, price } : null;
+    }
     const naver = window.__PRELOADED_STATE__ && window.__PRELOADED_STATE__.simpleProductForDetailPage;
     if (naver && naver.name) {
       return {
@@ -144,7 +152,9 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     const image = (raw.ld && raw.ld.image) || raw.og.image;
     const price = (raw.shop && raw.shop.price) ?? (raw.ld && raw.ld.price) ?? raw.og.price;
     const now = Date.now();
-    if (name && image && !isAppLinkLanding && foundAt === null) foundAt = now;
+    // 올리브영은 eg: 메타가 붙기 전에 찾았다고 보면 가격 대기 시간이 먼저 끝나 버린다.
+    const isShopDataPending = isOliveYoung && !raw.shop;
+    if (name && image && !isAppLinkLanding && !isShopDataPending && foundAt === null) foundAt = now;
     const isComplete = foundAt !== null && (price !== null && price !== undefined || now - foundAt >= ${PRODUCT_PAGE_PRICE_GRACE_MS});
     // __NEXT_DATA__ 같은 페이지 데이터는 문서 끝에 있어 문서를 다 읽기 전에는 끝내지 않는다.
     const isParsed = document.readyState !== "loading";
