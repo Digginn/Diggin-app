@@ -100,6 +100,20 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
         if (data) return { name: null, brand: data.production.brandName || null, price: null };
       } catch (error) {}
     }
+    // 4910은 공개 메타에 가격·브랜드가 없고 제목에 브랜드·사이트 문구가 붙는다. 판매처(market)는 브랜드가 없을 때만 쓴다.
+    if (location.hostname.endsWith("4910.kr") && next) {
+      try {
+        const queries = JSON.parse(next.textContent).props.serverQueryClient.queries;
+        const goods = queries.map((query) => query.state.data && query.state.data.goods).find(Boolean);
+        if (goods) {
+          return {
+            name: goods.name || null,
+            brand: (goods.brand && goods.brand.name) || (goods.market && goods.market.name) || null,
+            price: goods.price ?? null,
+          };
+        }
+      } catch (error) {}
+    }
     if (location.hostname.endsWith("zigzag.kr") && next) {
       try {
         const queries = JSON.parse(next.textContent).props.pageProps.dehydratedState.queries;
