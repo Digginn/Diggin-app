@@ -707,3 +707,108 @@ test("컬리는 페이지 데이터에서 상품명·판매가·브랜드를 읽
   assert.equal(values.price, "3990", "정가가 아니라 판매가를 쓴다");
   assert.equal(values.brand, "Dole", "판매자(컬리)가 아니라 브랜드를 쓴다");
 });
+
+test("전용 처리가 없는 쇼핑몰도 표준 형식(ProductGroup·priceSpecification·할인가 메타·마이크로데이터·eg: 메타)에서 가격과 브랜드를 읽는다", () => {
+  const read = ({ metas = {}, lds = [], microdata = null }) => {
+    const sent = [];
+    const element = (attributes, children = {}) => ({
+      getAttribute: (name) => attributes[name] ?? null,
+      textContent: attributes.text ?? "",
+      querySelector: (selector) => children[/"([^"]+)"/.exec(selector)[1]] ?? null,
+    });
+    runInNewContext(PRODUCT_PAGE_SCRIPT, {
+      window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+      document: {
+        readyState: "complete",
+        querySelector: (selector) => {
+          if (selector.includes("itemtype")) {
+            return microdata
+              ? element(
+                  {},
+                  {
+                    price: element({ content: microdata.price }),
+                    priceCurrency: element({ content: microdata.currency }),
+                    brand: element({}, { name: element({ text: microdata.brand }) }),
+                  },
+                )
+              : null;
+          }
+          const all = {
+            "og:title": "상품",
+            "og:image": "https://shop.example.com/a.jpg",
+            ...metas,
+          };
+          const key = /"([^"]+)"/.exec(selector)[1];
+          return all[key] ? { getAttribute: () => all[key] } : null;
+        },
+        querySelectorAll: (selector) =>
+          selector.includes("ld+json")
+            ? lds.map((ld) => ({ textContent: JSON.stringify(ld) }))
+            : [],
+        getElementById: () => null,
+      },
+      location: { href: "https://shop.example.com/p/1", hostname: "shop.example.com", search: "" },
+      URLSearchParams,
+      Date,
+      JSON,
+      setInterval: () => 1,
+      clearInterval: () => {},
+    });
+    return normalizeProductPage(sent[0], "https://shop.example.com/p/1").values;
+  };
+
+  const group = read({
+    lds: [
+      {
+        "@type": "ProductGroup",
+        "name": "울 니트",
+        "brand": [{ "@type": "Brand", "name": "브랜드A" }],
+        "hasVariant": [{ "@type": "Product", "offers": { price: "39000", priceCurrency: "KRW" } }],
+      },
+    ],
+  });
+  assert.equal(group.price, "39000", "옵션 묶음 상품은 첫 옵션 가격을 쓴다");
+  assert.equal(group.brand, "브랜드A", "브랜드가 배열이어도 읽는다");
+
+  const spec = read({
+    lds: [
+      {
+        "@type": "Product",
+        "name": "셔츠",
+        "offers": { priceSpecification: { price: 29000, priceCurrency: "KRW" } },
+      },
+    ],
+  });
+  assert.equal(spec.price, "29000");
+
+  const sale = read({
+    metas: {
+      "product:price:amount": "50000",
+      "product:price:currency": "KRW",
+      "product:sale_price:amount": "35000",
+      "product:sale_price:currency": "KRW",
+    },
+  });
+  assert.equal(sale.price, "35000", "정가 메타보다 할인가 메타를 먼저 쓴다");
+
+  const microdata = read({ microdata: { price: "12000", currency: "KRW", brand: "브랜드B" } });
+  assert.equal(microdata.price, "12000");
+  assert.equal(microdata.brand, "브랜드B");
+  assert.equal(
+    read({ microdata: { price: "15", currency: "USD", brand: "B" } }).price,
+    "",
+    "원화가 아닌 마이크로데이터 가격은 버린다",
+  );
+
+  const eg = read({ metas: { "eg:brandName": "브랜드C", "eg:salePrice": "8900" } });
+  assert.equal(eg.price, "8900");
+  assert.equal(eg.brand, "브랜드C");
+
+  const ldFirst = read({
+    lds: [
+      { "@type": "Product", "name": "가방", "offers": { price: "70000", priceCurrency: "KRW" } },
+    ],
+    metas: { "eg:salePrice": "1" },
+  });
+  assert.equal(ldFirst.price, "70000", "더 정확한 JSON-LD가 있으면 eg: 메타보다 먼저 쓴다");
+});
