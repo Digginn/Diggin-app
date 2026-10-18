@@ -43,13 +43,11 @@ export function ItemSaveFlow({ itemSave }: ItemSaveFlowProps) {
             : undefined
         }
         onSubmit={(values) =>
-          save.mutate(values, {
-            onSuccess: ({ isDuplicate }) => {
-              if (isDuplicate) return;
-              itemSave.close();
-              showToast(TOAST_MESSAGES.SAVE_011);
-              router.navigate("/all");
-            },
+          save.mutateAsync(values).then(({ isDuplicate }) => {
+            if (isDuplicate) return;
+            itemSave.close();
+            showToast(TOAST_MESSAGES.SAVE_011);
+            router.navigate("/all");
           })
         }
       />
