@@ -24,7 +24,6 @@ type FolderManageSheetProps = {
   completeLabel?: string;
   onBack?: () => void;
   backLabel?: string;
-  /** 저장 요청 중에는 완료 버튼을 다시 누르지 못하게 막는다. */
   isCompleting?: boolean;
   /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
   errorMessage?: string;

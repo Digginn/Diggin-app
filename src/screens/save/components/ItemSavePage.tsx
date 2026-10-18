@@ -82,7 +82,6 @@ export function ItemSavePage({
     onRequestClose();
   }
 
-  // 뒤로가기는 작성 중인 내용이 있으면 버릴지 묻는다.
   function requestClose() {
     if (!isDirty) return close();
     setOverlay(null);
