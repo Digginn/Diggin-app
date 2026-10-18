@@ -55,6 +55,8 @@ class LargeSecureStore {
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabasePublishableKey, {
+  // 클라이언트 자체 재시도(1·2·4초)가 TanStack Query 재시도와 겹쳐 실패 화면이 17초 걸렸다. 재시도는 queryClient에서만 한다.
+  db: { retry: false },
   auth: {
     // 웹은 SecureStore가 없어 기본 저장소를 쓴다.
     storage: Platform.OS === "web" ? undefined : new LargeSecureStore(),

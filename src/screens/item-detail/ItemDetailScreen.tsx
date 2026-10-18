@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconBack } from "@/assets/images/appbar";
@@ -16,47 +16,38 @@ import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
 import { WishLevel } from "@/components/WishLevel";
 import { STATE_MESSAGES, TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
+import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
+import { useFolders } from "@/hooks/useFolders";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useToast } from "@/hooks/useToast";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { EditChip } from "./components/EditChip";
 import { FolderManageButton } from "./components/FolderManageButton";
-import { FolderManageSheet, type ManagedFolder } from "./components/FolderManageSheet";
+import { FolderManageSheet } from "./components/FolderManageSheet";
 import { ItemEditSheet } from "./components/ItemEditSheet";
 import { ItemInfo } from "./components/ItemInfo";
 import { RecommendSection } from "./components/RecommendSection";
 import { VotePrompt } from "./components/VotePrompt";
+import { useIsImageDark } from "./hooks/useIsImageDark";
+import { useSaveProductFolders } from "./mutations/useSaveProductFolders";
 import { useUpdateProduct } from "./mutations/useUpdateProduct";
 import { useProduct } from "./queries/useProduct";
+import { useProductFolderIds } from "./queries/useProductFolderIds";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 const ShareIcon = cssInterop(ShareSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
 
+// HERO_FRAME의 높이와 같아야 한다. 뒤로가기 뒤 밝기를 잴 때 쓴다.
+const HERO_HEIGHT = 520;
 const HERO_FRAME = "h-[520px] w-full bg-gray-10 ";
 
 // MVP 에서 추천 아이템을 빼기로 하면서 그만큼 이미지가 커졌다.
 // 다시 넣을 때 true 로 바꾸면 된다.
 const SHOWS_RECOMMEND = false;
-
-// TODO: 폴더 목록 API 연결 전까지 쓰는 임시 값.
-const MOCK_FOLDERS: ManagedFolder[] = [
-  { id: "owned", name: "나의 소장템", isOwnedItems: true },
-  ...[
-    "바지",
-    "여름휴가때입을거",
-    "출근룩",
-    "선물 리스트",
-    "운동복",
-    "홈카페",
-    "겨울 코트",
-    "생일 선물",
-    "등산",
-  ].map((name, index) => ({ id: `folder-${index}`, name })),
-];
 
 const EMPTY_LEVELS: WishLevelCounts = { high: 0, medium: 0, low: 0 };
 
@@ -87,10 +78,30 @@ export function ItemDetailScreen() {
   const [editError, setEditError] = useState<string>();
   const [bottomHeight, setBottomHeight] = useState(0);
   const [isFolderOpen, setFolderOpen] = useState(false);
-  // TODO: 저장 여부는 API 연결 시 서버 값으로 바꾼다.
-  const [folders, setFolders] = useState(MOCK_FOLDERS);
-  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
+  const folders = useFolders();
+  const folderIds = useProductFolderIds(id);
+  const createFolder = useCreateFolder();
+  const saveFolders = useSaveProductFolders(id);
   const thumbnail = item?.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
+  const { width: windowWidth } = useWindowDimensions();
+  const isBackAreaDark = useIsImageDark(
+    thumbnail,
+    { width: windowWidth, height: HERO_HEIGHT },
+    { x: 0, y: insets.top, width: 48, height: 48 },
+  );
+
+  async function openFolderSheet() {
+    const [folderResult, folderIdsResult] = await Promise.all([
+      folders.data ? folders : folders.refetch(),
+      folderIds.data ? folderIds : folderIds.refetch(),
+    ]);
+    if (!folderResult.data || !folderIdsResult.data) {
+      showToast(TOAST_MESSAGES.SYS_001);
+      return;
+    }
+    saveFolders.reset();
+    setFolderOpen(true);
+  }
 
   if (product.isError) {
     return (
@@ -147,7 +158,13 @@ export function ItemDetailScreen() {
               accessibilityLabel="뒤로 가기"
               onPress={() => router.back()}
               disabled={isEditOpen || isFolderOpen}
-              className={isEditOpen || isFolderOpen ? "text-gray-400" : "text-gray-900"}
+              className={
+                isEditOpen || isFolderOpen
+                  ? "text-gray-400"
+                  : isBackAreaDark
+                    ? "text-gray-0"
+                    : "text-gray-900"
+              }
             />
           </View>
 
@@ -240,21 +257,21 @@ export function ItemDetailScreen() {
         }
       />
 
-      {isFolderOpen && (
+      {isFolderOpen && folders.data && folderIds.data && (
         <FolderManageSheet
-          folders={folders}
-          selectedFolderIds={selectedFolderIds}
+          folders={folders.data}
+          selectedFolderIds={folderIds.data}
           onClose={() => setFolderOpen(false)}
-          onCreateFolder={(name) => {
-            const folder = { id: `created-${Date.now()}`, name };
-            setFolders((previous) => [folder, ...previous]);
-            return folder;
-          }}
-          onComplete={(ids) => {
-            setSelectedFolderIds(ids);
-            setFolderOpen(false);
-            showToast(selectFolderSavedMessage(ids.length));
-          }}
+          onCreateFolder={(name) => createFolder.mutateAsync(name)}
+          isCompleting={saveFolders.isPending}
+          errorMessage={saveFolders.isError ? TOAST_MESSAGES.SYS_002 : undefined}
+          onErrorDismiss={saveFolders.reset}
+          onComplete={(ids) =>
+            saveFolders.mutateAsync(ids).then(() => {
+              setFolderOpen(false);
+              showToast(selectFolderSavedMessage(ids.length));
+            })
+          }
         />
       )}
 
@@ -279,8 +296,8 @@ export function ItemDetailScreen() {
           </View>
           <View className="flex-1">
             <FolderManageButton
-              folderCount={selectedFolderIds.length}
-              onPress={() => setFolderOpen(true)}
+              folderCount={folderIds.data?.length ?? 0}
+              onPress={openFolderSheet}
             />
           </View>
         </View>

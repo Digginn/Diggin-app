@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(39);
+select plan(50);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'a@test.dev'),
@@ -107,10 +107,14 @@ select throws_ok(
   $$ update public.products set wish_level = 'low' $$,
   'P0001', 'owned_product_wish_level', '소장템 상품에는 위시레벨을 넣을 수 없다'
 );
-select throws_ok(
-  $$ select public.set_owned((select id from public.products), false) $$,
-  '22023', 'wish_level_required', '소장 해제는 새 위시레벨이 있어야 한다'
+select lives_ok($$ select public.set_owned((select id from public.products), false) $$, '위시레벨 없이 소장을 해제할 수 있다');
+select is(
+  (select row(p.wish_level is null, (select count(*) from public.product_folders pf join public.folders f on f.id = pf.folder_id where f.kind = 'owned'))::text
+   from public.products p),
+  row(true, 0::bigint)::text,
+  '위시레벨 없이 해제하면 미선택으로 두고 소장템에서 뺀다'
 );
+select lives_ok($$ select public.set_owned((select id from public.products), true) $$, '다시 소장템에 넣는다');
 select lives_ok($$ select public.set_owned((select id from public.products), false, true, 'medium') $$, '새 위시레벨로 소장을 해제한다');
 select is(
   (select row(p.wish_level, (select count(*) from public.product_folders pf join public.folders f on f.id = pf.folder_id where f.kind = 'owned'))::text
@@ -130,6 +134,52 @@ select is(
      array[(select id from public.folders where kind = 'owned')]) s on s.product_id = p.id),
   null,
   '저장할 때 소장템을 고르면 위시레벨을 비운다'
+);
+
+-- PDT-003·008 폴더 관리 시트의 최종 선택을 한 번에 반영한다
+select set_config('test.p1', (select id::text from public.products where url = 'https://shop.com/p/1'), true);
+select lives_ok(
+  $$ select public.set_product_folders(current_setting('test.p1')::bigint,
+       array(select id from public.folders where name in ('바지', '상의'))) $$,
+  '최종 폴더 목록으로 바꿀 수 있다'
+);
+select is(
+  (select array_agg(f.name order by f.name) from public.product_folders pf
+   join public.folders f on f.id = pf.folder_id where pf.product_id = current_setting('test.p1')::bigint),
+  array['바지', '상의'],
+  '목록에 있는 일반 폴더만 남고 빠진 나의 소장템은 해제된다'
+);
+select lives_ok(
+  $$ select public.set_product_folders(current_setting('test.p1')::bigint,
+       array(select id from public.folders where kind = 'owned' or name = '상의')) $$,
+  '나의 소장템을 포함해 바꿀 수 있다'
+);
+select is(
+  (select row(
+     (select array_agg(f.kind::text || ':' || f.name order by f.name) from public.product_folders pf
+      join public.folders f on f.id = pf.folder_id where pf.product_id = p.id),
+     p.wish_level is null)::text
+   from public.products p where p.id = current_setting('test.p1')::bigint),
+  row(array['owned:나의 소장템', 'custom:상의'], true)::text,
+  '나의 소장템은 set_owned 규칙대로 넣고 위시레벨을 비운다'
+);
+select throws_ok(
+  $$ select public.set_product_folders(current_setting('test.p1')::bigint, array[-1::bigint]) $$,
+  '22023', 'folder_not_found', '없는 폴더가 섞이면 거부한다'
+);
+select is(
+  (select count(*) from public.product_folders where product_id = current_setting('test.p1')::bigint),
+  2::bigint,
+  '거부하면 아무것도 바뀌지 않는다'
+);
+select lives_ok(
+  $$ select public.set_product_folders(current_setting('test.p1')::bigint, '{}') $$,
+  '빈 목록이면 모든 폴더에서 뺀다'
+);
+select is(
+  (select count(*) from public.product_folders where product_id = current_setting('test.p1')::bigint),
+  0::bigint,
+  '폴더 없이 ALL에만 남는다'
 );
 
 select set_config('test.a_folder', (select id::text from public.folders where name = '상의'), true);
@@ -152,6 +202,10 @@ select throws_ok(
 select throws_ok(
   $$ select public.set_owned(current_setting('test.a_product')::bigint, true) $$,
   '22023', 'product_not_found', '남의 상품은 소장 처리할 수 없다'
+);
+select throws_ok(
+  $$ select public.set_product_folders(current_setting('test.a_product')::bigint, '{}') $$,
+  '22023', 'product_not_found', '남의 상품의 폴더는 바꿀 수 없다'
 );
 delete from public.products;
 reset role;

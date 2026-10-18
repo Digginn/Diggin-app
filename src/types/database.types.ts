@@ -301,6 +301,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      set_product_folders: {
+        Args: { folder_ids: number[]; target_product_id: number };
+        Returns: undefined;
+      };
       update_nickname: { Args: { new_nickname: string }; Returns: string };
     };
     Enums: {

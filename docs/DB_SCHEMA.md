@@ -112,7 +112,8 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 - 입력 검사 `private.product_input_error(url, name, brand, price)`: `invalid_url | name_required | name_too_long | brand_too_long | invalid_price` 중 하나 또는 null. 저장과 CSV 가져오기가 같은 함수로 검사한다. 상한을 넘는 자동 추출·CSV 값은 호출하는 쪽이 잘라서 넘긴다.
 - 정규화 트리거: 링크는 앞뒤 공백 제거, 상품명·브랜드는 NFC + 앞뒤 공백 제거, 빈 브랜드는 null.
 - `save_product(url, name, brand?, price?, image_url?, wish_level?, folder_ids?)` → `(product_id, is_duplicate)`. 같은 링크면 저장하지 않고 기존 상품 id와 `is_duplicate = true`를 돌려준다(SAVE-012). 입력 오류는 `22023` 예외(메시지가 위 오류 코드). 나의 소장템을 같이 고르면 위시레벨을 비운다.
-- `set_owned(product_id, is_owned, keep_other_folders = true, new_wish_level?)`: 소장 추가 시 위시레벨을 비우고 나의 소장템에 담는다. `keep_other_folders = false`면 다른 폴더에서 뺀다(MSG-PDT-009). 해제는 `new_wish_level`이 필수(`wish_level_required`).
+- `set_owned(product_id, is_owned, keep_other_folders = true, new_wish_level?)`: 소장 추가 시 위시레벨을 비우고 나의 소장템에 담는다. `keep_other_folders = false`면 다른 폴더에서 뺀다(MSG-PDT-009). 해제할 때 `new_wish_level`을 안 넘기면 위시레벨 미선택(null)으로 둔다(10/17 결정, PDT-008 필수 여부는 PM 확인 중).
+- `set_product_folders(product_id, folder_ids)`: 폴더 관리 시트의 최종 선택을 한 트랜잭션으로 반영한다. 상품 행을 잠그고, 내 폴더가 아니면 `folder_not_found`로 아무것도 바꾸지 않는다. 나의 소장템이 바뀌면 `set_owned` 규칙을 따른다.
 - product_folders: 앱은 일반 폴더만 직접 담기(insert)·빼기(delete). 나의 소장템은 `set_owned`로만. 담으면 `folders.last_added_at`을 담은 시각으로 바꾸고, 빼도 되돌리지 않는다.
 - 소장템 상품에 위시레벨을 넣거나, 위시레벨 있는 상품을 소장템에 담으면 `owned_product_wish_level`(P0001)로 막는다.
 
