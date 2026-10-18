@@ -102,7 +102,8 @@ export function ItemSavePage({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={requestClose}>
-      <View className="flex-1 bg-gray-0" style={{ paddingTop: insets.top }}>
+      {/* AppBar가 상태 표시줄 높이만큼 위 여백을 이미 넣는다. */}
+      <View className="flex-1 bg-gray-0">
         <AppBar title="아이템 정보 수정" onBack={requestClose} isDisabled={isFolderOpen} />
 
         <KeyboardAvoidingView
