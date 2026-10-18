@@ -1,4 +1,4 @@
-import { useNavigation, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useLayoutEffect, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
@@ -39,6 +39,14 @@ export function AllScreen() {
   const guide = useFirstVisitGuide("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
   const [wishLevel, setWishLevel] = useState<WishLevelKey | null>(null);
+  // 저장 직후 들어오면 오래된 순·다른 위시레벨 필터에 가려 새 아이템이 안 보일 수 있어 기본으로 되돌린다.
+  const { savedAt } = useLocalSearchParams<{ savedAt?: string }>();
+  const [handledSavedAt, setHandledSavedAt] = useState(savedAt);
+  if (savedAt !== handledSavedAt) {
+    setHandledSavedAt(savedAt);
+    setSortOrder("latest");
+    setWishLevel(null);
+  }
 
   const list = useProductList(sortOrder, wishLevel);
   const counts = useProductCounts();
@@ -151,6 +159,8 @@ export function AllScreen() {
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
         <WishItemGrid
+          // 저장 직후에는 새로 그려 맨 위부터 보여 준다.
+          key={savedAt}
           items={items}
           isLoading={list.isPending}
           onEndReached={() => {
