@@ -90,7 +90,6 @@ export function ItemDetailScreen() {
     { x: 0, y: insets.top, width: 48, height: 48 },
   );
 
-  // 처음 조회가 실패했으면 시트를 열 때 다시 불러온다. 그래도 실패하면 열 수 없어 알린다.
   async function openFolderSheet() {
     const [folderResult, folderIdsResult] = await Promise.all([
       folders.data ? folders : folders.refetch(),
@@ -265,7 +264,6 @@ export function ItemDetailScreen() {
           onClose={() => setFolderOpen(false)}
           onCreateFolder={(name) => createFolder.mutateAsync(name)}
           isCompleting={saveFolders.isPending}
-          // 시트가 네이티브 모달이라 바깥 토스트는 가려진다.
           errorMessage={saveFolders.isError ? TOAST_MESSAGES.SYS_002 : undefined}
           onErrorDismiss={saveFolders.reset}
           onComplete={(ids) =>
