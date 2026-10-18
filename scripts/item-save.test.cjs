@@ -149,3 +149,87 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   assert.equal(requiredCount(), 1);
   assert.equal(saveButton().props.isDisabled, true);
 });
+
+test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목록을 맨 위부터 다시 그린다", () => {
+  const state = [];
+  let cursor = 0;
+  let params = {};
+  const listArgs = [];
+  const { AllScreen } = load("../src/screens/all/AllScreen.tsx", {
+    "react": {
+      useLayoutEffect: () => {},
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [
+          state[index],
+          (next) => {
+            state[index] = typeof next === "function" ? next(state[index]) : next;
+          },
+        ];
+      },
+    },
+    "react-native": { Platform: { OS: "ios" }, Pressable: "Pressable", Text: "Text", View: "View" },
+    "expo-router": {
+      useLocalSearchParams: () => params,
+      useNavigation: () => ({ setOptions: () => {} }),
+      useRouter: () => ({ push: () => {} }),
+    },
+    "@/assets/images/appbar": { IconNotification: "IconNotification", IconSearch: "IconSearch" },
+    "@/components/app-bar": { AppBar: Object.assign(() => null, { IconButton: "IconButton" }) },
+    "@/components/EmptyState": { EmptyState: "EmptyState" },
+    "@/components/ErrorState": { ErrorState: "ErrorState" },
+    "@/components/FirstVisitGuide": { FirstVisitGuide: "FirstVisitGuide" },
+    "@/components/ItemSaveFlow": { ItemSaveFlow: "ItemSaveFlow" },
+    "@/components/modal": { ActionModal: "ActionModal" },
+    "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
+    "@/components/WishLevel": { WishLevel: "WishLevel" },
+    "@/constants/messages": {
+      selectDeletedMessage: () => "",
+      STATE_MESSAGES: {},
+      TOAST_MESSAGES: {},
+    },
+    "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: false }) },
+    "@/hooks/useItemSave": { useItemSave: () => ({ start: () => {} }) },
+    "@/hooks/useProductCounts": {
+      useProductCounts: () => ({
+        isPending: false,
+        data: { total: 1, levels: { high: 0, medium: 0, low: 0 } },
+      }),
+    },
+    "@/hooks/useProductList": {
+      useProductList: (sortOrder, wishLevel) => {
+        listArgs.push([sortOrder, wishLevel]);
+        return { isPending: false, data: { pages: [[{ id: "1", name: "아이템", price: 0 }]] } };
+      },
+    },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/screens/save/components/ItemLinkSheet": { ItemLinkSheet: "ItemLinkSheet" },
+    "./components/DeleteBar": { DeleteBar: "DeleteBar" },
+    "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
+    "./components/SortLabel": { SortLabel: "SortLabel" },
+    "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
+  });
+  const render = () => {
+    cursor = 0;
+    return nodes(AllScreen()).find((node) => node.type === "WishItemGrid");
+  };
+  const header = (grid, type) => nodes(grid.props.header).find((node) => node.type === type);
+
+  let grid = render();
+  header(grid, "SortLabel").props.onChange("oldest");
+  header(grid, "WishLevel").props.onSelect("high");
+  render();
+  assert.deepEqual(listArgs.at(-1), ["oldest", "high"]);
+
+  params = { savedAt: "1" };
+  // React는 렌더 중 상태를 바꾸면 바로 다시 그린다.
+  render();
+  grid = render();
+  assert.deepEqual(listArgs.at(-1), ["latest", null]);
+  assert.equal(grid.key, ".$1", "저장마다 목록을 새로 그려 맨 위부터 보인다");
+
+  header(grid, "SortLabel").props.onChange("oldest");
+  render();
+  assert.deepEqual(listArgs.at(-1), ["oldest", null], "같은 저장 신호로는 다시 되돌리지 않는다");
+});
