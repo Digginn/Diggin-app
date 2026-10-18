@@ -576,3 +576,51 @@ test("올리브영은 늦게 붙는 eg: 메타를 기다렸다가 브랜드와 �
   assert.equal(values.brand, "웨이크메이크");
   assert.equal(values.price, "23800");
 });
+
+test("4910은 페이지 데이터에서 상품명·판매가·브랜드를 읽고 판매처는 브랜드가 없을 때만 쓴다", () => {
+  const run = (goods) => {
+    const sent = [];
+    const nextData = {
+      props: { serverQueryClient: { queries: [{ state: { data: { goods } } }] } },
+    };
+    runInNewContext(PRODUCT_PAGE_SCRIPT, {
+      window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+      document: {
+        readyState: "complete",
+        querySelector: (selector) => {
+          const metas = {
+            "og:title": "어그 [어그] UGG 클래식 울트라 미니 - 4910 | 사고 싶은 스타일의 발견",
+            "og:image": "https://d3ha2047wt6x28.cloudfront.net/a.jpg",
+          };
+          const key = /"([^"]+)"/.exec(selector)[1];
+          return metas[key] ? { getAttribute: () => metas[key] } : null;
+        },
+        querySelectorAll: () => [],
+        getElementById: (id) =>
+          id === "__NEXT_DATA__" ? { textContent: JSON.stringify(nextData) } : null,
+      },
+      location: { href: "https://4910.kr/goods/29393250", hostname: "4910.kr", search: "" },
+      URLSearchParams,
+      Date,
+      JSON,
+      setInterval: () => 1,
+      clearInterval: () => {},
+    });
+    return normalizeProductPage(sent[0], "https://4910.kr/goods/29393250").values;
+  };
+
+  const values = run({
+    name: "[어그] UGG 클래식 울트라 미니",
+    price: 195000,
+    linked_option: { original_price: 258000 },
+    brand: { name: "어그" },
+    market: { name: "한아아이앤티" },
+  });
+  assert.equal(values.name, "[어그] UGG 클래식 울트라 미니");
+  assert.equal(values.price, "195000", "정가가 아니라 판매가를 쓴다");
+  assert.equal(values.brand, "어그", "판매처가 아니라 브랜드를 쓴다");
+  assert.equal(
+    run({ name: "니트", price: 30000, brand: null, market: { name: "데일리룩" } }).brand,
+    "데일리룩",
+  );
+});
