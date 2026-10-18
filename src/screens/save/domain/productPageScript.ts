@@ -114,6 +114,19 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
         }
       } catch (error) {}
     }
+    // 컬리도 공개 메타에 가격·브랜드가 없다. 판매가(salesPrice)는 정가(basePrice)에서 할인을 뺀 값이다.
+    if (location.hostname.endsWith("kurly.com") && next) {
+      try {
+        const product = JSON.parse(next.textContent).props.pageProps.product;
+        if (product && product.name) {
+          const brand =
+            (product.brandInfo && product.brandInfo.nameGate && product.brandInfo.nameGate.name) ||
+            null;
+          const prices = product.showablePrices || {};
+          return { name: product.name, brand, price: prices.salesPrice ?? prices.basePrice ?? null };
+        }
+      } catch (error) {}
+    }
     if (location.hostname.endsWith("zigzag.kr") && next) {
       try {
         const queries = JSON.parse(next.textContent).props.pageProps.dehydratedState.queries;
