@@ -32,6 +32,7 @@ const og = (fields = {}) => ({
   image: null,
   url: null,
   siteName: null,
+  brand: null,
   price: null,
   currency: null,
   ...fields,
@@ -270,4 +271,72 @@ test("광고 추적값만 떼고 상품을 가르는 쿼리 값은 남긴다", (
     stripTrackingParams("https://shop.example.com/p?option=red&size=M"),
     "https://shop.example.com/p?option=red&size=M",
   );
+});
+
+test("에이블리처럼 product:brand 메타만 있어도 브랜드를 채우고 공유 링크 추적값을 뗀다", () => {
+  const { values } = normalizeProductPage(
+    {
+      finalUrl:
+        "https://mobile.a-bly.com/goods/49239624?tracking_content=68e71e0e15ca83&utm_source=web&https_deeplink=true&short_id=0jn04fd&airbridge_referrer=x",
+      og: og({
+        title: "피프틴 셔링 퍼프 블라우스",
+        image: "https://d3ha2047wt6x28.cloudfront.net/a.gif",
+        brand: "제이닝",
+        price: "10,970",
+        currency: "KRW",
+      }),
+      ld: null,
+      shop: null,
+    },
+    "https://applink.a-bly.com/0jn04fd",
+  );
+  assert.equal(values.brand, "제이닝");
+  assert.equal(values.price, "10970");
+  assert.equal(values.sourceUrl, "https://mobile.a-bly.com/goods/49239624");
+});
+
+test("앱 공유 링크의 중간 페이지에서는 제목·이미지가 있어도 끝내지 않고 상품 페이지를 기다린다", () => {
+  const sent = [];
+  const metas = {
+    "og:title": "피프틴 셔링 퍼프 블라우스",
+    "og:image": "https://cdn.example.com/a.gif",
+  };
+  const run = (hostname, now) =>
+    runInNewContext(PRODUCT_PAGE_SCRIPT, {
+      window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+      document: {
+        querySelector: (selector) => {
+          const key = /"([^"]+)"/.exec(selector)[1];
+          return metas[key] ? { getAttribute: () => metas[key] } : null;
+        },
+        querySelectorAll: () => [],
+        getElementById: () => null,
+      },
+      location: { href: `https://${hostname}/goods/1`, hostname },
+      Date: { now },
+      JSON,
+      setInterval: () => 1,
+      clearInterval: () => {},
+    });
+  run("ably.airbridge.io", () => 0);
+  run("applink.a-bly.com", () => 0);
+  assert.equal(sent.length, 0, "중간 페이지에서는 바로 보내지 않는다");
+  run("mobile.a-bly.com", () => 0);
+  assert.equal(sent.length, 1, "상품 페이지에서는 바로 보낸다");
+});
+
+test("사이트 이름 메타가 없어도 알려진 쇼핑몰 이름만 제목 끝에서 떼고 색상 같은 상품명 일부는 남긴다", () => {
+  const name = (title) =>
+    normalizeProductPage(
+      {
+        finalUrl: "https://shop.example.com/p",
+        og: og({ title, image: "https://cdn.example.com/a.jpg" }),
+        ld: null,
+        shop: null,
+      },
+      "https://shop.example.com/p",
+    ).values.name;
+  assert.equal(name("피프틴 셔링 퍼프 블라우스 - 에이블리"), "피프틴 셔링 퍼프 블라우스");
+  assert.equal(name("와플 반팔 저지 - 블랙"), "와플 반팔 저지 - 블랙");
+  assert.equal(name("번개장터"), "");
 });
