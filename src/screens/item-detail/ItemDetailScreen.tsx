@@ -82,7 +82,6 @@ export function ItemDetailScreen() {
   const folderIds = useProductFolderIds(id);
   const createFolder = useCreateFolder();
   const saveFolders = useSaveProductFolders(id);
-  const ownedFolderId = folders.data?.find((folder) => folder.isOwnedItems)?.id;
   const thumbnail = item?.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
   const { width: windowWidth } = useWindowDimensions();
   const isBackAreaDark = useIsImageDark(
@@ -90,6 +89,20 @@ export function ItemDetailScreen() {
     { width: windowWidth, height: HERO_HEIGHT },
     { x: 0, y: insets.top, width: 48, height: 48 },
   );
+
+  // 처음 조회가 실패했으면 시트를 열 때 다시 불러온다. 그래도 실패하면 열 수 없어 알린다.
+  async function openFolderSheet() {
+    const [folderResult, folderIdsResult] = await Promise.all([
+      folders.data ? folders : folders.refetch(),
+      folderIds.data ? folderIds : folderIds.refetch(),
+    ]);
+    if (!folderResult.data || !folderIdsResult.data) {
+      showToast(TOAST_MESSAGES.SYS_001);
+      return;
+    }
+    saveFolders.reset();
+    setFolderOpen(true);
+  }
 
   if (product.isError) {
     return (
@@ -245,23 +258,23 @@ export function ItemDetailScreen() {
         }
       />
 
-      {isFolderOpen && folders.data && folderIds.data && ownedFolderId && (
+      {isFolderOpen && folders.data && folderIds.data && (
         <FolderManageSheet
           folders={folders.data}
           selectedFolderIds={folderIds.data}
           onClose={() => setFolderOpen(false)}
           onCreateFolder={(name) => createFolder.mutateAsync(name)}
+          isCompleting={saveFolders.isPending}
+          // 시트가 네이티브 모달이라 바깥 토스트는 가려진다.
+          errorMessage={saveFolders.isError ? TOAST_MESSAGES.SYS_002 : undefined}
+          onErrorDismiss={saveFolders.reset}
           onComplete={(ids) =>
-            saveFolders.mutate(
-              { ownedFolderId, before: folderIds.data, after: ids },
-              {
-                onSuccess: () => {
-                  setFolderOpen(false);
-                  showToast(selectFolderSavedMessage(ids.length));
-                },
-                onError: () => showToast(TOAST_MESSAGES.SYS_002),
+            saveFolders.mutate(ids, {
+              onSuccess: () => {
+                setFolderOpen(false);
+                showToast(selectFolderSavedMessage(ids.length));
               },
-            )
+            })
           }
         />
       )}
@@ -288,7 +301,7 @@ export function ItemDetailScreen() {
           <View className="flex-1">
             <FolderManageButton
               folderCount={folderIds.data?.length ?? 0}
-              onPress={() => setFolderOpen(true)}
+              onPress={openFolderSheet}
             />
           </View>
         </View>
