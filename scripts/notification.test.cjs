@@ -76,7 +76,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "@/assets/images/folder/icon-folder-plus.svg": "PlusIcon",
     "@/assets/images/folder/image-fab-glow.svg": "FabGlow",
     "@/screens/save/components/ItemLinkSheet": { ItemLinkSheet: "ItemLinkSheet" },
-    "@/screens/item-detail/components/ItemEditSheet": { ItemEditSheet: "ItemEditSheet" },
+    "@/components/ItemSaveFlow": { ItemSaveFlow: "ItemSaveFlow" },
     "@/hooks/useItemSave": {
       useItemSave: () => ({
         values: null,

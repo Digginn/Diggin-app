@@ -27,13 +27,14 @@ function load(file, mocks) {
   return module.exports;
 }
 
-test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가격은 선택값이고 숫자만 저장한다", () => {
+test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가격은 선택값이고 숫자만 저장한다", async () => {
   const state = [];
+  const submittingRef = { current: false };
   let cursor = 0;
   const saved = [];
   const { ItemEditSheet } = load("../src/screens/item-detail/components/ItemEditSheet.tsx", {
     "react": {
-      useRef: (initial) => ({ current: initial }),
+      useRef: (initial) => (initial === false ? submittingRef : { current: initial }),
       useState: (initial) => {
         const index = cursor++;
         if (!(index in state)) state[index] = initial;
@@ -63,7 +64,7 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
     "../utils/formatPriceInput": load("../src/screens/item-detail/utils/formatPriceInput.ts", {}),
   });
 
-  const render = () => {
+  const render = (props = {}) => {
     cursor = 0;
     return nodes(
       ItemEditSheet({
@@ -78,6 +79,7 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
         },
         onSubmit: (values) => saved.push(values),
         onRequestClose() {},
+        ...props,
       }),
     );
   };
@@ -92,20 +94,142 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   assert.ok(!priceField().props.isError, "가격이 비어도 오류가 아니다");
   assert.equal(requiredCount(), 0);
   assert.equal(saveButton().props.isDisabled, false);
-  saveButton().props.onPress();
+  await saveButton().props.onPress();
   assert.equal(saved.at(-1).price, "", "빈 가격은 빈 값으로 넘겨 null로 저장한다");
 
   priceField().props.onChangeText("70,000원");
   assert.equal(priceField().props.value, "70,000", "숫자만 남기고 쉼표를 찍는다");
-  saveButton().props.onPress();
+  await saveButton().props.onPress();
   assert.equal(saved.at(-1).price, "70000", "저장 값은 쉼표 없는 숫자다");
 
   priceField().props.onChangeText("0");
-  saveButton().props.onPress();
+  await saveButton().props.onPress();
   assert.equal(saved.at(-1).price, "0");
+
+  // 저장 응답 전 연타와 취소·끌어내리기는 막고, 끝나면 풀린다. 실패해도 풀린다.
+  let submitCount = 0;
+  let closeCount = 0;
+  let finishSave;
+  const saving = {
+    onSubmit: () => {
+      submitCount += 1;
+      return new Promise((resolve) => {
+        finishSave = resolve;
+      });
+    },
+    onRequestClose: () => {
+      closeCount += 1;
+    },
+  };
+  const button = (tree, label) =>
+    tree.find((node) => node.type === "Button" && node.props.children === label);
+  let tree = render(saving);
+  const submitting = button(tree, "저장하기").props.onPress();
+  button(tree, "저장하기").props.onPress();
+  button(tree, "취소").props.onPress();
+  tree[0].props.onRequestClose();
+  assert.equal(submitCount, 1);
+  assert.equal(closeCount, 0);
+  finishSave();
+  await submitting;
+  button(render(saving), "취소").props.onPress();
+  assert.equal(closeCount, 1);
+  await button(
+    render({ onSubmit: () => Promise.reject(new Error("fail")) }),
+    "저장하기",
+  ).props.onPress();
+  assert.equal(submittingRef.current, false);
+  tree = render({ isSubmitting: true });
+  assert.equal(tree[0].props.isCloseConfirmed, true);
+  assert.equal(button(tree, "취소").props.isDisabled, true);
+  assert.equal(button(tree, "저장하기").props.isDisabled, true);
 
   nameField().props.onChangeText("   ");
   assert.equal(nameField().props.isError, true, "공백만 있는 아이템명은 빈 값이다");
   assert.equal(requiredCount(), 1);
   assert.equal(saveButton().props.isDisabled, true);
+});
+
+test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목록을 맨 위부터 다시 그린다", () => {
+  const state = [];
+  let cursor = 0;
+  let params = {};
+  const listArgs = [];
+  const { AllScreen } = load("../src/screens/all/AllScreen.tsx", {
+    "react": {
+      useLayoutEffect: () => {},
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [
+          state[index],
+          (next) => {
+            state[index] = typeof next === "function" ? next(state[index]) : next;
+          },
+        ];
+      },
+    },
+    "react-native": { Platform: { OS: "ios" }, Pressable: "Pressable", Text: "Text", View: "View" },
+    "expo-router": {
+      useLocalSearchParams: () => params,
+      useNavigation: () => ({ setOptions: () => {} }),
+      useRouter: () => ({ push: () => {} }),
+    },
+    "@/assets/images/appbar": { IconNotification: "IconNotification", IconSearch: "IconSearch" },
+    "@/components/app-bar": { AppBar: Object.assign(() => null, { IconButton: "IconButton" }) },
+    "@/components/EmptyState": { EmptyState: "EmptyState" },
+    "@/components/ErrorState": { ErrorState: "ErrorState" },
+    "@/components/FirstVisitGuide": { FirstVisitGuide: "FirstVisitGuide" },
+    "@/components/ItemSaveFlow": { ItemSaveFlow: "ItemSaveFlow" },
+    "@/components/modal": { ActionModal: "ActionModal" },
+    "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
+    "@/components/WishLevel": { WishLevel: "WishLevel" },
+    "@/constants/messages": {
+      selectDeletedMessage: () => "",
+      STATE_MESSAGES: {},
+      TOAST_MESSAGES: {},
+    },
+    "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: false }) },
+    "@/hooks/useItemSave": { useItemSave: () => ({ start: () => {} }) },
+    "@/hooks/useProductCounts": {
+      useProductCounts: () => ({
+        isPending: false,
+        data: { total: 1, levels: { high: 0, medium: 0, low: 0 } },
+      }),
+    },
+    "@/hooks/useProductList": {
+      useProductList: (sortOrder, wishLevel) => {
+        listArgs.push([sortOrder, wishLevel]);
+        return { isPending: false, data: { pages: [[{ id: "1", name: "아이템", price: 0 }]] } };
+      },
+    },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/screens/save/components/ItemLinkSheet": { ItemLinkSheet: "ItemLinkSheet" },
+    "./components/DeleteBar": { DeleteBar: "DeleteBar" },
+    "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
+    "./components/SortLabel": { SortLabel: "SortLabel" },
+    "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
+  });
+  const render = () => {
+    cursor = 0;
+    return nodes(AllScreen()).find((node) => node.type === "WishItemGrid");
+  };
+  const header = (grid, type) => nodes(grid.props.header).find((node) => node.type === type);
+
+  let grid = render();
+  header(grid, "SortLabel").props.onChange("oldest");
+  header(grid, "WishLevel").props.onSelect("high");
+  render();
+  assert.deepEqual(listArgs.at(-1), ["oldest", "high"]);
+
+  params = { savedAt: "1" };
+  // React는 렌더 중 상태를 바꾸면 바로 다시 그린다.
+  render();
+  grid = render();
+  assert.deepEqual(listArgs.at(-1), ["latest", null]);
+  assert.equal(grid.key, ".$1", "저장마다 목록을 새로 그려 맨 위부터 보인다");
+
+  header(grid, "SortLabel").props.onChange("oldest");
+  render();
+  assert.deepEqual(listArgs.at(-1), ["oldest", null], "같은 저장 신호로는 다시 되돌리지 않는다");
 });

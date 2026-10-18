@@ -57,7 +57,21 @@ function loadProductsApi(rows = [], counts = {}) {
     module,
     exports: module.exports,
     Promise,
-    require: (name) => (name === "@/lib/supabase" ? { supabase: { from: query } } : require(name)),
+    require: (name) =>
+      name === "@/lib/supabase"
+        ? {
+            supabase: {
+              from: query,
+              rpc: (fn, args) => {
+                calls.push({ rpc: fn, args });
+                return Promise.resolve({
+                  data: [{ product_id: 7, is_duplicate: rows.length > 0 }],
+                  error: null,
+                });
+              },
+            },
+          }
+        : require(name),
   });
   return { api: module.exports, calls };
 }
@@ -139,6 +153,46 @@ test("검색은 상품명·브랜드에서 찾고 개수도 같은 조건으로 
   assert.ok(calls.slice(1).every((call) => call.search === "name.ilike.%바지%,brand.ilike.%바지%"));
   await api.fetchProductPage({ sort: "latest", wishLevel: null, page: 0 });
   assert.equal(calls.at(-1).search, undefined, "검색어가 없으면 거르지 않는다");
+});
+
+test("저장은 빈 가격·이미지·위시레벨을 보내지 않아 null로 두고, 0원과 폴더 id는 숫자로 보낸다(SAVE-005·013)", async () => {
+  const { api, calls } = loadProductsApi();
+  const values = {
+    name: "바지",
+    brand: "",
+    price: "",
+    sourceUrl: "https://shop.com/a",
+    thumbnailUrl: null,
+    wishLevel: null,
+  };
+  const result = await api.saveProduct(values);
+  assert.equal(calls[0].rpc, "save_product");
+  assert.deepEqual(Object.keys(calls[0].args).sort(), [
+    "folder_ids",
+    "product_brand",
+    "product_name",
+    "product_url",
+  ]);
+  assert.equal(result.productId, "7");
+  assert.equal(result.isDuplicate, false);
+  await api.saveProduct({ ...values, price: "0", wishLevel: "high" }, ["3", "5"]);
+  assert.equal(calls[1].args.product_price, 0, "직접 입력한 0원은 0으로 보낸다");
+  assert.equal(calls[1].args.product_wish_level, "high");
+  assert.deepEqual([...calls[1].args.folder_ids], [3, 5]);
+});
+
+test("같은 링크면 저장하지 않았다는 표시와 기존 상품 id를 돌려준다(SAVE-012)", async () => {
+  const { api } = loadProductsApi([{}]);
+  const result = await api.saveProduct({
+    name: "바지",
+    brand: "",
+    price: "",
+    sourceUrl: "https://shop.com/a",
+    thumbnailUrl: null,
+    wishLevel: null,
+  });
+  assert.equal(result.isDuplicate, true);
+  assert.equal(result.productId, "7");
 });
 
 test("선택 삭제는 고른 상품 id를 숫자로 바꿔 한 번에 지운다", async () => {

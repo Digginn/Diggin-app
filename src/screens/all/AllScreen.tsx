@@ -1,6 +1,6 @@
-import { useNavigation, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useLayoutEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { IconNotification, IconSearch } from "@/assets/images/appbar";
 import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
@@ -9,17 +9,16 @@ import { AppBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
-import { LoadingDialog } from "@/components/Loading";
+import { ItemSaveFlow } from "@/components/ItemSaveFlow";
 import { ActionModal } from "@/components/modal";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
 import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
-import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
+import { useItemSave } from "@/hooks/useItemSave";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useProductList } from "@/hooks/useProductList";
 import { useToast } from "@/hooks/useToast";
-import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ItemLinkSheet } from "@/screens/save/components/ItemLinkSheet";
 import type { WishItem, WishLevelKey } from "@/types/wish-item";
 
@@ -40,6 +39,14 @@ export function AllScreen() {
   const guide = useFirstVisitGuide("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
   const [wishLevel, setWishLevel] = useState<WishLevelKey | null>(null);
+  // SAVE-014 저장 직후에는 새 아이템이 정렬·필터에 가려지지 않게 기본으로 되돌리고 목록을 맨 위부터 다시 그린다.
+  const { savedAt } = useLocalSearchParams<{ savedAt?: string }>();
+  const [handledSavedAt, setHandledSavedAt] = useState(savedAt);
+  if (savedAt !== handledSavedAt) {
+    setHandledSavedAt(savedAt);
+    setSortOrder("latest");
+    setWishLevel(null);
+  }
 
   const list = useProductList(sortOrder, wishLevel);
   const counts = useProductCounts();
@@ -55,6 +62,10 @@ export function AllScreen() {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [confirming, setConfirming] = useState<"cancel" | "delete" | null>(null);
   const [isLinkSheetOpen, setLinkSheetOpen] = useState(false);
+  // 열 때마다 입력을 비우려고 키를 바꾼다. 닫을 때 바꾸면 닫힘 애니메이션 없이 사라져 onDismiss 가 오지 않는다.
+  const [linkSheetKey, setLinkSheetKey] = useState(0);
+  // 링크 시트가 다 닫힌 뒤 불러올 링크. iOS 는 닫히는 중에 띄운 로딩 모달을 무시한다.
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const itemSave = useItemSave();
 
   const selectedCount = selectedIds.size;
@@ -148,6 +159,7 @@ export function AllScreen() {
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
         <WishItemGrid
+          key={savedAt}
           items={items}
           isLoading={list.isPending}
           onEndReached={() => {
@@ -197,32 +209,23 @@ export function AllScreen() {
       ) : null}
 
       <ItemLinkSheet
-        key={`link-${isLinkSheetOpen}`}
+        key={`link-${linkSheetKey}`}
         visible={isLinkSheetOpen}
         onRequestClose={() => setLinkSheetOpen(false)}
         onSubmit={(url) => {
           setLinkSheetOpen(false);
-          void itemSave.start(url);
+          // 안드로이드는 이어서 띄워도 무시되지 않아 기다릴 필요가 없다.
+          if (Platform.OS === "ios") setPendingUrl(url);
+          else void itemSave.start(url);
+        }}
+        onDismiss={() => {
+          if (pendingUrl === null) return;
+          void itemSave.start(pendingUrl);
+          setPendingUrl(null);
         }}
       />
 
-      <LoadingDialog
-        visible={itemSave.isLoading}
-        message="아이템 정보를 불러오는 중입니다."
-        onDismiss={itemSave.openAfterLoading}
-      />
-
-      <ItemEditSheet
-        key={`save-${itemSave.values?.sourceUrl ?? ""}`}
-        visible={itemSave.values !== null}
-        hasExtractionFailed={itemSave.hasFailed}
-        initialValues={itemSave.values ?? EMPTY_ITEM_SAVE_VALUES}
-        onRequestClose={itemSave.close}
-        onSubmit={() => {
-          itemSave.close();
-          showToast(TOAST_MESSAGES.SAVE_011);
-        }}
-      />
+      <ItemSaveFlow itemSave={itemSave} />
 
       <ActionModal
         visible={confirming === "cancel"}
@@ -246,7 +249,10 @@ export function AllScreen() {
             accessibilityLabel="아이템 추가"
             accessibilityRole="button"
             className="absolute left-[73px] top-[73px] size-[54px] items-center justify-center rounded-full bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.1)] active:opacity-75"
-            onPress={() => setLinkSheetOpen(true)}
+            onPress={() => {
+              setLinkSheetKey((key) => key + 1);
+              setLinkSheetOpen(true);
+            }}
           >
             <PlusIcon />
           </Pressable>

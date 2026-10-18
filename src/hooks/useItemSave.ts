@@ -1,7 +1,9 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 
-import { MOCK_ITEM_PREVIEW } from "@/constants/mockItemPreview";
+import { folderKeys } from "@/api/folders";
+import { productKeys, saveProduct } from "@/api/products";
 import type { ItemSaveValues } from "@/types/wish-item";
 
 export const EMPTY_ITEM_SAVE_VALUES: ItemSaveValues = {
@@ -15,10 +17,9 @@ export const EMPTY_ITEM_SAVE_VALUES: ItemSaveValues = {
 
 type Loaded = { values: ItemSaveValues; hasFailed: boolean };
 
-// TODO: 크롤링 API 로 교체한다. 지금은 불러오기에 성공했다고 보고 목 데이터를 돌려준다.
-// 실패를 돌려줄 때는 null 을 주면 저장 시트가 직접 입력 상태로 열린다.
-async function loadItemPreview(sourceUrl: string): Promise<ItemSaveValues | null> {
-  return { ...MOCK_ITEM_PREVIEW, sourceUrl };
+// shortcut: 크롤링(상품정보 추출)이 아직 없어 항상 실패로 보고 링크만 채운 직접 입력 시트를 연다. 크롤링 이슈에서 이 함수만 바꾼다.
+async function loadItemPreview(_sourceUrl: string): Promise<ItemSaveValues | null> {
+  return null;
 }
 
 /**
@@ -55,7 +56,22 @@ export function useItemSave() {
     });
   }, []);
 
-  const close = useCallback(() => setLoaded(null), []);
+  const queryClient = useQueryClient();
+  const save = useMutation({
+    mutationFn: (values: ItemSaveValues) => saveProduct(values),
+    onSuccess: ({ isDuplicate }) => {
+      if (isDuplicate) return;
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: productKeys.all }),
+        queryClient.invalidateQueries({ queryKey: folderKeys.all }),
+      ]);
+    },
+  });
+
+  const close = useCallback(() => {
+    setLoaded(null);
+    save.reset();
+  }, [save]);
 
   return {
     isLoading,
@@ -66,5 +82,6 @@ export function useItemSave() {
     start,
     openAfterLoading,
     close,
+    save,
   };
 }

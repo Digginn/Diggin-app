@@ -48,8 +48,9 @@ type ItemEditSheetProps = {
   /** 이미 저장한 링크면 기존 아이템으로 갈지 묻는다. */
   duplicate?: { onConfirm: () => void; onDismiss: () => void };
   onRequestClose: () => void;
-  onSubmit: (values: ItemSaveValues) => void;
-  /** 저장 요청 중에는 다시 누르지 못하게 막는다. */
+  /** 저장 요청이면 Promise를 돌려준다. 끝날 때까지 다시 누르거나 닫을 수 없다. */
+  onSubmit: (values: ItemSaveValues) => void | Promise<unknown>;
+  /** 이미 보낸 요청은 닫아도 저장되니, 저장 중에는 다시 누르기와 취소·끌어내리기를 모두 막는다. */
   isSubmitting?: boolean;
   /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
   errorMessage?: string;
@@ -72,6 +73,8 @@ export function ItemEditSheet({
   const [isHintOpen, setHintOpen] = useState(false);
   const [isExitOpen, setExitOpen] = useState(false);
   const hintRef = useRef<View>(null);
+  // isSubmitting은 다시 그린 뒤에야 버튼을 막아, 그 사이 들어온 연타는 여기서 막는다.
+  const isSubmittingRef = useRef(false);
   const [hintAnchor, setHintAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
   const isHintVisible = useNativeModalVisible(isHintOpen);
 
@@ -97,7 +100,20 @@ export function ItemEditSheet({
     });
   }
 
+  async function submit() {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    try {
+      await onSubmit(values);
+    } catch {
+      // 실패는 부모가 errorMessage로 알린다.
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
   function handleClose() {
+    if (isSubmittingRef.current) return;
     setLevelOpen(false);
     setHintOpen(false);
     onRequestClose();
@@ -105,6 +121,7 @@ export function ItemEditSheet({
 
   // 취소는 버리겠다는 뜻이 분명해서 묻지 않고, 끌어내리기·뒤로가기만 묻는다.
   function requestClose() {
+    if (isSubmittingRef.current) return;
     if (!isDirty) return handleClose();
     setLevelOpen(false);
     setHintOpen(false);
@@ -115,7 +132,7 @@ export function ItemEditSheet({
     <BottomSheet
       visible={visible}
       isScrimClosable={false}
-      isCloseConfirmed={isDirty}
+      isCloseConfirmed={isDirty || isSubmitting}
       onRequestClose={requestClose}
       toastMessage={errorMessage}
       toastVariant="error"
@@ -226,14 +243,15 @@ export function ItemEditSheet({
         </View>
 
         <View className="flex-row gap-4">
-          <Button className="flex-1" variant="secondary" onPress={handleClose}>
-            취소
-          </Button>
           <Button
             className="flex-1"
-            isDisabled={isNameMissing || isSubmitting}
-            onPress={() => onSubmit(values)}
+            variant="secondary"
+            isDisabled={isSubmitting}
+            onPress={handleClose}
           >
+            취소
+          </Button>
+          <Button className="flex-1" isDisabled={isNameMissing || isSubmitting} onPress={submit}>
             저장하기
           </Button>
         </View>

@@ -121,6 +121,28 @@ export async function fetchProduct(id: string): Promise<ProductDetail> {
   };
 }
 
+// 빈 가격은 null(가격 정보 없음), 직접 입력한 0은 0으로 저장한다(SAVE-005).
+function toPrice(price: string) {
+  const digits = price.replace(/\D/g, "");
+  return digits === "" ? null : Number(digits);
+}
+
+/** SAVE-012·013 같은 링크가 이미 있으면 저장하지 않고 기존 상품 id를 돌려받는다. */
+export async function saveProduct(values: ItemSaveValues, folderIds: readonly string[] = []) {
+  const price = toPrice(values.price);
+  const { data, error } = await supabase.rpc("save_product", {
+    product_url: values.sourceUrl,
+    product_name: values.name,
+    product_brand: values.brand,
+    ...(price !== null && { product_price: price }),
+    ...(values.thumbnailUrl && { product_image_url: values.thumbnailUrl }),
+    ...(values.wishLevel && { product_wish_level: values.wishLevel }),
+    folder_ids: folderIds.map(Number),
+  });
+  if (error) throw error;
+  return { productId: String(data[0].product_id), isDuplicate: data[0].is_duplicate };
+}
+
 export type ProductPatch = Partial<Pick<ItemSaveValues, "name" | "brand" | "price" | "wishLevel">>;
 
 /** PDT-005·006 링크와 대표 이미지는 고칠 수 없어 넘기지 않는다. 넘긴 값만 바꾼다. */
@@ -132,7 +154,7 @@ export async function updateProduct(id: string, patch: ProductPatch) {
       // 빈 브랜드는 null로 저장한다(브랜드 줄을 숨긴다).
       ...(patch.brand !== undefined && { brand: patch.brand.trim() || null }),
       ...(patch.price !== undefined && {
-        price: patch.price === "" ? null : Number(patch.price.replace(/\D/g, "")),
+        price: toPrice(patch.price),
       }),
       ...(patch.wishLevel !== undefined && { wish_level: patch.wishLevel }),
     })
