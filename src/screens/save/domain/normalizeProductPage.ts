@@ -60,6 +60,24 @@ function isSiteDefault(ogUrl: unknown) {
   return /^https?:\/\/[^/?#]+\/?(?:[?#]|$)/i.test(asText(ogUrl) ?? "");
 }
 
+// 광고·유입 추적용 이름이 확실한 값만 뗀다. 상품 옵션이나 쿠팡 vendorItemId처럼 상품을 가르는 값은 남긴다.
+const TRACKING_PARAM =
+  /^(utm_.*|nt_.*|airbridge.*|fbclid|gclid|igshid|napm|is_retargeting|source_caller|sourcetype|searchid)$/i;
+
+/** 같은 상품이 추적값만 달라 다른 링크로 저장되지 않게 한다(SAVE-012 중복 검사). */
+export function stripTrackingParams(url: string) {
+  const hashAt = url.indexOf("#");
+  const hash = hashAt === -1 ? "" : url.slice(hashAt);
+  const beforeHash = hashAt === -1 ? url : url.slice(0, hashAt);
+  const queryAt = beforeHash.indexOf("?");
+  if (queryAt === -1) return url;
+  const kept = beforeHash
+    .slice(queryAt + 1)
+    .split("&")
+    .filter((pair) => pair && !TRACKING_PARAM.test(pair.split("=")[0]));
+  return beforeHash.slice(0, queryAt) + (kept.length ? `?${kept.join("&")}` : "") + hash;
+}
+
 /**
  * SAVE-005·006·007 페이지에서 모은 재료로 저장 시트 초안을 만든다.
  * 정확한 출처부터 쓴다: 쇼핑몰 전용 데이터 → JSON-LD 상품 정보 → Open Graph.
@@ -90,7 +108,9 @@ export function normalizeProductPage(
       brand: truncate(asText(shop?.brand) ?? asText(ld?.brand), BRAND_MAX),
       price: price ?? "",
       // SAVE-003 리다이렉트를 따라간 최종 주소. 못 읽었으면 로그인·만료 페이지일 수 있어 원래 링크를 둔다.
-      sourceUrl: hasFailed || !raw.finalUrl.startsWith("https://") ? sourceUrl : raw.finalUrl,
+      sourceUrl: stripTrackingParams(
+        hasFailed || !raw.finalUrl.startsWith("https://") ? sourceUrl : raw.finalUrl,
+      ),
       // 상품명을 못 읽은 페이지의 이미지는 사이트 로고일 때가 많다. 저장 후 못 바꾸니(PDT-006) 쓰지 않는다.
       thumbnailUrl: hasFailed ? null : (toHttpsImage(ld?.image) ?? toHttpsImage(og.image)),
       wishLevel: null,
