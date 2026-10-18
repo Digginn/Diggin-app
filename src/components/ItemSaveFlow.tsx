@@ -47,7 +47,6 @@ export function ItemSaveFlow({ itemSave }: ItemSaveFlowProps) {
             if (isDuplicate) return;
             itemSave.close();
             showToast(TOAST_MESSAGES.SAVE_011);
-            // SAVE-014 새 아이템이 바로 보이도록 ALL의 정렬·필터를 되돌리게 알린다.
             router.navigate({ pathname: "/all", params: { savedAt: String(Date.now()) } });
           })
         }

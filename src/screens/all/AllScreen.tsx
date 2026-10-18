@@ -39,7 +39,7 @@ export function AllScreen() {
   const guide = useFirstVisitGuide("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
   const [wishLevel, setWishLevel] = useState<WishLevelKey | null>(null);
-  // 저장 직후 들어오면 오래된 순·다른 위시레벨 필터에 가려 새 아이템이 안 보일 수 있어 기본으로 되돌린다.
+  // SAVE-014 저장 직후에는 새 아이템이 정렬·필터에 가려지지 않게 기본으로 되돌리고 목록을 맨 위부터 다시 그린다.
   const { savedAt } = useLocalSearchParams<{ savedAt?: string }>();
   const [handledSavedAt, setHandledSavedAt] = useState(savedAt);
   if (savedAt !== handledSavedAt) {
@@ -159,7 +159,6 @@ export function AllScreen() {
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
         <WishItemGrid
-          // 저장 직후에는 새로 그려 맨 위부터 보여 준다.
           key={savedAt}
           items={items}
           isLoading={list.isPending}
