@@ -28,7 +28,7 @@ export const PRODUCT_PAGE_WAIT_MS = 8000;
  * 페이지 스크립트와 normalizeProductPage가 같이 쓴다.
  */
 export const APP_LINK_HOST =
-  /(^|\.)(airbridge\.io|abr\.ge|onelink\.me|app\.link|page\.link)$|^applink\./i;
+  /(^|\.)(airbridge\.io|abr\.ge|onelink\.me|app\.link|page\.link)$|^applink\.|^kurlink\.kurly\.com$/i;
 // 중간 페이지 주소에 담긴 웹 대체 주소. Airbridge·AppsFlyer·Branch 순.
 const WEB_FALLBACK_PARAMS = [
   "fallback_mobile",
@@ -149,6 +149,12 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
   const isAppLinkLanding = ${APP_LINK_HOST}.test(location.hostname);
   // 중간 페이지가 웹으로 넘겨 주지 않는 경우(오늘의집)가 있어, 주소에 담긴 웹 대체 주소로 직접 옮긴다.
   if (isAppLinkLanding) {
+    // 컬리 공유 링크는 앱을 열거나 App Store로 보내고, 웹 대체 주소를 쿼리에 담지 않는다. 같은 상품 번호의 웹 주소로 옮긴다.
+    const kurlyProduct = /^\\/products\\/(\\d+)/.exec(location.pathname);
+    if (location.hostname === "kurlink.kurly.com" && kurlyProduct) {
+      location.replace("https://www.kurly.com/goods/" + kurlyProduct[1]);
+      return;
+    }
     const params = new URLSearchParams(location.search);
     const fallback = ${JSON.stringify(WEB_FALLBACK_PARAMS)}.map((key) => params.get(key)).find((url) => url && /^https:\\/\\//i.test(url));
     if (fallback) {
