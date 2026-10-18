@@ -101,7 +101,7 @@ const LOGIN_PAGE = /^https?:\/\/[^?#]*[/.](?:log-?in|sign-?in)\b/i;
 
 /**
  * SAVE-005·006·007 페이지에서 모은 재료로 저장 시트 초안을 만든다.
- * 정확한 출처부터 쓴다: 쇼핑몰 전용 데이터 → JSON-LD 상품 정보 → Open Graph.
+ * 정확한 출처부터 쓴다: 쇼핑몰 전용 데이터 → JSON-LD 상품 정보 → Open Graph → 마이크로데이터 → eg: 메타.
  * 상품명을 못 찾으면 실패로 보고, 찾은 값만 채운 채 사용자가 나머지를 입력한다.
  */
 export function normalizeProductPage(
@@ -136,14 +136,23 @@ export function normalizeProductPage(
   const price =
     toKrwPrice(shop?.price, "KRW") ??
     toKrwPrice(ld?.price, ld?.currency) ??
-    toKrwPrice(og.price, og.currency);
+    toKrwPrice(og.price, og.currency) ??
+    toKrwPrice(raw.md?.price, raw.md?.currency) ??
+    toKrwPrice(raw.eg?.price, "KRW");
   const hasFailed = name === "";
 
   return {
     hasFailed,
     values: {
       name,
-      brand: truncate(asText(shop?.brand) ?? asText(ld?.brand) ?? asText(og.brand), BRAND_MAX),
+      brand: truncate(
+        asText(shop?.brand) ??
+          asText(ld?.brand) ??
+          asText(og.brand) ??
+          asText(raw.md?.brand) ??
+          asText(raw.eg?.brand),
+        BRAND_MAX,
+      ),
       price: price ?? "",
       // SAVE-003 리다이렉트를 따라간 최종 주소. 못 읽었으면 로그인·만료 페이지일 수 있어 원래 링크를 둔다.
       sourceUrl: stripTrackingParams(

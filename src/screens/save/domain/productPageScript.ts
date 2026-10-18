@@ -19,6 +19,10 @@ export type ProductPageRaw = {
   } | null;
   // 공개 메타가 부정확한 쇼핑몰만 페이지 데이터에서 읽는다. 원화 판매처라 통화는 따로 두지 않는다.
   shop: { name: string | null; brand: string | null; price: number | null } | null;
+  /** HTML 요소의 schema.org 마이크로데이터(itemprop). 상품 영역 안에서만 읽는다. */
+  md?: { brand: string | null; price: string | null; currency: string | null } | null;
+  /** 국내 상품 추천 서비스용 eg: 메타. 국내 서비스라 원화로 본다. */
+  eg?: { brand: string | null; price: string | null } | null;
 };
 
 export const PRODUCT_PAGE_WAIT_MS = 8000;
@@ -57,32 +61,54 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
       try {
         const data = JSON.parse(script.textContent);
         const list = Array.isArray(data) ? data : data["@graph"] || [data];
-        const product = list.find((item) => [].concat(item["@type"]).includes("Product"));
+        // 옵션을 묶은 상품(ProductGroup)은 가격이 옵션(hasVariant) 안에 있다.
+        const product = list.find((item) =>
+          [].concat(item["@type"]).some((type) => type === "Product" || type === "ProductGroup"),
+        );
         if (!product) continue;
-        const offer = [].concat(product.offers || [])[0] || {};
+        const variant = [].concat(product.hasVariant || [])[0] || {};
+        const offer = [].concat(product.offers || variant.offers || [])[0] || {};
+        const spec = [].concat(offer.priceSpecification || [])[0] || {};
+        const brand = [].concat(product.brand || [])[0];
         return {
           name: product.name || null,
-          brand: (product.brand && (product.brand.name || product.brand)) || null,
+          brand: (brand && (brand.name || brand)) || null,
           image: ((image) => (image && (image.url || image.contentUrl)) || image || null)(
-            [].concat(product.image || [])[0],
+            [].concat(product.image || variant.image || [])[0],
           ),
-          price: offer.price ?? offer.lowPrice ?? null,
-          currency: offer.priceCurrency || null,
+          price: offer.price ?? offer.lowPrice ?? spec.price ?? null,
+          currency: offer.priceCurrency || spec.priceCurrency || null,
         };
       } catch (error) {}
     }
     return null;
   };
 
-  // 올리브영은 공개 메타에 가격·브랜드가 없고, 추천 서비스용 eg: 메타를 페이지가 뜬 뒤 늦게 붙인다.
+  // 추천 영역의 다른 상품을 읽지 않도록 상품 영역 안에서만 찾는다.
+  const readMicrodata = () => {
+    const root = document.querySelector('[itemtype*="schema.org/Product"]');
+    if (!root) return null;
+    const value = (element) =>
+      element ? (element.getAttribute("content") || element.textContent || "").trim() || null : null;
+    const brandElement = root.querySelector('[itemprop="brand"]');
+    const brand = brandElement
+      ? value(brandElement.querySelector('[itemprop="name"]')) || value(brandElement)
+      : null;
+    const price = value(root.querySelector('[itemprop="price"]'));
+    const currency = value(root.querySelector('[itemprop="priceCurrency"]'));
+    return brand || price ? { brand, price, currency } : null;
+  };
+
+  // 정가(eg:originalPrice)가 아니라 지금 파는 값을 쓴다.
+  const readEg = () => {
+    const brand = meta("eg:brandName");
+    const price = meta("eg:salePrice");
+    return brand || price ? { brand, price } : null;
+  };
+
+  // 올리브영은 공개 메타에 가격·브랜드가 없고 eg: 메타를 페이지가 뜬 뒤 늦게 붙인다.
   const isOliveYoung = location.hostname.endsWith("oliveyoung.co.kr");
   const readShop = () => {
-    if (isOliveYoung) {
-      const brand = meta("eg:brandName");
-      // 정가(eg:originalPrice)가 아니라 지금 파는 값을 쓴다.
-      const price = meta("eg:salePrice");
-      return brand || price ? { name: null, brand, price } : null;
-    }
     const naver = window.__PRELOADED_STATE__ && window.__PRELOADED_STATE__.simpleProductForDetailPage;
     if (naver && naver.name) {
       return {
@@ -144,20 +170,29 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     return null;
   };
 
-  const read = () => ({
-    finalUrl: location.href,
-    og: {
-      title: meta("og:title"),
-      image: meta("og:image"),
-      url: meta("og:url"),
-      siteName: meta("og:site_name"),
-      brand: meta("product:brand"),
-      price: meta("product:price:amount") || meta("og:price:amount"),
-      currency: meta("product:price:currency") || meta("og:price:currency"),
-    },
-    ld: readLd(),
-    shop: readShop(),
-  });
+  const read = () => {
+    // 할인가 메타가 있으면 정가 메타보다 먼저 쓰고, 통화도 같은 쪽에서 읽는다.
+    const salePrice = meta("product:sale_price:amount");
+    return {
+      finalUrl: location.href,
+      og: {
+        title: meta("og:title"),
+        image: meta("og:image"),
+        url: meta("og:url"),
+        siteName: meta("og:site_name"),
+        brand: meta("product:brand"),
+        price: salePrice || meta("product:price:amount") || meta("og:price:amount"),
+        currency:
+          (salePrice && meta("product:sale_price:currency")) ||
+          meta("product:price:currency") ||
+          meta("og:price:currency"),
+      },
+      ld: readLd(),
+      shop: readShop(),
+      md: readMicrodata(),
+      eg: readEg(),
+    };
+  };
 
   const isAppLinkLanding = ${APP_LINK_HOST}.test(location.hostname);
   // 중간 페이지가 웹으로 넘겨 주지 않는 경우(오늘의집)가 있어, 주소에 담긴 웹 대체 주소로 직접 옮긴다.
@@ -183,10 +218,15 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     try { raw = read(); } catch (error) { return false; }
     const name = (raw.shop && raw.shop.name) || (raw.ld && raw.ld.name) || raw.og.title;
     const image = (raw.ld && raw.ld.image) || raw.og.image;
-    const price = (raw.shop && raw.shop.price) ?? (raw.ld && raw.ld.price) ?? raw.og.price;
+    const price =
+      (raw.shop && raw.shop.price) ??
+      (raw.ld && raw.ld.price) ??
+      raw.og.price ??
+      (raw.md && raw.md.price) ??
+      (raw.eg && raw.eg.price);
     const now = Date.now();
     // 올리브영은 eg: 메타가 붙기 전에 찾았다고 보면 가격 대기 시간이 먼저 끝나 버린다.
-    const isShopDataPending = isOliveYoung && !raw.shop;
+    const isShopDataPending = isOliveYoung && !raw.eg;
     if (name && image && !isAppLinkLanding && !isShopDataPending && foundAt === null) foundAt = now;
     const isComplete = foundAt !== null && (price !== null && price !== undefined || now - foundAt >= ${PRODUCT_PAGE_PRICE_GRACE_MS});
     // __NEXT_DATA__ 같은 페이지 데이터는 문서 끝에 있어 문서를 다 읽기 전에는 끝내지 않는다.
