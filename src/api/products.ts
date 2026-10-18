@@ -143,6 +143,13 @@ export async function saveProduct(values: ItemSaveValues, folderIds: readonly st
   return { productId: String(data[0].product_id), isDuplicate: data[0].is_duplicate };
 }
 
+/** SAVE-012 폴더를 고르기 전에 같은 링크가 이미 있는지 본다. 저장할 때 save_product가 한 번 더 막는다. */
+export async function findProductIdByUrl(url: string) {
+  const { data, error } = await supabase.from("products").select("id").eq("url", url).maybeSingle();
+  if (error) throw error;
+  return data ? String(data.id) : null;
+}
+
 export type ProductPatch = Partial<Pick<ItemSaveValues, "name" | "brand" | "price" | "wishLevel">>;
 
 /** PDT-005·006 링크와 대표 이미지는 고칠 수 없어 넘기지 않는다. 넘긴 값만 바꾼다. */

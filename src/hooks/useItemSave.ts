@@ -76,7 +76,8 @@ export function useItemSave() {
 
   const queryClient = useQueryClient();
   const save = useMutation({
-    mutationFn: (values: ItemSaveValues) => saveProduct(values),
+    mutationFn: ({ values, folderIds }: { values: ItemSaveValues; folderIds: string[] }) =>
+      saveProduct(values, folderIds),
     onSuccess: ({ isDuplicate }) => {
       if (isDuplicate) return;
       return Promise.all([

@@ -23,6 +23,12 @@ type FolderManageSheetProps = {
   title?: string;
   completeLabel?: string;
   onBack?: () => void;
+  backLabel?: string;
+  /** 저장 요청 중에는 완료 버튼을 다시 누르지 못하게 막는다. */
+  isCompleting?: boolean;
+  /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
+  errorMessage?: string;
+  onErrorDismiss?: () => void;
 };
 
 export function FolderManageSheet({
@@ -34,6 +40,10 @@ export function FolderManageSheet({
   title = "폴더 관리",
   completeLabel = "완료",
   onBack,
+  backLabel = "이전으로",
+  isCompleting = false,
+  errorMessage,
+  onErrorDismiss,
 }: FolderManageSheetProps) {
   const [selectedIds, setSelectedIds] = useState(selectedFolderIds);
   const [isCreating, setIsCreating] = useState(false);
@@ -47,6 +57,9 @@ export function FolderManageSheet({
 
   return (
     <BottomSheet
+      toastMessage={errorMessage}
+      toastVariant="error"
+      onToastDismiss={onErrorDismiss}
       visible
       onRequestClose={onClose}
       maxHeight={702}
@@ -172,14 +185,18 @@ export function FolderManageSheet({
         {onBack ? (
           <View className="flex-row gap-4">
             <Button className="flex-1" variant="secondary" onPress={onBack}>
-              이전으로
+              {backLabel}
             </Button>
-            <Button className="flex-1" onPress={() => onComplete(selectedIds)}>
+            <Button
+              className="flex-1"
+              isDisabled={isCompleting}
+              onPress={() => onComplete(selectedIds)}
+            >
               {completeLabel}
             </Button>
           </View>
         ) : (
-          <Button size="large" onPress={() => onComplete(selectedIds)}>
+          <Button size="large" isDisabled={isCompleting} onPress={() => onComplete(selectedIds)}>
             {completeLabel}
           </Button>
         )}
