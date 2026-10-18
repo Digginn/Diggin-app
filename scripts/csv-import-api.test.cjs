@@ -180,6 +180,14 @@ test("IMP-005 승인 판매처 가격을 실제 가져오기 RPC에 전달하고
     ["KREAM", "https://kream.co.kr.example.com/products/13", "100", "80", null],
     ["알리익스프레스", "https://aliexpress.com/item/14", "100", "80", null],
     ["", "https://WWW.MUSINSA.COM/products/15", "100", "80", "80"],
+    ["무신사", "https://m.store.musinsa.com/app/goods/16", "100", "80", "80"],
+    ["지그재그", "https://s.zigzag.kr/share/17", "100", "80", "80"],
+    ["네이버 브랜드스토어", "https://m.brand.naver.com/shop/products/18", "100", "80", "80"],
+    ["네이버 쇼핑", "https://m.shopping.naver.com/window/products/19", "100", "80", "80"],
+    ["네이버 쇼핑", "https://msearch.shopping.naver.com/catalog/20", "100", "80", "80"],
+    ["네이버", "https://m.shopping.naver.com.example.org/21", "100", "80", null],
+    ["지그재그", "https://s.zigzag.kr.example.org/22", "100", "80", null],
+    ["무신사", "https://global.store.musinsa.com/goods/23", "100", "80", null],
   ];
   const bytes = new TextEncoder().encode(
     Papa.unparse([

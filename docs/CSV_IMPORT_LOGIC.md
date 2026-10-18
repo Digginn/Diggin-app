@@ -37,6 +37,8 @@ CSV로 새로 만든 폴더에는 `folders.csv_source_name`으로 정규화한 �
 
 ## 실제 저장 연결
 
+`useImportCsv`는 서버가 완료 결과를 반환한 후 `products`·`folders` prefix의 조회 캐시를 무효화한다. ALL 목록·필터·개수·상세, 폴더 목록·폴더별 상품·개수·소장 관계가 대상이다. 화면에서 사용 중인 쿼리는 즉시 재조회하며, 닫힌 화면의 캐시는 stale로 표시해 다음 진입 시 새 데이터를 가져온다. 신규 저장 0건이어도 기존 상품에 폴더·소장 관계가 추가될 수 있어 동일하게 갱신한다. 검증 실패나 RPC 오류는 완료로 취급하지 않고 캐시를 갱신하지 않는다. 폴더 prefix는 PR #86의 `folderKeys.all` 계약에 맞췄으며 아직 해당 PR의 코드를 병합하지는 않았다.
+
 `importCsv`는 실제 파일 크기와 바이트를 확인하고 `supabase.auth.getUser()`로 사용자를 확인한다. 기존 일반 폴더 이름을 조회해 계획을 만든 뒤, `import_csv(request_id, import_plan)` RPC로 전달한다. 기존 상품을 전부 미리 조회하지 않으므로 API의 1000행 조회 제한과 무관하게 서버에서 URL 중복을 판정한다.
 
 - 서버는 JWT 소유자를 기준으로 저장한다. 파일을 선택한 계정과 요청 시 계정이 다르면 거부한다. 상품 입력은 공통 `private.product_input_error`로 재검증하며, 유한하지 않거나 서버 현재 시각보다 미래인 `saved_at`은 `INVALID_PRODUCT_DATA`로 제외한다.
@@ -53,22 +55,26 @@ CSV 담당 범위는 파일 검증·파싱·중복 병합, CSV 버킷의 폴더 
 
 2026.10.17 사용자 전달 PM 승인 기준으로 쿠팡·무신사·29CM·지그재그·네이버 스마트스토어·KREAM·ABLY·4910을 원화 인정 판매처로 확정했다. `api/importCsv.ts`의 최초 계획과 재시도 계획에 같은 판별 함수를 연결한다.
 
-| 판매처                                              | 허용 호스트                                                                             |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [쿠팡](https://www.coupang.com)                     | `coupang.com`, `www.coupang.com`, `m.coupang.com`                                       |
-| [무신사](https://www.musinsa.com)                   | `musinsa.com`, `www.musinsa.com`, `m.musinsa.com`, `store.musinsa.com`                  |
-| [29CM](https://www.29cm.co.kr)                      | `29cm.co.kr`, `www.29cm.co.kr`, `m.29cm.co.kr`, `shop.29cm.co.kr`, `product.29cm.co.kr` |
-| [지그재그](https://zigzag.kr)                       | `zigzag.kr`, `www.zigzag.kr`, `m.zigzag.kr`                                             |
-| [네이버 스마트스토어](https://smartstore.naver.com) | `smartstore.naver.com`, `m.smartstore.naver.com`                                        |
-| [KREAM](https://www.kream.co.kr)                    | `kream.co.kr`, `www.kream.co.kr`, `m.kream.co.kr`                                       |
-| [ABLY](https://mobile.a-bly.com)                    | `a-bly.com`, `www.a-bly.com`, `m.a-bly.com`, `mobile.a-bly.com`                         |
-| [4910](https://www.4910.kr)                         | `4910.kr`, `www.4910.kr`, `m.4910.kr`                                                   |
+| 판매처                                              | 허용 호스트                                                                                                                 |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [쿠팡](https://www.coupang.com)                     | `coupang.com`, `www.coupang.com`, `m.coupang.com`                                                                           |
+| [무신사](https://www.musinsa.com)                   | `musinsa.com`, `www.musinsa.com`, `m.musinsa.com`, `store.musinsa.com`, `m.store.musinsa.com`                               |
+| [29CM](https://www.29cm.co.kr)                      | `29cm.co.kr`, `www.29cm.co.kr`, `m.29cm.co.kr`, `shop.29cm.co.kr`, `product.29cm.co.kr`                                     |
+| [지그재그](https://zigzag.kr)                       | `zigzag.kr`, `www.zigzag.kr`, `m.zigzag.kr`, `s.zigzag.kr`                                                                  |
+| [네이버 스마트스토어](https://smartstore.naver.com) | `smartstore.naver.com`, `m.smartstore.naver.com`, `m.brand.naver.com`, `m.shopping.naver.com`, `msearch.shopping.naver.com` |
+| [KREAM](https://www.kream.co.kr)                    | `kream.co.kr`, `www.kream.co.kr`, `m.kream.co.kr`                                                                           |
+| [ABLY](https://mobile.a-bly.com)                    | `a-bly.com`, `www.a-bly.com`, `m.a-bly.com`, `mobile.a-bly.com`                                                             |
+| [4910](https://www.4910.kr)                         | `4910.kr`, `www.4910.kr`, `m.4910.kr`                                                                                       |
 
 호스트는 소문자로 비교하며 정확히 일치해야 한다. 모든 하위 도메인을 일괄 허용하지 않는다. `global.musinsa.com`, `www.tw.coupang.com` 같은 해외몰, `link.coupang.com`·`click.linkprice.com` 같은 제휴·단축 링크와 미확인 호스트는 가격을 비운다. CSV 스토어명은 개별 입점 판매자명일 수도 있으므로 단독 판별 근거로 쓰지 않고, 승인 판매처명이 적혀 있어도 미확인 도메인을 원화로 바꾸지 않는다. 원본 URL을 그대로 저장하고 redirect 확인이나 환율 변환은 하지 않는다.
+
+2026.10.18 리뷰에서 확인한 국내 주소 5개(`m.store.musinsa.com`, `s.zigzag.kr`, `m.brand.naver.com`, `m.shopping.naver.com`, `msearch.shopping.naver.com`)를 추가했다. 지그재그가 직접 제공하는 공유 호스트 `s.zigzag.kr`는 명시적으로 허용하지만 일반 제휴·단축 링크를 일괄 허용하지 않는다. 네이버 쇼핑은 CSV에 기록된 국내 쇼핑 노출 가격을 원화로 취급하는 규칙이며 외부 판매처의 가격을 새로 추출하거나 변환하지 않는다.
 
 기존 상품 가격은 재업로드로 보정하지 않는다(IMP-006). 이전 버전에서 가격 없이 저장된 상품도 기존 정보 유지 정책을 따른다.
 
 ## 확인 필요 (PR #80 리뷰)
+
+- **통합 확인:** 폴더 PR #86 병합 후 실제 CSV 저장으로 ALL·폴더 목록과 개수가 앱 재시작 없이 갱신되는지 화면 검증한다. 캐시 갱신 자체는 실제 TanStack QueryClient를 사용하는 자동 테스트로 검증한다.
 
 - **IMP-008 폴더명:** 구현은 사용자 확인에 따라 공백 포함 7자다. 예시의 `맥북 파우치 케`는 공백 포함 8자이므로 이 기준의 결과는 `맥북 파우치`이며, 충돌한 두 번째 후보는 `맥북 파우치2`다. 명세 예시·QA 기준은 PM과 맞춘다.
 - **폴더 생성 우선순위:** 현재 유효 행 최초 등장 순을 유지한다. 기존 설계의 상품 많은 순과 어떤 기준으로 통일할지 미확정이다.

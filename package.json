@@ -67,7 +67,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "test:csv-import": "node --test scripts/csv-import-logic.test.cjs scripts/csv-import.test.cjs scripts/csv-import-api.test.cjs",
+    "test:csv-import": "node --test scripts/csv-import-logic.test.cjs scripts/csv-import.test.cjs scripts/csv-import-api.test.cjs scripts/csv-import-cache.test.cjs",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
