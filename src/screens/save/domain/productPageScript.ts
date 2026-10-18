@@ -41,7 +41,8 @@ const WEB_FALLBACK_PARAMS = [
 export const PRODUCT_PAGE_PRICE_GRACE_MS = 2500;
 
 /**
- * 숨긴 WebView에 넣어 실행한다. 문자열이라 타입 검사를 못 받으니 판단은 하지 않고 재료만 모은다.
+ * 숨긴 WebView가 페이지를 열기 시작할 때 넣어 실행한다(injectedJavaScriptBeforeContentLoaded).
+ * 메타는 HTML 앞부분에 있어 이미지까지 다 받을 때를 기다리지 않고, 문서만 다 읽히면 판단한다. 문자열이라 타입 검사를 못 받으니 판단은 하지 않고 재료만 모은다.
  * 상품명·이미지·가격이 잡히면 바로 보낸다. 가격만 없으면 PRODUCT_PAGE_PRICE_GRACE_MS 더 기다리고,
  * 상품명·이미지도 못 잡으면 PRODUCT_PAGE_WAIT_MS가 지나서 그때까지 모은 값을 보낸다.
  * 앱 공유 링크는 앱 연결 업체(Airbridge 등)의 중간 페이지를 거친다. 거기서도 제목·이미지가 보이지만 가격이 없고
@@ -145,7 +146,9 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     const now = Date.now();
     if (name && image && !isAppLinkLanding && foundAt === null) foundAt = now;
     const isComplete = foundAt !== null && (price !== null && price !== undefined || now - foundAt >= ${PRODUCT_PAGE_PRICE_GRACE_MS});
-    if (!isComplete && now - startedAt < ${PRODUCT_PAGE_WAIT_MS}) return false;
+    // __NEXT_DATA__ 같은 페이지 데이터는 문서 끝에 있어 문서를 다 읽기 전에는 끝내지 않는다.
+    const isParsed = document.readyState !== "loading";
+    if (!(isComplete && isParsed) && now - startedAt < ${PRODUCT_PAGE_WAIT_MS}) return false;
     if (timer) clearInterval(timer);
     window.ReactNativeWebView.postMessage(JSON.stringify(raw));
     return true;
