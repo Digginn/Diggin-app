@@ -10,7 +10,7 @@ const CHECK_SIZE = 12;
 type SelectCardProps = {
   item: PostItem;
   name: string;
-  price: number;
+  price: number | null;
   brand?: string | null;
   isSelected: boolean;
   onToggle: () => void;

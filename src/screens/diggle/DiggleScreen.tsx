@@ -128,11 +128,13 @@ export function DiggleScreen() {
         />
       )}
       <View className="absolute bottom-6 right-[27px]">
-        {/* 작성 RPC는 #95에서 연결한다. 비회원 로그인 진입은 공통 Modal을 사용한다. */}
         <Fab
           accessibilityLabel={tab === "vote" ? "투표글 작성" : "게시글 작성"}
-          isDisabled={session !== null || isRestoring}
-          onPress={() => setLoginRequired(true)}
+          isDisabled={isRestoring}
+          onPress={() => {
+            if (!session) setLoginRequired(true);
+            else router.push(tab === "vote" ? "/votes/write" : "/posts/write");
+          }}
         />
       </View>
       <LoginRequiredModal

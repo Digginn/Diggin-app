@@ -291,7 +291,7 @@ function nodes(node, type) {
 }
 
 function screenMocks({
-  session = {},
+  session = { user: { id: "viewer" } },
   post = null,
   feed = {},
   comments = [],
@@ -301,7 +301,12 @@ function screenMocks({
   let destination;
   const toasts = [];
   const mocks = {
-    "react": { ...React, useEffect: () => {}, useState: (initial) => [initial, () => {}] },
+    "react": {
+      ...React,
+      useEffect: () => {},
+      useState: (initial) => [initial, () => {}],
+      useRef: (initial) => ({ current: initial }),
+    },
     "react-native": {
       View: "View",
       Text: "Text",
@@ -328,12 +333,21 @@ function screenMocks({
       }),
     },
     "@/assets/images/appbar": { IconNotification: "IconNotification" },
-    "@/components/app-bar": { AppBar: Object.assign(() => null, { IconButton: "IconButton" }) },
+    "@/components/app-bar": {
+      AppBar: Object.assign(() => null, { IconButton: "IconButton", TextButton: "TextButton" }),
+    },
     "@/components/Button": { Button: "Button" },
     "@/components/EmptyState": { EmptyState: "EmptyState" },
     "@/components/Fab": { Fab: "Fab" },
     "@/components/Loading": { Spinner: "Spinner" },
-    "@/components/modal": { LoginRequiredModal: "LoginRequiredModal" },
+    "@/components/modal": { LoginRequiredModal: "LoginRequiredModal", ActionModal: "ActionModal" },
+    "@/components/ToastText": { ToastText: "ToastText" },
+    "@tanstack/react-query": { useQueryClient: () => ({ invalidateQueries: () => {} }) },
+    "./api/community": { communityKeys: { all: ["community"] } },
+    "./api/communityWrite": {
+      deleteCommunityPost: async () => {},
+      communityWriteError: () => "error",
+    },
     "@/components/Post": { Post: "Post" },
     "@/components/TopTab": { TopTab: "TopTab" },
     "@/components/Comment": { Comment: "Comment" },

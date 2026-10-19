@@ -9,13 +9,13 @@
 
 ## 1. 진행 상황
 
-| 영역           | 테이블                                                                                                                         | 상태                                                                 |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                           |
-| 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다          |
-| 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69) |
-| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 구현 (#94), 쓰기 후속 (#95~97)                               |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                               |
+| 영역           | 테이블                                                                                                                         | 상태                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                                      |
+| 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다                     |
+| 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69)            |
+| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·정책 동의·삭제 (#95). 투표·댓글·좋아요 쓰기는 후속 (#96~97) |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                                          |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -186,7 +186,7 @@ import_failures
 
 #### #94 구현된 읽기 기반
 
-`supabase/schemas/community.sql`에 posts, post_products, vote_responses, post_likes, comments, post_anon_numbers와 조회 제외에 필요한 user_blocks, reports를 구현했다. 전부 RLS를 활성화하고 앱 역할의 테이블·시퀀스 직접 접근을 회수한다. 아래 나머지 설명의 create_post/vote/댓글/좋아요 쓰기 RPC와 운영·알림은 후속 작업이며 아직 구현하지 않았다. hidden_at/deleted_at은 구현했고 운영자 hidden_by FK는 운영 스키마 작업에서 추가한다.
+`supabase/schemas/community.sql`에 posts, post_products, vote_responses, post_likes, comments, post_anon_numbers와 조회 제외에 필요한 user_blocks, reports를 구현했다. 전부 RLS를 활성화하고 앱 역할의 테이블·시퀀스 직접 접근을 회수한다. 작성·정책 동의·삭제는 아래 #95 구현을 따른다. vote/댓글/좋아요 쓰기 RPC와 운영·알림은 후속 작업이다. hidden_at/deleted_at은 구현했고 운영자 hidden_by FK는 운영 스키마 작업에서 추가한다.
 
 - `get_community_feed(feed_type = 'all', after_created_at?, after_id?)`: 일반글·투표글 통합 또는 투표글만 최신순 20개를 반환한다. `(created_at, id)` 커서로 같은 시각의 글·앞쪽 신규 삽입에도 중복 페이지를 방지한다. 비회원은 첫 줄 본문과 Snapshot 이미지만 받으며 상품명·브랜드·가격·원본 링크·집계·본인 여부는 받지 않는다. 페이지 경계용 id/type/created_at은 포함한다.
 - `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·내가 차단하거나 신고한 작성자의 글은 null이다. 작성자 UUID는 응답에 없고 `is_mine`만 반환한다.
@@ -194,9 +194,21 @@ import_failures
 - 투표 집계는 본인의 응답이 존재할 때만 반환하고 미참여자에게는 null을 반환한다. 작성자·마감 후 미참여자의 공개 범위는 확인 필요 항목을 유지하며 임의로 공개하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
 - definer 구현은 private, invoker 래퍼는 public이다. 비회원 피드 래퍼에 필요한 private 스키마 usage와 피드 함수 execute만 anon에 허용하고 원본·내부 helper·상세·댓글 권한은 주지 않는다.
-- #94 화면은 실제 조회만 제공하며 기존 목업의 등록·삭제·투표·댓글·좋아요·신고/차단·상품 저장 성공 동작을 원격 글에 적용하지 않는다. 각 변경 Action은 #95~99 및 별도 신고·차단 작업에서 서버에 연결한다.
+- #94 화면은 실제 조회만 제공하며 기존 목업의 등록·삭제·투표·댓글·좋아요·신고/차단·상품 저장 성공 동작을 원격 글에 적용하지 않는다. 작성·삭제 Action은 #95에서 연결했으며 나머지는 #96~99 및 별도 신고·차단 작업에서 서버에 연결한다.
 
 마이그레이션은 로컬 Docker가 없는 환경에서 PR의 임시 CI가 CLI 2.120.0 `db schema declarative sync -f community_read --no-apply`로 생성한 artifact를 검토해 추가했다. 같은 임시 DB에서 전체 마이그레이션·pgTAP·lint·Advisors와 타입 생성을 수행했으며 생성용 워크플로는 최종 변경에서 제거한다. 이후 검증은 공통 DB 배포 워크플로를 따른다.
+
+#### #95 구현된 작성·정책 동의·삭제
+
+- `profiles.community_policy_agreed_at timestamptz null`: 계정별 최초 커뮤니티 동의 시각. 본인만 조회하고 앱의 직접 UPDATE는 허용하지 않는다. 기존 약관·개인정보 처리방침 동의와 별도로 관리한다.
+- `agree_community_policy()`: 인증·커뮤니티 쓰기 제한 검사 후 서버 시각을 저장한다. 이미 동의했다면 최초 시각을 보존한다. 일반 게시글 편집기는 동의 여부 조회·저장에 성공한 뒤에만 표시한다. 최초 필수 동의는 DGL-006의 일반글 진입에 적용하며 투표 진입에 추가 강제하지 않는다.
+- `create_post(post_kind, post_content, product_ids, request_id) → text`: 인증·제재, NFC 정규화 후 공백 제외 5~50자, 중복 없는 본인 상품(일반글 1~4개·투표글 1개), 일반글 정책 동의를 검증한다. 앱과 DB가 NBSP·전각 공백을 포함한 같은 공백 집합을 제외한다. 상품 행을 id 순으로 잠근 뒤 선택 순서대로 이미지·이름·브랜드·가격·URL을 Snapshot에 복사한다. 글과 Snapshot은 한 트랜잭션이며 원본 상품 수정·삭제 후에도 유지한다. 투표 종료 시각은 서버 생성 시각 +24시간이다.
+- `posts.creation_request_id uuid`와 `(author_id, creation_request_id)` unique로 응답 유실 후 같은 등록 요청을 재시도해도 기존 글 id를 반환한다. 앱은 같은 본문·첨부로 재시도할 때 키를 유지하고 내용을 바꾸면 새 키를 사용한다. 글 id는 bigint 정밀도를 잃지 않도록 문자열로 반환한다.
+- `delete_community_post(target_post_id)`: 인증된 본인 글만 잠근 뒤 글·댓글을 soft delete하고 투표 응답은 실제 삭제한다. 재시도는 안전하며 원본 ALL 상품은 변경하지 않는다. 커뮤니티 작성 제한 중에도 본인 콘텐츠 정리는 허용한다. 후속 댓글·투표 쓰기 RPC도 부모 글 행을 먼저 잠그고 삭제 여부를 검사해야 삭제와의 경합을 막을 수 있다.
+- 작성 후 수정·이미지 교체 API는 제공하지 않는다. 등록·삭제 성공 시 `community` 캐시 전체를 무효화한다. 후속 내 활동 조회도 이 키 아래에 둔다.
+- 작성 이탈 확정 시 초안을 폐기한다. 상품 상세로 돌아갈 대상이 없는 DIGGLE 직접 진입은 DIGGLE로 복귀한다(사용자 확인, 2026-10-19). 이어 쓰기는 본문·첨부를 유지한다.
+- 기준: [최신 기능명세](https://docs.google.com/spreadsheets/d/1Q7K3St6Kl0jSTVTvoBYdSzdioU4xfd0dXI_NpNYZ2fQ/edit?gid=1996326967)의 DGL-004~010·013, VOTE-001~003·012, SYS-006. 정책 Banner 문구와 읽기 전용 보기도 동일 기준으로 연결한다.
+- 마이그레이션은 CLI 2.120.0 선언형 sync로 생성했다. 임시 로컬 DB에서 전체 이력 reset·pgTAP·lint·Advisors를 검증하며 공유 DB는 변경하지 않는다.
 
 #### 후속 쓰기를 포함한 설계 계약
 
@@ -207,6 +219,7 @@ posts
   ends_at timestamptz null                  투표만, created_at + 24h
   deleted_at, hidden_at timestamptz null, hidden_by FK admin_users null
   created_at, next_anon_number integer not null default 1
+  creation_request_id uuid not null, unique (author_id, creation_request_id)
   content: 일반글·투표글 모두 공백 제외 5~50자, char_count 기준(DGL-005·VOTE-002 최신 정책)
 
 post_products   (post_id, position 1~4) PK, name, brand, price integer, url, image_url

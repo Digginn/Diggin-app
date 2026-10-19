@@ -5,6 +5,7 @@ create table public.profiles (
   status public.account_status not null default 'active',
   restricted_until timestamptz,
   suspended_at timestamptz,
+  community_policy_agreed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint profiles_nickname_format check (nickname ~ '^[가-힣A-Za-z0-9]{2,10}$'),

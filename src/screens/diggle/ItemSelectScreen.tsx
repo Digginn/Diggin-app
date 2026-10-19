@@ -6,7 +6,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { HelperText, SearchField } from "@/components/Field";
+import { Spinner } from "@/components/Loading";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePostDraft } from "@/contexts/PostDraftContext";
+import { useProductCounts } from "@/hooks/useProductCounts";
+import { useProductList } from "@/hooks/useProductList";
 import type { PostItem } from "@/types/post";
 
 import { MAX_ATTACH_COUNT } from "./components/ProductAttachGrid";
@@ -17,21 +21,6 @@ const COLUMN_GAP = 12;
 const ROW_GAP = 20;
 const SCREEN_PADDING = 15;
 
-// TODO: API 연결 전까지 쓰는 임시 데이터.
-const MOCK_ITEMS = Array.from({ length: 9 }, (_, index) => ({
-  id: String(index),
-  imageUrl: null,
-  name: `아이템명 ${index + 1}`,
-  price: 0,
-  brand: "브랜드명",
-}));
-
-const MOCK_VOTE_ITEMS = MOCK_ITEMS.map((item, index) => ({
-  ...item,
-  name: ["미니 토트백", "캔버스 숄더 가방", "레더 크로스백"][index] ?? item.name,
-  searchKeywords: index < 3 ? "가방" : "",
-}));
-
 export function ItemSelectScreen() {
   const router = useRouter();
   const { type } = useLocalSearchParams<{ type?: string }>();
@@ -40,23 +29,23 @@ export function ItemSelectScreen() {
   const { items: attached, setItems } = usePostDraft();
   const [keyword, setKeyword] = useState("");
   // 검색어가 바뀌어도 이미 고른 아이템은 선택 상태를 유지함
-  const [selectedIds, setSelectedIds] = useState<string[]>(
-    attached.slice(0, maxAttachCount).map((item) => item.id),
-  );
+  const [selected, setSelected] = useState<PostItem[]>(attached.slice(0, maxAttachCount));
+  const selectedIds = selected.map((item) => item.id);
   const [isKeyboardVisible, setKeyboardVisible] = useState(Keyboard.isVisible());
 
-  const availableItems = type === "vote" ? MOCK_VOTE_ITEMS : MOCK_ITEMS;
   const searchKeyword = keyword.trim();
-  const results = searchKeyword
-    ? availableItems.filter(
-        (item) =>
-          item.name.includes(searchKeyword) ||
-          item.brand.includes(searchKeyword) ||
-          ("searchKeywords" in item &&
-            typeof item.searchKeywords === "string" &&
-            item.searchKeywords.includes(searchKeyword)),
-      )
-    : availableItems;
+  const { session } = useAuth();
+  const [selectionOwner, setSelectionOwner] = useState(session?.user.id);
+  if (selectionOwner !== session?.user.id) {
+    setSelectionOwner(session?.user.id);
+    setSelected([]);
+  }
+  const products = useProductList("latest", null, searchKeyword, !!session);
+  const counts = useProductCounts(searchKeyword, !!session);
+  const results = (products.data?.pages.flat() ?? []).map((item) => ({
+    ...item,
+    imageUrl: item.thumbnailUrl,
+  }));
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -74,13 +63,13 @@ export function ItemSelectScreen() {
   }, []);
 
   function toggle(item: PostItem) {
-    setSelectedIds((prev) =>
-      prev.includes(item.id)
-        ? prev.filter((id) => id !== item.id)
+    setSelected((prev) =>
+      prev.some((selectedItem) => selectedItem.id === item.id)
+        ? prev.filter((selectedItem) => selectedItem.id !== item.id)
         : maxAttachCount === 1
-          ? [item.id]
+          ? [item]
           : prev.length < maxAttachCount
-            ? [...prev, item.id]
+            ? [...prev, item]
             : prev,
     );
   }
@@ -105,7 +94,7 @@ export function ItemSelectScreen() {
 
       <View className="w-full flex-row items-center justify-between px-margin py-3">
         {keyword ? (
-          <Text className="text-gray-700 font-b3">{`'${keyword}' 검색 결과 ${results.length}개`}</Text>
+          <Text className="text-gray-700 font-b3">{`'${keyword}' 검색 결과${counts.data && !counts.isPlaceholderData ? ` ${counts.data.total}개` : " 조회 중"}`}</Text>
         ) : (
           <HelperText
             className="flex-1"
@@ -122,7 +111,36 @@ export function ItemSelectScreen() {
       </View>
 
       <FlatList
-        data={results}
+        data={products.isPlaceholderData ? [] : results}
+        refreshing={products.isRefetching && !products.isFetchingNextPage}
+        onRefresh={() => void products.refetch()}
+        onEndReached={() => {
+          if (products.hasNextPage && !products.isFetching && !products.isFetchNextPageError)
+            void products.fetchNextPage();
+        }}
+        ListEmptyComponent={
+          products.isPending || products.isPlaceholderData ? (
+            <Spinner />
+          ) : (
+            <Text className="py-8 text-center text-gray-500 font-b3">
+              {products.isError ? "아이템을 불러오지 못했습니다." : "선택할 아이템이 없습니다."}
+            </Text>
+          )
+        }
+        ListFooterComponent={
+          products.isError ? (
+            <Button
+              onPress={() => {
+                if (products.isFetchNextPageError) void products.fetchNextPage();
+                else void products.refetch();
+              }}
+            >
+              다시 시도
+            </Button>
+          ) : products.isFetchingNextPage ? (
+            <Spinner />
+          ) : null
+        }
         numColumns={COLUMN_COUNT}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
@@ -146,14 +164,14 @@ export function ItemSelectScreen() {
       >
         <Button
           size="large"
-          isDisabled={selectedIds.length === 0}
+          isDisabled={!session || selectedIds.length === 0}
           onPress={() => {
             Keyboard.dismiss();
-            setItems(availableItems.filter((item) => selectedIds.includes(item.id)));
+            setItems(selected);
             router.back();
           }}
         >
-          첨부하기
+          {`첨부하기(${selected.length}/${maxAttachCount}개)`}
         </Button>
       </View>
     </KeyboardAvoidingView>

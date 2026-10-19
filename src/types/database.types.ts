@@ -281,6 +281,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_path: string | null;
+          community_policy_agreed_at: string | null;
           created_at: string;
           id: string;
           nickname: string;
@@ -292,6 +293,7 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           avatar_path?: string | null;
+          community_policy_agreed_at?: string | null;
           created_at?: string;
           id: string;
           nickname: string;
@@ -302,6 +304,7 @@ export type Database = {
         };
         Update: {
           avatar_path?: string | null;
+          community_policy_agreed_at?: string | null;
           created_at?: string;
           id?: string;
           nickname?: string;
@@ -354,6 +357,17 @@ export type Database = {
     };
     Functions: {
       accept_policy: { Args: { target_policy_id: number }; Returns: undefined };
+      agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
+      create_post: {
+        Args: {
+          post_content: string;
+          post_kind: Database["public"]["Enums"]["post_type"];
+          product_ids: number[];
+          request_id: string;
+        };
+        Returns: string;
+      };
+      delete_community_post: { Args: { target_post_id: number }; Returns: undefined };
       get_community_comments: {
         Args: { after_created_at?: string; after_id?: number; target_post_id: number };
         Returns: Json;
