@@ -34,8 +34,8 @@ export function DiggleScreen() {
   const posts = feed.data?.pages.flat() ?? [];
 
   useEffect(() => {
-    if (feed.error) showToast(communityErrorMessage(feed.error));
-  }, [feed.error, showToast]);
+    if (feed.error && posts.length > 0) showToast(communityErrorMessage(feed.error));
+  }, [feed.error, posts.length, showToast]);
 
   return (
     <View className="flex-1 bg-gray-0">

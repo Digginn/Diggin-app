@@ -282,11 +282,24 @@ function nodes(node, type) {
   return [
     ...(node.type === type ? [node] : []),
     ...React.Children.toArray(node.props.children).flatMap((child) => nodes(child, type)),
+    ...nodes(node.props.ListHeaderComponent, type),
+    ...nodes(node.props.ListFooterComponent, type),
+    ...(node.type === "FlatList"
+      ? (node.props.data ?? []).flatMap((item) => nodes(node.props.renderItem({ item }), type))
+      : []),
   ];
 }
 
-function screenMocks({ session = {}, post = null, feed = {}, comments = [] } = {}) {
+function screenMocks({
+  session = {},
+  post = null,
+  feed = {},
+  comments = [],
+  postResult = {},
+  commentsResult = {},
+} = {}) {
   let destination;
+  const toasts = [];
   const mocks = {
     "react": {
       ...React,
@@ -315,7 +328,9 @@ function screenMocks({ session = {}, post = null, feed = {}, comments = [] } = {
         push: (value) => {
           destination = value;
         },
-        replace: () => {},
+        replace: (value) => {
+          destination = value;
+        },
         setParams: () => {},
       }),
     },
@@ -331,15 +346,16 @@ function screenMocks({ session = {}, post = null, feed = {}, comments = [] } = {
     "@/components/Comment": { Comment: "Comment" },
     "@/constants/messages": { DIGGLE_EMPTY_MESSAGES: { all: "empty", vote: "empty" } },
     "@/contexts/AuthContext": { useAuth: () => ({ session, isRestoring: false }) },
-    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/hooks/useToast": { useToast: () => (message) => toasts.push(message) },
     "./queries/useCommunity": {
       useCommunityFeed: () => feed,
-      useCommunityPost: () => ({ data: post }),
-      useCommunityComments: () => ({ data: { pages: [comments] } }),
+      useCommunityPost: () => ({ data: post, ...postResult }),
+      useCommunityComments: () => ({ data: { pages: [comments] }, ...commentsResult }),
     },
     "./utils/formatCommunityTime": {
       formatCommunityTime: () => "방금 전",
-      communityErrorMessage: () => "error",
+      communityErrorMessage: load("src/screens/diggle/utils/formatCommunityTime.ts")
+        .communityErrorMessage,
     },
     "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
     "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
@@ -356,7 +372,7 @@ function screenMocks({ session = {}, post = null, feed = {}, comments = [] } = {
           : null,
     },
   };
-  return { mocks, destination: () => destination };
+  return { mocks, toasts, destination: () => destination };
 }
 
 test("비회원 상세 직접 진입은 로그인 안내로 차단하고 없는 글에 목업을 보여주지 않는다", () => {
@@ -490,4 +506,131 @@ test("서버가 비공개로 내려준 투표 집계는 작성자·마감 화면
     .map((node) => React.Children.toArray(node.props.children).join(""))
     .join(" ");
   assert.ok(!text.includes("0명"));
+});
+
+test("상세 URL의 종류가 다르면 실제 글 주소로 교체하며 없는 글 안내를 띄우지 않는다", async () => {
+  for (const actualType of ["post", "vote"]) {
+    const post = await api({ ...MEMBER, type: actualType }).fetchCommunityPost("12");
+    const state = screenMocks({ post });
+    state.mocks.react.useEffect = (effect) => effect();
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const tree = PostDetailScreen({ type: actualType === "post" ? "vote" : "all" });
+    assert.equal(
+      state.destination().pathname,
+      actualType === "vote" ? "/votes/[id]" : "/posts/[id]",
+    );
+    assert.equal(state.destination().params.id, "12");
+    assert.equal(nodes(tree, "EmptyState").length, 0);
+    assert.equal(nodes(tree, "Spinner").length, 1);
+  }
+});
+
+test("댓글은 스크롤 끝에서 추가 조회하고 진행 중·마지막 페이지·실패 상태에서는 반복 요청하지 않는다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  let requests = 0;
+  const commentsResult = {
+    hasNextPage: true,
+    isFetching: false,
+    isFetchNextPageError: false,
+    fetchNextPage: (options) => {
+      assert.equal(options.cancelRefetch, false);
+      requests++;
+    },
+  };
+  const state = screenMocks({ post, commentsResult });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const list = () => nodes(PostDetailScreen({}), "FlatList")[0];
+  list().props.onEndReached();
+  assert.equal(requests, 1);
+  commentsResult.isFetching = true;
+  list().props.onEndReached();
+  commentsResult.isFetching = false;
+  commentsResult.hasNextPage = false;
+  list().props.onEndReached();
+  commentsResult.hasNextPage = true;
+  commentsResult.isFetchNextPageError = true;
+  list().props.onEndReached();
+  assert.equal(requests, 1);
+  assert.equal(
+    nodes(PostDetailScreen({}), "Button").some(
+      (button) => button.props.children === "댓글 더 보기",
+    ),
+    false,
+  );
+});
+
+test("댓글 첫 조회와 추가 조회 실패는 본문·기존 댓글을 유지하고 댓글 전용 안내 및 올바른 재시도를 제공한다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  for (const nextPage of [false, true]) {
+    let refetched = 0,
+      fetchedNext = 0;
+    const state = screenMocks({
+      post,
+      comments: nextPage ? [{ id: "1", body: "기존 댓글", createdAt: PREVIEW.created_at }] : [],
+      commentsResult: {
+        isError: true,
+        error: { message: "server error" },
+        isFetchNextPageError: nextPage,
+        refetch: () => refetched++,
+        fetchNextPage: () => fetchedNext++,
+      },
+    });
+    state.mocks.react.useEffect = (effect) => effect();
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const tree = PostDetailScreen({});
+    assert.equal(
+      nodes(tree, "Text").some((text) => text.props.children === post.body),
+      true,
+    );
+    assert.equal(nodes(tree, "Comment").length, nextPage ? 1 : 0);
+    assert.equal(
+      nodes(tree, "Text").some(
+        (text) => text.props.children === "댓글을 불러오지 못했습니다. 다시 시도해 주세요.",
+      ),
+      true,
+    );
+    assert.deepEqual(state.toasts, []);
+    nodes(tree, "Button")
+      .find((button) => button.props.children === "댓글 다시 불러오기")
+      .props.onPress();
+    assert.equal(refetched, nextPage ? 0 : 1);
+    assert.equal(fetchedNext, nextPage ? 1 : 0);
+  }
+});
+
+test("피드·상세 첫 조회 실패는 화면 안내만 표시하고 기존 게시글이 있는 재조회 실패만 토스트로 알린다", async () => {
+  const error = { message: "server error" };
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  for (const hasData of [false, true]) {
+    const detail = screenMocks({
+      post: hasData ? post : null,
+      postResult: { isError: true, error },
+    });
+    detail.mocks.react.useEffect = (effect) => effect();
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", detail.mocks);
+    const tree = PostDetailScreen({});
+    assert.equal(detail.toasts.length, hasData ? 1 : 0);
+    assert.equal(nodes(tree, "EmptyState").length, hasData ? 0 : 1);
+    const feed = screenMocks({
+      feed: { data: { pages: [hasData ? [post] : []] }, isError: true, error },
+    });
+    feed.mocks.react.useEffect = (effect) => effect();
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", feed.mocks);
+    const list = nodes(DiggleScreen(), "FlatList")[0];
+    assert.equal(feed.toasts.length, hasData ? 1 : 0);
+    assert.equal(
+      nodes(list.props.ListEmptyComponent, "Text")[0].props.children,
+      "게시글을 불러오지 못했습니다. 다시 시도해 주세요.",
+    );
+  }
+});
+
+test("투표 블록은 본문 컨테이너의 좌우 여백을 그대로 사용한다", () => {
+  const { VoteBlock } = load("src/screens/diggle/components/VoteBlock.tsx", {
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+  });
+  const tree = VoteBlock({
+    vote: { buyCount: 0, notCount: 0, myChoice: null, isClosed: false, remainingLabel: "1시간" },
+  });
+  assert.equal(tree.props.className.includes("px-margin"), false);
 });
