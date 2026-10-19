@@ -363,6 +363,9 @@ function screenMocks({
         toggle() {},
       }),
     },
+    "./hooks/useCommunityVote": {
+      useCommunityVote: () => ({ isPending: false, choose() {} }),
+    },
     "@/assets/images/appbar": { IconNotification: "IconNotification" },
     "@/components/app-bar": {
       AppBar: Object.assign(() => null, { IconButton: "IconButton", TextButton: "TextButton" }),

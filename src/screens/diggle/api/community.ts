@@ -66,7 +66,7 @@ function parseItem(value: unknown): CommunityItem {
   };
 }
 
-function parsePost(value: unknown): CommunityPost {
+export function parsePost(value: unknown): CommunityPost {
   const row = record(value);
   if (row.type !== "post" && row.type !== "vote") throw new Error("invalid_community_response");
   if (row.my_choice != null && row.my_choice !== "buy" && row.my_choice !== "not")

@@ -39,6 +39,7 @@ import { VoteBlock } from "./components/VoteBlock";
 import { mergeComments } from "./domain/comments";
 import { useCommentActions } from "./hooks/useCommentActions";
 import { useCommunityLike } from "./hooks/useCommunityLike";
+import { useCommunityVote } from "./hooks/useCommunityVote";
 import { useCommunityVoteTiming } from "./hooks/useCommunityVoteTiming";
 import { useCommunityComments, useCommunityPost } from "./queries/useCommunity";
 import type { CommunityComment, CommunityItem } from "./types/community";
@@ -65,6 +66,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const post = result.data;
   const isWrongRoute = !!post && post.type !== (type === "vote" ? "vote" : "post");
   const voteTiming = useCommunityVoteTiming(post, result.dataUpdatedAt);
+  const vote = useCommunityVote(post, session?.user.id ?? null, voteTiming?.isClosed ?? false);
   const comments = useCommunityComments(id, !!post && !isWrongRoute);
   const actions = useCommentActions(id, session?.user.id ?? null);
   const like = useCommunityLike(post, session?.user.id ?? null);
@@ -288,7 +290,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                 />
                 {post.type === "vote" && voteTiming && (
                   <VoteBlock
-                    isReadOnly
+                    isReadOnly={vote.isPending}
+                    onChoose={(choice) => void vote.choose(choice)}
                     isMyVote={post.isMine}
                     hasResults={post.buyCount !== null && post.notCount !== null}
                     vote={{

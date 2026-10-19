@@ -1,0 +1,103 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set search_path = public, extensions;
+select no_plan();
+
+insert into auth.users(id,email) values
+ ('96000000-0000-0000-0000-000000000001','vote-author@test.dev'),
+ ('96000000-0000-0000-0000-000000000002','vote-member@test.dev'),
+ ('96000000-0000-0000-0000-000000000003','vote-other@test.dev');
+insert into private.posts(author_id,type,content,ends_at) values
+ ('96000000-0000-0000-0000-000000000001','vote','투표 테스트 게시글',now()+interval '24 hours');
+select set_config('test.vote',(select max(id)::text from private.posts),true);
+insert into private.posts(author_id,type,content,created_at,ends_at) values
+ ('96000000-0000-0000-0000-000000000001','vote','마감 경계 테스트',now()-interval '24 hours',now());
+select set_config('test.closed',(select max(id)::text from private.posts),true);
+insert into private.posts(author_id,type,content) values
+ ('96000000-0000-0000-0000-000000000001','post','일반 게시글 테스트');
+select set_config('test.post',(select max(id)::text from private.posts),true);
+
+set local role anon;
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501',null,'비회원 투표 차단');
+select ok(not (public.get_community_feed('vote')->0 ? 'buy_count'),'비회원 마감/작성자 여부와 무관하게 집계 비공개');
+reset role;
+set local role authenticated;
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','not_authenticated','인증 누락 차단');
+set local request.jwt.claims='{"sub":"96000000-0000-0000-0000-000000000002","role":"authenticated"}';
+select is(public.get_community_post(current_setting('test.vote')::bigint)->>'buy_count',null,'진행 중 미참여자 BUY 비공개');
+select is(public.get_community_feed('vote')->0->>'not_count',null,'피드도 진행 중 미참여자 집계 비공개');
+select throws_ok($$select * from private.vote_responses$$,'42501',null,'원시 응답 우회 조회 차단');
+select throws_ok($$insert into private.vote_responses(post_id,user_id,choice) values (1,auth.uid(),'buy')$$,'42501',null,'원시 투표 직접 삽입 차단');
+select throws_ok($$select public.set_community_vote(0,'buy')$$,'42501','post_not_found','없는 투표 차단');
+select throws_ok($$select public.set_community_vote(current_setting('test.post')::bigint,'buy')$$,'22023','invalid_post_type','일반글에 투표 차단');
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'other')$$,'22023','invalid_vote_choice','잘못된 선택 차단');
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,null)$$,'22023','invalid_vote_choice','빈 선택 차단');
+select set_config('test.result',public.set_community_vote(current_setting('test.vote')::bigint,'buy')::text,true);
+select is(current_setting('test.result')::jsonb->>'my_choice','buy','최초 BUY 저장 응답');
+select is(current_setting('test.result')::jsonb->>'buy_count','1','별도 조회 없이 최신 집계 반환');
+select is(current_setting('test.result')::jsonb->>'not_count','0','NOT 0명 공개');
+select ok(not (current_setting('test.result')::jsonb ? 'author_id'),'응답 작성자 UUID 비공개');
+reset role;
+select set_config('test.response',(select id::text from private.vote_responses where post_id=current_setting('test.vote')::bigint),true);
+select set_config('test.updated',(select updated_at::text from private.vote_responses where id=current_setting('test.response')::bigint),true);
+set local role authenticated;
+select lives_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'동일 선택 재시도 성공');
+reset role;
+select is((select count(*) from private.vote_responses where post_id=current_setting('test.vote')::bigint),1::bigint,'동일 선택은 한 표 유지');
+select is((select updated_at::text from private.vote_responses where id=current_setting('test.response')::bigint),current_setting('test.updated'),'동일 선택은 갱신 시각도 유지');
+set local role authenticated;
+select set_config('test.result',public.set_community_vote(current_setting('test.vote')::bigint,'not')::text,true);
+select is(current_setting('test.result')::jsonb->>'my_choice','not','선택 변경 저장');
+select is(current_setting('test.result')::jsonb->>'buy_count','0','이전 선택 집계 감소');
+select is(current_setting('test.result')::jsonb->>'not_count','1','새 선택 집계 증가');
+reset role;
+select is((select id::text from private.vote_responses where post_id=current_setting('test.vote')::bigint),current_setting('test.response'),'변경 시 기존 응답 행 유지');
+set local role authenticated;
+set local request.jwt.claims='{"sub":"96000000-0000-0000-0000-000000000001","role":"authenticated"}';
+select is(public.get_community_post(current_setting('test.vote')::bigint)->>'not_count','1','작성자도 진행 중 결과 공개');
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','own_vote','작성자 본인 참여 차단');
+set local request.jwt.claims='{"sub":"96000000-0000-0000-0000-000000000003","role":"authenticated"}';
+select is(public.get_community_post(current_setting('test.vote')::bigint)->>'not_count',null,'다른 미참여자는 진행 중 결과 비공개');
+select is(public.get_community_post(current_setting('test.closed')::bigint)->>'buy_count','0','마감 미참여자 결과 공개');
+select throws_ok($$select public.set_community_vote(current_setting('test.closed')::bigint,'buy')$$,'P0001','vote_closed','마감 경계 신규 투표 차단');
+reset role;
+update private.posts set created_at=now()-interval '24 hours',ends_at=now() where id=current_setting('test.vote')::bigint;
+set local role authenticated;
+set local request.jwt.claims='{"sub":"96000000-0000-0000-0000-000000000002","role":"authenticated"}';
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'P0001','vote_closed','마감 후 선택 변경 차단');
+select is(public.get_community_post(current_setting('test.vote')::bigint)->>'not_count','1','마감 후 최종 결과 유지');
+reset role;
+update private.posts set created_at=now(),ends_at=now()+interval '24 hours',hidden_at=now() where id=current_setting('test.vote')::bigint;
+set local role authenticated;
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','post_not_found','숨김 투표 차단');
+reset role;
+update private.posts set hidden_at=null,deleted_at=now() where id=current_setting('test.vote')::bigint;
+set local role authenticated;
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','post_not_found','삭제 투표 차단');
+reset role;
+update private.posts set deleted_at=null where id=current_setting('test.vote')::bigint;
+insert into private.user_blocks(blocker_id,blocked_id) values ('96000000-0000-0000-0000-000000000002','96000000-0000-0000-0000-000000000001');
+set local role authenticated;
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','post_not_found','차단 작성자 투표 차단');
+reset role;
+delete from private.user_blocks where blocker_id='96000000-0000-0000-0000-000000000002';
+insert into private.reports(reporter_id,target_type,post_id,reported_user_id,reason) values
+ ('96000000-0000-0000-0000-000000000002','post',current_setting('test.vote')::bigint,'96000000-0000-0000-0000-000000000001','spam');
+set local role authenticated;
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','post_not_found','신고한 작성자 투표 차단');
+reset role;
+delete from private.reports where reporter_id='96000000-0000-0000-0000-000000000002';
+update public.profiles set status='community_restricted',restricted_until=now()+interval '7 days' where id='96000000-0000-0000-0000-000000000002';
+set local role authenticated;
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','community_restricted','커뮤니티 제재 투표 차단');
+reset role;
+update public.profiles set status='community_restricted',restricted_until=now()-interval '1 second' where id='96000000-0000-0000-0000-000000000002';
+set local role authenticated;
+select lives_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'제재 만료 후 참여 가능');
+reset role;
+update public.profiles set status='suspended',suspended_at=now() where id='96000000-0000-0000-0000-000000000002';
+set local role authenticated;
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'not')$$,'42501','community_restricted','정지 계정 투표 차단');
+reset role;
+select * from finish();
+rollback;
