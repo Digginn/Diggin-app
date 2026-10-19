@@ -874,3 +874,20 @@ test("상품명을 못 읽어도 JSON-LD 상품 이미지는 쓰고, 사이트 �
   );
   assert.equal(onlyOg.values.thumbnailUrl, null);
 });
+
+test("사이트 이름으로 시작하는 상품명은 지우지 않고, 뒤에 붙은 사이트 이름 조각만 뗀다", () => {
+  const name = (title, siteName = "Nike") =>
+    normalizeProductPage(
+      {
+        finalUrl: "https://www.nike.com/kr/t/air-force-1",
+        og: og({ title, siteName, image: "https://static.nike.com/a.png" }),
+        ld: null,
+        shop: null,
+      },
+      "https://www.nike.com/kr/t/air-force-1",
+    ).values.name;
+  assert.equal(name("Nike Air Force 1"), "Nike Air Force 1");
+  assert.equal(name("Air Force 1 | Nike.com"), "Air Force 1");
+  assert.equal(name("Nike Air Force 1 - Nike"), "Nike Air Force 1");
+  assert.equal(name("Nike"), "", "제목이 사이트 이름뿐이면 상품명이 아니다");
+});

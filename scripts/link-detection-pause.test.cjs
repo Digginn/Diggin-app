@@ -19,18 +19,11 @@ function load(file, mocks) {
   return module.exports;
 }
 
-test("링크를 직접 넣는 시트가 떠 있으면 감지 모달을 띄우지 않고 그 링크는 다시 묻지 않는다", async () => {
-  let effect;
-  const pause = load("../src/hooks/useLinkDetectionPause.ts", {
-    react: { useEffect: (callback) => (effect = callback) },
-  });
-  pause.useLinkDetectionPause(true);
-  const release = effect();
-
+function loadDetectedLink(pause, clipboardText) {
   const state = [];
   let cursor = 0;
   const effects = [];
-  const { useDetectedLink } = load("../src/hooks/useDetectedLink.ts", {
+  const detected = load("../src/hooks/useDetectedLink.ts", {
     "react": {
       useState: (initial) => {
         const index = cursor++;
@@ -46,14 +39,40 @@ test("링크를 직접 넣는 시트가 떠 있으면 감지 모달을 띄우지
     },
     "expo-clipboard": {
       hasStringAsync: async () => true,
-      getStringAsync: async () => "https://zigzag.kr/catalog/products/1",
+      getStringAsync: async () => clipboardText,
     },
     "@/hooks/useLinkDetectionPause": pause,
     "@/utils/itemLink": { findItemLink: (text) => text },
   });
-  useDetectedLink();
-  effects[0]();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(state[0], null, "시트가 떠 있는 동안에는 감지 모달을 띄우지 않는다");
+  const check = async () => {
+    cursor = 0;
+    detected.useDetectedLink();
+    effects.at(-1)();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return state[0];
+  };
+  return { check, markLinkHandled: detected.markLinkHandled };
+}
+
+test("시트가 떠 있는 동안 본 링크는 묻지 않되 기록하지 않아서, 시트를 닫고 돌아오면 다시 묻는다", async () => {
+  let effect;
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", {
+    react: { useEffect: (callback) => (effect = callback) },
+  });
+  pause.useLinkDetectionPause(true);
+  const release = effect();
+  const url = "https://zigzag.kr/catalog/products/1";
+  const { check } = loadDetectedLink(pause, url);
+
+  assert.equal(await check(), null, "시트가 떠 있는 동안에는 감지 모달을 띄우지 않는다");
   release();
+  assert.equal(await check(), url, "시트를 닫은 뒤 앱으로 돌아오면 같은 링크를 다시 묻는다");
+});
+
+test("불러오기를 시작한 링크는 같은 앱 실행 동안 다시 묻지 않는다", async () => {
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
+  const url = "https://zigzag.kr/catalog/products/2";
+  const { check, markLinkHandled } = loadDetectedLink(pause, url);
+  markLinkHandled(url);
+  assert.equal(await check(), null);
 });
