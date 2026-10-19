@@ -4,6 +4,7 @@ import { AppState, Platform } from "react-native";
 
 import { folderKeys } from "@/api/folders";
 import { productKeys, saveProduct } from "@/api/products";
+import { markLinkHandled } from "@/hooks/useDetectedLink";
 import { normalizeProductPage } from "@/screens/save/domain/normalizeProductPage";
 import type { ProductPageRaw } from "@/screens/save/domain/productPageScript";
 import type { ItemSaveValues } from "@/types/wish-item";
@@ -36,6 +37,8 @@ export function useItemSave() {
   const [readingUrl, setReadingUrl] = useState<string | null>(null);
 
   const start = useCallback((sourceUrl: string) => {
+    // 링크 입력 시트로 직접 넣은 링크를 클립보드에서 다시 묻지 않는다.
+    markLinkHandled(sourceUrl);
     setLoading(true);
     setReadingUrl(sourceUrl);
   }, []);

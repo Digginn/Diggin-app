@@ -5,11 +5,17 @@ import { AppState, type AppStateStatus } from "react-native";
 import { isLinkDetectionPaused } from "@/hooks/useLinkDetectionPause";
 import { findItemLink } from "@/utils/itemLink";
 
+// 불러오기를 시작했거나 감지 모달에서 답한 링크. 같은 앱 실행 동안 다시 묻지 않는다.
+const handledLinks = new Set<string>();
+
+export function markLinkHandled(url: string) {
+  handledLinks.add(url);
+}
+
 export function useDetectedLink() {
   const [link, setLink] = useState<string | null>(null);
   // 클립보드를 읽는 순간이 iOS 시스템 팝업이 뜨는 순간이다.
   const [hasReadClipboard, setHasReadClipboard] = useState(false);
-  const handledRef = useRef(new Set<string>());
   const deniedRef = useRef(false);
   const checkingRef = useRef(false);
 
@@ -28,12 +34,8 @@ export function useDetectedLink() {
       }
 
       const url = findItemLink(text);
-      if (!url || handledRef.current.has(url)) return;
-      // 사용자가 이미 링크를 직접 넣는 중이면 그 링크는 처리한 것으로 보고, 시트를 닫은 뒤에도 다시 묻지 않는다.
-      if (isLinkDetectionPaused()) {
-        handledRef.current.add(url);
-        return;
-      }
+      // 시트·모달이 떠 있으면 묻지 않고 넘긴다. 기록하지 않아서 다음에 앱으로 돌아오면 다시 묻는다.
+      if (!url || handledLinks.has(url) || isLinkDetectionPaused()) return;
 
       setLink(url);
     } catch {
@@ -44,7 +46,7 @@ export function useDetectedLink() {
   }, []);
 
   const handle = useCallback((url: string) => {
-    handledRef.current.add(url);
+    markLinkHandled(url);
     setLink(null);
   }, []);
 
