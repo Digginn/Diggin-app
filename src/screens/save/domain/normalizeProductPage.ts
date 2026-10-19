@@ -102,6 +102,7 @@ const LOGIN_PAGE = /^https?:\/\/[^?#]*[/.](?:log-?in|sign-?in)\b/i;
 /**
  * SAVE-005·006·007 페이지에서 모은 재료로 저장 시트 초안을 만든다.
  * 정확한 출처부터 쓴다: 쇼핑몰 전용 데이터 → JSON-LD 상품 정보 → Open Graph → 마이크로데이터 → eg: 메타.
+ * 가격만은 할인가가 명시된 값을 먼저 쓴다.
  * 상품명을 못 찾으면 실패로 보고, 찾은 값만 채운 채 사용자가 나머지를 입력한다.
  */
 export function normalizeProductPage(
@@ -127,18 +128,21 @@ export function normalizeProductPage(
   }
   const { ld, shop } = raw;
   const og = isSiteDefault(raw.og.url)
-    ? { ...raw.og, title: null, image: null, price: null }
+    ? { ...raw.og, title: null, image: null, price: null, salePrice: null }
     : raw.og;
   const name = truncate(
     asText(shop?.name) ?? asText(ld?.name) ?? cleanTitle(asText(og.title), asText(og.siteName)),
     NAME_MAX,
   );
+  // SAVE-010 할인가가 명시된 값(product:sale_price, eg:salePrice)을 정가일 수 있는 값보다 먼저 쓴다.
+  // 쇼핑몰 전용 데이터는 이미 판매가를 읽는다.
   const price =
     toKrwPrice(shop?.price, "KRW") ??
+    toKrwPrice(og.salePrice, og.saleCurrency) ??
+    toKrwPrice(raw.eg?.price, "KRW") ??
     toKrwPrice(ld?.price, ld?.currency) ??
     toKrwPrice(og.price, og.currency) ??
-    toKrwPrice(raw.md?.price, raw.md?.currency) ??
-    toKrwPrice(raw.eg?.price, "KRW");
+    toKrwPrice(raw.md?.price, raw.md?.currency);
   const hasFailed = name === "";
 
   return {

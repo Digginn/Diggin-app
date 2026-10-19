@@ -9,6 +9,9 @@ export type ProductPageRaw = {
     brand: string | null;
     price: string | null;
     currency: string | null;
+    /** 할인가 메타(product:sale_price). 정가 메타와 섞지 않고 따로 둔다. */
+    salePrice: string | null;
+    saleCurrency: string | null;
   };
   ld: {
     name: string | null;
@@ -171,8 +174,7 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
   };
 
   const read = () => {
-    // 할인가 메타가 있으면 정가 메타보다 먼저 쓰고, 통화도 같은 쪽에서 읽는다.
-    const salePrice = meta("product:sale_price:amount");
+    const currency = meta("product:price:currency") || meta("og:price:currency");
     return {
       finalUrl: location.href,
       og: {
@@ -181,11 +183,11 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
         url: meta("og:url"),
         siteName: meta("og:site_name"),
         brand: meta("product:brand"),
-        price: salePrice || meta("product:price:amount") || meta("og:price:amount"),
-        currency:
-          (salePrice && meta("product:sale_price:currency")) ||
-          meta("product:price:currency") ||
-          meta("og:price:currency"),
+        price: meta("product:price:amount") || meta("og:price:amount"),
+        currency,
+        salePrice: meta("product:sale_price:amount"),
+        // 할인가 통화를 따로 안 적는 쇼핑몰은 정가 통화를 쓴다.
+        saleCurrency: meta("product:sale_price:currency") || currency,
       },
       ld: readLd(),
       shop: readShop(),
@@ -220,10 +222,11 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     const image = (raw.ld && raw.ld.image) || raw.og.image;
     const price =
       (raw.shop && raw.shop.price) ??
+      raw.og.salePrice ??
+      (raw.eg && raw.eg.price) ??
       (raw.ld && raw.ld.price) ??
       raw.og.price ??
-      (raw.md && raw.md.price) ??
-      (raw.eg && raw.eg.price);
+      (raw.md && raw.md.price);
     const now = Date.now();
     // 올리브영은 eg: 메타가 붙기 전에 찾았다고 보면 가격 대기 시간이 먼저 끝나 버린다.
     const isShopDataPending = isOliveYoung && !raw.eg;
