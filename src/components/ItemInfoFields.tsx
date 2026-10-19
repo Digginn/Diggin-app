@@ -8,8 +8,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { WishLevelSelect } from "@/components/WishLevelSelect";
 import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 import type { ItemSaveValues } from "@/types/wish-item";
-
-import { formatPriceInput } from "../utils/formatPriceInput";
+import { formatPriceInput } from "@/utils/formatPriceInput";
 
 const TooltipIcon = cssInterop(TooltipSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },

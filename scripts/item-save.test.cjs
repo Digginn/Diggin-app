@@ -63,12 +63,9 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
     "@/components/Tooltip": { Tooltip: "Tooltip" },
     "@/hooks/useNativeModalVisible": { useNativeModalVisible: (visible) => visible },
     "@/components/WishLevelSelect": { WishLevelSelect: "WishLevelSelect" },
-    "../utils/formatPriceInput": load("../src/screens/item-detail/utils/formatPriceInput.ts", {}),
+    "@/utils/formatPriceInput": load("../src/utils/formatPriceInput.ts", {}),
   };
-  mocks["./ItemInfoFields"] = load(
-    "../src/screens/item-detail/components/ItemInfoFields.tsx",
-    mocks,
-  );
+  mocks["@/components/ItemInfoFields"] = load("../src/components/ItemInfoFields.tsx", mocks);
   const { ItemEditSheet } = load("../src/screens/item-detail/components/ItemEditSheet.tsx", mocks);
 
   const render = (props = {}) => {
@@ -201,7 +198,7 @@ test("폴더 선택하기는 폴더 목록이 없으면 다시 불러오고, 그
       FolderManageSheet: "FolderManageSheet",
     },
     "@/screens/item-detail/components/ItemEditSheet": { ITEM_INFO_DESCRIPTION: {} },
-    "@/screens/item-detail/components/ItemInfoFields": { ItemInfoFields: "ItemInfoFields" },
+    "@/components/ItemInfoFields": { ItemInfoFields: "ItemInfoFields" },
   });
   const render = () => {
     cursor = 0;

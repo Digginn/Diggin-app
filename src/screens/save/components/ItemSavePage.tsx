@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { findProductIdByUrl } from "@/api/products";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
+import { ItemInfoFields, type ItemInfoOverlay } from "@/components/ItemInfoFields";
 import { ActionModal } from "@/components/modal";
 import { ToastText } from "@/components/ToastText";
 import { TOAST_MESSAGES } from "@/constants/messages";
@@ -20,10 +21,6 @@ import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFolders } from "@/hooks/useFolders";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
 import { ITEM_INFO_DESCRIPTION } from "@/screens/item-detail/components/ItemEditSheet";
-import {
-  ItemInfoFields,
-  type ItemInfoOverlay,
-} from "@/screens/item-detail/components/ItemInfoFields";
 import type { ItemSaveValues } from "@/types/wish-item";
 
 type ItemSavePageProps = {

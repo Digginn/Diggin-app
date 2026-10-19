@@ -3,10 +3,9 @@ import { ScrollView, Text, View } from "react-native";
 
 import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
+import { ItemInfoFields, type ItemInfoOverlay } from "@/components/ItemInfoFields";
 import { ActionModal } from "@/components/modal";
 import type { ItemSaveValues } from "@/types/wish-item";
-
-import { ItemInfoFields, type ItemInfoOverlay } from "./ItemInfoFields";
 
 export const ITEM_INFO_DESCRIPTION = {
   loaded: "불러온 정보를 확인하고 저장해 주세요.",
