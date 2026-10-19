@@ -10,7 +10,7 @@ export function formatCommunityTime(createdAt: string, now = Date.now()) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export function communityErrorMessage(error: unknown) {
+export function communityErrorMessage(error: unknown, target: "게시글" | "댓글" = "게시글") {
   const message =
     error instanceof Error
       ? error.message
@@ -19,5 +19,5 @@ export function communityErrorMessage(error: unknown) {
         : "";
   return /network request failed|failed to fetch|networkerror|network_offline/i.test(message)
     ? "연결 상태를 확인한 후 다시 시도해 주세요."
-    : "게시글을 불러오지 못했습니다. 다시 시도해 주세요.";
+    : `${target}을 불러오지 못했습니다. 다시 시도해 주세요.`;
 }

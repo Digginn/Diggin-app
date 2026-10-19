@@ -24,7 +24,7 @@ export function VoteBlock({
   const hasResults = requestedResults ?? (isMyVote || vote.myChoice !== null || vote.isClosed);
 
   return (
-    <View className="w-full gap-2.5 px-margin pb-1 pt-4">
+    <View className="w-full gap-2.5 pb-1 pt-4">
       <View className="flex-row items-start justify-between">
         <Text className="text-gray-700 font-label-14">
           {vote.isClosed
