@@ -843,3 +843,34 @@ test("전용 처리가 없는 쇼핑몰도 표준 형식(ProductGroup·priceSpec
     "할인가가 따로 없으면 JSON-LD 가격을 쓴다",
   );
 });
+
+test("상품명을 못 읽어도 JSON-LD 상품 이미지는 쓰고, 사이트 로고일 수 있는 og:image는 쓰지 않는다", () => {
+  const { values, hasFailed } = normalizeProductPage(
+    {
+      finalUrl: "https://shop.example.com/p/1",
+      og: og({ image: "https://shop.example.com/logo.png" }),
+      ld: {
+        name: null,
+        brand: null,
+        image: "https://cdn.shop.example.com/product.jpg",
+        price: null,
+        currency: null,
+      },
+      shop: null,
+    },
+    "https://shop.example.com/p/1",
+  );
+  assert.equal(hasFailed, true);
+  assert.equal(values.thumbnailUrl, "https://cdn.shop.example.com/product.jpg");
+
+  const onlyOg = normalizeProductPage(
+    {
+      finalUrl: "https://shop.example.com/p/1",
+      og: og({ image: "https://shop.example.com/logo.png" }),
+      ld: null,
+      shop: null,
+    },
+    "https://shop.example.com/p/1",
+  );
+  assert.equal(onlyOg.values.thumbnailUrl, null);
+});
