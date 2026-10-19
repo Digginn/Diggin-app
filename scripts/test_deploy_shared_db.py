@@ -1,4 +1,5 @@
 import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 import tempfile
 import unittest
@@ -25,6 +26,7 @@ class DeploymentTests(unittest.TestCase):
         self.directory = self.root / "supabase/migrations"
         shutil.copytree(ROOT / "supabase/migrations", self.directory)
         self.local = {path.name.split("_")[0] for path in self.directory.glob("*.sql")}
+        self.future_version = (datetime.strptime(max(self.local), "%Y%m%d%H%M%S") + timedelta(seconds=1)).strftime("%Y%m%d%H%M%S")
         self.csv = {name.split("_")[0] for name in CSV_RECOVERY}
         self.remote = self.local - self.csv
 
@@ -44,9 +46,10 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(self.plan(self.local), ([], False))
 
     def test_normal_future_migration_does_not_use_include_all(self):
-        (self.directory / "20261019000000_future.sql").write_text("select 1;", encoding="utf-8")
-        self.local.add("20261019000000")
-        self.assertEqual(self.plan(self.local - {"20261019000000"}), (["20261019000000_future.sql"], False))
+        filename = f"{self.future_version}_future.sql"
+        (self.directory / filename).write_text("select 1;", encoding="utf-8")
+        self.local.add(self.future_version)
+        self.assertEqual(self.plan(self.local - {self.future_version}), ([filename], False))
 
     def test_unknown_historical_gap_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unreviewed out-of-order"):
@@ -66,7 +69,7 @@ class DeploymentTests(unittest.TestCase):
 
     def test_unknown_remote_version_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "remote migrations missing"):
-            self.plan(self.remote | {"20261020000000"})
+            self.plan(self.remote | {self.future_version})
 
     def test_empty_remote_history_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Empty remote history"):
