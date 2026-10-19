@@ -12,7 +12,7 @@ type LikeCommentRowProps = {
   likeCount: number;
   commentCount: number;
   isLiked: boolean;
-  onPressLike: () => void;
+  onPressLike?: () => void;
   hasLike?: boolean;
 };
 
@@ -32,7 +32,8 @@ export function LikeCommentRow({
           <Pressable
             accessibilityLabel="좋아요"
             accessibilityRole="button"
-            accessibilityState={{ selected: isLiked }}
+            accessibilityState={{ selected: isLiked, disabled: !onPressLike }}
+            disabled={!onPressLike}
             className="-mr-1.5 size-12 items-center justify-center active:opacity-75"
             onPress={onPressLike}
           >

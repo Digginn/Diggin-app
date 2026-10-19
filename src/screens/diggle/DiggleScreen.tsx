@@ -1,100 +1,148 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
-import { FlatList, View } from "react-native";
+import { useEffect, useState } from "react";
+import { FlatList, Text, View } from "react-native";
 
 import { IconNotification } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
+import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Fab } from "@/components/Fab";
 import { Spinner } from "@/components/Loading";
+import { LoginRequiredModal } from "@/components/modal";
 import { Post } from "@/components/Post";
-import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { DIGGLE_EMPTY_MESSAGES } from "@/constants/messages";
-import { useBlockedUsers } from "@/contexts/BlockedUsersContext";
-import { usePosts } from "@/contexts/PostsContext";
-import type { PostTab } from "@/types/post";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/useToast";
+
+import { useCommunityFeed } from "./queries/useCommunity";
+import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 const TABS = [
   { key: "all", label: "전체 게시글" },
   { key: "vote", label: "투표" },
 ];
 
-const LOAD_MORE_DELAY_MS = 1200;
-
 export function DiggleScreen() {
   const router = useRouter();
   const { tab: requestedTab } = useLocalSearchParams<{ tab?: string }>();
-  const tab: PostTab = requestedTab === "vote" ? "vote" : "all";
-  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
-  const { isBlocked, block } = useBlockedUsers();
-  const { posts: allPosts, votes } = usePosts();
-  const [isLoadingMore, setLoadingMore] = useState(false);
+  const tab = requestedTab === "vote" ? "vote" : "all";
+  const { session, isRestoring } = useAuth();
+  const [isLoginRequired, setLoginRequired] = useState(false);
+  const showToast = useToast();
+  const feed = useCommunityFeed(tab);
+  const posts = feed.data?.pages.flat() ?? [];
 
-  const posts = (tab === "vote" ? votes : allPosts).filter((post) => !isBlocked(post.authorId));
-
-  function loadMore() {
-    if (isLoadingMore) return;
-    setLoadingMore(true);
-    // TODO: 다음 페이지 조회 API 연결. 마지막 페이지면 스피너를 띄우지 않는다.
-    setTimeout(() => setLoadingMore(false), LOAD_MORE_DELAY_MS);
-  }
+  useEffect(() => {
+    if (feed.error && posts.length > 0) showToast(communityErrorMessage(feed.error));
+  }, [feed.error, posts.length, showToast]);
 
   return (
     <View className="flex-1 bg-gray-0">
       <AppBar
         left="logo"
-        right={<AppBar.IconButton icon={IconNotification} accessibilityLabel="알림" />}
+        right={
+          <AppBar.IconButton
+            icon={IconNotification}
+            accessibilityLabel="알림"
+            onPress={() => {
+              if (!session) setLoginRequired(true);
+              else router.push("/notifications");
+            }}
+          />
+        }
       />
       <TopTab items={TABS} activeKey={tab} onChange={(key) => router.setParams({ tab: key })} />
-
-      {posts.length === 0 ? (
-        <EmptyState
-          variant={tab === "all" ? "post" : "vote"}
-          message={DIGGLE_EMPTY_MESSAGES[tab]}
-        />
+      {isRestoring || feed.isPending ? (
+        <View
+          accessibilityLabel="게시글 불러오는 중"
+          accessibilityState={{ busy: true }}
+          className="gap-6 px-margin pt-6"
+        >
+          {[0, 1, 2].map((key) => (
+            <View key={key} className="gap-3">
+              <View className="h-4 w-3/4 rounded bg-gray-100" />
+              <View className="h-32 rounded bg-gray-100" />
+            </View>
+          ))}
+        </View>
       ) : (
         <FlatList
           data={posts}
           keyExtractor={(post) => post.id}
-          onEndReached={loadMore}
+          refreshing={feed.isRefetching && !feed.isFetchingNextPage}
+          onRefresh={() => void feed.refetch()}
+          onEndReached={() => {
+            if (feed.hasNextPage && !feed.isFetching && !feed.isFetchNextPageError)
+              void feed.fetchNextPage();
+          }}
           onEndReachedThreshold={0.4}
+          ListEmptyComponent={
+            feed.isError ? (
+              <View className="items-center gap-4 px-margin py-12">
+                <Text className="text-center text-gray-500 font-b1">
+                  {communityErrorMessage(feed.error)}
+                </Text>
+                <View className="w-[156px]">
+                  <Button onPress={() => void feed.refetch()}>다시 시도</Button>
+                </View>
+              </View>
+            ) : (
+              <View className="h-96">
+                <EmptyState
+                  variant={tab === "all" ? "post" : "vote"}
+                  message={DIGGLE_EMPTY_MESSAGES[tab]}
+                />
+              </View>
+            )
+          }
           ListFooterComponent={
-            isLoadingMore ? (
+            feed.isFetchingNextPage ? (
               <View className="items-center py-5">
                 <Spinner />
               </View>
+            ) : feed.isFetchNextPageError ? (
+              <Button onPress={() => void feed.fetchNextPage()}>다시 시도</Button>
             ) : null
           }
           renderItem={({ item }) => (
             <Post
-              type={tab}
+              type={item.type === "vote" ? "vote" : "all"}
+              isPreview={item.isPreview}
               body={item.body}
               items={item.items}
-              timeLabel={item.timeLabel}
-              authorLabel={item.authorLabel}
-              likeCount={tab === "all" ? item.likeCount : undefined}
-              commentCount={item.commentCount}
-              onPress={() =>
-                router.push({
-                  pathname: tab === "vote" ? "/votes/[id]" : "/posts/[id]",
-                  params: { id: item.id },
-                })
-              }
-              onPressReport={() => setReportTarget({ authorId: item.authorId })}
+              timeLabel={formatCommunityTime(item.createdAt)}
+              authorLabel={item.isMine ? "글쓴이 (나)" : "글쓴이"}
+              likeCount={item.type === "post" ? (item.likeCount ?? undefined) : undefined}
+              commentCount={item.commentCount ?? 0}
+              onPress={() => {
+                if (!session) setLoginRequired(true);
+                else
+                  router.push({
+                    pathname: item.type === "vote" ? "/votes/[id]" : "/posts/[id]",
+                    params: { id: item.id },
+                  });
+              }}
             />
           )}
         />
       )}
-
       <View className="absolute bottom-6 right-[27px]">
+        {/* 작성 RPC는 #95에서 연결한다. 비회원 로그인 진입은 공통 Modal을 사용한다. */}
         <Fab
           accessibilityLabel={tab === "vote" ? "투표글 작성" : "게시글 작성"}
-          onPress={() => router.push(tab === "vote" ? "/votes/write" : "/posts/write")}
+          isDisabled={session !== null || isRestoring}
+          onPress={() => setLoginRequired(true)}
         />
       </View>
-
-      <ReportFlow target={reportTarget} onClose={() => setReportTarget(null)} onBlock={block} />
+      <LoginRequiredModal
+        visible={isLoginRequired && !session}
+        onClose={() => setLoginRequired(false)}
+        onLogin={() => {
+          setLoginRequired(false);
+          router.push("/login");
+        }}
+      />
     </View>
   );
 }

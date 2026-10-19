@@ -37,6 +37,7 @@ type PostProps = {
   onPress?: () => void;
   onPressReport?: () => void;
   onPressItemInfo?: (item: PostItem) => void;
+  isPreview?: boolean;
 };
 
 function Meta({ children }: { children: ReactNode }) {
@@ -64,6 +65,7 @@ export function Post({
   onPress,
   onPressReport,
   onPressItemInfo,
+  isPreview = false,
 }: PostProps) {
   const isVote = type === "vote";
 
@@ -82,7 +84,10 @@ export function Post({
         {isVote ? (
           <View className="w-full flex-row items-start gap-3">
             <View className="min-w-0 flex-1 self-stretch">
-              <Text className="h-[39px] w-full text-gray-1000 font-b4" numberOfLines={2}>
+              <Text
+                className="h-[39px] w-full text-gray-1000 font-b4"
+                numberOfLines={isPreview ? 1 : 2}
+              >
                 {body}
               </Text>
             </View>
@@ -118,34 +123,38 @@ export function Post({
           </View>
         )}
 
-        <View className="w-full flex-row items-center justify-between">
-          <View className="flex-row items-center gap-1.5">
-            <Meta>{timeLabel}</Meta>
-            <Text className="text-gray-500 font-b1">·</Text>
-            <Meta>{authorLabel}</Meta>
-            <Text className="text-gray-500 font-b1">·</Text>
-            <View className="flex-row items-center justify-end gap-2">
-              {likeCount !== undefined ? (
+        {!isPreview && (
+          <View className="w-full flex-row items-center justify-between">
+            <View className="flex-row items-center gap-1.5">
+              <Meta>{timeLabel}</Meta>
+              <Text className="text-gray-500 font-b1">·</Text>
+              <Meta>{authorLabel}</Meta>
+              <Text className="text-gray-500 font-b1">·</Text>
+              <View className="flex-row items-center justify-end gap-2">
+                {likeCount !== undefined ? (
+                  <View className="flex-row items-center justify-center gap-1">
+                    <HeartSvg {...HEART} color={colors.gray[500]} />
+                    <Meta>{likeCount}</Meta>
+                  </View>
+                ) : null}
                 <View className="flex-row items-center justify-center gap-1">
-                  <HeartSvg {...HEART} color={colors.gray[500]} />
-                  <Meta>{likeCount}</Meta>
+                  <CommentSvg {...COMMENT} color={colors.gray[500]} />
+                  <Meta>{commentCount}</Meta>
                 </View>
-              ) : null}
-              <View className="flex-row items-center justify-center gap-1">
-                <CommentSvg {...COMMENT} color={colors.gray[500]} />
-                <Meta>{commentCount}</Meta>
               </View>
             </View>
+            {onPressReport && (
+              <Pressable
+                accessibilityLabel="신고하기"
+                accessibilityRole="button"
+                className="size-12 flex-row items-center justify-end active:opacity-75"
+                onPress={onPressReport}
+              >
+                <ReportSvg width={18} height={18} color={colors.gray[400]} />
+              </Pressable>
+            )}
           </View>
-          <Pressable
-            accessibilityLabel="신고하기"
-            accessibilityRole="button"
-            className="size-12 flex-row items-center justify-end active:opacity-75"
-            onPress={onPressReport}
-          >
-            <ReportSvg width={18} height={18} color={colors.gray[400]} />
-          </Pressable>
-        </View>
+        )}
       </View>
     </Pressable>
   );

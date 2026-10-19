@@ -51,7 +51,7 @@ export function ProductImg({ url, onPressInfo, onRemove, className }: ProductImg
         >
           <MiniCloseIcon className="size-6" />
         </Pressable>
-      ) : (
+      ) : onPressInfo ? (
         <Pressable
           accessibilityLabel="아이템 정보 보기"
           accessibilityRole="button"
@@ -60,7 +60,7 @@ export function ProductImg({ url, onPressInfo, onRemove, className }: ProductImg
         >
           <InfoIcon className="size-5" />
         </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
