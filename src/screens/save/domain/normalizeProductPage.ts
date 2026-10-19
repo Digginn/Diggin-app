@@ -40,14 +40,20 @@ const KNOWN_SITE_NAMES = [
 /** "상품명 - 에이블리", "상품명 | 무신사"처럼 뒤에 붙은 사이트 이름을 뗀다. 제목이 사이트 이름뿐이면 상품명이 아니다. */
 function cleanTitle(title: string | null, siteName: string | null) {
   if (!title) return null;
-  const site = siteName?.toLowerCase();
+  const site = siteName?.trim().toLowerCase();
   const isSiteName = (part: string) => {
     const text = part.trim().toLowerCase();
-    return KNOWN_SITE_NAMES.includes(text) || (site !== undefined && text.includes(site));
+    return KNOWN_SITE_NAMES.includes(text) || text === site;
   };
   const parts = title.split(/\s[-|:]\s/);
-  while (parts.length > 1 && isSiteName(parts.at(-1)!)) parts.pop();
+  // 뒤 조각은 "Nike.com"처럼 사이트 이름이 들어 있기만 해도 뗀다.
+  while (
+    parts.length > 1 &&
+    (isSiteName(parts.at(-1)!) || (!!site && parts.at(-1)!.toLowerCase().includes(site)))
+  )
+    parts.pop();
   const cleaned = parts.join(" - ").trim();
+  // 제목 전체는 사이트 이름과 똑같을 때만 버린다. "Nike Air Force 1"처럼 사이트 이름으로 시작하는 상품명이 있다.
   return isSiteName(cleaned) ? null : cleaned;
 }
 
