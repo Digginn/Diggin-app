@@ -133,7 +133,7 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
         useProductList: (_sort, _level, query) => ({
           data: {
             pages: [
-              Array.from({ length: query ? 3 : 9 }, (_, i) => ({
+              Array.from({ length: query === "partial" ? 2 : query ? 3 : 9 }, (_, i) => ({
                 id: String(i),
                 name: ["미니 토트백", "캔버스 숄더 가방", "레더 크로스백"][i] ?? `아이템 ${i}`,
                 price: null,
@@ -201,6 +201,11 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
       findAll(render(), "Button")[0].props.onPress();
       assert.equal(attached[0].name, "미니 토트백");
     }
+    findAll(render(), "SearchField")[0].props.onChangeText("partial");
+    const partial = findAll(render(), "FlatList")[0];
+    assert.equal(partial.props.data.length, 3);
+    assert.equal(partial.props.data[2], null, "결과가 2개여도 빈 셀로 세 열 너비 유지");
+    assert.equal(partial.props.renderItem({ item: null }).props.className, "flex-1");
   }
 });
 

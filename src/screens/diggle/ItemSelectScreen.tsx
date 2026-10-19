@@ -46,6 +46,14 @@ export function ItemSelectScreen() {
     ...item,
     imageUrl: item.thumbnailUrl,
   }));
+  // ALL 목록과 같이 마지막 행을 채워 검색 결과가 1~2개여도 세 열 너비를 유지한다.
+  const gridItems = [
+    ...results,
+    ...Array.from(
+      { length: (COLUMN_COUNT - (results.length % COLUMN_COUNT)) % COLUMN_COUNT },
+      () => null,
+    ),
+  ];
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -111,7 +119,7 @@ export function ItemSelectScreen() {
       </View>
 
       <FlatList
-        data={products.isPlaceholderData ? [] : results}
+        data={products.isPlaceholderData ? [] : gridItems}
         refreshing={products.isRefetching && !products.isFetchingNextPage}
         onRefresh={() => void products.refetch()}
         onEndReached={() => {
@@ -142,20 +150,24 @@ export function ItemSelectScreen() {
           ) : null
         }
         numColumns={COLUMN_COUNT}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item?.id ?? `empty-${index}`}
         keyboardShouldPersistTaps="handled"
         columnWrapperStyle={{ gap: COLUMN_GAP, marginBottom: ROW_GAP }}
         contentContainerStyle={{ paddingHorizontal: SCREEN_PADDING, paddingTop: 8 }}
-        renderItem={({ item }) => (
-          <SelectCard
-            item={item}
-            name={item.name}
-            price={item.price}
-            brand={item.brand}
-            isSelected={selectedIds.includes(item.id)}
-            onToggle={() => toggle(item)}
-          />
-        )}
+        renderItem={({ item }) =>
+          item ? (
+            <SelectCard
+              item={item}
+              name={item.name}
+              price={item.price}
+              brand={item.brand}
+              isSelected={selectedIds.includes(item.id)}
+              onToggle={() => toggle(item)}
+            />
+          ) : (
+            <View className="flex-1" />
+          )
+        }
       />
 
       <View
