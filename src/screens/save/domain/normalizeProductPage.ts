@@ -162,8 +162,9 @@ export function normalizeProductPage(
       sourceUrl: stripTrackingParams(
         hasFailed || !raw.finalUrl.startsWith("https://") ? sourceUrl : raw.finalUrl,
       ),
-      // 상품명을 못 읽은 페이지의 이미지는 사이트 로고일 때가 많다. 저장 후 못 바꾸니(PDT-006) 쓰지 않는다.
-      thumbnailUrl: hasFailed ? null : (toHttpsImage(ld?.image) ?? toHttpsImage(og.image)),
+      // JSON-LD 상품 이미지는 상품명이 없어도 그 상품 것이라 쓴다. og:image는 상품명을 못 읽은 페이지에선
+      // 사이트 로고일 때가 많고 저장 후 못 바꾸니(PDT-006) 쓰지 않는다.
+      thumbnailUrl: toHttpsImage(ld?.image) ?? (hasFailed ? null : toHttpsImage(og.image)),
       wishLevel: null,
     },
   };
