@@ -89,7 +89,7 @@ function parsePost(value: unknown): CommunityPost {
   };
 }
 
-function databaseId(id: string) {
+export function databaseId(id: string) {
   const value = Number(id);
   if (!/^\d+$/.test(id) || !Number.isSafeInteger(value) || value <= 0)
     throw new Error("invalid_post_id");
@@ -126,15 +126,17 @@ export async function fetchCommunityComments(
     ...cursorArgs(after),
   });
   if (error) throw error;
-  return rows(data).map((value) => {
-    const row = record(value);
-    return {
-      ...cursor(row),
-      body: optionalText(row.content),
-      isPostAuthor: row.is_post_author === true,
-      isMine: row.is_mine === true,
-      isWithdrawn: row.is_withdrawn === true,
-      anonNumber: count(row.anon_number),
-    };
-  });
+  return rows(data).map(parseCommunityComment);
+}
+
+export function parseCommunityComment(value: unknown): CommunityComment {
+  const row = record(value);
+  return {
+    ...cursor(row),
+    body: optionalText(row.content),
+    isPostAuthor: row.is_post_author === true,
+    isMine: row.is_mine === true,
+    isWithdrawn: row.is_withdrawn === true,
+    anonNumber: count(row.anon_number),
+  };
 }
