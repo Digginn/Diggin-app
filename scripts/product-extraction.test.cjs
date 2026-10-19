@@ -804,11 +804,42 @@ test("전용 처리가 없는 쇼핑몰도 표준 형식(ProductGroup·priceSpec
   assert.equal(eg.price, "8900");
   assert.equal(eg.brand, "브랜드C");
 
-  const ldFirst = read({
+  // SAVE-010 JSON-LD에 정가만 있고 할인가가 메타에 따로 있으면 할인가를 쓴다.
+  const saleOverLd = read({
     lds: [
-      { "@type": "Product", "name": "가방", "offers": { price: "70000", priceCurrency: "KRW" } },
+      {
+        "@type": "Product",
+        "name": "가방",
+        "brand": "브랜드D",
+        "offers": { price: "70000", priceCurrency: "KRW" },
+      },
     ],
-    metas: { "eg:salePrice": "1" },
+    metas: {
+      "eg:salePrice": "56000",
+      "eg:brandName": "다른이름",
+      "product:price:amount": "70000",
+      "product:price:currency": "KRW",
+    },
   });
-  assert.equal(ldFirst.price, "70000", "더 정확한 JSON-LD가 있으면 eg: 메타보다 먼저 쓴다");
+  assert.equal(saleOverLd.price, "56000", "eg: 할인가를 JSON-LD 정가보다 먼저 쓴다");
+  assert.equal(saleOverLd.brand, "브랜드D", "브랜드는 그대로 JSON-LD를 먼저 쓴다");
+  assert.equal(
+    read({
+      lds: [
+        { "@type": "Product", "name": "가방", "offers": { price: "70000", priceCurrency: "KRW" } },
+      ],
+      metas: { "product:sale_price:amount": "49000", "product:price:currency": "KRW" },
+    }).price,
+    "49000",
+    "할인가 메타에 통화가 없으면 정가 통화를 쓰고, JSON-LD 정가보다 먼저 쓴다",
+  );
+  assert.equal(
+    read({
+      lds: [
+        { "@type": "Product", "name": "가방", "offers": { price: "70000", priceCurrency: "KRW" } },
+      ],
+    }).price,
+    "70000",
+    "할인가가 따로 없으면 JSON-LD 가격을 쓴다",
+  );
 });
