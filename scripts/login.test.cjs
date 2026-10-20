@@ -315,6 +315,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   let cursor = 0;
   let emit;
   const signOutOptions = [];
+  const order = [];
   const cacheClears = [];
   const supabase = {
     auth: {
@@ -325,6 +326,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
       },
       signOut: async (options) => {
         signOutOptions.push(options);
+        order.push("signOut");
         emit("SIGNED_OUT", null);
         return { error: null };
       },
@@ -350,6 +352,11 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     },
     "@/lib/supabase": { supabase },
     "@/lib/queryClient": { queryClient: { clear: () => cacheClears.push(true) } },
+    "@/lib/pushNotifications": {
+      unregisterDevicePush: async () => {
+        order.push("unregisterPush");
+      },
+    },
   });
   const render = () => {
     cursor = 0;
@@ -359,6 +366,11 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   await render().signOut();
   assert.equal(signOutOptions.length, 1);
   assert.equal(signOutOptions[0].scope, "local", "이 기기 세션만 끊는다");
+  assert.deepEqual(
+    order,
+    ["unregisterPush", "signOut"],
+    "세션을 끊기 전에 이 기기 Push 토큰을 지운다",
+  );
   assert.equal(render().isSessionExpired, false);
   emit("TOKEN_REFRESHED", { id: "s2" });
   assert.equal(render().isSessionExpired, false);
