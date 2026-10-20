@@ -53,6 +53,7 @@ function setup(screenName) {
             Text: "Text",
             Pressable: "Pressable",
             ScrollView: "ScrollView",
+            FlatList: "FlatList",
             TextInput: "TextInput",
             Keyboard: {
               isVisible: () => false,
@@ -102,6 +103,10 @@ function setup(screenName) {
             IconWithdrawalClose: "IconWithdrawalClose",
           };
         if (name === "./constants/supportChannel") return { SUPPORT_CHANNEL_URL: CHANNEL_URL };
+        if (name === "./constants/policyDocuments.json")
+          return require("../src/screens/my/constants/policyDocuments.json");
+        if (name === "./constants/openSourceLicenses.json")
+          return require("../src/screens/my/constants/openSourceLicenses.json");
         return require(name);
       },
     },
@@ -169,7 +174,7 @@ test("비로그인 MY는 로그인과 고객지원만 제공한다", async () =>
   const supportRows = sections[1].props.rows;
   assert.deepEqual(
     Array.from(supportRows, (row) => row.label),
-    ["1:1 문의", "이용약관", "앱 정보"],
+    ["1:1 문의", "약관 및 정책", "앱 정보"],
   );
   await supportRows[0].onPress();
   assert.deepEqual(context.opened, [CHANNEL_URL]);
@@ -207,7 +212,7 @@ test("MY 문의는 채널로 바로 이동하고 실패할 때만 고객지원 �
   context.failLink();
   await contact.onPress();
   assert.deepEqual(context.routes, ["/customer-support"]);
-  section.props.rows.find((row) => row.label === "이용약관").onPress();
+  section.props.rows.find((row) => row.label === "약관 및 정책").onPress();
   assert.equal(context.routes[1], "/terms");
 });
 
@@ -325,7 +330,7 @@ test("약관 목록은 48px 행·safe area를 적용하고 문서 종류를 사�
   const rows = nodes.filter((node) => node.type === "Pressable");
   assert.deepEqual(
     rows.map((node) => node.props.accessibilityLabel),
-    ["이용약관", "개인정보 처리방침", "오픈소스 라이센스"],
+    ["이용약관", "개인정보 처리방침", "커뮤니티 이용정책", "오픈소스 라이센스"],
   );
   assert.ok(rows.every((row) => row.props.className.includes("h-12")));
   assert.equal(
@@ -333,11 +338,44 @@ test("약관 목록은 48px 행·safe area를 적용하고 문서 종류를 사�
     58,
   );
   rows.forEach((row) => row.props.onPress());
-  assert.deepEqual(selected, ["terms", "privacy", "licenses"]);
+  assert.deepEqual(selected, ["terms", "privacy", "community", "licenses"]);
+  assert.equal(nodes.find((node) => node.type === "AppBar").props.title, "약관 및 정책");
   descendants(context.Screen())
-    .find((node) => node.type === "Pressable")
-    .props.onPress();
-  assert.deepEqual(context.toasts, ["약관 본문은 준비 중입니다."]);
+    .filter((node) => node.type === "Pressable")
+    .forEach((node) => node.props.onPress());
+  assert.deepEqual(context.routes, [
+    "/policies/terms",
+    "/policies/privacy",
+    "/policies/community",
+    "/policies/licenses",
+  ]);
+  assert.deepEqual(context.toasts, []);
+});
+
+test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다", () => {
+  const context = setup("PolicyDocumentScreen");
+  function expand(element) {
+    if (!React.isValidElement(element)) return [];
+    if (typeof element.type === "function") return expand(element.type(element.props));
+    return [element, ...React.Children.toArray(element.props.children).flatMap(expand)];
+  }
+  for (const [document, title, lastText] of [
+    ["terms", "이용약관", "고객지원: diggin.app@gmail.com"],
+    ["privacy", "개인정보 처리방침", "· 개인정보 관련 문의처: [확인 필요]"],
+    [
+      "community",
+      "커뮤니티 이용정책",
+      "게시글을 등록하면 DIGGIN 커뮤니티 이용정책에 동의한 것으로 간주됩니다.",
+    ],
+  ]) {
+    const nodes = expand(context.Screen({ document }));
+    assert.equal(nodes.find((node) => node.type === "AppBar").props.title, title);
+    assert.ok(nodes.some((node) => node.type === "ScrollView"));
+    const textNodes = nodes.filter((node) => node.type === "Text");
+    assert.ok(textNodes.at(-1).props.children.endsWith(lastText));
+    assert.ok(textNodes.every((node) => node.props.selectable));
+    assert.ok(textNodes.every((node) => node.props.className));
+  }
 });
 
 test("MY 회원탈퇴 메뉴가 확인 창을 열고 취소하며 콜백을 전달한다", () => {
