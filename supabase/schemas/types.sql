@@ -9,6 +9,7 @@ create type public.vote_choice as enum ('buy', 'not');
 create type public.report_target as enum ('post', 'comment');
 create type public.report_reason as enum ('abuse', 'spam', 'inappropriate', 'other');
 create type public.report_status as enum ('received', 'reviewing', 'resolved', 'rejected');
+create type public.notification_type as enum ('vote_ended', 'post_commented', 'post_liked');
 
 create type public.import_status as enum ('processing', 'completed', 'failed');
 
