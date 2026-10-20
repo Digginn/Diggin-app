@@ -7,6 +7,7 @@ import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconBack } from "@/assets/images/appbar";
+import MoreIcon from "@/assets/images/folder/icon-detail-more.svg";
 import ShareSvg from "@/assets/images/icon-share.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
@@ -14,16 +15,19 @@ import { ErrorState } from "@/components/ErrorState";
 import { FallbackImg } from "@/components/FallbackImg";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
+import { ActionModal } from "@/components/modal";
 import { WishLevel } from "@/components/WishLevel";
 import { STATE_MESSAGES, TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
 import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useFolders } from "@/hooks/useFolders";
+import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useToast } from "@/hooks/useToast";
+import { useDeleteProducts } from "@/screens/all/mutations/useDeleteProducts";
+import { FolderMenu } from "@/screens/folder/components/FolderMenu";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
-import { EditChip } from "./components/EditChip";
 import { FolderManageButton } from "./components/FolderManageButton";
 import { FolderManageSheet } from "./components/FolderManageSheet";
 import { ItemEditSheet } from "./components/ItemEditSheet";
@@ -89,6 +93,21 @@ export function ItemDetailScreen() {
     { width: windowWidth, height: HERO_HEIGHT },
     { x: 0, y: insets.top, width: 48, height: 48 },
   );
+  const isMoreAreaDark = useIsImageDark(
+    thumbnail,
+    { width: windowWidth, height: HERO_HEIGHT },
+    { x: windowWidth - 48, y: insets.top, width: 48, height: 48 },
+  );
+  const [isMenuOpen, setMenuOpen] = useState(false);
+  const [isDeleteOpen, setDeleteOpen] = useState(false);
+  const deleteProduct = useDeleteProducts();
+  // isPending은 다시 그린 뒤에야 버튼을 막아, 그 사이 들어온 연타·닫기는 여기서 막는다.
+  const isDeletingRef = useRef(false);
+  // 시트·모달 위에 클립보드 감지 모달이 겹치면 iOS가 무시하고 투명한 창만 남아 화면이 멈춘다.
+  useLinkDetectionPause(isEditOpen || isFolderOpen || isMenuOpen || isDeleteOpen);
+  const isHeaderDisabled = isEditOpen || isFolderOpen;
+  const headerIconColor = (isDark: boolean) =>
+    isHeaderDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900";
 
   async function openFolderSheet() {
     const [folderResult, folderIdsResult] = await Promise.all([
@@ -103,7 +122,8 @@ export function ItemDetailScreen() {
     setFolderOpen(true);
   }
 
-  if (product.isError) {
+  // 삭제하면 목록을 새로 고치면서 이 상품도 다시 불러와 "없음" 오류가 나는데, 곧 나가는 화면이라 무시한다.
+  if (product.isError && !deleteProduct.isPending && !deleteProduct.isSuccess) {
     return (
       <View className="flex-1 bg-gray-0" style={{ paddingTop: insets.top }}>
         <AppBar.IconButton
@@ -157,14 +177,18 @@ export function ItemDetailScreen() {
               icon={IconBack}
               accessibilityLabel="뒤로 가기"
               onPress={() => router.back()}
-              disabled={isEditOpen || isFolderOpen}
-              className={
-                isEditOpen || isFolderOpen
-                  ? "text-gray-400"
-                  : isBackAreaDark
-                    ? "text-gray-0"
-                    : "text-gray-900"
-              }
+              disabled={isHeaderDisabled}
+              className={headerIconColor(isBackAreaDark)}
+            />
+          </View>
+          <View className="absolute right-0 top-0" style={{ paddingTop: insets.top }}>
+            <AppBar.IconButton
+              icon={MoreIcon}
+              iconSize={16}
+              accessibilityLabel="아이템 더보기"
+              onPress={() => setMenuOpen(true)}
+              disabled={isHeaderDisabled}
+              className={headerIconColor(isMoreAreaDark)}
             />
           </View>
 
@@ -209,7 +233,6 @@ export function ItemDetailScreen() {
               <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
                 {item.brand}
               </Text>
-              <EditChip onPress={() => setEditOpen(true)} />
             </View>
             <ItemInfo
               name={item.name}
@@ -255,6 +278,61 @@ export function ItemDetailScreen() {
             },
           )
         }
+      />
+
+      {isMenuOpen && (
+        <FolderMenu
+          placement="header"
+          subject="아이템"
+          // 메뉴 위쪽이 앱바(56) 아래에 붙도록 앵커 높이를 맞춘다. FolderMenu는 앵커 아래에서 4를 빼 둔다.
+          anchor={{ x: windowWidth - 48, y: insets.top, width: 48, height: 60 }}
+          onClose={() => setMenuOpen(false)}
+          onEdit={() => setEditOpen(true)}
+          onDelete={() => setDeleteOpen(true)}
+        />
+      )}
+
+      {/* PDT-007 상세에서 삭제할 때도 ALL 선택 삭제와 같은 확인 모달(MSG-PDT-003)을 쓴다. */}
+      <ActionModal
+        visible={isDeleteOpen}
+        type="2Btn"
+        title="아이템을 삭제하시겠습니까?"
+        description={
+          "삭제한 아이템은 복구할 수 없습니다.\n게시글·투표에 올린 아이템 정보는 유지됩니다."
+        }
+        // 이미 보낸 삭제는 닫아도 진행되니 삭제 중에는 닫지 못하게 한다.
+        onRequestClose={() => {
+          if (!isDeletingRef.current) setDeleteOpen(false);
+        }}
+        secondaryAction={{
+          label: "취소",
+          isDisabled: deleteProduct.isPending,
+          onPress: () => {
+            if (!isDeletingRef.current) setDeleteOpen(false);
+          },
+        }}
+        primaryAction={{
+          label: "삭제하기",
+          isDisabled: deleteProduct.isPending,
+          onPress: () => {
+            if (isDeletingRef.current) return;
+            isDeletingRef.current = true;
+            deleteProduct.mutate([id], {
+              onSettled: () => {
+                isDeletingRef.current = false;
+              },
+              onSuccess: () => {
+                setDeleteOpen(false);
+                showToast(TOAST_MESSAGES.ALL_007);
+                router.back();
+              },
+              onError: () => {
+                setDeleteOpen(false);
+                showToast(TOAST_MESSAGES.ALL_008);
+              },
+            });
+          },
+        }}
       />
 
       {isFolderOpen && folders.data && folderIds.data && (

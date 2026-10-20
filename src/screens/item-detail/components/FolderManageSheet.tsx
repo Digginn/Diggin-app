@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import AddIcon from "@/assets/images/folder/icon-folder-add.svg";
@@ -33,6 +33,9 @@ type FolderManageSheetProps = {
   /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
   errorMessage?: string;
   onErrorDismiss?: () => void;
+  isNewItem?: boolean;
+  overlay?: ReactNode;
+  getCreateErrorMessage?: (error: unknown) => string;
 };
 
 export function FolderManageSheet({
@@ -48,10 +51,13 @@ export function FolderManageSheet({
   isCompleting = false,
   errorMessage,
   onErrorDismiss,
+  isNewItem = false,
+  overlay,
+  getCreateErrorMessage,
 }: FolderManageSheetProps) {
   const [selectedIds, setSelectedIds] = useState(selectedFolderIds);
   const [isCreating, setIsCreating] = useState(false);
-  const [hasCreateFailed, setHasCreateFailed] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [pendingOwnedFolderId, setPendingOwnedFolderId] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
   // isCompleting은 다시 그린 뒤에야 버튼을 막아, 그 사이 들어온 연타는 여기서 막는다.
@@ -86,6 +92,7 @@ export function FolderManageSheet({
       onRequestClose={close}
       isCloseConfirmed={isCompleting}
       maxHeight={702}
+      height={isNewItem && folders.length >= 9 ? 702 : undefined}
       className="rounded-t-[20px]"
       handleClassName="mb-4 h-1 w-9 self-center rounded-sm bg-gray-300"
       scrimOpacity={0.36}
@@ -100,28 +107,29 @@ export function FolderManageSheet({
         </View>
       }
       overlay={
-        isCreating ? (
+        overlay ??
+        (isCreating ? (
           <FolderNameModal
             overlay={
-              hasCreateFailed ? (
+              createError ? (
                 <View pointerEvents="none" className="absolute inset-x-0 bottom-40">
-                  <FolderToast message={FOLDER_MESSAGES.createError} />
+                  <FolderToast message={createError} />
                 </View>
               ) : undefined
             }
             onClose={() => {
               setIsCreating(false);
-              setHasCreateFailed(false);
+              setCreateError(null);
             }}
             onSubmit={async (name) => {
               try {
                 const folder = await onCreateFolder(name);
                 setSelectedIds((previous) => [...previous, folder.id]);
                 listRef.current?.scrollTo({ y: 0, animated: false });
-                setHasCreateFailed(false);
+                setCreateError(null);
                 return true;
-              } catch {
-                setHasCreateFailed(true);
+              } catch (error) {
+                setCreateError(getCreateErrorMessage?.(error) ?? FOLDER_MESSAGES.createError);
                 return false;
               }
             }}
@@ -152,7 +160,7 @@ export function FolderManageSheet({
               setPendingOwnedFolderId(null);
             }}
           />
-        )
+        ))
       }
     >
       {/* 높이를 정하지 않아 폴더 수만큼 자라고, maxHeight 에 닿으면 목록이 줄며 스크롤된다. */}
@@ -193,7 +201,8 @@ export function FolderManageSheet({
                         ? previous.filter((id) => id !== folder.id)
                         : [...previous, folder.id],
                     );
-                    if (folder.isOwnedItems && !isSelected) setPendingOwnedFolderId(folder.id);
+                    if (!isNewItem && folder.isOwnedItems && !isSelected)
+                      setPendingOwnedFolderId(folder.id);
                   }}
                 >
                   <Text numberOfLines={1} className="flex-1 text-gray-900 font-b2">

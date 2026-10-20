@@ -1,5 +1,5 @@
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -113,6 +113,15 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
     };
   }, [scrollEditing]);
   const [infoItem, setInfoItem] = useState<CommunityItem | null>(null);
+  const returnItem = useRef<CommunityItem | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (returnItem.current) {
+        setInfoItem(returnItem.current);
+        returnItem.current = null;
+      }
+    }, []),
+  );
   const [isLoginPromptVisible, setLoginPromptVisible] = useState(true);
   const goBack = () => {
     if (!isBusy) {
@@ -405,6 +414,18 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         price={infoItem?.price ?? null}
         imageUrl={infoItem?.imageUrl}
         onRequestClose={() => setInfoItem(null)}
+        onSaveToAll={
+          infoItem?.name && infoItem.url && post
+            ? () => {
+                returnItem.current = infoItem;
+                setInfoItem(null);
+                router.push({
+                  pathname: "/posts/save",
+                  params: { postId: post.id, itemId: infoItem.id },
+                });
+              }
+            : undefined
+        }
         onOpenWebsite={() => {
           const url = infoItem?.url;
           if (!url || !/^https:\/\//i.test(url)) {

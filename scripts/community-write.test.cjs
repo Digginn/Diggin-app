@@ -64,6 +64,19 @@ test("입력창은 50자 초과를 반영하지 않고 테두리·카운터를 �
   assert.equal(body.postBodyLength(value), 50);
   assert.match(render().props.className, /border-semantic-error/);
   assert.match(nodes(render(), "Text")[0].props.className, /text-semantic-error/);
+  value = "가".repeat(49) + "끝";
+  const fullBody = value;
+  for (const position of [0, 25, 50]) {
+    const next = fullBody.slice(0, position) + "새" + fullBody.slice(position);
+    nodes(render(), "TextInput")[0].props.onChangeText(next);
+    assert.equal(value, fullBody, "50자에서 한 글자를 삽입해도 기존 본문을 유지한다");
+  }
+  nodes(render(), "TextInput")[0].props.onChangeText("👨‍👩‍👧‍👦" + fullBody);
+  assert.equal(value, fullBody, "조합 이모지 한 글자도 기존 본문을 밀어내지 않는다");
+  nodes(render(), "TextInput")[0].props.onChangeText("나" + fullBody.slice(1));
+  assert.equal(value, "나" + fullBody.slice(1), "50자에서도 선택한 글자는 교체할 수 있다");
+  nodes(render(), "TextInput")[0].props.onChangeText("붙여넣기" + fullBody);
+  assert.equal(value, body.limitPostBody("붙여넣기" + fullBody), "여러 글자 붙여넣기는 50자로 자른다");
   nodes(render(), "TextInput")[0].props.onChangeText("가".repeat(49));
   assert.doesNotMatch(render().props.className, /border-semantic-error/);
   nodes(render(), "TextInput")[0].props.onChangeText("👍🏽".repeat(70));

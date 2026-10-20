@@ -39,7 +39,11 @@ export function readSinglePixelPng(bytes: Uint8Array): [number, number, number] 
   idat.reduce((offset, chunk) => (joined.set(chunk, offset), offset + chunk.length), 0);
   const raw = unzlibSync(joined);
   // 픽셀이 하나라 왼쪽·위 이웃이 모두 0이어서 줄 앞 필터 종류와 관계없이 값이 그대로다.
-  return [raw[1], raw[2], raw[3]];
+  if (colorType === 2) return [raw[1], raw[2], raw[3]];
+  // 투명 PNG(KREAM 등)는 투명한 곳이 0,0,0으로 읽혀 검게 보인다. 화면에서처럼 흰 배경 위에 섞은 색으로 본다.
+  const alpha = raw[4] / 255;
+  const onWhite = (value: number) => Math.round(value * alpha + 255 * (1 - alpha));
+  return [onWhite(raw[1]), onWhite(raw[2]), onWhite(raw[3])];
 }
 
 /** WCAG 상대 휘도 기준으로 흰색이 검정보다 잘 보이면 어두운 색이다. */
