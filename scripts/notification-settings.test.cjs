@@ -54,6 +54,8 @@ function setup(props = {}) {
           return { useSafeAreaInsets: () => ({ bottom: 34 }) };
         if (name === "@/components/app-bar") return { AppBar: "AppBar" };
         if (name === "@/components/Toggle") return { Toggle: "Toggle" };
+        if (name === "@/screens/notification/components/PushOffBanner")
+          return { PushOffBanner: "PushOffBanner" };
         if (name === "@/hooks/useToast")
           return {
             useToast:
@@ -70,40 +72,39 @@ function setup(props = {}) {
     refCursor = 0;
     return screen.exports.NotificationSettingsScreen(props);
   };
-  const rows = () => React.Children.toArray(render().props.children)[2].props.children;
-  const toggles = () => rows().map((row) => React.Children.toArray(row.props.children)[1].props);
+  const toggles = () =>
+    descendants(render())
+      .filter((node) => node.type === "Toggle")
+      .map((node) => node.props);
   return { render, toggles, toasts, cleanup: () => cleanup(), states };
 }
 
-test("Figma의 네 가지 항목·공용 토글·48px 행·safe area를 적용한다", () => {
+function descendants(node) {
+  if (!React.isValidElement(node)) return [];
+  return [node, ...React.Children.toArray(node.props.children).flatMap(descendants)];
+}
+
+test("Figma의 푸시 알림 항목·설명·공용 토글·safe area를 적용한다", () => {
   const { render, toggles } = setup();
   const children = React.Children.toArray(render().props.children);
   assert.equal(children[0].props.style, "dark");
   assert.equal(children[1].props.title, "알림 설정");
-  assert.equal(children[1].props.titleClassName, "font-label-20-medium");
+  assert.equal(children[1].props.titleClassName, undefined);
   assert.equal(children[2].props.contentContainerStyle.paddingBottom, 58);
   assert.deepEqual(
     Array.from(toggles(), (toggle) => toggle.accessibilityLabel),
-    ["전체 알림", "투표 종료 알림", "게시글 댓글 알림", "게시글 좋아요 알림"],
+    ["푸시 알림"],
   );
   assert.ok(toggles().every((toggle) => toggle.isOn && !toggle.isDisabled));
 });
 
-test("개별 설정을 변경하고 전체 OFF→ON에서 하위 선택을 복원한다", async () => {
+test("푸시 알림을 껐다 켜며 앱 알림 OFF가 기기 권한 배너를 만들지 않는다", async () => {
   const { toggles } = setup();
-  await toggles()[1].onChange(false);
-  assert.equal(toggles()[1].isOn, false);
-  assert.equal(toggles()[2].isOn, true);
   await toggles()[0].onChange(false);
   assert.ok(toggles().every((toggle) => !toggle.isOn));
-  assert.ok(
-    toggles()
-      .slice(1)
-      .every((toggle) => toggle.isDisabled),
-  );
+  assert.equal(toggles()[0].isDisabled, false);
   await toggles()[0].onChange(true);
-  assert.equal(toggles()[1].isOn, false);
-  assert.equal(toggles()[2].isOn, true);
+  assert.equal(toggles()[0].isOn, true);
 });
 
 test("저장 성공 시 다음 설정을 전달하고 실패 시 이전 설정과 회색 토스트를 복원한다", async () => {
@@ -115,9 +116,10 @@ test("저장 성공 시 다음 설정을 전달하고 실패 시 이전 설정�
         if (hasFailure) throw new Error("API failure");
       },
     });
-    await toggles()[2].onChange(false);
-    assert.equal(saved[0].isCommentEnabled, false);
-    assert.equal(toggles()[2].isOn, hasFailure);
+    await toggles()[0].onChange(false);
+    assert.equal(saved[0].isAllEnabled, false);
+    assert.equal(saved[0].isCommentEnabled, true);
+    assert.equal(toggles()[0].isOn, hasFailure);
     assert.ok(toggles().every((toggle) => !toggle.isDisabled));
     assert.deepEqual(
       toasts,
@@ -137,7 +139,7 @@ test("저장 중 중복 요청을 막고 언마운트 후 실패 토스트를 �
       });
     },
   });
-  const pending = toggles()[3].onChange(false);
+  const pending = toggles()[0].onChange(false);
   assert.ok(toggles().every((toggle) => toggle.isDisabled));
   await toggles()[0].onChange(false);
   assert.equal(calls, 1);
@@ -145,4 +147,139 @@ test("저장 중 중복 요청을 막고 언마운트 후 실패 토스트를 �
   finish(new Error("late failure"));
   await pending;
   assert.equal(toasts.length, 0);
+});
+
+test("기기 알림이 꺼졌을 때만 닫기 없는 배너와 설정 이동을 제공한다", () => {
+  let opened = 0;
+  const context = setup({ isDevicePushEnabled: false, onOpenNotificationSettings: () => opened++ });
+  const banner = descendants(context.render()).find((node) => node.type === "PushOffBanner");
+  assert.equal(banner.props.onClose, undefined);
+  assert.equal(banner.props.title, "기기 알림이 꺼져 있습니다.");
+  assert.equal(banner.props.description, "알림을 받으려면 기기 설정에서 알림을 허용해 주세요.");
+  banner.props.onOpenSettings();
+  assert.equal(opened, 1);
+  for (const isDevicePushEnabled of [true, undefined]) {
+    assert.equal(
+      descendants(setup({ isDevicePushEnabled }).render()).some(
+        (node) => node.type === "PushOffBanner",
+      ),
+      false,
+    );
+  }
+  assert.ok(
+    descendants(context.render()).some(
+      (node) => node.props.children === "푸시 알림을 꺼도 알림함에서 확인할 수 있습니다.",
+    ),
+  );
+});
+
+function setupRoute(platform = "ios") {
+  let state,
+    effect,
+    onAppState,
+    permission = { granted: false },
+    settingsFailure = false;
+  const calls = { reads: 0, opened: 0, alerts: 0, removed: 0 };
+  const route = { exports: {} };
+  const mocks = {
+    "react": {
+      useState: () => [
+        state,
+        (value) => {
+          state = value;
+        },
+      ],
+      useEffect: (callback) => {
+        effect ??= callback;
+      },
+    },
+    "react-native": {
+      Platform: { OS: platform },
+      AppState: {
+        addEventListener: (_, listener) => {
+          onAppState = listener;
+          return { remove: () => calls.removed++ };
+        },
+      },
+      Linking: {
+        openSettings: async () => {
+          calls.opened++;
+          if (settingsFailure) throw new Error("unavailable");
+        },
+      },
+      Alert: { alert: () => calls.alerts++ },
+    },
+    "expo-notifications": {
+      getPermissionsAsync: async () => {
+        calls.reads++;
+        return permission;
+      },
+      IosAuthorizationStatus: { PROVISIONAL: 3, EPHEMERAL: 4 },
+    },
+    "@/screens/my/NotificationSettingsScreen": { NotificationSettingsScreen: "Settings" },
+  };
+  runInNewContext(
+    ts.transpileModule(
+      readFileSync(path.join(__dirname, "../src/app/notification-settings.tsx"), "utf8"),
+      {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+      },
+    ).outputText,
+    {
+      module: route,
+      exports: route.exports,
+      require: (name) => mocks[name] ?? require(name),
+      console,
+    },
+  );
+  const render = () => route.exports.default();
+  render();
+  const cleanup = effect();
+  return {
+    render,
+    calls,
+    cleanup,
+    resume: () => onAppState("active"),
+    setPermission: (value) => {
+      permission = value;
+    },
+    failSettings: () => {
+      settingsFailure = true;
+    },
+  };
+}
+
+test("기기 권한 조회·설정 복귀 시 갱신·iOS 임시 허용·언마운트를 처리한다", async () => {
+  const context = setupRoute();
+  await new Promise(setImmediate);
+  assert.equal(context.render().props.isDevicePushEnabled, false);
+  for (const permission of [
+    { granted: true },
+    { granted: false, ios: { status: 3 } },
+    { granted: false, ios: { status: 4 } },
+  ]) {
+    context.setPermission(permission);
+    context.resume();
+    await new Promise(setImmediate);
+    assert.equal(context.render().props.isDevicePushEnabled, true);
+  }
+  await context.render().props.onOpenNotificationSettings();
+  assert.equal(context.calls.opened, 1);
+  context.failSettings();
+  await context.render().props.onOpenNotificationSettings();
+  await new Promise(setImmediate);
+  assert.equal(context.calls.alerts, 1);
+  context.setPermission({ granted: false });
+  context.resume();
+  context.cleanup();
+  await new Promise(setImmediate);
+  assert.equal(context.calls.removed, 1);
+  assert.equal(context.render().props.isDevicePushEnabled, true);
+});
+
+test("웹에서는 네이티브 알림 권한을 조회하지 않는다", async () => {
+  const context = setupRoute("web");
+  await new Promise(setImmediate);
+  assert.equal(context.calls.reads, 0);
+  assert.equal(context.render().props.isDevicePushEnabled, undefined);
 });
