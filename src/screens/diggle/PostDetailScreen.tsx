@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Linking, Text, View } from "react-native";
@@ -7,10 +8,13 @@ import { Button } from "@/components/Button";
 import { Comment } from "@/components/Comment";
 import { EmptyState } from "@/components/EmptyState";
 import { Spinner } from "@/components/Loading";
-import { LoginRequiredModal } from "@/components/modal";
+import { ActionModal, LoginRequiredModal } from "@/components/modal";
+import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
 
+import { communityKeys } from "./api/community";
+import { communityWriteError, deleteCommunityPost } from "./api/communityWrite";
 import { LikeCommentRow } from "./components/LikeCommentRow";
 import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
@@ -25,6 +29,18 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const router = useRouter();
   const { session, isRestoring } = useAuth();
   const showToast = useToast();
+  const queryClient = useQueryClient();
+  const [isDeleteOpen, setDeleteOpen] = useState(false);
+  const [isDeleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const deleting = useRef(false);
+  const currentViewer = useRef(session?.user.id);
+  useEffect(() => {
+    currentViewer.current = session?.user.id;
+    return () => {
+      currentViewer.current = undefined;
+    };
+  }, [session?.user.id]);
   const result = useCommunityPost(id);
   const post = result.data;
   const isWrongRoute = !!post && post.type !== (type === "vote" ? "vote" : "post");
@@ -42,6 +58,30 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   );
   const [isLoginPromptVisible, setLoginPromptVisible] = useState(true);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/diggle"));
+
+  async function removePost() {
+    if (!post?.isMine || deleting.current) return;
+    const viewer = session?.user.id;
+    deleting.current = true;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteCommunityPost(post.id);
+      if (currentViewer.current !== viewer) return;
+      setDeleteOpen(false);
+      void queryClient.invalidateQueries({ queryKey: communityKeys.all });
+      router.dismissTo({
+        pathname: "/(tabs)/diggle",
+        params: { tab: post.type === "vote" ? "vote" : "all" },
+      });
+      showToast(post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.");
+    } catch (error) {
+      if (currentViewer.current === viewer) setDeleteError(communityWriteError(error));
+    } finally {
+      deleting.current = false;
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     if (result.error && post) showToast(communityErrorMessage(result.error));
@@ -73,7 +113,24 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
 
   return (
     <View className="flex-1 bg-gray-0">
-      <AppBar left="back" onBack={goBack} isDisabled={infoItem !== null} />
+      <AppBar
+        left="back"
+        onBack={goBack}
+        isDisabled={infoItem !== null || isDeleting}
+        right={
+          post?.isMine && !isWrongRoute ? (
+            <AppBar.TextButton
+              disabled={isDeleting || infoItem !== null}
+              onPress={() => {
+                setDeleteError("");
+                setDeleteOpen(true);
+              }}
+            >
+              삭제
+            </AppBar.TextButton>
+          ) : null
+        }
+      />
       {isRestoring || result.isPending || isWrongRoute ? (
         <View
           accessibilityLabel="게시글 불러오는 중"
@@ -133,7 +190,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                   />
                 )}
               </View>
-              {/* 변경 Action은 #95~97에서 연결한다. 원격 글에 로컬 목업 변경을 적용하지 않는다. */}
+              {/* 좋아요·댓글 쓰기는 #97에서 연결한다. */}
               <LikeCommentRow
                 likeCount={post.likeCount ?? 0}
                 commentCount={post.commentCount ?? 0}
@@ -215,6 +272,32 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             showToast("아이템 페이지를 열지 못했습니다. 다시 시도해 주세요."),
           );
         }}
+      />
+      <ActionModal
+        visible={isDeleteOpen}
+        type="2Btn"
+        title={post?.type === "vote" ? "투표글을 삭제하시겠습니까?" : "게시글을 삭제하시겠습니까?"}
+        description="댓글도 함께 삭제되며 복구할 수 없습니다."
+        primaryAction={{
+          label: isDeleting ? "삭제 중…" : "삭제",
+          onPress: () => void removePost(),
+        }}
+        secondaryAction={{
+          label: "취소",
+          onPress: () => {
+            if (!deleting.current) setDeleteOpen(false);
+          },
+        }}
+        onRequestClose={() => {
+          if (!deleting.current) setDeleteOpen(false);
+        }}
+        overlay={
+          deleteError ? (
+            <View className="absolute bottom-12 self-center">
+              <ToastText message={deleteError} variant="error" />
+            </View>
+          ) : undefined
+        }
       />
     </View>
   );

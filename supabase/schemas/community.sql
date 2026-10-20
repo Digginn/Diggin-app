@@ -9,8 +9,10 @@ create table private.posts (
   hidden_at timestamptz,
   created_at timestamptz not null default now(),
   next_anon_number integer not null default 1 check (next_anon_number > 0),
+  creation_request_id uuid not null default gen_random_uuid(),
+  constraint posts_author_request_key unique (author_id, creation_request_id),
   constraint posts_content_length check (
-    private.char_count(regexp_replace(content, '[[:space:]]', '', 'g')) between 5 and 50
+    private.char_count(regexp_replace(content, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]', '', 'g')) between 5 and 50
   ),
   constraint posts_vote_end check (
     (type = 'post' and ends_at is null) or
