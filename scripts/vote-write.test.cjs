@@ -449,3 +449,32 @@ test("시간 경과·앱 복귀 시 종료를 갱신하고 갱신 전에도 만�
   cleanup();
   assert.equal(removed && cleared, true);
 });
+
+test("100% 결과의 인원 수는 회색 사각 배경 없이 흰색으로 표시하고 0명은 기본 색상을 유지한다", () => {
+  const { VoteBlock } = load("../src/screens/diggle/components/VoteBlock.tsx", {
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+  });
+  for (const [buyCount, notCount] of [
+    [1, 0],
+    [0, 12],
+  ]) {
+    const tree = VoteBlock({
+      vote: { buyCount, notCount, myChoice: null, isClosed: true, remainingLabel: "" },
+    });
+    const winner = findAll(tree, "Pressable")[buyCount ? 0 : 1];
+    const count = findAll(winner, "Text").find(
+      (node) =>
+        React.Children.toArray(node.props.children).join("") === `${buyCount || notCount}명`,
+    );
+    assert.ok(count.props.className.includes("text-gray-0"));
+    assert.ok(!count.props.className.includes("bg-"));
+    assert.equal(
+      findAll(winner, "View").find((node) => node.props.style)?.props.style.width,
+      "100%",
+    );
+    const loser = findAll(tree, "Pressable")[buyCount ? 1 : 0];
+    assert.ok(
+      findAll(loser, "Text").some((node) => node.props.className.includes("text-gray-900")),
+    );
+  }
+});

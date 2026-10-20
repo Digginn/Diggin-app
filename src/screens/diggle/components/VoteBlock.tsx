@@ -42,6 +42,7 @@ export function VoteBlock({
           const count = choice === "BUY" ? vote.buyCount : vote.notCount;
           const otherCount = choice === "BUY" ? vote.notCount : vote.buyCount;
           const isLeading = count > otherCount;
+          const isFull = total > 0 && count === total;
           const isDisabled =
             isReadOnly || !onChoose || vote.isClosed || (!isMyVote && vote.myChoice === choice);
           return (
@@ -85,7 +86,14 @@ export function VoteBlock({
                 ) : null}
               </View>
               <View className="absolute bottom-0 right-4 top-0 justify-center">
-                <Text className="bg-gray-100 text-gray-900 font-label-16-semibold">{count}명</Text>
+                <Text
+                  className={clsx(
+                    "font-label-16-semibold",
+                    isFull ? "text-gray-0" : "bg-gray-100 text-gray-900",
+                  )}
+                >
+                  {count}명
+                </Text>
               </View>
             </Pressable>
           );

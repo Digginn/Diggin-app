@@ -179,9 +179,11 @@ returns jsonb language sql stable set search_path = '' as $$
     'comment_count', (select count(*) from private.comments c where c.post_id = p.id
       and c.deleted_at is null and c.hidden_at is null and private.community_author_visible(c.author_id)),
     'my_choice', (select v.choice from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())),
-    'buy_count', case when exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid()))
+    'buy_count', case when p.type = 'vote' and (p.author_id = (select auth.uid()) or p.ends_at <= now() or
+      exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())))
       then (select count(*) from private.vote_responses v where v.post_id = p.id and v.choice = 'buy') else null end,
-    'not_count', case when exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid()))
+    'not_count', case when p.type = 'vote' and (p.author_id = (select auth.uid()) or p.ends_at <= now() or
+      exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())))
       then (select count(*) from private.vote_responses v where v.post_id = p.id and v.choice = 'not') else null end
   ) end
   from private.posts p where p.id = target_post_id;

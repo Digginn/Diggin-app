@@ -47,7 +47,7 @@ select ok(not (public.get_community_post(current_setting('test.post')::bigint) ?
 select is(public.get_community_post(current_setting('test.post')::bigint)->'items'->0->>'price','0','Snapshot 0원 보존');
 select is(public.get_community_post(current_setting('test.post')::bigint)->'items'->0->>'name','게시 시점 상품','Snapshot 상품 정보 조회');
 select is(jsonb_array_length(public.get_community_feed('vote')),1,'투표 탭은 투표글만 반환한다');
-select is(public.get_community_post(current_setting('test.vote')::bigint)->>'buy_count',null,'마감된 투표도 미참여자의 집계를 숨긴다');
+select is(public.get_community_post(current_setting('test.vote')::bigint)->>'buy_count','0','마감된 투표는 미참여자에게도 집계를 공개한다');
 select is(public.get_community_post(current_setting('test.hidden')::bigint),null,'숨긴 글은 상세 조회 불가');
 select is(public.get_community_post(current_setting('test.deleted')::bigint),null,'삭제 글은 상세 조회 불가');
 select is(public.get_community_post(0),null,'없는 글은 목업 대신 null');
