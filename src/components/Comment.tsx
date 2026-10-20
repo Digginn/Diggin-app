@@ -4,11 +4,9 @@ import { Linking, Pressable, Text, View } from "react-native";
 
 import KebabSvg from "@/assets/images/icon-kebab.svg";
 import { colors } from "@/theme";
+import { httpLinkParts } from "@/utils/httpLinks";
 
 const KEBAB_SIZE = 16;
-// g 플래그가 붙으면 test 가 lastIndex 를 기억해서 쪼개기용과 판별용을 나눠 둠
-const URL_SPLIT = /(https?:\/\/[^\s]+)/g;
-const IS_URL = /^https?:\/\//;
 
 export type MenuAnchor = { x: number; y: number; width: number; height: number };
 
@@ -22,20 +20,25 @@ type CommentProps = {
   isDeleted?: boolean;
   /** 케밥의 창 기준 좌표를 같이 넘김 */
   onPressMenu?: (anchor: MenuAnchor) => void;
+  onOpenLink?: (url: string) => void;
 };
 
-function renderBody(body: string) {
-  return body.split(URL_SPLIT).map((part, index) =>
-    IS_URL.test(part) ? (
+function renderBody(body: string, onOpenLink?: (url: string) => void) {
+  return httpLinkParts(body).map((part, index) =>
+    part.url ? (
       <Text
         key={index}
         className="text-semantic-link underline"
-        onPress={() => Linking.openURL(part)}
+        onPress={(event) => {
+          event.stopPropagation();
+          if (onOpenLink) onOpenLink(part.url!);
+          else void Linking.openURL(part.url!).catch(() => {});
+        }}
       >
-        {part}
+        {part.text}
       </Text>
     ) : (
-      part
+      part.text
     ),
   );
 }
@@ -47,6 +50,7 @@ export function Comment({
   isHighlighted = false,
   isDeleted = false,
   onPressMenu,
+  onOpenLink,
 }: CommentProps) {
   const kebabRef = useRef<View>(null);
 
@@ -69,7 +73,7 @@ export function Comment({
         </View>
         {/* 케밥(48)이 이 줄의 높이를 만든다. 삭제된 댓글이라 숨겨도 높이는 유지한다. */}
         <View className="h-12 w-[120px] flex-row items-center justify-end gap-1.5">
-          {isDeleted ? null : (
+          {isDeleted || !onPressMenu ? null : (
             <Pressable
               ref={kebabRef}
               accessibilityLabel="댓글 메뉴"
@@ -85,8 +89,11 @@ export function Comment({
 
       <View className="w-full items-start px-margin">
         <View className="w-full items-start border-b border-gray-200 pb-4">
-          <Text className={clsx("w-full font-b3", isDeleted ? "text-gray-500" : "text-gray-800")}>
-            {isDeleted ? "삭제된 댓글입니다." : renderBody(body)}
+          <Text
+            onPress={!isDeleted && onPressMenu ? handlePressMenu : undefined}
+            className={clsx("w-full font-b3", isDeleted ? "text-gray-500" : "text-gray-800")}
+          >
+            {isDeleted ? "삭제된 댓글입니다." : renderBody(body, onOpenLink)}
           </Text>
         </View>
       </View>

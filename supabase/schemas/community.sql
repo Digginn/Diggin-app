@@ -9,8 +9,10 @@ create table private.posts (
   hidden_at timestamptz,
   created_at timestamptz not null default now(),
   next_anon_number integer not null default 1 check (next_anon_number > 0),
+  creation_request_id uuid not null default gen_random_uuid(),
+  constraint posts_author_request_key unique (author_id, creation_request_id),
   constraint posts_content_length check (
-    private.char_count(regexp_replace(content, '[[:space:]]', '', 'g')) between 5 and 50
+    private.char_count(regexp_replace(content, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]', '', 'g')) between 5 and 50
   ),
   constraint posts_vote_end check (
     (type = 'post' and ends_at is null) or
@@ -59,10 +61,12 @@ create table private.comments (
   post_id bigint not null references private.posts(id) on delete cascade,
   author_id uuid references public.profiles(id) on delete set null,
   content text check (content is null or private.char_count(content) between 1 and 30),
+  creation_request_id uuid not null default gen_random_uuid(),
   deleted_at timestamptz,
   hidden_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint comments_author_request_key unique (author_id, creation_request_id)
 );
 create index comments_post_idx on private.comments(post_id, created_at, id)
   where deleted_at is null and hidden_at is null;
@@ -175,9 +179,11 @@ returns jsonb language sql stable set search_path = '' as $$
     'comment_count', (select count(*) from private.comments c where c.post_id = p.id
       and c.deleted_at is null and c.hidden_at is null and private.community_author_visible(c.author_id)),
     'my_choice', (select v.choice from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())),
-    'buy_count', case when exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid()))
+    'buy_count', case when p.type = 'vote' and (p.author_id = (select auth.uid()) or p.ends_at <= now() or
+      exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())))
       then (select count(*) from private.vote_responses v where v.post_id = p.id and v.choice = 'buy') else null end,
-    'not_count', case when exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid()))
+    'not_count', case when p.type = 'vote' and (p.author_id = (select auth.uid()) or p.ends_at <= now() or
+      exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())))
       then (select count(*) from private.vote_responses v where v.post_id = p.id and v.choice = 'not') else null end
   ) end
   from private.posts p where p.id = target_post_id;

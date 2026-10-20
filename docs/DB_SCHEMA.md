@@ -14,7 +14,7 @@
 | 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                           |
 | 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다          |
 | 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69) |
-| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 구현 (#94), 쓰기 후속 (#95~97)                               |
+| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)        |
 | 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                               |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
@@ -186,17 +186,51 @@ import_failures
 
 #### #94 구현된 읽기 기반
 
-`supabase/schemas/community.sql`에 posts, post_products, vote_responses, post_likes, comments, post_anon_numbers와 조회 제외에 필요한 user_blocks, reports를 구현했다. 전부 RLS를 활성화하고 앱 역할의 테이블·시퀀스 직접 접근을 회수한다. 아래 나머지 설명의 create_post/vote/댓글/좋아요 쓰기 RPC와 운영·알림은 후속 작업이며 아직 구현하지 않았다. hidden_at/deleted_at은 구현했고 운영자 hidden_by FK는 운영 스키마 작업에서 추가한다.
+`supabase/schemas/community.sql`에 posts, post_products, vote_responses, post_likes, comments, post_anon_numbers와 조회 제외에 필요한 user_blocks, reports를 구현했다. 전부 RLS를 활성화하고 앱 역할의 테이블·시퀀스 직접 접근을 회수한다. 작성·정책 동의·삭제는 아래 #95 구현을 따른다. 투표는 아래 #96, 댓글·좋아요는 #97 구현을 따른다. 운영·알림은 후속 작업이다. hidden_at/deleted_at은 구현했고 운영자 hidden_by FK는 운영 스키마 작업에서 추가한다.
 
 - `get_community_feed(feed_type = 'all', after_created_at?, after_id?)`: 일반글·투표글 통합 또는 투표글만 최신순 20개를 반환한다. `(created_at, id)` 커서로 같은 시각의 글·앞쪽 신규 삽입에도 중복 페이지를 방지한다. 비회원은 첫 줄 본문과 Snapshot 이미지만 받으며 상품명·브랜드·가격·원본 링크·집계·본인 여부는 받지 않는다. 페이지 경계용 id/type/created_at은 포함한다.
 - `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·내가 차단하거나 신고한 작성자의 글은 null이다. 작성자 UUID는 응답에 없고 `is_mine`만 반환한다.
 - `get_community_comments(target_post_id, after_created_at?, after_id?)`: 동일한 게시글 접근 조건을 확인한 뒤 오래된 순 20개를 반환한다. 댓글도 삭제·숨김·작성자 차단/신고를 제외한다. UUID 없이 글쓴이/본인/탈퇴 여부와 게시물 단위 익명번호를 반환하며 탈퇴 사용자 본문은 항상 null이다.
-- 투표 집계는 본인의 응답이 존재할 때만 반환하고 미참여자에게는 null을 반환한다. 작성자·마감 후 미참여자의 공개 범위는 확인 필요 항목을 유지하며 임의로 공개하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
+- 투표 집계는 참여자·작성자에게 공개하고, 마감 후에는 미참여 회원에게도 공개한다(2026-10-20 사용자 확정). 진행 중 미참여 회원의 집계는 null이다. 비회원에게는 항상 집계를 반환하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
 - definer 구현은 private, invoker 래퍼는 public이다. 비회원 피드 래퍼에 필요한 private 스키마 usage와 피드 함수 execute만 anon에 허용하고 원본·내부 helper·상세·댓글 권한은 주지 않는다.
-- #94 화면은 실제 조회만 제공하며 기존 목업의 등록·삭제·투표·댓글·좋아요·신고/차단·상품 저장 성공 동작을 원격 글에 적용하지 않는다. 각 변경 Action은 #95~99 및 별도 신고·차단 작업에서 서버에 연결한다.
+- #94 화면은 실제 조회만 제공하며 기존 목업의 등록·삭제·투표·댓글·좋아요·신고/차단·상품 저장 성공 동작을 원격 글에 적용하지 않는다. 작성·삭제 Action은 #95에서 연결했으며 댓글·좋아요는 #97에서 연결했고 투표 참여는 #96에서 연결했고 나머지는 #98·99 및 별도 신고·차단 작업에서 연결한다.
 
 마이그레이션은 로컬 Docker가 없는 환경에서 PR의 임시 CI가 CLI 2.120.0 `db schema declarative sync -f community_read --no-apply`로 생성한 artifact를 검토해 추가했다. 같은 임시 DB에서 전체 마이그레이션·pgTAP·lint·Advisors와 타입 생성을 수행했으며 생성용 워크플로는 최종 변경에서 제거한다. 이후 검증은 공통 DB 배포 워크플로를 따른다.
+
+#### #95 구현된 작성·정책 동의·삭제
+
+- `profiles.community_policy_agreed_at timestamptz null`: 계정별 최초 커뮤니티 동의 시각. 본인만 조회하고 앱의 직접 UPDATE는 허용하지 않는다. 기존 약관·개인정보 처리방침 동의와 별도로 관리한다.
+- `agree_community_policy()`: 인증·커뮤니티 쓰기 제한 검사 후 서버 시각을 저장한다. 이미 동의했다면 최초 시각을 보존한다. 일반 게시글 편집기는 동의 여부 조회·저장에 성공한 뒤에만 표시한다. 최초 필수 동의는 DGL-006의 일반글 진입에 적용하며 투표 진입에 추가 강제하지 않는다.
+- `create_post(post_kind, post_content, product_ids, request_id) → text`: 인증·제재, NFC 정규화 후 공백 제외 5~50자, 중복 없는 본인 상품(일반글 1~4개·투표글 1개), 일반글 정책 동의를 검증한다. 앱과 DB가 NBSP·전각 공백을 포함한 같은 공백 집합을 제외한다. 상품 행을 id 순으로 잠근 뒤 선택 순서대로 이미지·이름·브랜드·가격·URL을 Snapshot에 복사한다. 글과 Snapshot은 한 트랜잭션이며 원본 상품 수정·삭제 후에도 유지한다. 투표 종료 시각은 서버 생성 시각 +24시간이다.
+- `posts.creation_request_id uuid`와 `(author_id, creation_request_id)` unique로 응답 유실 후 같은 등록 요청을 재시도해도 기존 글 id를 반환한다. 앱은 같은 본문·첨부로 재시도할 때 키를 유지하고 내용을 바꾸면 새 키를 사용한다. 글 id는 bigint 정밀도를 잃지 않도록 문자열로 반환한다.
+- `delete_community_post(target_post_id)`: 인증된 본인 글만 잠근 뒤 글·댓글을 soft delete하고 투표 응답은 실제 삭제한다. 재시도는 안전하며 원본 ALL 상품은 변경하지 않는다. 커뮤니티 작성 제한 중에도 본인 콘텐츠 정리는 허용한다. 후속 댓글·투표 쓰기 RPC도 부모 글 행을 먼저 잠그고 삭제 여부를 검사해야 삭제와의 경합을 막을 수 있다.
+- 작성 후 수정·이미지 교체 API는 제공하지 않는다. 등록·삭제 성공 시 `community` 캐시 전체를 무효화한다. 후속 내 활동 조회도 이 키 아래에 둔다.
+- 작성 이탈 확정 시 초안을 폐기한다. 상품 상세로 돌아갈 대상이 없는 DIGGLE 직접 진입은 DIGGLE로 복귀한다(사용자 확인, 2026-10-19). 이어 쓰기는 본문·첨부를 유지한다.
+- 기준: [최신 기능명세](https://docs.google.com/spreadsheets/d/1Q7K3St6Kl0jSTVTvoBYdSzdioU4xfd0dXI_NpNYZ2fQ/edit?gid=1996326967)의 DGL-004~010·013, VOTE-001~003·012, SYS-006. 정책 Banner 문구와 읽기 전용 보기도 동일 기준으로 연결한다.
+- 마이그레이션은 CLI 2.120.0 선언형 sync로 생성했다. 임시 로컬 DB에서 전체 이력 reset·pgTAP·lint·Advisors를 검증하며 공유 DB는 변경하지 않는다.
+
+#### #96 BUY·NOT 참여·변경·결과·마감
+
+- `set_community_vote(target_post_id, vote_option)`는 `buy`/`not`만 받고 서버의 게시글 JSON을 반환한다. 사용자는 JWT에서 결정하며 원시 응답·작성자 UUID는 공개하지 않는다. 최초 참여는 insert, 다른 선택은 기존 행 update, 같은 선택은 시각·행을 변경하지 않는다. 계정당 한 표를 unique로 보장한다.
+- #97의 부모 글 잠금과 공통 가드로 삭제·숨김·차단/신고·제재를 검사한다. 작성자 본인 참여는 `own_vote`, 마감은 `vote_closed`로 거부한다. 잠금을 얻은 뒤 `clock_timestamp()`로 마감을 다시 판정하므로 트랜잭션 시작 시각이 마감 전이어도 늦은 저장은 차단한다.
+- 결과 공개: 진행 중 참여자와 작성자, 마감 후 미참여 회원에게 공개한다(2026-10-20 사용자 확정). 피드·상세가 같은 직렬화 함수를 사용한다. 진행 중 미참여자와 비회원에게 집계 우회 조회를 허용하지 않는다.
+- 앱은 저장 성공 응답으로 선택·집계를 같은 화면에 반영한다. 실패하면 기존 선택·결과를 유지하고 SYS 오류를 안내한다. 같은 선택·연타·비회원·마감 요청을 막으며 작성자는 결과 바를 누르면 참여 불가 Toast를 받는다.
+- 마감 시점·앱 복귀·성공한 투표 후 community 캐시를 갱신한다. 최종 결과 조회 실패 시 기존 결과를 유지한다. 계정 변경·화면 이탈 뒤 늦은 응답은 새 캐시에 적용하지 않는다.
+- 마감 알림 연동 계약: 서버 `ends_at`이 도달한 삭제·숨김 아닌 투표에 대해 `vote_ended:{post_id}` 키로 작성자에게 한 번만 알린다. 수신자는 서버에서 결정한다. 실제 이벤트 저장·스케줄·Push 발송은 알림 작업에서 구현하며 앱 타이머가 알림을 만들지 않는다. 알림 담당자 확인이 필요하다.
+- 검증: pgTAP의 권한·공개 범위·마감·중복·변경 검사와 `scripts/check_vote_concurrency.py --container supabase_db_diggin-96`의 실제 동시 참여·잠금 대기 마감 검사를 사용한다.
+
+#### #97 댓글·익명번호·좋아요
+
+- `create_comment(target_post_id, comment_content, request_id)` / `update_comment(target_comment_id, comment_content)`는 작성자 UUID 없이 조회와 같은 댓글 JSON을 반환한다. `delete_comment(target_comment_id)`는 본인 댓글을 soft delete한다. 수정은 같은 본문도 허용하며 `updated_at`만 갱신하고 정렬용 `created_at`은 보존한다.
+- 댓글 본문은 NFC·CRLF/CR → LF 정규화 후 사용자 인식 문자 1~30자다. 공백·줄바꿈도 세며 공백만 있는 본문은 거부한다. 앱은 초과 입력을 유지하되 전송을 막고, 조회한 줄바꿈은 개수만큼 공백으로 표시한다. HTTP(S)로 해석 가능한 URL만 외부 링크로 만든다.
+- 모든 댓글·좋아요 쓰기는 `private.lock_community_post_for_write()`로 인증·제재를 확인하고 부모 글 행을 잠근 뒤 변경한다. 글 삭제도 같은 행을 먼저 잠그므로 삭제 후 댓글이나 좋아요가 추가되는 경합을 막는다. 삭제·숨김·차단/신고로 접근할 수 없는 글은 쓰기도 허용하지 않는다. 댓글 수정·삭제는 글쓴이에게도 타인 댓글 권한을 주지 않는다.
+- `post_anon_numbers`는 최초 댓글 때만 할당하고 같은 글에서 유지한다. 부모 글 잠금 안에서 `next_anon_number`를 올리므로 동시 참여에도 중복 번호가 없다. 글쓴이는 번호를 소비하지 않는다. 본인·글쓴이·탈퇴 라벨과 본문 비공개는 조회 계약을 따른다.
+- `comments.creation_request_id`와 `(author_id, creation_request_id)` unique로 응답 유실·동시 재시도에 같은 댓글을 반환한다. 다른 게시글로 키를 재사용하면 거부한다. 앱은 성공한 댓글을 서버 페이지와 중복 없이 합치며 서버 커서를 바꾸지 않는다. 등록 후 새 댓글까지 남은 페이지를 읽고 이동하고, 실패한 조회는 댓글 영역에서 재시도한다.
+- `set_community_like(target_post_id, is_liked)`는 일반글에만 적용하고 `{is_liked, like_count}`를 반환한다. 계정당 한 행이며 원하는 상태를 지정하므로 재시도해도 토글되지 않는다. 댓글 작성과 독립적으로 실행하며 앱의 낙관적 아이콘·개수는 실패 시 원상 복구한다.
+- 등록·수정·삭제·좋아요 성공은 `community` 캐시를 갱신한다. 후속 내 활동도 같은 키 아래에 두어 함께 갱신한다. 계정이 바뀌거나 화면을 떠난 후 도착한 응답으로 새 계정의 초안·캐시를 변경하지 않는다.
+- 알림 연동 계약: 댓글 등록 성공 트랜잭션에서 `comment:{comment_id}`를 이벤트 키로 사용하고 본인 댓글은 알리지 않는다. 수정·삭제·재시도는 새 등록 이벤트가 아니다. 좋아요 알림은 `(post_id, actor_id)`를 `like_notification_log`에 최초 한 번 기록하는 계약이며 취소·재등록으로 다시 발송하지 않는다. 수신자는 서버가 글에서 결정하고 UUID를 앱에 반환하지 않는다. 알림 테이블·실제 이벤트 저장·Push 발송은 알림 작업에서 이 RPC에 연결한다.
+- 로컬 검증: 전체 pgTAP, DB lint·Advisors와 `scripts/check_community_concurrency.py --container supabase_db_diggin-97`로 실제 동시 요청을 확인한다. 테스트 데이터만 사용하는 임시 DB에서 실행한다.
 
 #### 후속 쓰기를 포함한 설계 계약
 
@@ -207,20 +241,22 @@ posts
   ends_at timestamptz null                  투표만, created_at + 24h
   deleted_at, hidden_at timestamptz null, hidden_by FK admin_users null
   created_at, next_anon_number integer not null default 1
+  creation_request_id uuid not null, unique (author_id, creation_request_id)
   content: 일반글·투표글 모두 공백 제외 5~50자, char_count 기준(DGL-005·VOTE-002 최신 정책)
 
 post_products   (post_id, position 1~4) PK, name, brand, price integer, url, image_url
 vote_responses  id, post_id, user_id null(탈퇴 후), choice, created_at, updated_at, unique (post_id, user_id)
 post_likes      id, post_id, user_id null(탈퇴 후), created_at, unique (post_id, user_id)
 comments        id, post_id, author_id null(탈퇴 후), content 1~30자(줄바꿈 1자) 탈퇴 후 null,
-                deleted_at, hidden_at, hidden_by, created_at, updated_at(논의)
+                deleted_at, hidden_at, hidden_by, created_at, updated_at,
+                creation_request_id uuid not null, unique (author_id, creation_request_id)
 post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)
 ```
 
 - post_products는 `create_post`가 본인 상품에서 값을 복사한다. 원본 product_id는 저장하지 않는다. 일반글 1~4개, 투표글 정확히 1개.
 - 수정 RPC는 없다(DGL-008). 삭제는 deleted_at, 댓글도 같이 soft delete. 투표글 삭제 시 vote_responses는 실제로 지운다.
-- `vote`는 upsert. 투표글인지, 삭제·숨김 아닌지, 서버 `now() < ends_at`, 본인 글 아닌지, 커뮤니티 제한 아닌지 순서로 검사.
-- 투표 결과는 참여한 사람에게만 보인다(VOTE-009). 조회 RPC가 본인 vote_responses가 없으면 buy_count·not_count를 null로 돌려준다. 퍼센트는 앱이 계산한다.
+- `set_community_vote`는 upsert. 공통 쓰기 권한·부모 글 잠금 후 투표글·유효 선택·본인 글 제외·서버 `clock_timestamp() < ends_at`을 검사한다. 잠금 대기 중 마감된 요청도 차단한다.
+- 투표 결과는 진행 중 참여자·작성자, 마감 후 미참여 회원에게도 공개한다. 진행 중 미참여자는 buy_count·not_count가 null이고 비회원 미리보기에는 필드 자체가 없다. 퍼센트는 앱이 계산한다.
 - 좋아요는 일반글만(LIKE-001).
 - 익명 번호는 그 사용자의 첫 댓글일 때 posts.next_anon_number를 올리며 받는다. 글쓴이는 번호를 받지 않는다. 댓글 조회는 author_id 대신 `is_post_author, anon_number, is_mine, is_withdrawn`을 돌려준다.
 - 모든 커뮤니티 조회는 삭제·숨김, 내가 차단한 작성자, 내가 신고한 작성자의 콘텐츠를 뺀다.
@@ -272,7 +308,7 @@ admin_actions  id, admin_id, action, target_type, target_id, report_id null, rea
 ## 7. 제재 (RPT-006)
 
 - warning: 기능 제한 없이 이력과 안내만.
-- community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 쓰기 RPC(create_post, delete_post, vote, like_post, unlike_post, create_comment, update_comment, delete_comment)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다.
+- community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 쓰기 RPC(create_post, set_community_vote, set_community_like, create_comment, update_comment, delete_comment)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. #95의 본인 게시글 삭제는 콘텐츠 정리를 위해 예외로 허용한다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다.
 - suspended: profiles.status 변경과 함께 Supabase Auth 계정 정지(ban)와 전체 세션 무효화를 한다. status만으로는 상품·폴더 접근을 못 막기 때문이다. 해제할 때 둘 다 푼다.
 
 ## 8. 탈퇴 (MY-007, Edge Function)
@@ -291,7 +327,6 @@ admin_actions  id, admin_id, action, target_type, target_id, report_id null, rea
 
 ## 10. 확인 필요 (PM·팀 결정 대기)
 
-- 투표 결과를 투표할 수 없는 작성자와 마감 후 미참여자에게 보여줄지(VOTE-009)
 - 가입 시 약관 동의 화면이 명세에 없다. 처음 동의 기록을 언제 만들지(MY-009)
 - 닉네임 "한글"에 자음·모음 단독(ㄱ, ㅏ)을 허용할지. 지금은 허용하지 않는다
 - 차단 해제 화면 없음. 차단 방향은 RPT-004 단방향으로 확정했으며, 앱 모달의 "서로의 게시글" 문구는 후속 작업에서 맞춘다.
@@ -302,5 +337,4 @@ admin_actions  id, admin_id, action, target_type, target_id, report_id null, rea
 - IMP-008 예시는 공백 포함 7자 구현과 다르다. 구현 기준은 사용자 확인을 받았으나 명세 예시·QA 기준은 PM과 통일한다.
 - 운영자가 숨긴 글을 작성자 본인에게 보여줄지, 작성자가 지운 글·댓글 원문 보관 기간
 - URL 정규화 규칙(쿼리스트링, 끝 슬래시)
-- comments.updated_at: 화면에 '수정됨' 표시가 없으면 뺀다
 - 기능명세 문구 수정 요청: FLD-002 색상·중복명 허용, IMP-008 중복 허용, SAVE-002·004·IMP-007 HTTP(S)

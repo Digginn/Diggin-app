@@ -38,6 +38,7 @@ function findAll(node, type) {
 
 test("댓글 30자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {
   const { CommentInput } = load("../src/components/CommentInput.tsx", {
+    "@/utils/text": load("../src/utils/text.ts", {}),
     "react": { forwardRef: (render) => render },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable", TextInput: "TextInput" },
     "@/assets/images/icon-send.svg": { __esModule: true, default: "SendSvg" },
@@ -92,7 +93,7 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
         useEffect: (effect) => effect(),
         useState: (initial) => {
           const slot = index++;
-          if (!(slot in state)) state[slot] = initial;
+          if (!(slot in state)) state[slot] = typeof initial === "function" ? initial() : initial;
           return [
             state[slot],
             (next) => {
@@ -126,6 +127,23 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
         }),
       },
       "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/Loading": { Spinner: "Spinner" },
+      "@/contexts/AuthContext": { useAuth: () => ({ session: { user: { id: "viewer" } } }) },
+      "@/hooks/useProductCounts": { useProductCounts: () => ({ data: { total: 9 } }) },
+      "@/hooks/useProductList": {
+        useProductList: (_sort, _level, query) => ({
+          data: {
+            pages: [
+              Array.from({ length: query === "partial" ? 2 : query ? 3 : 9 }, (_, i) => ({
+                id: String(i),
+                name: ["미니 토트백", "캔버스 숄더 가방", "레더 크로스백"][i] ?? `아이템 ${i}`,
+                price: null,
+                brand: "브랜드",
+              })),
+            ],
+          },
+        }),
+      },
       "@/components/Button": { Button: "Button" },
       "@/components/Field": { HelperText: "HelperText", SearchField: "SearchField" },
       "@/contexts/PostDraftContext": {
@@ -154,7 +172,7 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
     select(0);
     select(1);
     assert.equal(state[1].length, type === "vote" ? 1 : 2);
-    assert.equal(state[1].at(-1), "1");
+    assert.equal(state[1].at(-1).id, "1");
     findAll(render(), "Button")[0].props.onPress();
     assert.equal(attached.length, type === "vote" ? 1 : 2);
     assert.equal(backCount, 1);
@@ -172,9 +190,11 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
     if (type === "vote") {
       findAll(render(), "SearchField")[0].props.onChangeText("가방");
       assert.equal(findAll(render(), "FlatList")[0].props.data.length, 3);
-      assert.equal(state[1][0], "5");
+      assert.equal(state[1][0].id, "5");
+      findAll(render(), "Button")[0].props.onPress();
+      assert.equal(attached[0].id, "5", "검색 결과에 없어도 선택한 상품을 첨부한다");
       select(0);
-      assert.equal(state[1][0], "0");
+      assert.equal(state[1][0].id, "0");
       keyboardEvents[os === "ios" ? "keyboardWillShow" : "keyboardDidShow"]();
       assert.equal(findAll(render(), "View").at(-1).props.style.paddingBottom, 12);
       keyboardEvents[os === "ios" ? "keyboardWillHide" : "keyboardDidHide"]();
@@ -182,6 +202,11 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
       findAll(render(), "Button")[0].props.onPress();
       assert.equal(attached[0].name, "미니 토트백");
     }
+    findAll(render(), "SearchField")[0].props.onChangeText("partial");
+    const partial = findAll(render(), "FlatList")[0];
+    assert.equal(partial.props.data.length, 3);
+    assert.equal(partial.props.data[2], null, "결과가 2개여도 빈 셀로 세 열 너비 유지");
+    assert.equal(partial.props.renderItem({ item: null }).props.className, "flex-1");
   }
 });
 
@@ -214,119 +239,7 @@ test("투표 첨부 영역은 160 높이의 한 열이며 첨부하면 추가 �
   );
 });
 
-test("투표 작성은 공용 입력 검증과 1개 첨부 조건으로 등록을 활성화한다", () => {
-  for (const isValid of [false, true]) {
-    for (const count of [0, 1, 2]) {
-      let slot = 0;
-      let destination;
-      let isSubmitPreview = false;
-      let completeRegistration;
-      let addedVote;
-      let toast;
-      const { PostWriteScreen } = load("../src/screens/diggle/PostWriteScreen.tsx", {
-        "react": {
-          useState: (initial) => {
-            const currentSlot = slot++;
-            return [
-              currentSlot === 1 ? isValid : currentSlot === 3 ? isSubmitPreview : initial,
-              (next) => {
-                if (currentSlot === 3) isSubmitPreview = next;
-              },
-            ];
-          },
-          useEffect: (effect) => effect(),
-          useCallback: (callback) => callback,
-        },
-        "setTimeout": (callback) => {
-          completeRegistration = callback;
-        },
-        "./constants/mockPosts": { CURRENT_USER_ID: "me" },
-        "react-native": {
-          View: "View",
-          Text: "Text",
-          Pressable: "Pressable",
-          ScrollView: "ScrollView",
-          KeyboardAvoidingView: "KeyboardAvoidingView",
-          Platform: { OS: "ios" },
-          Keyboard: { dismiss: () => {} },
-        },
-        "expo-router": {
-          useFocusEffect: () => {},
-          useRouter: () => ({
-            push: (route) => {
-              destination = route;
-            },
-            dismissTo: (route) => {
-              destination = route;
-            },
-          }),
-        },
-        "@/components/app-bar": { AppBar: "AppBar" },
-        "@/components/Field": { BodyTextField: "BodyTextField", HelperText: "HelperText" },
-        "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
-        "@/components/modal": { ActionModal: "ActionModal" },
-        "@/contexts/PostDraftContext": {
-          usePostDraft: () => ({
-            items: Array.from({ length: count }, (_, id) => ({ id: String(id) })),
-            reset: () => {},
-          }),
-        },
-        "@/contexts/PostsContext": {
-          usePosts: () => ({
-            addVotePreview: (body, items) => {
-              addedVote = { body, items };
-            },
-          }),
-        },
-        "@/constants/messages": {
-          DIGGLE_TOAST_MESSAGES: {
-            VOTE_009: "투표를 등록했습니다. 24시간 뒤 결과를 알려드립니다.",
-          },
-        },
-        "@/hooks/useToast": {
-          useToast: () => (message) => {
-            toast = message;
-          },
-        },
-        "./components/ProductAttachGrid": {
-          MAX_ATTACH_COUNT: 4,
-          ProductAttachGrid: "ProductAttachGrid",
-        },
-      });
-      const tree = PostWriteScreen({ type: "vote" });
-      const bar = findAll(tree, "AppBar")[0];
-      assert.equal(bar.props.title, "투표글 작성");
-      assert.equal(bar.props.right.props.disabled, !(isValid && count === 1));
-      const input = findAll(tree, "BodyTextField")[0];
-      assert.equal(input.props.size, "compact");
-      assert.ok(input.props.placeholder.includes("최소 5글자"));
-      const grid = findAll(tree, "ProductAttachGrid")[0];
-      assert.equal(grid.props.maxCount, 1);
-      grid.props.onPressAdd();
-      assert.equal(destination, "/posts/item-select?type=vote");
-      assert.ok(
-        findAll(tree, "HelperText").some((helper) => helper.props.message.includes("24시간")),
-      );
-      if (isValid && count === 1) {
-        bar.props.right.props.onPress();
-        assert.equal(isSubmitPreview, true);
-        slot = 0;
-        const loading = PostWriteScreen({ type: "vote" });
-        assert.equal(
-          findAll(loading, "LoadingDialog")[0].props.message,
-          "투표를 등록하는 중입니다.",
-        );
-        assert.equal(findAll(loading, "AppBar")[0].props.right.props.disabled, true);
-        assert.equal(addedVote, undefined);
-        completeRegistration();
-        assert.equal(addedVote.items.length, 1);
-        assert.equal(destination.pathname, "/(tabs)/diggle");
-        assert.equal(destination.params.tab, "vote");
-        assert.equal(toast, "투표를 등록했습니다. 24시간 뒤 결과를 알려드립니다.");
-      }
-    }
-  }
-});
+// 실제 등록·실패 재시도는 community-write.test.cjs에서 검증한다.
 
 test("투표 결과는 비례 너비, 동률, 0명 및 종료 상태를 표시한다", () => {
   const { VoteBlock } = load("../src/screens/diggle/components/VoteBlock.tsx", {
@@ -535,4 +448,33 @@ test("시간 경과·앱 복귀 시 종료를 갱신하고 갱신 전에도 만�
   assert.equal(render().votes[0].isClosed, true);
   cleanup();
   assert.equal(removed && cleared, true);
+});
+
+test("100% 결과의 인원 수는 회색 사각 배경 없이 흰색으로 표시하고 0명은 기본 색상을 유지한다", () => {
+  const { VoteBlock } = load("../src/screens/diggle/components/VoteBlock.tsx", {
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+  });
+  for (const [buyCount, notCount] of [
+    [1, 0],
+    [0, 12],
+  ]) {
+    const tree = VoteBlock({
+      vote: { buyCount, notCount, myChoice: null, isClosed: true, remainingLabel: "" },
+    });
+    const winner = findAll(tree, "Pressable")[buyCount ? 0 : 1];
+    const count = findAll(winner, "Text").find(
+      (node) =>
+        React.Children.toArray(node.props.children).join("") === `${buyCount || notCount}명`,
+    );
+    assert.ok(count.props.className.includes("text-gray-0"));
+    assert.ok(!count.props.className.includes("bg-"));
+    assert.equal(
+      findAll(winner, "View").find((node) => node.props.style)?.props.style.width,
+      "100%",
+    );
+    const loser = findAll(tree, "Pressable")[buyCount ? 1 : 0];
+    assert.ok(
+      findAll(loser, "Text").some((node) => node.props.className.includes("text-gray-900")),
+    );
+  }
 });

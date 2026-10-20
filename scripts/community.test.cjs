@@ -291,7 +291,7 @@ function nodes(node, type) {
 }
 
 function screenMocks({
-  session = {},
+  session = { user: { id: "viewer" } },
   post = null,
   feed = {},
   comments = [],
@@ -306,6 +306,7 @@ function screenMocks({
       useEffect: () => {},
       useCallback: (callback) => callback,
       useRef: (initial) => ({ current: initial }),
+      useMemo: (callback) => callback(),
       useState: (initial) => [initial, () => {}],
     },
     "react-native": {
@@ -313,6 +314,11 @@ function screenMocks({
       Text: "Text",
       FlatList: "FlatList",
       ScrollView: "ScrollView",
+      KeyboardAvoidingView: "KeyboardAvoidingView",
+      Pressable: "Pressable",
+      Platform: { OS: "android" },
+      useWindowDimensions: () => ({ height: 812, width: 375 }),
+      Keyboard: { isVisible: () => false, addListener: () => ({ remove() {} }), dismiss() {} },
       Linking: {
         openURL: async (url) => {
           destination = url;
@@ -334,19 +340,56 @@ function screenMocks({
         setParams: () => {},
       }),
     },
+    "expo-router/react-navigation": { usePreventRemove() {} },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+    "@/components/CommentInput": { CommentInput: "CommentInput" },
+    "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
+    "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
+    "./domain/comments": load("src/screens/diggle/domain/comments.ts"),
+    "./hooks/useCommentActions": {
+      useCommentActions: () => ({
+        changes: {},
+        body: "",
+        editing: null,
+        deleteTarget: null,
+        isSending: false,
+        isDeleting: false,
+      }),
+    },
+    "./hooks/useCommunityLike": {
+      useCommunityLike: (post) => ({
+        likeCount: post?.likeCount ?? 0,
+        isLiked: post?.isLiked ?? false,
+        isPending: false,
+        toggle() {},
+      }),
+    },
+    "./hooks/useCommunityVote": {
+      useCommunityVote: () => ({ isPending: false, choose() {} }),
+    },
     "@/assets/images/appbar": { IconNotification: "IconNotification" },
-    "@/components/app-bar": { AppBar: Object.assign(() => null, { IconButton: "IconButton" }) },
+    "@/components/app-bar": {
+      AppBar: Object.assign(() => null, { IconButton: "IconButton", TextButton: "TextButton" }),
+    },
     "@/components/Button": { Button: "Button" },
     "@/components/EmptyState": { EmptyState: "EmptyState" },
     "@/components/Fab": { Fab: "Fab" },
     "@/components/Loading": { Spinner: "Spinner" },
-    "@/components/modal": { LoginRequiredModal: "LoginRequiredModal" },
+    "@/components/modal": { LoginRequiredModal: "LoginRequiredModal", ActionModal: "ActionModal" },
+    "@/components/ToastText": { ToastText: "ToastText" },
+    "@tanstack/react-query": { useQueryClient: () => ({ invalidateQueries: () => {} }) },
+    "./api/community": { communityKeys: { all: ["community"] } },
+    "./api/communityWrite": {
+      deleteCommunityPost: async () => {},
+      communityWriteError: () => "error",
+    },
     "@/components/Post": { Post: "Post" },
     "@/components/TopTab": { TopTab: "TopTab" },
     "@/components/Comment": { Comment: "Comment" },
     "@/constants/messages": { DIGGLE_EMPTY_MESSAGES: { all: "empty", vote: "empty" } },
     "@/contexts/AuthContext": { useAuth: () => ({ session, isRestoring: false }) },
     "@/hooks/useToast": { useToast: () => (message) => toasts.push(message) },
+    "@/utils/text": load("src/utils/text.ts"),
     "./queries/useCommunity": {
       useCommunityFeed: () => feed,
       useCommunityPost: () => ({ data: post, ...postResult }),
@@ -486,7 +529,7 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   assert.equal(comments[1].props.author, "디기 1(나)");
   assert.equal(comments[1].props.body, "줄바꿈 댓글");
   assert.equal(comments[2].props.isDeleted, true);
-  assert.equal(nodes(screen, "LikeCommentRow")[0].props.onPressLike, undefined);
+  assert.equal(typeof nodes(screen, "LikeCommentRow")[0].props.onPressLike, "function");
   assert.equal(nodes(screen, "PostItemInfoSheet")[0].props.onSaveToAll, undefined);
 });
 
@@ -591,7 +634,7 @@ test("댓글 첫 조회와 추가 조회 실패는 본문·기존 댓글을 유�
     );
     assert.deepEqual(state.toasts, []);
     nodes(tree, "Button")
-      .find((button) => button.props.children === "댓글 다시 불러오기")
+      .find((button) => button.props.accessibilityLabel === "댓글 다시 불러오기")
       .props.onPress();
     assert.equal(refetched, nextPage ? 0 : 1);
     assert.equal(fetchedNext, nextPage ? 1 : 0);

@@ -16,6 +16,8 @@ type FolderMenuProps = {
   onEdit?: () => void;
   onDelete?: () => void;
   placement?: "card" | "header";
+  /** 화면 읽기에서 "폴더 수정하기"처럼 읽을 대상. 아이템 상세도 같은 메뉴를 쓴다. */
+  subject?: string;
 };
 
 export function FolderMenu({
@@ -24,6 +26,7 @@ export function FolderMenu({
   onEdit,
   onDelete,
   placement = "card",
+  subject = "폴더",
 }: FolderMenuProps) {
   const isNativeVisible = useNativeModalVisible(true);
   const { width, height } = useWindowDimensions();
@@ -54,7 +57,7 @@ export function FolderMenu({
       onRequestClose={onClose}
     >
       <Pressable
-        accessibilityLabel="폴더 메뉴 닫기"
+        accessibilityLabel={`${subject} 메뉴 닫기`}
         accessibilityRole="button"
         className="absolute inset-0"
         onPress={onClose}
@@ -65,7 +68,7 @@ export function FolderMenu({
       >
         <Pressable
           accessibilityRole="menuitem"
-          accessibilityLabel="폴더 수정하기"
+          accessibilityLabel={`${subject} 수정하기`}
           accessibilityState={{ disabled: !onEdit }}
           disabled={!onEdit}
           onPress={() => {
@@ -83,7 +86,7 @@ export function FolderMenu({
         />
         <Pressable
           accessibilityRole="menuitem"
-          accessibilityLabel="폴더 삭제하기"
+          accessibilityLabel={`${subject} 삭제하기`}
           accessibilityState={{ disabled: !onDelete }}
           disabled={!onDelete}
           onPress={() => {
