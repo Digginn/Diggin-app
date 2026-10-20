@@ -356,7 +356,7 @@ function findAll(node, type) {
   ];
 }
 
-test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7글자를 제한한다", async () => {
+test("새 폴더 모달은 공백 포함 7글자로 검증하고 초과 입력과 실패한 이름을 유지한다", async () => {
   const state = [];
   let cursor = 0;
   let focusCalls = 0;
@@ -404,7 +404,7 @@ test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7
           },
         };
       if (name === "react-native") return { Text: "Text", View: "View" };
-      if (name.endsWith("/Field")) return { TextField: "TextField" };
+      if (name.endsWith("/Field")) return { TextField: "TextField", HelperText: "HelperText" };
       if (name.endsWith("/modal")) return { ActionModal: "ActionModal" };
       return require(name);
     },
@@ -433,14 +433,20 @@ test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7
   assert.equal(focusCalls, 1);
   assert.equal(tree.props.isPrimaryDisabled, true);
   assert.equal(findAll(tree, "TextField")[0].props.value, "새 폴더");
-  assert.equal(findAll(tree, "Text").at(-1).props.children.join(""), "3/7");
+  assert.equal(findAll(tree, "Text").at(-1).props.children.join(""), "4/7");
   findAll(tree, "TextField")[0].props.onChangeText("  가족👨‍👩‍👧‍👦 여행  ");
   tree = render();
   assert.equal(tree.props.isPrimaryDisabled, false);
-  assert.equal(findAll(tree, "Text").at(-1).props.children.join(""), "5/7");
+  assert.equal(findAll(tree, "Text").at(-1).props.children.join(""), "6/7");
   findAll(tree, "TextField")[0].props.onChangeText("12345678");
   tree = render();
-  assert.equal(findAll(tree, "TextField")[0].props.value, "  가족👨‍👩‍👧‍👦 여행  ");
+  assert.equal(findAll(tree, "TextField")[0].props.value, "12345678");
+  assert.equal(tree.props.isPrimaryDisabled, true);
+  await tree.props.primaryAction.onPress();
+  assert.equal(submitted, undefined);
+  assert.equal(findAll(tree, "HelperText")[0].props.status, "error");
+  findAll(tree, "TextField")[0].props.onChangeText("  가족👨‍👩‍👧‍👦 여행  ");
+  tree = render();
   await tree.props.primaryAction.onPress();
   assert.equal(submitted, "가족👨‍👩‍👧‍👦 여행");
   assert.equal(closed, true);
@@ -452,7 +458,7 @@ test("새 폴더 모달은 3/7로 시작하고 공백 제외·이모지 포함 7
   assert.equal(tree.props.isPrimaryDisabled, false);
   assert.equal(tree.props.keyboardGap, 24);
   assert.equal(tree.props.onShow, undefined);
-  assert.equal(findAll(tree, "Text").at(-1).props.children.join(""), "5/7");
+  assert.equal(findAll(tree, "Text").at(-1).props.children.join(""), "6/7");
   await tree.props.primaryAction.onPress();
   assert.equal(submitted, "기존 폴더명");
   assert.equal(closed, true);

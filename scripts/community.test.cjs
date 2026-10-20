@@ -304,8 +304,9 @@ function screenMocks({
     "react": {
       ...React,
       useEffect: () => {},
-      useState: (initial) => [initial, () => {}],
+      useCallback: (callback) => callback,
       useRef: (initial) => ({ current: initial }),
+      useState: (initial) => [initial, () => {}],
     },
     "react-native": {
       View: "View",
@@ -319,6 +320,7 @@ function screenMocks({
       },
     },
     "expo-router": {
+      useFocusEffect: () => {},
       useLocalSearchParams: () => ({ id: "12" }),
       useRouter: () => ({
         canGoBack: () => true,
@@ -389,6 +391,50 @@ test("비회원 상세 직접 진입은 로그인 안내로 차단하고 없는 
   state = screenMocks();
   ({ PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks));
   assert.match(nodes(PostDetailScreen({}), "EmptyState")[0].props.message, /찾을 수 없습니다/);
+});
+
+test("상품 저장은 게시글·Snapshot 위치로 이동하고 취소 후 해당 정보 시트를 복원한다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({ post });
+  const hooks = [];
+  let cursor = 0,
+    onFocus;
+  state.mocks.react = {
+    ...state.mocks.react,
+    useRef: (initial) => {
+      const index = cursor++;
+      return (hooks[index] ??= { current: initial });
+    },
+    useState: (initial) => {
+      const index = cursor++;
+      if (!(index in hooks)) hooks[index] = initial;
+      return [
+        hooks[index],
+        (value) => {
+          hooks[index] = value;
+        },
+      ];
+    },
+  };
+  state.mocks["expo-router"].useFocusEffect = (callback) => {
+    onFocus = callback;
+  };
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const render = () => {
+    cursor = 0;
+    return PostDetailScreen({});
+  };
+  nodes(render(), "ProductImgGrid")[0].props.onPressInfo(post.items[0]);
+  nodes(render(), "PostItemInfoSheet")[0].props.onSaveToAll();
+  const destination = state.destination();
+  assert.equal(destination.pathname, "/posts/save");
+  assert.equal(destination.params.postId, "12");
+  assert.equal(destination.params.itemId, "1");
+  assert.equal(nodes(render(), "PostItemInfoSheet")[0].props.visible, false);
+  onFocus();
+  const restored = nodes(render(), "PostItemInfoSheet")[0];
+  assert.equal(restored.props.visible, true);
+  assert.equal(restored.props.name, post.items[0].name);
 });
 
 test("회원 피드는 all 탭에서도 투표글 유형으로 라우팅하고 마지막 페이지는 더 요청하지 않는다", () => {

@@ -68,7 +68,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "test:community": "node --test scripts/community.test.cjs scripts/vote-write.test.cjs scripts/community-write.test.cjs",
+    "test:community": "node --test scripts/community.test.cjs scripts/vote-write.test.cjs scripts/community-write.test.cjs scripts/community-save.test.cjs",
     "test:csv-import": "node --test scripts/csv-import-logic.test.cjs scripts/csv-import.test.cjs scripts/csv-import-api.test.cjs scripts/csv-import-cache.test.cjs",
     "start": "expo start",
     "android": "expo start --android",
