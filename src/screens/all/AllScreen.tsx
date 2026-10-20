@@ -16,6 +16,7 @@ import { WishLevel } from "@/components/WishLevel";
 import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useItemSave } from "@/hooks/useItemSave";
+import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useProductList } from "@/hooks/useProductList";
 import { useToast } from "@/hooks/useToast";
@@ -67,6 +68,7 @@ export function AllScreen() {
   // 링크 시트가 다 닫힌 뒤 불러올 링크. iOS 는 닫히는 중에 띄운 로딩 모달을 무시한다.
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const itemSave = useItemSave();
+  useLinkDetectionPause(isLinkSheetOpen || itemSave.isBusy);
 
   const selectedCount = selectedIds.size;
   const isAllSelected = items.length > 0 && selectedCount === items.length;

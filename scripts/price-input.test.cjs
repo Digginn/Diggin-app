@@ -9,10 +9,7 @@ const ts = require("typescript");
 const module_ = { exports: {} };
 runInNewContext(
   ts.transpileModule(
-    readFileSync(
-      path.join(__dirname, "../src/screens/item-detail/utils/formatPriceInput.ts"),
-      "utf8",
-    ),
+    readFileSync(path.join(__dirname, "../src/utils/formatPriceInput.ts"), "utf8"),
     { compilerOptions: { module: ts.ModuleKind.CommonJS } },
   ).outputText,
   { module: module_, exports: module_.exports },

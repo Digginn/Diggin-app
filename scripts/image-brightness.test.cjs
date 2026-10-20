@@ -42,6 +42,12 @@ test("1×1 PNG의 픽셀 색을 읽고 어두운지 가른다", () => {
   const { readSinglePixelPng, isDarkColor } = load();
   assert.deepEqual([...readSinglePixelPng(onePixelPng([20, 30, 40, 255]))], [20, 30, 40]);
   assert.deepEqual([...readSinglePixelPng(onePixelPng([200, 10, 10, 255], 4))], [200, 10, 10]);
+  assert.deepEqual(
+    [...readSinglePixelPng(onePixelPng([0, 0, 0, 0]))],
+    [255, 255, 255],
+    "투명한 픽셀은 흰 배경으로 본다",
+  );
+  assert.deepEqual([...readSinglePixelPng(onePixelPng([0, 0, 0, 128]))], [127, 127, 127]);
   assert.equal(isDarkColor([20, 30, 40]), true);
   assert.equal(isDarkColor([240, 240, 240]), false);
   assert.equal(
