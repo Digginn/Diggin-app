@@ -15,6 +15,8 @@ export const communityKeys = {
   post: (viewer: string | null, id: string) => [...communityKeys.all, viewer, "post", id] as const,
   comments: (viewer: string | null, id: string) =>
     [...communityKeys.all, viewer, "comments", id] as const,
+  activity: (viewer: string | null, kind: string) =>
+    [...communityKeys.all, viewer, "activity", kind] as const,
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -66,7 +68,7 @@ function parseItem(value: unknown): CommunityItem {
   };
 }
 
-function parsePost(value: unknown): CommunityPost {
+export function parsePost(value: unknown): CommunityPost {
   const row = record(value);
   if (row.type !== "post" && row.type !== "vote") throw new Error("invalid_community_response");
   if (row.my_choice != null && row.my_choice !== "buy" && row.my_choice !== "not")
