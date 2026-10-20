@@ -2,7 +2,7 @@ import { type ReactNode, useRef, useState } from "react";
 import { Text, type TextInput, View } from "react-native";
 import { splitGraphemes } from "unicode-segmenter/grapheme";
 
-import { TextField } from "@/components/Field";
+import { HelperText, TextField } from "@/components/Field";
 import { ActionModal } from "@/components/modal";
 
 const INITIAL_FOLDER_NAME = "새 폴더";
@@ -24,10 +24,8 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
   const [hasEditedName, setHasEditedName] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
-  // Figma의 '새 폴더'는 공백을 제외한 3글자로 표시됩니다.
-  const characterCount = [...splitGraphemes(name)].filter(
-    (character) => !/^\s+$/u.test(character),
-  ).length;
+  const normalizedName = name.normalize("NFC").trim();
+  const characterCount = [...splitGraphemes(normalizedName)].length;
   const canSubmit =
     (isEditing || hasEditedName) &&
     characterCount > 0 &&
@@ -44,7 +42,7 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
-      if ((await onSubmit?.(name.trim())) !== false) onClose();
+      if ((await onSubmit?.(normalizedName)) !== false) onClose();
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -85,12 +83,6 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
             className="!h-12 !border-gray-350 pr-14"
             inputClassName="!text-gray-700"
             onChangeText={(text) => {
-              const next = [...splitGraphemes(text)];
-              if (
-                next.filter((character) => !/^\s+$/u.test(character)).length >
-                MAX_FOLDER_NAME_LENGTH
-              )
-                return;
               setName(text);
               setHasEditedName(true);
             }}
@@ -103,6 +95,9 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
             </Text>
           </View>
         </View>
+        {characterCount > MAX_FOLDER_NAME_LENGTH && (
+          <HelperText status="error" message="폴더명은 최대 7자까지 입력할 수 있습니다." />
+        )}
       </View>
     </ActionModal>
   );

@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Linking, Text, View } from "react-native";
 
 import { AppBar } from "@/components/app-bar";
@@ -31,6 +31,15 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const voteTiming = useCommunityVoteTiming(post, result.dataUpdatedAt);
   const comments = useCommunityComments(id, !!post && !isWrongRoute);
   const [infoItem, setInfoItem] = useState<CommunityItem | null>(null);
+  const returnItem = useRef<CommunityItem | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (returnItem.current) {
+        setInfoItem(returnItem.current);
+        returnItem.current = null;
+      }
+    }, []),
+  );
   const [isLoginPromptVisible, setLoginPromptVisible] = useState(true);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/diggle"));
 
@@ -184,6 +193,18 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         price={infoItem?.price ?? null}
         imageUrl={infoItem?.imageUrl}
         onRequestClose={() => setInfoItem(null)}
+        onSaveToAll={
+          infoItem?.name && infoItem.url && post
+            ? () => {
+                returnItem.current = infoItem;
+                setInfoItem(null);
+                router.push({
+                  pathname: "/posts/save",
+                  params: { postId: post.id, itemId: infoItem.id },
+                });
+              }
+            : undefined
+        }
         onOpenWebsite={() => {
           const url = infoItem?.url;
           if (!url || !/^https:\/\//i.test(url)) {
