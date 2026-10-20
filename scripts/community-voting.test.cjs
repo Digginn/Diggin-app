@@ -16,6 +16,7 @@ function load(file, mocks = {}) {
   );
   return module.exports;
 }
+const messages = load("src/constants/messages.ts").DIGGLE_TOAST_MESSAGES;
 const keys = load("src/screens/diggle/api/community.ts", { "@/lib/supabase": { supabase: {} } });
 const initial = () => ({
   id: "12",
@@ -98,6 +99,7 @@ function harness(send = async (_id, choice) => saved(choice)) {
       },
     },
     "@tanstack/react-query": { useQueryClient: () => client },
+    "@/constants/messages": { DIGGLE_TOAST_MESSAGES: messages },
     "@/hooks/useToast": { useToast: () => (message) => toasts.push(message) },
     "../api/community": keys,
     "../api/communityVote": {
@@ -219,7 +221,7 @@ test("작성자는 안내만 보이며 비회원·일반글·마감 후에는 �
   const ui = harness();
   ui.setPost({ isMine: true });
   await ui.render().choose("BUY");
-  assert.match(ui.toasts[0], /본인/);
+  assert.equal(ui.toasts[0], "내가 만든 투표에는 참여할 수 없습니다.");
   assert.equal(ui.calls.length, 0);
   ui.setPost({ isMine: false });
   await ui.render(null).choose("BUY");
@@ -269,4 +271,14 @@ test("이전 계정·화면에서 늦게 도착한 투표 응답은 새 캐시�
     assert.equal(ui.invalidations.length, 0);
     if (!unmount) assert.equal(ui.render("viewer").isPending, false);
   }
+});
+
+test("서버가 본인 투표를 거부해도 같은 명세 문구를 안내한다", async () => {
+  const ui = harness(async () => {
+    throw { message: "own_vote" };
+  });
+  await ui.render().choose("BUY");
+  assert.equal(ui.toasts[0], messages.VOTE_002);
+  assert.equal(ui.toasts[0], "내가 만든 투표에는 참여할 수 없습니다.");
+  assert.equal(ui.post().myChoice, null);
 });

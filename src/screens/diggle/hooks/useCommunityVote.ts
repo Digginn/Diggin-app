@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 
+import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
 import { useToast } from "@/hooks/useToast";
 import type { VoteChoice } from "@/types/post";
 
@@ -45,7 +46,7 @@ export function useCommunityVote(
   async function choose(value: VoteChoice) {
     if (!viewer || !post || post.type !== "vote" || busy.current || isClosed) return;
     if (post.isMine) {
-      showToast("본인이 작성한 투표에는 참여할 수 없습니다.", "error");
+      showToast(DIGGLE_TOAST_MESSAGES.VOTE_002, "error");
       return;
     }
     const choice = value === "BUY" ? "buy" : "not";
@@ -75,7 +76,7 @@ export function useCommunityVote(
       const message = error && typeof error === "object" && "message" in error ? error.message : "";
       showToast(
         message === "own_vote"
-          ? "본인이 작성한 투표에는 참여할 수 없습니다."
+          ? DIGGLE_TOAST_MESSAGES.VOTE_002
           : message === "vote_closed"
             ? "투표가 종료되었습니다."
             : communityWriteError(error),
