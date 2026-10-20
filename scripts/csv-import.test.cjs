@@ -16,6 +16,7 @@ function setup(pick, bottomInset = 34) {
   const states = [];
   let refCursor = 0;
   let stateCursor = 0;
+  let unmount;
   const screenModule = { exports: {} };
   const source = readFileSync(
     path.join(__dirname, "../src/screens/my/CsvImportScreen.tsx"),
@@ -32,7 +33,9 @@ function setup(pick, bottomInset = 34) {
         if (name === "react")
           return {
             ...React,
-            useEffect: () => {},
+            useEffect: (effect, deps) => {
+              if (deps.length === 0 && !unmount) unmount = effect();
+            },
             useRef: (initial) => refs[refCursor++] ?? (refs[refCursor - 1] = { current: initial }),
             useState: (initial) => {
               const index = stateCursor++;
@@ -79,7 +82,7 @@ function setup(pick, bottomInset = 34) {
   };
   function find(node, type) {
     if (!React.isValidElement(node)) return;
-    if (node.type === type) return node;
+    if (typeof type === "function" ? type(node) : node.type === type) return node;
     return React.Children.toArray(node.props.children)
       .map((child) => find(child, type))
       .find(Boolean);
@@ -87,7 +90,7 @@ function setup(pick, bottomInset = 34) {
   const select = (props) => {
     return find(render(props), "Button").props.onPress();
   };
-  return { render, select, alerts, toasts, selecting, find };
+  return { render, select, alerts, toasts, selecting, find, unmount: () => unmount?.() };
 }
 
 test("CSV 소개 화면에 밝은 상태바·어두운 AppBar·safe area·공통 버튼을 적용한다", () => {
@@ -314,6 +317,12 @@ test("완료·중복 제외·전체 성공·전체 실패의 제목과 개수를
     const text = textContent(node).replace(/\s+\n/g, "\n");
     assert.ok(text.includes(expected), text);
     assert.equal(text.includes("제외된 아이템 보기"), excluded.length > 0);
+    assert.ok(text.includes(`전체 ${count + excluded.length}개 · 성공 ${count}개`));
+    assert.ok(
+      text.includes(
+        `실패 ${excluded.filter((item) => item.kind === "failed").length}개 · 중복 ${excluded.filter((item) => item.kind === "duplicate").length}개`,
+      ),
+    );
     assert.ok(
       text.includes(
         count === 0 && excluded.some((item) => item.kind === "failed")
@@ -354,4 +363,90 @@ test("제외 목록은 필요한 행만 렌더링하고 X와 확인은 서로 �
     "상품 10사유 10",
   );
   assert.equal(children.at(-1).props.onPress, onConfirm);
+});
+
+test("폴더 한도 배너에서 계속·취소·뒤로가기·화면 이탈을 선택할 때만 대기를 종료한다", async () => {
+  for (const action of ["continue", "cancel", "back", "unmount"]) {
+    const ui = setup(async () => ({ canceled: false, assets: [{ name: "wishlist.csv" }] }));
+    let writes = 0;
+    let picks = 0;
+    const props = {
+      onSelectCsv: async (_, onProgress, confirmFolderLimit) => {
+        picks++;
+        onProgress({ completed: 0, total: 1 });
+        if (!(await confirmFolderLimit())) return null;
+        writes++;
+        return { importedCount: 1, excludedProducts: [] };
+      },
+    };
+    const originalSelect = ui.find(ui.render(props), "Button").props.onPress;
+    const pending = originalSelect();
+    await new Promise((resolve) => setImmediate(resolve));
+    const notice = ui.render(props);
+    assert.ok(
+      textContent(notice).includes(
+        "폴더는 최대 50개까지 만들 수 있습니다. 초과분은 ALL탭에 개별 아이템으로 저장됩니다.",
+      ),
+    );
+    assert.equal(ui.find(notice, "CsvImportLoading"), undefined);
+    assert.equal(writes, 0);
+    const continueButton = ui.find(
+      notice,
+      (node) => node.type === "Button" && node.props.children === "계속 불러오기",
+    );
+    assert.equal(continueButton.props.isDisabled, false);
+    // 확인 대기 중 파일 선택 콜백을 다시 실행해도 중복 작업이 생기지 않는다.
+    await originalSelect();
+    if (action === "continue") continueButton.props.onPress();
+    else if (action === "cancel")
+      ui.find(
+        notice,
+        (node) => node.type === "Button" && node.props.children === "취소",
+      ).props.onPress();
+    else if (action === "back") ui.find(notice, "AppBar").props.onBack();
+    else ui.unmount();
+    await pending;
+    assert.equal(picks, 1);
+    assert.equal(writes, action === "continue" ? 1 : 0);
+    assert.equal(ui.alerts.length, 0);
+    if (action !== "unmount") {
+      assert.ok(!textContent(ui.render(props)).includes("초과분은 ALL탭"));
+      assert.equal(ui.find(ui.render(props), "Button").props.isDisabled, false);
+    }
+  }
+});
+
+test("폴더 한도 초과 결과만 한도 안내를 표시하고 일반 폴더 실패와 구분한다", () => {
+  const render = loadResultModal();
+  for (const reasons of [
+    [],
+    ["FOLDER_LIMIT_EXCEEDED"],
+    ["FOLDER_SAVE_FAILED"],
+    ["FOLDER_LIMIT_EXCEEDED", "FOLDER_SAVE_FAILED"],
+  ]) {
+    const text = textContent(
+      render({
+        result: {
+          importedCount: 1,
+          excludedProducts: [],
+          folderFailures: reasons.map((reason) => ({
+            reason,
+            rowNumber: 2,
+            productName: "상품",
+            sourceFolderName: "폴더",
+          })),
+        },
+        isExcludedListOpen: false,
+      }),
+    );
+    assert.ok(text.includes("전체 1개 · 성공 1개\n실패 0개 · 중복 0개"));
+    assert.equal(
+      text.includes("폴더 최대 개수를 초과한 아이템은 ALL탭에 개별 아이템으로 저장되었습니다."),
+      reasons.includes("FOLDER_LIMIT_EXCEEDED"),
+    );
+    assert.equal(
+      text.includes("폴더에 담지 못한 항목이 1건"),
+      reasons.includes("FOLDER_SAVE_FAILED"),
+    );
+  }
 });
