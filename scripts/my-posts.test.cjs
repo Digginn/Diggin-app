@@ -8,7 +8,7 @@ const React = require("react");
 const ts = require("typescript");
 
 function loadScreen(screenName = "MyPostsScreen", options = {}) {
-  let activeKey = "posts";
+  let activeKey = options.tab ?? "posts";
   function load(relativePath) {
     const screenModule = { exports: {} };
     const source = readFileSync(path.join(__dirname, relativePath), "utf8");
@@ -37,7 +37,11 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
                 },
                 canGoBack: () => false,
                 replace: () => {},
+                setParams: (params) => {
+                  activeKey = params.tab;
+                },
               }),
+              useLocalSearchParams: () => ({ tab: activeKey }),
               useFocusEffect: (callback) => callback(),
               useIsFocused: () => options.isFocused !== false,
             };
@@ -173,6 +177,7 @@ test("좋아요한 글은 탭 없이 실제 카드를 표시하고 상세로 이
   assert.equal(row.props.onPressReport, undefined);
   row.props.onPress();
   assert.equal(selected[0].params.id, "4");
+  assert.equal(selected[0].params.returnTo, "liked");
 });
 
 test("빈 상태·최초 오류·추가 페이지 오류를 구분하고 기존 목록을 유지한다", () => {
@@ -305,4 +310,14 @@ test("상세 화면 연결 전에도 참여 목록의 신고 버튼은 활성화
   );
   const element = children[1].props.renderItem({ item: { id: "vote-1" } });
   assert.equal(element.type(element.props).props.disabled, false);
+});
+
+test("복귀한 투표 탭을 유지하고 상세에 원래 목록 경로를 전달한다", () => {
+  const selected = [],
+    item = activity("2", "vote");
+  const Screen = loadScreen("MyPostsScreen", { tab: "votes", rows: { vote: [item] }, selected });
+  const tree = Screen();
+  assert.equal(find(tree, "TopTab").props.activeKey, "votes");
+  find(tree, "FlatList").props.renderItem({ item }).props.onPress();
+  assert.equal(selected[0].params.returnTo, "my-posts");
 });

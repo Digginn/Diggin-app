@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useFocusEffect, useIsFocused, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -62,7 +62,8 @@ function PostRow({ item, onPress }: { item: MyPost; onPress?: () => void }) {
 }
 
 export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
-  const [activeKey, setActiveKey] = useState("posts");
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const activeKey = tab === "votes" ? "votes" : "posts";
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -89,7 +90,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
     try {
       router.push({
         pathname: post.type === "vote" ? "/votes/[id]" : "/posts/[id]",
-        params: { id: post.id },
+        params: { id: post.id, returnTo: isLiked ? "liked" : "my-posts" },
       });
     } catch {
       showToast("요청을 처리하지 못했습니다. 다시 시도해 주세요.", "error");
@@ -109,7 +110,13 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
         <Spinner />
       ) : (
         <>
-          {!isLiked && <TopTab items={TABS} activeKey={activeKey} onChange={setActiveKey} />}
+          {!isLiked && (
+            <TopTab
+              items={TABS}
+              activeKey={activeKey}
+              onChange={(key) => router.setParams({ tab: key })}
+            />
+          )}
           {activity.isPending ? (
             <View
               accessibilityLabel="내 활동 불러오는 중"
