@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
+const { setImmediate } = require("node:timers");
 const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
@@ -297,6 +298,7 @@ function screenMocks({
   comments = [],
   postResult = {},
   commentsResult = {},
+  params = { id: "12" },
 } = {}) {
   let destination;
   const toasts = [];
@@ -327,8 +329,11 @@ function screenMocks({
     },
     "expo-router": {
       useFocusEffect: () => {},
-      useLocalSearchParams: () => ({ id: "12" }),
+      useLocalSearchParams: () => params,
       useRouter: () => ({
+        dismissTo: (value) => {
+          destination = value;
+        },
         canGoBack: () => true,
         back: () => {},
         push: (value) => {
@@ -676,4 +681,50 @@ test("투표 블록은 본문 컨테이너의 좌우 여백을 그대로 사용�
     vote: { buyCount: 0, notCount: 0, myChoice: null, isClosed: false, remainingLabel: "1시간" },
   });
   assert.equal(tree.props.className.includes("px-margin"), false);
+});
+
+test("삭제 성공은 진입 목록과 탭으로 복귀하며 일반 DIGGLE 진입은 기존 경로를 유지한다", async () => {
+  for (const [returnTo, type, pathname, tab] of [
+    ["my-posts", "post", "/my-posts", "posts"],
+    ["my-posts", "vote", "/my-posts", "votes"],
+    ["liked", "post", "/my-liked-posts", undefined],
+    [undefined, "post", "/(tabs)/diggle", "all"],
+    [undefined, "vote", "/(tabs)/diggle", "vote"],
+  ]) {
+    const post = await api({ ...MEMBER, type, is_mine: true }).fetchCommunityPost("12");
+    const state = screenMocks({ post, params: { id: "12", returnTo } });
+    const invalidations = [];
+    state.mocks["@tanstack/react-query"] = {
+      useQueryClient: () => ({ invalidateQueries: (input) => invalidations.push(input) }),
+    };
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const tree = PostDetailScreen({ type: type === "vote" ? "vote" : "all" });
+    await nodes(tree, "ActionModal")
+      .find((node) => node.props.primaryAction?.label === "삭제")
+      .props.primaryAction.onPress();
+    await new Promise(setImmediate);
+    const target = state.destination();
+    assert.equal(typeof target === "string" ? target : target.pathname, pathname);
+    if (tab) assert.equal(target.params.tab, tab);
+    assert.equal(invalidations.length, 1);
+  }
+});
+
+test("삭제 실패는 원래 상세에 남고 잘못된 글 종류를 교정해도 복귀 목록을 보존한다", async () => {
+  const post = await api({ ...MEMBER, type: "vote", is_mine: true }).fetchCommunityPost("12");
+  const state = screenMocks({ post, params: { id: "12", returnTo: "my-posts" } });
+  state.mocks["./api/communityWrite"].deleteCommunityPost = async () => {
+    throw Error("offline");
+  };
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const tree = PostDetailScreen({ type: "vote" });
+  await nodes(tree, "ActionModal")
+    .find((node) => node.props.primaryAction?.label === "삭제")
+    .props.primaryAction.onPress();
+  await new Promise(setImmediate);
+  assert.equal(state.destination(), undefined);
+  state.mocks.react.useEffect = (effect) => effect();
+  const corrected = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks).PostDetailScreen;
+  corrected({ type: "all" });
+  assert.equal(state.destination().params.returnTo, "my-posts");
 });

@@ -46,7 +46,7 @@ import type { CommunityComment, CommunityItem } from "./types/community";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
   const router = useRouter();
   const { session, isRestoring } = useAuth();
   const showToast = useToast();
@@ -141,10 +141,17 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
       if (currentViewer.current !== viewer) return;
       setDeleteOpen(false);
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
-      router.dismissTo({
-        pathname: "/(tabs)/diggle",
-        params: { tab: post.type === "vote" ? "vote" : "all" },
-      });
+      if (returnTo === "my-posts")
+        router.dismissTo({
+          pathname: "/my-posts",
+          params: { tab: post.type === "vote" ? "votes" : "posts" },
+        });
+      else if (returnTo === "liked") router.dismissTo("/my-liked-posts");
+      else
+        router.dismissTo({
+          pathname: "/(tabs)/diggle",
+          params: { tab: post.type === "vote" ? "vote" : "all" },
+        });
       showToast(post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.");
     } catch (error) {
       if (currentViewer.current === viewer) setDeleteError(communityWriteError(error));
@@ -192,10 +199,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
     if (!isRestoring && session && post && isWrongRoute) {
       router.replace({
         pathname: post.type === "vote" ? "/votes/[id]" : "/posts/[id]",
-        params: { id: post.id },
+        params: { id: post.id, ...(returnTo ? { returnTo } : {}) },
       });
     }
-  }, [isRestoring, session, post, isWrongRoute, router]);
+  }, [isRestoring, session, post, isWrongRoute, router, returnTo]);
 
   if (!isRestoring && !session)
     return (
