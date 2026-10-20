@@ -15,7 +15,7 @@
 | 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다          |
 | 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69) |
 | 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)        |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                               |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 알림 생성·목록 (#104). Push 발송·신고·운영은 미구현                  |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -278,21 +278,28 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 - 차단 RPC는 user id를 받지 않고 post_id나 comment_id를 받아 서버에서 작성자를 찾는다. 차단 목록은 앱에 열지 않는다.
 - RPT-004 차단은 단방향이다. 차단한 사용자에게만 차단 대상의 게시글·투표글·댓글·답글을 숨긴다. 차단당한 사용자에게는 차단한 사용자의 콘텐츠가 계속 보인다. 기존 콘텐츠와 이후 새 콘텐츠에 동일하게 적용한다.
 
-### 6-4. 알림 (notifications는 public select만, 나머지 private)
+### 6-4. 알림 (#104, 전부 private, 목록은 RPC로만)
 
 ```
-notifications
-  id, recipient_id FK profiles, type, post_id FK posts, title, body,
-  created_at, event_key text unique, push_sent_at null
+private.notifications
+  id, recipient_id FK profiles cascade, type notification_type, post_id FK posts cascade,
+  title, body, event_key text unique, created_at, push_sent_at null
 
-like_notification_log  (post_id, actor_id) PK, created_at
+private.like_notification_log  (post_id, actor_id) PK, created_at
 ```
 
-- 알림 종류별 수신 설정은 없다(MY-011 MVP 제외). 목록은 최근 30일만 보이고(조회에서 거름), pg_cron이 하루 한 번 30일 지난 행을 지운다. 읽음 상태 없음.
-- event_key는 수신자 + 유형 + 원본 이벤트 ID. Push 워커 재시도 중복을 막는다. 앱 select 컬럼에서 뺀다.
-- 좋아요 알림은 같은 사람·같은 글에 최초 1회. `like_post`가 like_notification_log에 on conflict do nothing으로 넣고, 들어갔을 때만 알림을 만든다. 취소해도 지우지 않는다.
-- 본인 댓글·본인 좋아요는 알림 없음. 투표 마감 전에 글이 삭제되면 종료 알림을 만들지 않는다.
-- Push는 사용자의 토큰 전체에 보낸다. 발송 결과가 DeviceNotRegistered면 토큰을 지운다. push_sent_at이 null이면 다음 실행 때 다시 보낸다.
+처음엔 notifications를 public에 두고 select만 열 생각이었는데, 알림을 눌렀을 때 글이 지워졌는지(NOTI-006)를 앱이 알아야 해서 private.posts를 같이 봐야 했다. 그래서 커뮤니티처럼 원본은 private에 두고 `get_notifications(after_created_at, after_id)`로만 읽는다.
+
+- 알림은 쓰기 RPC를 고치지 않고 트리거로 만든다. 댓글은 `comments` insert, 좋아요는 `post_likes` insert 때 돈다. 댓글 재시도는 기존 댓글을 돌려줘 insert가 없고, 좋아요는 on conflict do nothing이라 이미 누른 상태면 트리거가 돌지 않는다.
+- 일반 게시글만 알린다(NOTI-004·005). 본인 댓글·본인 좋아요, 받는 사람이 차단·신고한 사용자의 행동, 지워지거나 숨겨진 글은 알리지 않는다.
+- 좋아요는 같은 사람·같은 글에 최초 1회. like_notification_log에 on conflict do nothing으로 넣고 들어갔을 때만 알림을 만든다. 취소하거나 알림이 30일 지나 지워져도 기록은 남겨 다시 보내지 않는다.
+- 투표 마감은 pg_cron `notifications-vote-ended`가 1분마다 `ends_at`이 지난 투표를 찾아 작성자에게 만든다(NOTI-003). 마감 전에 지워진 글은 건너뛴다. 작업이 밀려도 놓치지 않게 시각 범위가 아니라 event_key로 중복을 막는다.
+- event_key는 `comment:{comment_id}`, `like:{post_id}:{actor_id}`, `vote_ended:{post_id}`. 앱에는 주지 않는다.
+- 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 글자 수는 자르지 않는다(Push 줄 수는 OS에 맡긴다).
+- 목록은 최근 30일, 최신순 20개씩. 알림은 항상 받는 사람 자신의 글이라 `is_post_available`은 삭제·숨김만 본다. 읽음 상태는 없다.
+- pg_cron `notifications-cleanup`이 매일 03:00(KST)에 30일 지난 알림을 지운다.
+- 알림 종류별 수신 설정은 없다(MY-011 MVP 제외). 수신 설정·OS 권한과 관계없이 알림은 목록에 남긴다(NOTI-007).
+- Push 발송은 다음 작업이다. 사용자의 토큰 전체에 보내고, DeviceNotRegistered면 토큰을 지우고, push_sent_at이 null이면 다음 실행 때 다시 보낸다.
 
 ### 6-5. 운영 (private, Edge Function의 service_role만)
 
