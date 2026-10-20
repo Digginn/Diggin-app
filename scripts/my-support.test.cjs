@@ -77,7 +77,7 @@ function setup(screenName) {
           };
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
         if (name === "expo-router")
-          return { useRouter: () => ({ push: (route) => routes.push(route) }) };
+          return { useIsFocused: () => true, useRouter: () => ({ push: (route) => routes.push(route) }) };
         if (name === "react-native-safe-area-context")
           return { useSafeAreaInsets: () => ({ bottom: 34 }) };
         if (name === "@/hooks/useToast") return { useToast: () => (text) => toasts.push(text) };

@@ -148,6 +148,7 @@ test("내 활동 메뉴는 두 실제 목록으로 이동하고 이동 실패·�
     fail = false;
   const { MyActivityScreen } = load("src/screens/my/MyActivityScreen.tsx", {
     "expo-router": {
+      useIsFocused: () => true,
       useRouter: () => ({
         push: (target) => {
           if (fail) throw Error("navigation");

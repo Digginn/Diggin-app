@@ -33,11 +33,13 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
                 push: (value) => {
                   if (options.navigationFails) throw Error("navigation");
                   options.selected?.push(value);
+                  if (value === "/login") options.isFocused = false;
                 },
                 canGoBack: () => false,
                 replace: () => {},
               }),
               useFocusEffect: (callback) => callback(),
+              useIsFocused: () => options.isFocused !== false,
             };
           if (name === "@/contexts/AuthContext")
             return {
@@ -92,6 +94,7 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
             };
           if (name === "@/components/app-bar") return { AppBar: "AppBar" };
           if (name === "@/components/TopTab") return { TopTab: "TopTab" };
+          if (name === "./components/MyMenuList") return { MyMenuList: "MyMenuList" };
           if (name === "./components/VoteListItem")
             return load("../src/screens/my/components/VoteListItem.tsx");
           return require(name);
@@ -225,6 +228,26 @@ test("비회원은 목록 대신 로그인 안내를 받으며 인증 복원 중
   tree = Screen();
   assert.ok(find(tree, "Spinner"));
   assert.equal(find(tree, "FlatList"), undefined);
+});
+
+test("로그인 화면에서는 이전 활동 화면의 모달을 숨기고, 비회원으로 돌아오면 다시 표시한다", () => {
+  for (const [screenName, props] of [
+    ["MyActivityScreen", undefined],
+    ["MyPostsScreen", undefined],
+    ["MyPostsScreen", { isLiked: true }],
+  ]) {
+    const options = { guest: true, isFocused: true, selected: [] };
+    const Screen = loadScreen(screenName, options);
+    const prompt = () => find(Screen(props), "LoginRequiredModal");
+    assert.equal(prompt().props.visible, true);
+    prompt().props.onLogin();
+    assert.deepEqual(options.selected, ["/login"]);
+    assert.equal(prompt().props.visible, false, "이전 화면이 로그인 화면을 덮지 않는다");
+    options.isFocused = true;
+    assert.equal(prompt().props.visible, true, "로그인을 취소하고 돌아오면 다시 안내한다");
+    options.guest = false;
+    assert.equal(prompt(), undefined, "로그인한 계정에는 로그인 안내를 표시하지 않는다");
+  }
 });
 
 test("재조회·화면 이동 실패에도 기존 목록을 유지하고 오류를 안내한다", () => {

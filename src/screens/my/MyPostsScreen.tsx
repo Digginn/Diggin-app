@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useIsFocused, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -65,6 +65,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
   const [activeKey, setActiveKey] = useState("posts");
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { session, isRestoring } = useAuth();
   const queryClient = useQueryClient();
   const showToast = useToast();
@@ -99,7 +100,11 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
     <View className="flex-1 bg-gray-0">
       <AppBar title={title} onBack={goBack} />
       {!isRestoring && !session ? (
-        <LoginRequiredModal visible onClose={goBack} onLogin={() => router.push("/login")} />
+        <LoginRequiredModal
+          visible={isFocused}
+          onClose={goBack}
+          onLogin={() => router.push("/login")}
+        />
       ) : isRestoring ? (
         <Spinner />
       ) : (

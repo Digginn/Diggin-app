@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useIsFocused, useRouter } from "expo-router";
 import { ScrollView, View } from "react-native";
 
 import { AppBar } from "@/components/app-bar";
@@ -10,6 +10,7 @@ import { MyMenuList } from "./components/MyMenuList";
 
 export function MyActivityScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const showToast = useToast();
   const { session, isRestoring } = useAuth();
   function open(path: "/my-posts" | "/my-liked-posts") {
@@ -25,7 +26,7 @@ export function MyActivityScreen() {
       <AppBar title="내 활동" />
       {!isRestoring && !session ? (
         <LoginRequiredModal
-          visible
+          visible={isFocused}
           onClose={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/my"))}
           onLogin={() => router.push("/login")}
         />
