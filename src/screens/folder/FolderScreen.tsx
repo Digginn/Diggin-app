@@ -24,6 +24,7 @@ const INITIAL_FOLDERS: FolderItem[] = [
   { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
 ];
 const TOAST_DURATION_MS = 2000;
+const MAX_CUSTOM_FOLDERS = 50;
 
 type FolderScreenProps = {
   isError?: boolean;
@@ -91,14 +92,31 @@ export function FolderScreen({
   }, [toast]);
 
   async function submitFolderName(name: string, folder?: FolderItem) {
+    if (!folder && folders.filter((entry) => !entry.isOwnedItems).length >= MAX_CUSTOM_FOLDERS) {
+      Keyboard.dismiss();
+      setToast({ message: FOLDER_MESSAGES.createLimit });
+      return false;
+    }
     try {
       if (folder) await onRenameFolder?.(folder, name);
       else await onCreateFolder?.(name);
       setToast({ message: folder ? FOLDER_MESSAGES.renameSuccess : FOLDER_MESSAGES.createSuccess });
       return true;
-    } catch {
+    } catch (error) {
       Keyboard.dismiss();
-      setToast({ message: folder ? FOLDER_MESSAGES.renameError : FOLDER_MESSAGES.createError });
+      const isLimitError =
+        !folder &&
+        typeof error === "object" &&
+        error !== null &&
+        "reason" in error &&
+        error.reason === "limit";
+      setToast({
+        message: folder
+          ? FOLDER_MESSAGES.renameError
+          : isLimitError
+            ? FOLDER_MESSAGES.createLimit
+            : FOLDER_MESSAGES.createError,
+      });
       return false;
     }
   }
