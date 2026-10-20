@@ -38,6 +38,7 @@ function findAll(node, type) {
 
 test("댓글 30자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {
   const { CommentInput } = load("../src/components/CommentInput.tsx", {
+    "@/utils/text": load("../src/utils/text.ts", {}),
     "react": { forwardRef: (render) => render },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable", TextInput: "TextInput" },
     "@/assets/images/icon-send.svg": { __esModule: true, default: "SendSvg" },

@@ -358,6 +358,10 @@ export type Database = {
     Functions: {
       accept_policy: { Args: { target_policy_id: number }; Returns: undefined };
       agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
+      create_comment: {
+        Args: { comment_content: string; request_id: string; target_post_id: number };
+        Returns: Json;
+      };
       create_post: {
         Args: {
           post_content: string;
@@ -367,6 +371,7 @@ export type Database = {
         };
         Returns: string;
       };
+      delete_comment: { Args: { target_comment_id: number }; Returns: undefined };
       delete_community_post: { Args: { target_post_id: number }; Returns: undefined };
       get_community_comments: {
         Args: { after_created_at?: string; after_id?: number; target_post_id: number };
@@ -416,6 +421,7 @@ export type Database = {
         }[];
       };
       set_avatar: { Args: { new_path: string }; Returns: undefined };
+      set_community_like: { Args: { is_liked: boolean; target_post_id: number }; Returns: Json };
       set_owned: {
         Args: {
           is_owned: boolean;
@@ -428,6 +434,10 @@ export type Database = {
       set_product_folders: {
         Args: { folder_ids: number[]; target_product_id: number };
         Returns: undefined;
+      };
+      update_comment: {
+        Args: { comment_content: string; target_comment_id: number };
+        Returns: Json;
       };
       update_nickname: { Args: { new_nickname: string }; Returns: string };
     };

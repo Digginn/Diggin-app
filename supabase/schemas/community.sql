@@ -61,10 +61,12 @@ create table private.comments (
   post_id bigint not null references private.posts(id) on delete cascade,
   author_id uuid references public.profiles(id) on delete set null,
   content text check (content is null or private.char_count(content) between 1 and 30),
+  creation_request_id uuid not null default gen_random_uuid(),
   deleted_at timestamptz,
   hidden_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint comments_author_request_key unique (author_id, creation_request_id)
 );
 create index comments_post_idx on private.comments(post_id, created_at, id)
   where deleted_at is null and hidden_at is null;
