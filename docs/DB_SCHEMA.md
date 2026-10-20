@@ -15,7 +15,7 @@
 | 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다          |
 | 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69) |
 | 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)        |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 미구현                                                               |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 신고·차단 (#112), 운영·알림 후속                                     |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -194,7 +194,7 @@ import_failures
 - 투표 집계는 참여자·작성자에게 공개하고, 마감 후에는 미참여 회원에게도 공개한다(2026-10-20 사용자 확정). 진행 중 미참여 회원의 집계는 null이다. 비회원에게는 항상 집계를 반환하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
 - definer 구현은 private, invoker 래퍼는 public이다. 비회원 피드 래퍼에 필요한 private 스키마 usage와 피드 함수 execute만 anon에 허용하고 원본·내부 helper·상세·댓글 권한은 주지 않는다.
-- 커뮤니티 기능 연결: 작성·삭제·정책 동의는 #95, 투표 참여는 #96, 댓글·좋아요는 #97, 상품 저장은 #98, 내 활동은 #99에서 연결했다. 신고·차단 쓰기와 알림은 후속 작업이다.
+- 커뮤니티 기능 연결: 작성·삭제·정책 동의는 #95, 투표 참여는 #96, 댓글·좋아요는 #97, 상품 저장은 #98, 내 활동은 #99에서 연결했다. 신고·차단 쓰기는 #112에서 연결했으며 운영·알림은 후속 작업이다.
 
 마이그레이션은 로컬 Docker가 없는 환경에서 PR의 임시 CI가 CLI 2.120.0 `db schema declarative sync -f community_read --no-apply`로 생성한 artifact를 검토해 추가했다. 같은 임시 DB에서 전체 마이그레이션·pgTAP·lint·Advisors와 타입 생성을 수행했으며 생성용 워크플로는 최종 변경에서 제거한다. 이후 검증은 공통 DB 배포 워크플로를 따른다.
 
@@ -287,6 +287,18 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 - 신고만으로 차단하지 않는다. 신고 후 모달에서 '차단하기'를 눌렀을 때만 user_blocks를 만든다(RPT-003).
 - 차단 RPC는 user id를 받지 않고 post_id나 comment_id를 받아 서버에서 작성자를 찾는다. 차단 목록은 앱에 열지 않는다.
 - RPT-004 차단은 단방향이다. 차단한 사용자에게만 차단 대상의 게시글·투표글·댓글·답글을 숨긴다. 차단당한 사용자에게는 차단한 사용자의 콘텐츠가 계속 보인다. 기존 콘텐츠와 이후 새 콘텐츠에 동일하게 적용한다.
+
+#### #112 신고·단방향 차단 (RPT-001~004)
+
+- `report_community_content(target_type, target_id, report_reason, report_detail?)`는 `post`(일반글·투표글) 또는 `comment` ID와 사유만 받는다. 서버가 작성자를 결정하고 신고 ID만 반환한다. 클라이언트는 실제 사용자 UUID와 원문 테이블을 조회하지 않는다.
+- 인증·정지·본인·삭제·숨김·이미 제외된 작성자를 검증한다. 커뮤니티 작성 제한 중 신고·차단은 허용한다. 사유는 abuse/spam/inappropriate/other 중 하나이며 other만 NFC 정규화한 0~50자 상세를 허용한다. 앱과 DB 모두 사용자 인식 문자 기준이다.
+- 신고자는 같은 콘텐츠를 1건만 신고한다. 계정·종류·대상별 트랜잭션 잠금과 기존 unique 제약으로 동시 재시도를 보호하고 최초 사유·상태·Snapshot을 보존한다. 댓글은 부모 글 → 댓글 행 잠금 안에서 접수 시점 본문을 복사한다. 수정 불가 글은 별도 Snapshot을 만들지 않는다.
+- `block_community_author(target_type, target_id)`는 해당 계정의 기존 신고에서 작성자를 결정해 단방향 관계를 저장한다. 신고로 이미 숨겨진 대상도 차단할 수 있으며 같은 관계 재시도는 안전하다. 신고만으로 user_blocks를 만들지 않는다. 계정 ID를 임의 입력해 차단하거나 다른 계정의 신고를 사용할 수 없다.
+- 기존 공통 조회 필터로 신고·차단 작성자의 기존·신규 피드/상세/댓글/활동을 서버에서 제외한다. 차단당한 사용자에게는 반대 방향 필터를 만들지 않는다. 같은 작성자의 다른 콘텐츠까지 제외하는 기존 읽기 계약을 유지한다.
+- 앱의 피드·상세·댓글·좋아요 목록에서 공통 ReportFlow를 사용한다. 본인·탈퇴 댓글에는 신고 버튼이 없고, 한 NativeModal에서 사유 입력 → 차단 여부 확인을 전환한다. 실패 시 입력·단계를 유지하고 모달 위 Toast를 표시한다. 요청 중 입력·연타·닫기를 막는다.
+- 신고·차단 후 community 캐시를 갱신하고 조회 실패도 성공 완료로 표시하지 않는다. 재시도는 서버의 기존 신고/차단을 재사용한다. 계정 변경·화면 이탈 후 늦은 응답은 모달이나 완료 Toast를 변경하지 않는다.
+- 관리자 신고 목록·상태 전환·제재·감사 로그·Retool은 RPT-005~006 후속 범위다. 최신 RPT-006의 모든 커뮤니티 변경 차단(본인 글 삭제 포함)과 제재 안내/세션 종료는 해당 작업에서 기존 예외와 함께 정리해야 한다.
+- 검증: `community_reporting.test.sql`, `community-reporting.test.cjs`와 `check_report_concurrency.py --container supabase_db_diggin-112`. 실제 동시 신고·차단, Snapshot 보존·단방향·권한·실패 재시도를 확인한다.
 
 ### 6-4. 알림 (notifications는 public select만, 나머지 private)
 
