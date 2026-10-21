@@ -77,10 +77,12 @@ function setup(screenName) {
           };
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
         if (name === "expo-router")
-          return { useRouter: () => ({ push: (route) => routes.push(route) }) };
+          return { useIsFocused: () => true, useRouter: () => ({ push: (route) => routes.push(route) }) };
         if (name === "react-native-safe-area-context")
           return { useSafeAreaInsets: () => ({ bottom: 34 }) };
         if (name === "@/hooks/useToast") return { useToast: () => (text) => toasts.push(text) };
+        if (name === "@/contexts/AuthContext")
+          return { useAuth: () => ({ session: { user: { id: "viewer" } }, isRestoring: false }) };
         if (name === "@/components/app-bar") return { AppBar: "AppBar" };
         if (name === "@/components/Button") return { Button: "Button" };
         if (name === "@/components/modal") return { Modal: "Modal" };
@@ -194,7 +196,8 @@ test("내 활동은 쓴 글과 좋아요한 글만 표시하고 쓴 글 목록�
   rows[0].onPress();
   assert.equal(context.routes[0], "/my-posts");
   rows[1].onPress();
-  assert.deepEqual(context.toasts, ["좋아요한 글 목록은 준비 중입니다."]);
+  assert.equal(context.routes[1], "/my-liked-posts");
+  assert.deepEqual(context.toasts, []);
 });
 
 test("MY 문의는 채널로 바로 이동하고 실패할 때만 고객지원 화면을 표시한다", async () => {

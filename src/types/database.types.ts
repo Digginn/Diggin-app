@@ -382,6 +382,10 @@ export type Database = {
         Returns: Json;
       };
       get_community_post: { Args: { target_post_id: number }; Returns: Json };
+      get_my_community_activity: {
+        Args: { activity_type: string; after_activity_at?: string; after_id?: number };
+        Returns: Json;
+      };
       get_notifications: { Args: { after_created_at?: string; after_id?: number }; Returns: Json };
       get_pending_policies: {
         Args: Record<PropertyKey, never>;
