@@ -357,6 +357,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
       unregisterDevicePush: async () => {
         order.push("unregisterPush");
       },
+      finishDeviceSignOut: () => order.push("finishPush"),
     },
   });
   const render = () => {
@@ -369,8 +370,8 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.equal(signOutOptions[0].scope, "local", "이 기기 세션만 끊는다");
   assert.deepEqual(
     order,
-    ["unregisterPush", "signOut"],
-    "세션을 끊기 전에 이 기기 Push 토큰을 지운다",
+    ["unregisterPush", "signOut", "finishPush"],
+    "세션을 끊기 전에 이 기기 Push 토큰을 지우고, 세션을 끊은 뒤에야 등록 막기를 푼다",
   );
   assert.equal(render().isSessionExpired, false);
   emit("TOKEN_REFRESHED", { id: "s2" });
