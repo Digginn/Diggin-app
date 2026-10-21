@@ -31,7 +31,10 @@ function findAll(node, type) {
 
 test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   const events = [];
-  const AppBar = Object.assign(() => null, { IconButton: "IconButton" });
+  const AppBar = Object.assign(() => null, {
+    IconButton: "IconButton",
+    NotificationButton: "NotificationButton",
+  });
   const mocks = {
     "react": {
       useState: (initial) => [initial, () => {}],
@@ -93,10 +96,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   };
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", mocks);
   const allBar = findAll(AllScreen(), AppBar)[0];
-  const allButton = findAll(allBar.props.right, "IconButton").find(
-    (button) => button.props.icon === "NotificationIcon",
-  );
-  allButton.props.onPress();
+  findAll(allBar.props.right, "NotificationButton")[0].props.onPress();
   const { SearchScreen } = load("../src/screens/search/SearchScreen.tsx", mocks);
   assert.equal(findAll(SearchScreen(), "SearchBar")[0].props.maxLength, 100);
   findAll(SearchScreen(), "SearchBar")[0].props.right.props.onPress();
@@ -238,6 +238,9 @@ test("뒤로 가기는 이전 화면으로, 직접 진입한 경우에는 탭 �
         "@/screens/notification/queries/useNotifications": {
           useNotifications: () => ({ data: undefined, isPending: false, isError: false }),
         },
+        "@/screens/notification/queries/useNotificationCheck": {
+          useNotificationCheck: () => ({ data: null, isPending: false, isError: false }),
+        },
         "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "방금 전" },
         "@/hooks/useToast": { useToast: () => () => {} },
         "@/constants/messages": {
@@ -269,6 +272,9 @@ test("개발용 미리보기는 ?preview가 있을 때만 샘플을 보이고, �
     },
     "@/screens/notification/queries/useNotifications": {
       useNotifications: () => ({ data: undefined, isPending: false, isError: false }),
+    },
+    "@/screens/notification/queries/useNotificationCheck": {
+      useNotificationCheck: () => ({ data: null, isPending: false, isError: false }),
     },
     "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "방금 전" },
     "@/hooks/useToast": { useToast: () => () => {} },
@@ -428,7 +434,7 @@ test("기기 알림이 꺼져 있으면 안내를 띄우고, 닫은 기한은 �
   assert.equal(render().isPushOff, false, "아직 정하지 않은 권한은 꺼진 것으로 보지 않는다");
 });
 
-test("운영 알림 목록은 실제 알림을 보여 주고, 누르면 글 종류에 맞는 상세로 이동하거나 지워진 글을 안내하며 끝에서 다음 페이지를 부른다", () => {
+test("운영 알림 목록은 실제 알림과 지난 확인 뒤 새 알림을 보여 주고, 누르면 글 종류에 맞는 상세로 이동하거나 지워진 글을 안내하며 끝에서 다음 페이지를 부른다", () => {
   const pushed = [];
   const toasts = [];
   let fetchedNext = 0;
@@ -484,6 +490,13 @@ test("운영 알림 목록은 실제 알림을 보여 주고, 누르면 글 종�
         useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
       },
       "@/screens/notification/queries/useNotifications": { useNotifications: () => list },
+      "@/screens/notification/queries/useNotificationCheck": {
+        useNotificationCheck: () => ({
+          data: "2026-10-20T12:00:00.000000+00:00",
+          isPending: false,
+          isError: false,
+        }),
+      },
       "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "1시간 전" },
       "@/hooks/useToast": {
         useToast: () => (message, variant) => toasts.push([message, variant]),
@@ -498,9 +511,10 @@ test("운영 알림 목록은 실제 알림을 보여 주고, 누르면 글 종�
   assert.deepEqual(
     props.notifications.map((item) => [item.title, item.message, item.timeLabel, item.isRead]),
     [
-      ["투표 결과가 나왔어요", "'고민돼요' 투표가 종료됐어요. BUY 1 · NOT 2", "1시간 전", true],
+      ["투표 결과가 나왔어요", "'고민돼요' 투표가 종료됐어요. BUY 1 · NOT 2", "1시간 전", false],
       ["내 게시글에 댓글이 달렸어요", "디기 1: 예뻐요", "1시간 전", true],
     ],
+    "지난번 알림함을 연 뒤에 온 알림만 안 읽음으로 보인다",
   );
   props.onPressNotification(props.notifications[0]);
   props.onPressNotification(props.notifications[1]);
@@ -516,4 +530,19 @@ test("운영 알림 목록은 실제 알림을 보여 주고, 누르면 글 종�
   assert.equal(fetchedNext, 1);
   props.onRetry();
   assert.equal(refetched, 1);
+});
+
+test("종 아이콘은 지난 확인 뒤 새 알림이 있으면 빨간 점 아이콘으로 바뀐다", () => {
+  for (const hasUnread of [true, false]) {
+    const { NotificationButton } = load("../src/components/app-bar/NotificationButton.tsx", {
+      "@/assets/images/appbar": { IconNotification: "Bell", IconNotificationDot: "BellDot" },
+      "@/hooks/useHasUnreadNotifications": { useHasUnreadNotifications: () => hasUnread },
+      "./IconButton": { IconButton: "IconButton" },
+    });
+    const onPress = () => {};
+    const button = NotificationButton({ onPress });
+    assert.equal(button.props.icon, hasUnread ? "BellDot" : "Bell");
+    assert.equal(button.props.accessibilityLabel, hasUnread ? "알림, 새 알림 있음" : "알림");
+    assert.equal(button.props.onPress, onPress);
+  }
 });

@@ -215,6 +215,7 @@ test("AppBar는 로그인용 아이콘 옵션과 develop의 다크모드·제목
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 24 }) },
     "@/assets/images/appbar": { IconBack: "DefaultBack" },
     "./IconButton": { IconButton: "IconButton" },
+    "./NotificationButton": { NotificationButton: "NotificationButton" },
     "./TextButton": { TextButton: "TextButton" },
   });
   const dark = nodes(
