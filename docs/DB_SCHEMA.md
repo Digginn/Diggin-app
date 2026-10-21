@@ -304,7 +304,7 @@ private.notification_checks    user_id PK FK profiles cascade, checked_at
 - 알림은 쓰기 RPC를 고치지 않고 트리거로 만든다. 댓글은 `comments` insert, 좋아요는 `post_likes` insert 때 돈다. 댓글 재시도는 기존 댓글을 돌려줘 insert가 없고, 좋아요는 on conflict do nothing이라 이미 누른 상태면 트리거가 돌지 않는다.
 - 일반 게시글만 알린다(NOTI-004·005). 본인 댓글·본인 좋아요, 받는 사람이 차단·신고한 사용자의 행동, 지워지거나 숨겨진 글은 알리지 않는다.
 - 좋아요는 같은 사람·같은 글에 최초 1회. like_notification_log에 on conflict do nothing으로 넣고 들어갔을 때만 알림을 만든다. 취소하거나 알림이 30일 지나 지워져도 기록은 남겨 다시 보내지 않는다.
-- 투표 마감은 pg_cron `notifications-vote-ended`가 1분마다 `ends_at`이 지난 투표를 찾아 작성자에게 만든다(NOTI-003). 마감 전에 지워진 글은 건너뛴다. 작업이 밀려도 놓치지 않게 시각 범위가 아니라 event_key로 중복을 막는다.
+- 투표 마감은 pg_cron `notifications-vote-ended`가 1분마다 `ends_at`이 지난 투표를 찾아 작성자에게 만든다(NOTI-003). 마감 전에 지워지거나 숨겨진 글은 건너뛰고, 마감 뒤 작업이 돌기 전에 지운 글은 알린다(누르면 NOTI-006 안내). 작업이 밀려도 놓치지 않게 시각 범위가 아니라 event_key로 중복을 막는다.
 - event_key는 `comment:{comment_id}`, `like:{post_id}:{actor_id}`, `vote_ended:{post_id}`. 앱에는 주지 않는다.
 - 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 글자 수는 자르지 않는다(Push 줄 수는 OS에 맡긴다).
 - 목록은 최근 30일, 최신순 20개씩. 알림은 항상 받는 사람 자신의 글이라 `is_post_available`은 삭제·숨김만 본다.
