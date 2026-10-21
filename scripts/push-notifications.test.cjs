@@ -5,7 +5,13 @@ const test = require("node:test");
 const { runInNewContext } = require("node:vm");
 const ts = require("typescript");
 
-function loadPush({ os = "ios", status = "undetermined", requestResult = "granted" } = {}) {
+function loadPush({
+  os = "ios",
+  status = "undetermined",
+  requestResult = "granted",
+  tokenGate,
+  rpcGate,
+} = {}) {
   const calls = { requests: 0, tokens: 0, channels: 0, rpc: [], deleted: [] };
   const state = { status };
   const compiled = ts.transpileModule(
@@ -39,6 +45,7 @@ function loadPush({ os = "ios", status = "undetermined", requestResult = "grante
           getExpoPushTokenAsync: async ({ projectId }) => {
             calls.tokens += 1;
             assert.equal(projectId, "project");
+            await tokenGate;
             return { data: "ExponentPushToken[device]" };
           },
         };
@@ -47,6 +54,7 @@ function loadPush({ os = "ios", status = "undetermined", requestResult = "grante
           supabase: {
             rpc: async (fn, args) => {
               calls.rpc.push([fn, args]);
+              await rpcGate;
               return { error: null };
             },
             from: (table) => ({
@@ -114,4 +122,30 @@ test("로그아웃하면 이 기기에 등록한 토큰만 지우고, 등록한 
   assert.deepEqual(calls.deleted, [["push_tokens", "token", "ExponentPushToken[device]"]]);
   await push.registerDevicePush("user-a", true);
   assert.equal(calls.rpc.length, 2, "로그아웃 뒤 같은 계정으로 다시 로그인하면 다시 등록한다");
+});
+
+test("토큰을 받거나 등록 응답을 기다리는 중에 로그아웃해도 로그아웃한 계정의 토큰을 남기지 않는다", async () => {
+  let releaseRpc;
+  const slowRpc = loadPush({ rpcGate: new Promise((resolve) => (releaseRpc = resolve)) });
+  const registering = slowRpc.push.registerDevicePush("user-a", true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(slowRpc.calls.rpc.length, 1, "등록 요청을 보낸 상태");
+  const loggingOut = slowRpc.push.unregisterDevicePush();
+  releaseRpc();
+  await Promise.all([registering, loggingOut]);
+  assert.deepEqual(
+    slowRpc.calls.deleted,
+    [["push_tokens", "token", "ExponentPushToken[device]"]],
+    "응답을 기다렸다가 방금 등록한 토큰을 지운다",
+  );
+
+  let releaseToken;
+  const slowToken = loadPush({ tokenGate: new Promise((resolve) => (releaseToken = resolve)) });
+  const waitingToken = slowToken.push.registerDevicePush("user-a", true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await slowToken.push.unregisterDevicePush();
+  releaseToken();
+  await waitingToken;
+  assert.equal(slowToken.calls.rpc.length, 0, "로그아웃한 뒤 받은 토큰은 등록하지 않는다");
+  assert.equal(slowToken.calls.deleted.length, 0);
 });
