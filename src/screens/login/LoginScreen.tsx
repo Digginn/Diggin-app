@@ -1,7 +1,15 @@
 import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SANCTION_REASON_LABELS, type AccountAccess } from "@/api/accountAccess";
@@ -15,7 +23,8 @@ import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeM
 import { signIn } from "./api/signIn";
 import { SocialLoginButton, type LoginProvider } from "./components/SocialLoginButton";
 
-const LOGIN_PROVIDERS: LoginProvider[] = ["google", "kakao", "apple"];
+const LOGIN_PROVIDERS: LoginProvider[] =
+  Platform.OS === "ios" ? ["google", "kakao", "apple"] : ["google", "kakao"];
 
 type LoginScreenProps = {
   isLoginError?: boolean;

@@ -8,8 +8,6 @@ import {
 import { initializeKakaoSDK } from "@react-native-kakao/core";
 import { me as getKakaoProfile, login as loginWithKakao } from "@react-native-kakao/user";
 import * as AppleAuthentication from "expo-apple-authentication";
-import * as Linking from "expo-linking";
-import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
 
 import { fetchAccountAccess, parseAccountAccess, type AccountAccess } from "@/api/accountAccess";
@@ -146,39 +144,9 @@ async function signInWithKakao(): Promise<SignInResult> {
   }
 }
 
-// 기기 애플 로그인이 없는 Android의 애플은 브라우저 로그인 후 딥링크로 돌아온다.
-async function signInWithAppleBrowser(): Promise<SignInResult> {
-  const provider = "apple";
-  const redirectTo = Linking.createURL("auth/callback");
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: { redirectTo, skipBrowserRedirect: true },
-  });
-  if (error) throw error;
-
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== "success") return { status: "cancelled" };
-
-  const { queryParams } = Linking.parse(result.url);
-  if (typeof queryParams?.error_description === "string") {
-    // 브라우저 OAuth 거부 응답에는 본인 ID token이 없으므로 위반 유형을 추측하지 않는다.
-    if (
-      queryParams.error_code === "user_banned" ||
-      /user.*banned/i.test(queryParams.error_description)
-    )
-      return { status: "suspended", access: UNKNOWN_SUSPENSION };
-    throw new Error(queryParams.error_description);
-  }
-  if (typeof queryParams?.code !== "string") throw new Error("oauth_code_missing");
-
-  const exchanged = await supabase.auth.exchangeCodeForSession(queryParams.code);
-  if (isBanned(exchanged.error)) return { status: "suspended", access: UNKNOWN_SUSPENSION };
-  if (exchanged.error) throw exchanged.error;
-  return finishSignIn();
-}
-
 export function signIn(provider: LoginProvider): Promise<SignInResult> {
   if (provider === "google") return signInWithGoogle();
   if (provider === "kakao") return signInWithKakao();
-  return Platform.OS === "ios" ? signInWithAppleNative() : signInWithAppleBrowser();
+  if (Platform.OS !== "ios") return Promise.reject(new Error("apple_login_not_supported"));
+  return signInWithAppleNative();
 }

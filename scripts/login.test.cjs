@@ -132,76 +132,83 @@ test("루트는 폰트·세션 복원이 끝난 뒤 앱과 전역 제재 안내�
   assert.equal(gate().type(gate().props), null);
 });
 
-test("로그인 화면의 둘러보기·뒤로 가기와 소셜 로그인 호출이 정상 동작한다", () => {
-  const routes = [];
-  const alerts = [];
-  const signIns = [];
-  let canGoBack = false;
-  const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
-    "react": { useState: (initial) => [initial, () => {}] },
-    "./api/signIn": {
-      signIn: (provider) => {
-        signIns.push(provider);
-        return Promise.resolve({ status: "cancelled" });
+for (const os of ["ios", "android"]) {
+  test(`${os}: 로그인 화면의 둘러보기·뒤로 가기와 OS별 소셜 로그인이 정상 동작한다`, () => {
+    const expectedProviders = os === "ios" ? "google,kakao,apple" : "google,kakao";
+    const routes = [];
+    const alerts = [];
+    const signIns = [];
+    let canGoBack = false;
+    const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+      "react": { useState: (initial) => [initial, () => {}] },
+      "./api/signIn": {
+        signIn: (provider) => {
+          signIns.push(provider);
+          return Promise.resolve({ status: "cancelled" });
+        },
       },
-    },
-    "expo-router": {
-      useRouter: () => ({
-        replace: (route) => routes.push(route),
-        back: () => routes.push("back"),
-        canGoBack: () => canGoBack,
-      }),
-    },
-    "expo-status-bar": { StatusBar: "StatusBar" },
-    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) },
-    "react-native": {
-      View: "View",
-      Text: "Text",
-      Pressable: "Pressable",
-      ScrollView: "ScrollView",
-      useWindowDimensions: () => ({ height: 812 }),
-      Alert: { alert: (...args) => alerts.push(args) },
-    },
-    "@/components/app-bar": { AppBar: "AppBar" },
-    "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
-    "@/components/ToastText": { ToastText: "ToastText" },
-    "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+      "expo-router": {
+        useRouter: () => ({
+          replace: (route) => routes.push(route),
+          back: () => routes.push("back"),
+          canGoBack: () => canGoBack,
+        }),
+      },
+      "expo-status-bar": { StatusBar: "StatusBar" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) },
+      "react-native": {
+        Platform: { OS: os },
+        View: "View",
+        Text: "Text",
+        Pressable: "Pressable",
+        ScrollView: "ScrollView",
+        useWindowDimensions: () => ({ height: 812 }),
+        Alert: { alert: (...args) => alerts.push(args) },
+      },
+      "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/ToastText": { ToastText: "ToastText" },
+      "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+    });
+    const tree = nodes(LoginScreen());
+    const bar = tree.find((node) => node.type === "AppBar");
+    assert.equal(bar.props.backIconSize, 24);
+    assert.equal(bar.props.left, "back");
+    assert.ok(!tree.some((node) => node.type === "ToastText"));
+    bar.props.onBack();
+    assert.equal(routes.at(-1), "/");
+    canGoBack = true;
+    bar.props.onBack();
+    assert.equal(routes.at(-1), "back");
+    const scroll = tree.find((node) => node.type === "ScrollView");
+    assert.equal(scroll.props.contentContainerStyle.minHeight, 706);
+    assert.equal(scroll.props.contentContainerStyle.paddingBottom, 36);
+    const providers = tree.filter((node) => node.type === "SocialLoginButton");
+    assert.equal(providers.map((node) => node.props.provider).join(","), expectedProviders);
+    for (const button of providers) button.props.onPress();
+    assert.equal(signIns.join(","), expectedProviders);
+    assert.equal(alerts.length, 0);
+    const buttons = tree.filter((node) => node.type === "Pressable");
+    buttons[0].props.onPress();
+    assert.equal(routes.at(-1), "/browse");
+    buttons[1].props.onPress();
+    buttons[2].props.onPress();
+    assert.equal(alerts.at(-2)[0], "이용약관");
+    assert.equal(alerts.at(-1)[0], "개인정보 처리방침");
+    const errorTree = nodes(LoginScreen({ isLoginError: true }));
+    const toast = errorTree.find((node) => node.type === "ToastText");
+    assert.equal(toast.props.message, "로그인에 실패했습니다. 다시 시도해 주세요.");
+    assert.equal(errorTree.find((node) => node.type === "AppBar").props.left, "none");
+    assert.equal(
+      errorTree.filter((node) => node.type === "SocialLoginButton").length,
+      os === "ios" ? 3 : 2,
+    );
+    assert.ok(errorTree.some((node) => node.props.className?.includes("top-[-54px]")));
+    const loadingTree = nodes(LoginScreen({ isLoginLoading: true }));
+    const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
+    assert.equal(loadingDialog.props.message, "로그인 중입니다.");
   });
-  const tree = nodes(LoginScreen());
-  const bar = tree.find((node) => node.type === "AppBar");
-  assert.equal(bar.props.backIconSize, 24);
-  assert.equal(bar.props.left, "back");
-  assert.ok(!tree.some((node) => node.type === "ToastText"));
-  bar.props.onBack();
-  assert.equal(routes.at(-1), "/");
-  canGoBack = true;
-  bar.props.onBack();
-  assert.equal(routes.at(-1), "back");
-  const scroll = tree.find((node) => node.type === "ScrollView");
-  assert.equal(scroll.props.contentContainerStyle.minHeight, 706);
-  assert.equal(scroll.props.contentContainerStyle.paddingBottom, 36);
-  const providers = tree.filter((node) => node.type === "SocialLoginButton");
-  assert.equal(providers.map((node) => node.props.provider).join(","), "google,kakao,apple");
-  for (const button of providers) button.props.onPress();
-  assert.equal(signIns.join(","), "google,kakao,apple");
-  assert.equal(alerts.length, 0);
-  const buttons = tree.filter((node) => node.type === "Pressable");
-  buttons[0].props.onPress();
-  assert.equal(routes.at(-1), "/browse");
-  buttons[1].props.onPress();
-  buttons[2].props.onPress();
-  assert.equal(alerts.at(-2)[0], "이용약관");
-  assert.equal(alerts.at(-1)[0], "개인정보 처리방침");
-  const errorTree = nodes(LoginScreen({ isLoginError: true }));
-  const toast = errorTree.find((node) => node.type === "ToastText");
-  assert.equal(toast.props.message, "로그인에 실패했습니다. 다시 시도해 주세요.");
-  assert.equal(errorTree.find((node) => node.type === "AppBar").props.left, "none");
-  assert.equal(errorTree.filter((node) => node.type === "SocialLoginButton").length, 3);
-  assert.ok(errorTree.some((node) => node.props.className?.includes("top-[-54px]")));
-  const loadingTree = nodes(LoginScreen({ isLoginLoading: true }));
-  const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
-  assert.equal(loadingDialog.props.message, "로그인 중입니다.");
-});
+}
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
   const { ToastText } = load("components/ToastText.tsx", {
@@ -388,6 +395,7 @@ function loadSignIn({
   saveAvatar = async () => {},
   authError = null,
   restrictionNotice = null,
+  os = "ios",
 }) {
   const storage = new Map();
   return load("screens/login/api/signIn.ts", {
@@ -417,7 +425,7 @@ function loadSignIn({
     "expo-apple-authentication": {},
     "expo-linking": {},
     "expo-web-browser": {},
-    "react-native": { Platform: { OS: "ios" } },
+    "react-native": { Platform: { OS: os } },
     "@/api/avatar": { saveAvatar },
     "@/api/accountAccess": {
       ...load("api/accountAccess.ts", {
@@ -513,4 +521,12 @@ test("제재 상세를 조회하지 못해도 로그인 성공이나 임의 위�
   const result = await signIn("google");
   assert.equal(result.status, "suspended");
   assert.equal(result.access.reasonCategory, null);
+});
+
+test("Android에서는 Apple 인증을 직접 호출해도 실행하지 않는다", async () => {
+  const { signIn } = loadSignIn({
+    os: "android",
+    getUser: () => assert.fail("must_not_load_user"),
+  });
+  await assert.rejects(signIn("apple"), /apple_login_not_supported/);
 });
