@@ -24,6 +24,8 @@ type NotificationScreenProps = {
   bannerDismissedUntil?: number;
   onDismissPushBanner?: (dismissedUntil: number) => void;
   onOpenNotificationSettings?: () => void;
+  onEndReached?: () => void;
+  isLoadingMore?: boolean;
 };
 
 export function NotificationScreen({
@@ -37,6 +39,8 @@ export function NotificationScreen({
   bannerDismissedUntil = 0,
   onDismissPushBanner,
   onOpenNotificationSettings,
+  onEndReached,
+  isLoadingMore = false,
 }: NotificationScreenProps = {}) {
   const [localDismissedUntil, setLocalDismissedUntil] = useState(0);
   const [openedAt] = useState(Date.now);
@@ -79,6 +83,9 @@ export function NotificationScreen({
             ListHeaderComponent={pushBanner}
             data={notifications}
             keyExtractor={(item) => item.id}
+            onEndReached={onEndReached}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={isLoadingMore ? <NotificationSkeleton /> : null}
             renderItem={({ item }) => (
               <NotificationRow
                 notification={item}

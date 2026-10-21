@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
-import { IconNotification } from "@/assets/images/appbar";
 import { AppBar, SearchBar } from "@/components/app-bar";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -82,13 +81,7 @@ export function SearchScreen() {
           setHistory([]);
         }}
         onSubmitEditing={(event) => handleSubmit(event.nativeEvent.text)}
-        right={
-          <AppBar.IconButton
-            icon={IconNotification}
-            accessibilityLabel="알림"
-            onPress={() => router.push("/notifications")}
-          />
-        }
+        right={<AppBar.NotificationButton onPress={() => router.push("/notifications")} />}
       />
 
       {!isSearching ? (

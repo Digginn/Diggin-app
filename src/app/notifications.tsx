@@ -1,11 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, Linking } from "react-native";
 
+import { TOAST_MESSAGES } from "@/constants/messages";
+import { useToast } from "@/hooks/useToast";
+import { formatCommunityTime } from "@/screens/diggle/utils/formatCommunityTime";
 import type { NotificationItem } from "@/screens/notification/components/NotificationRow";
 import { useDevicePushOff } from "@/screens/notification/hooks/useDevicePushOff";
 import { NotificationScreen } from "@/screens/notification/NotificationScreen";
+import { useNotificationCheck } from "@/screens/notification/queries/useNotificationCheck";
+import { useNotifications } from "@/screens/notification/queries/useNotifications";
 
-// UI 확인용 샘플입니다. 운영 앱에서는 실제 알림 데이터 연결 전까지 빈 목록을 표시합니다.
+// 개발 빌드에서 ?preview= 로 화면 상태를 확인하는 샘플이다. 운영에서는 실제 알림만 보인다.
 const PREVIEW_NOTIFICATIONS: NotificationItem[] = [
   {
     id: "vote-unread",
@@ -50,11 +55,16 @@ const PUSH_OFF_PREVIEW_MESSAGES = [
 export default function NotificationsRoute() {
   const router = useRouter();
   const { preview } = useLocalSearchParams<{ preview?: string }>();
+  const isPreview = __DEV__ && preview !== undefined;
   const isErrorPreview = __DEV__ && preview === "error";
   const devicePush = useDevicePushOff();
+  const showToast = useToast();
+  const list = useNotifications();
+  const check = useNotificationCheck();
+  const items = list.data?.pages.flat() ?? [];
   return (
     <NotificationScreen
-      isError={isErrorPreview}
+      isError={isPreview ? isErrorPreview : list.isError}
       isDevicePushEnabled={!(__DEV__ && preview === "push-off") && !devicePush.isPushOff}
       bannerDismissedUntil={devicePush.dismissedUntil}
       onDismissPushBanner={devicePush.dismiss}
@@ -63,18 +73,57 @@ export default function NotificationsRoute() {
           Alert.alert("설정을 열지 못했습니다", "기기 설정에서 앱 알림을 허용해 주세요."),
         );
       }}
-      onRetry={isErrorPreview ? () => router.setParams({ preview: undefined }) : undefined}
-      isLoading={__DEV__ && preview === "loading"}
-      notifications={
-        __DEV__ && preview !== "empty"
-          ? preview === "push-off"
-            ? PREVIEW_NOTIFICATIONS.map((notification, index) => ({
-                ...notification,
-                message: PUSH_OFF_PREVIEW_MESSAGES[index],
-              }))
-            : PREVIEW_NOTIFICATIONS
-          : []
+      onRetry={
+        isErrorPreview
+          ? () => router.setParams({ preview: undefined })
+          : isPreview
+            ? undefined
+            : () => void list.refetch()
       }
+      isLoading={isPreview ? preview === "loading" : list.isPending || check.isPending}
+      isLoadingMore={!isPreview && list.isFetchingNextPage}
+      onEndReached={() => {
+        if (!isPreview && list.hasNextPage && !list.isFetching && !list.isFetchNextPageError)
+          void list.fetchNextPage();
+      }}
+      notifications={
+        isPreview
+          ? preview === "empty"
+            ? []
+            : preview === "push-off"
+              ? PREVIEW_NOTIFICATIONS.map((notification, index) => ({
+                  ...notification,
+                  message: PUSH_OFF_PREVIEW_MESSAGES[index],
+                }))
+              : PREVIEW_NOTIFICATIONS
+          : items.map((notification) => ({
+              id: notification.id,
+              title: notification.title,
+              message: notification.body,
+              timeLabel: formatCommunityTime(notification.createdAt),
+              // 확인 처리에 실패하면 점이 남아 있으니 목록은 모두 읽은 모양으로 둔다.
+              isRead:
+                check.isError ||
+                (check.data != null &&
+                  Date.parse(notification.createdAt) <= Date.parse(check.data)),
+            }))
+      }
+      onPressNotification={(item) => {
+        const notification = items.find((entry) => entry.id === item.id);
+        if (!notification) return;
+        // NOTI-006 지워진 글은 이동하지 않고 목록에서 안내한다.
+        if (!notification.isPostAvailable) {
+          showToast(
+            notification.postType === "vote" ? TOAST_MESSAGES.VOTE_007 : TOAST_MESSAGES.NOTI_004,
+            "error",
+          );
+          return;
+        }
+        router.push({
+          pathname: notification.postType === "vote" ? "/votes/[id]" : "/posts/[id]",
+          params: { id: notification.postId },
+        });
+      }}
       onBack={() => {
         if (router.canGoBack()) router.back();
         else router.replace("/(tabs)/all");

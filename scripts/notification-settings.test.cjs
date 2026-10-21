@@ -173,7 +173,10 @@ test("기기 알림이 꺼졌을 때만 닫기 없는 배너와 설정 이동을
   );
 });
 
-function setupRoute(platform = "ios") {
+function setupRoute(
+  platform = "ios",
+  pushSetting = { isLoaded: false, settings: {}, save: async () => {} },
+) {
   let state,
     effect,
     onAppState,
@@ -217,6 +220,7 @@ function setupRoute(platform = "ios") {
       IosAuthorizationStatus: { PROVISIONAL: 3, EPHEMERAL: 4 },
     },
     "@/screens/my/NotificationSettingsScreen": { NotificationSettingsScreen: "Settings" },
+    "@/screens/my/queries/usePushSetting": { usePushSetting: () => pushSetting },
   };
   runInNewContext(
     ts.transpileModule(
@@ -282,4 +286,64 @@ test("웹에서는 네이티브 알림 권한을 조회하지 않는다", async 
   await new Promise(setImmediate);
   assert.equal(context.calls.reads, 0);
   assert.equal(context.render().props.isDevicePushEnabled, undefined);
+});
+
+test("저장된 Push 수신 여부를 받으면 토글 초기값으로 쓰고, 바꾸면 저장한다", () => {
+  const save = async () => {};
+  const settings = { isAllEnabled: false };
+  const loading = setupRoute("ios", { isLoaded: false, settings: { isAllEnabled: true }, save });
+  const loaded = setupRoute("ios", { isLoaded: true, settings, save });
+  const before = loading.render();
+  const after = loaded.render();
+  assert.notEqual(before.key, after.key, "값을 받으면 화면을 다시 만들어 초기값을 반영한다");
+  assert.equal(after.props.initialSettings, settings);
+  assert.equal(after.props.onSaveSettings, save);
+});
+
+test("Push 수신 여부를 불러와 화면 설정으로 바꾸고, 저장하면 서버와 캐시에 반영한다", async () => {
+  const saved = [];
+  const cache = new Map();
+  let data;
+  const hook = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(
+      readFileSync(path.join(__dirname, "../src/screens/my/queries/usePushSetting.ts"), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+    ).outputText,
+    {
+      module: hook,
+      exports: hook.exports,
+      require: (name) =>
+        ({
+          "@tanstack/react-query": {
+            useQuery: ({ queryKey, enabled }) => {
+              assert.deepEqual(queryKey, ["notification-settings", "user-a"]);
+              assert.equal(enabled, true);
+              return { data, isSuccess: data !== undefined };
+            },
+            useQueryClient: () => ({
+              setQueryData: (key, value) => cache.set(key.join("/"), value),
+            }),
+          },
+          "@/contexts/AuthContext": {
+            useAuth: () => ({ session: { user: { id: "user-a" } }, isRestoring: false }),
+          },
+          "../api/notificationSettings": {
+            notificationSettingKeys: { push: (viewer) => ["notification-settings", viewer] },
+            fetchPushEnabled: async () => true,
+            savePushEnabled: async (enabled) => saved.push(enabled),
+          },
+        })[name] ?? require(name),
+    },
+  );
+  const loading = hook.exports.usePushSetting();
+  assert.equal(loading.isLoaded, false);
+  assert.equal(loading.settings.isAllEnabled, true, "불러오기 전에는 기본값(켬)");
+  data = false;
+  const loaded = hook.exports.usePushSetting();
+  assert.equal(loaded.isLoaded, true);
+  assert.equal(loaded.settings.isAllEnabled, false);
+  await loaded.save({ ...loaded.settings, isAllEnabled: true });
+  assert.deepEqual(saved, [true]);
+  assert.equal(cache.get("notification-settings/user-a"), true);
 });

@@ -430,6 +430,7 @@ export type Database = {
         Args: { activity_type: string; after_activity_at?: string; after_id?: number };
         Returns: Json;
       };
+      get_notifications: { Args: { after_created_at?: string; after_id?: number }; Returns: Json };
       get_pending_policies: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -448,11 +449,14 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      get_push_enabled: { Args: Record<PropertyKey, never>; Returns: boolean };
+      has_unread_notifications: { Args: Record<PropertyKey, never>; Returns: boolean };
       import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
       lookup_suspended_identity: {
         Args: { identity_provider: string; identity_subject: string };
         Returns: Json;
       };
+      mark_notifications_checked: { Args: Record<PropertyKey, never>; Returns: string };
       register_push_token: {
         Args: { new_platform: string; new_token: string };
         Returns: undefined;
@@ -497,6 +501,7 @@ export type Database = {
         Args: { folder_ids: number[]; target_product_id: number };
         Returns: undefined;
       };
+      set_push_enabled: { Args: { enabled: boolean }; Returns: boolean };
       update_comment: {
         Args: { comment_content: string; target_comment_id: number };
         Returns: Json;
@@ -515,6 +520,7 @@ export type Database = {
         | "FOLDER_LIMIT_EXCEEDED"
         | "FOLDER_SAVE_FAILED";
       import_status: "processing" | "completed" | "failed";
+      notification_type: "vote_ended" | "post_commented" | "post_liked";
       post_type: "post" | "vote";
       report_reason: "abuse" | "spam" | "inappropriate" | "other";
       report_status: "received" | "reviewing" | "resolved" | "rejected";
@@ -649,6 +655,7 @@ export const Constants = {
         "FOLDER_SAVE_FAILED",
       ],
       import_status: ["processing", "completed", "failed"],
+      notification_type: ["vote_ended", "post_commented", "post_liked"],
       post_type: ["post", "vote"],
       report_reason: ["abuse", "spam", "inappropriate", "other"],
       report_status: ["received", "reviewing", "resolved", "rejected"],

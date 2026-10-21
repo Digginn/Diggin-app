@@ -2,7 +2,7 @@ import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useLayoutEffect, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
-import { IconNotification, IconSearch } from "@/assets/images/appbar";
+import { IconSearch } from "@/assets/images/appbar";
 import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
 import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
@@ -135,11 +135,7 @@ export function AllScreen() {
                 accessibilityLabel="검색"
                 onPress={() => router.push("/all/search")}
               />
-              <AppBar.IconButton
-                icon={IconNotification}
-                accessibilityLabel="알림"
-                onPress={() => router.push("/notifications")}
-              />
+              <AppBar.NotificationButton onPress={() => router.push("/notifications")} />
             </>
           }
         />

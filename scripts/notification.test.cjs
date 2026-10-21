@@ -31,7 +31,10 @@ function findAll(node, type) {
 
 test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   const events = [];
-  const AppBar = Object.assign(() => null, { IconButton: "IconButton" });
+  const AppBar = Object.assign(() => null, {
+    IconButton: "IconButton",
+    NotificationButton: "NotificationButton",
+  });
   const mocks = {
     "react": {
       useState: (initial) => [initial, () => {}],
@@ -92,10 +95,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   };
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", mocks);
   const allBar = findAll(AllScreen(), AppBar)[0];
-  const allButton = findAll(allBar.props.right, "IconButton").find(
-    (button) => button.props.icon === "NotificationIcon",
-  );
-  allButton.props.onPress();
+  findAll(allBar.props.right, "NotificationButton")[0].props.onPress();
   const { SearchScreen } = load("../src/screens/search/SearchScreen.tsx", mocks);
   assert.equal(findAll(SearchScreen(), "SearchBar")[0].props.maxLength, 100);
   findAll(SearchScreen(), "SearchBar")[0].props.right.props.onPress();
@@ -234,6 +234,20 @@ test("뒤로 가기는 이전 화면으로, 직접 진입한 경우에는 탭 �
         "@/screens/notification/hooks/useDevicePushOff": {
           useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
         },
+        "@/screens/notification/queries/useNotifications": {
+          useNotifications: () => ({ data: undefined, isPending: false, isError: false }),
+        },
+        "@/screens/notification/queries/useNotificationCheck": {
+          useNotificationCheck: () => ({ data: null, isPending: false, isError: false }),
+        },
+        "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "방금 전" },
+        "@/hooks/useToast": { useToast: () => () => {} },
+        "@/constants/messages": {
+          TOAST_MESSAGES: {
+            NOTI_004: "삭제되었거나 더 이상 볼 수 없는 콘텐츠입니다.",
+            VOTE_007: "삭제되었거나 더 이상 볼 수 없는 투표입니다.",
+          },
+        },
       },
       { __DEV__: false },
     );
@@ -242,7 +256,7 @@ test("뒤로 가기는 이전 화면으로, 직접 진입한 경우에는 탭 �
   }
 });
 
-test("개발용 오류 미리보기의 다시 시도는 목록으로 복귀하고 운영에는 샘플을 표시하지 않는다", () => {
+test("개발용 미리보기는 ?preview가 있을 때만 샘플을 보이고, 다시 시도하면 실제 목록으로 돌아가며 운영에는 샘플이 없다", () => {
   let preview = "error";
   const mocks = {
     "react-native": { Alert: { alert: () => {} }, Linking: { openSettings: async () => {} } },
@@ -258,18 +272,39 @@ test("개발용 오류 미리보기의 다시 시도는 목록으로 복귀하�
     "@/screens/notification/hooks/useDevicePushOff": {
       useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
     },
+    "@/screens/notification/queries/useNotifications": {
+      useNotifications: () => ({ data: undefined, isPending: false, isError: false }),
+    },
+    "@/screens/notification/queries/useNotificationCheck": {
+      useNotificationCheck: () => ({ data: null, isPending: false, isError: false }),
+    },
+    "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "방금 전" },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/constants/messages": {
+      TOAST_MESSAGES: { NOTI_004: "삭제되었거나 더 이상 볼 수 없는 콘텐츠입니다." },
+    },
   };
   const { default: PreviewRoute } = load("../src/app/notifications.tsx", mocks, { __DEV__: true });
   assert.equal(PreviewRoute().props.isError, true);
   PreviewRoute().props.onRetry();
   assert.equal(PreviewRoute().props.isError, false);
+  assert.equal(
+    PreviewRoute().props.notifications.length,
+    0,
+    "미리보기를 끄면 실제 알림을 보여 준다",
+  );
+  preview = "push-off";
   assert.equal(PreviewRoute().props.notifications.length, 4);
   const { default: ProductionRoute } = load("../src/app/notifications.tsx", mocks, {
     __DEV__: false,
   });
   preview = "error";
   assert.equal(ProductionRoute().props.isError, false);
-  assert.equal(ProductionRoute().props.onRetry, undefined);
+  assert.equal(
+    typeof ProductionRoute().props.onRetry,
+    "function",
+    "운영의 다시 시도는 실제 목록을 다시 불러온다",
+  );
   assert.equal(ProductionRoute().props.notifications.length, 0);
 });
 
@@ -407,4 +442,134 @@ test("기기 알림이 꺼져 있으면 안내를 띄우고, 닫은 기한은 �
   onAppState("active");
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(render().isPushOff, false, "아직 정하지 않은 권한은 꺼진 것으로 보지 않는다");
+});
+
+test("운영 알림 목록은 실제 알림과 지난 확인 뒤 새 알림을 보여 주고, 누르면 글 종류에 맞는 상세로 이동하거나 지워진 글을 안내하며 끝에서 다음 페이지를 부른다", () => {
+  const pushed = [];
+  const toasts = [];
+  let fetchedNext = 0;
+  let refetched = 0;
+  const list = {
+    data: {
+      pages: [
+        [
+          {
+            id: "3",
+            title: "투표 결과가 나왔어요",
+            body: "'고민돼요' 투표가 종료됐어요. BUY 1 · NOT 2",
+            createdAt: "2026-10-21T00:00:00.000000+00:00",
+            postId: "41",
+            postType: "vote",
+            isPostAvailable: true,
+          },
+          {
+            id: "2",
+            title: "내 게시글에 댓글이 달렸어요",
+            body: "디기 1: 예뻐요",
+            createdAt: "2026-10-20T00:00:00.000000+00:00",
+            postId: "40",
+            postType: "post",
+            isPostAvailable: false,
+          },
+          {
+            id: "1",
+            title: "투표 결과가 나왔어요",
+            body: "'지운 투표' 투표가 종료됐어요. BUY 0 · NOT 0",
+            createdAt: "2026-10-19T00:00:00.000000+00:00",
+            postId: "39",
+            postType: "vote",
+            isPostAvailable: false,
+          },
+        ],
+      ],
+    },
+    isPending: false,
+    isError: false,
+    hasNextPage: true,
+    isFetching: false,
+    isFetchNextPageError: false,
+    isFetchingNextPage: false,
+    fetchNextPage: async () => {
+      fetchedNext += 1;
+    },
+    refetch: async () => {
+      refetched += 1;
+    },
+  };
+  const { default: Route } = load(
+    "../src/app/notifications.tsx",
+    {
+      "react-native": { Alert: { alert: () => {} }, Linking: { openSettings: async () => {} } },
+      "expo-router": {
+        useLocalSearchParams: () => ({}),
+        useRouter: () => ({ push: (route) => pushed.push(route) }),
+      },
+      "@/screens/notification/NotificationScreen": { NotificationScreen: "NotificationScreen" },
+      "@/screens/notification/hooks/useDevicePushOff": {
+        useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
+      },
+      "@/screens/notification/queries/useNotifications": { useNotifications: () => list },
+      "@/screens/notification/queries/useNotificationCheck": {
+        useNotificationCheck: () => ({
+          data: "2026-10-20T12:00:00.000000+00:00",
+          isPending: false,
+          isError: false,
+        }),
+      },
+      "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "1시간 전" },
+      "@/hooks/useToast": {
+        useToast: () => (message, variant) => toasts.push([message, variant]),
+      },
+      "@/constants/messages": {
+        TOAST_MESSAGES: {
+          NOTI_004: "삭제되었거나 더 이상 볼 수 없는 콘텐츠입니다.",
+          VOTE_007: "삭제되었거나 더 이상 볼 수 없는 투표입니다.",
+        },
+      },
+    },
+    { __DEV__: false },
+  );
+  const props = Route().props;
+  assert.deepEqual(
+    props.notifications.map((item) => [item.title, item.message, item.timeLabel, item.isRead]),
+    [
+      ["투표 결과가 나왔어요", "'고민돼요' 투표가 종료됐어요. BUY 1 · NOT 2", "1시간 전", false],
+      ["내 게시글에 댓글이 달렸어요", "디기 1: 예뻐요", "1시간 전", true],
+      ["투표 결과가 나왔어요", "'지운 투표' 투표가 종료됐어요. BUY 0 · NOT 0", "1시간 전", true],
+    ],
+    "지난번 알림함을 연 뒤에 온 알림만 안 읽음으로 보인다",
+  );
+  props.onPressNotification(props.notifications[0]);
+  props.onPressNotification(props.notifications[1]);
+  props.onPressNotification(props.notifications[2]);
+  assert.deepEqual(JSON.parse(JSON.stringify(pushed)), [
+    { pathname: "/votes/[id]", params: { id: "41" } },
+  ]);
+  assert.deepEqual(
+    toasts,
+    [
+      ["삭제되었거나 더 이상 볼 수 없는 콘텐츠입니다.", "error"],
+      ["삭제되었거나 더 이상 볼 수 없는 투표입니다.", "error"],
+    ],
+    "지워진 글은 이동하지 않고 목록에서 안내하고, 투표는 투표 문구로 안내한다(NOTI-006)",
+  );
+  props.onEndReached();
+  assert.equal(fetchedNext, 1);
+  props.onRetry();
+  assert.equal(refetched, 1);
+});
+
+test("종 아이콘은 지난 확인 뒤 새 알림이 있으면 빨간 점 아이콘으로 바뀐다", () => {
+  for (const hasUnread of [true, false]) {
+    const { NotificationButton } = load("../src/components/app-bar/NotificationButton.tsx", {
+      "@/assets/images/appbar": { IconNotification: "Bell", IconNotificationDot: "BellDot" },
+      "@/hooks/useHasUnreadNotifications": { useHasUnreadNotifications: () => hasUnread },
+      "./IconButton": { IconButton: "IconButton" },
+    });
+    const onPress = () => {};
+    const button = NotificationButton({ onPress });
+    assert.equal(button.props.icon, hasUnread ? "BellDot" : "Bell");
+    assert.equal(button.props.accessibilityLabel, hasUnread ? "알림, 새 알림 있음" : "알림");
+    assert.equal(button.props.onPress, onPress);
+  }
 });
