@@ -41,13 +41,15 @@ begin
   -- 기존 댓글 수정·삭제와 같은 부모 → 댓글 잠금 순서로 Snapshot 경합을 막는다.
   select * into parent from private.posts where id = parent_id for update;
   if not found or parent.deleted_at is not null or parent.hidden_at is not null or
-    not private.community_author_visible(parent.author_id) then
+    not private.community_author_visible(parent.author_id) or
+    not private.community_content_visible('post', parent.id) then
     raise exception 'report_target_not_found' using errcode = '42501';
   end if;
   if content_type = 'comment' then
     select * into comment from private.comments where id = target_id for update;
     if not found or comment.deleted_at is not null or comment.hidden_at is not null or
-      comment.author_id is null or not private.community_author_visible(comment.author_id) then
+      comment.author_id is null or not private.community_author_visible(comment.author_id) or
+      not private.community_content_visible('comment', comment.id) then
       raise exception 'report_target_not_found' using errcode = '42501';
     end if;
     author := comment.author_id;

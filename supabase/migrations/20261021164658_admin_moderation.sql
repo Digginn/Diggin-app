@@ -541,6 +541,7 @@ begin
       where p.deleted_at is null and p.hidden_at is null
         and (feed_type = 'all' or p.type = 'vote')
         and private.community_author_visible(p.author_id)
+        and private.community_content_visible('post', p.id)
         and (after_created_at is null or (p.created_at, p.id) < (after_created_at, after_id))
       order by p.created_at desc, p.id desc limit 20
     ) p
@@ -568,6 +569,7 @@ begin
     select private.community_post_json(p.id, false) from private.posts p
     where p.id = target_post_id and p.deleted_at is null and p.hidden_at is null
       and private.community_author_visible(p.author_id)
+        and private.community_content_visible('post', p.id)
   );
 end;
 $function$;
@@ -607,6 +609,7 @@ begin
         from private.post_likes l join private.posts p on p.id = l.post_id
         where l.user_id = viewer_id and p.type = 'post' and p.deleted_at is null and p.hidden_at is null
           and private.community_author_visible(p.author_id)
+          and private.community_content_visible('post', p.id)
           and (after_activity_at is null or (l.created_at, l.id) < (after_activity_at, after_id))
         order by l.created_at desc, l.id desc limit 20
       ) page
@@ -621,6 +624,7 @@ begin
       select p.id, p.created_at from private.posts p
       where p.author_id = viewer_id and p.type = activity_type::public.post_type
         and p.deleted_at is null and p.hidden_at is null and private.community_author_visible(p.author_id)
+          and private.community_content_visible('post', p.id)
         and (after_activity_at is null or (p.created_at, p.id) < (after_activity_at, after_id))
       order by p.created_at desc, p.id desc limit 20
     ) page

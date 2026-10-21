@@ -98,6 +98,9 @@ select is((select count(*)::int from auth.sessions where user_id='11400000-0000-
 select ok((select banned_until>now() from auth.users where id='11400000-0000-0000-0000-000000000002'),'Auth 로그인도 ban');
 select throws_ok($$select public.update_nickname('새닉네임114')$$,'42501','suspended','미만료 JWT로 비커뮤니티 RPC도 이용 불가');
 select throws_ok($$select public.get_community_feed()$$,'42501','suspended','영구 제한 피드 차단');
+select throws_ok($$select public.get_community_post(current_setting('test.post')::bigint)$$,'42501','suspended','신고 범위 수정 병합 후에도 정지 계정 상세 차단');
+select throws_ok($$select public.get_my_community_activity('liked')$$,'42501','suspended','신고 범위 수정 병합 후에도 정지 계정 활동 차단');
+select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'spam')$$,'42501','suspended','신고 범위 수정 병합 후에도 정지 계정 신고 차단');
 set local role authenticated;
 select is((select count(*)::int from public.folders),0,'미만료 JWT로 폴더 원본 접근 불가');
 select is(public.get_account_access()->>'reason_category','abuse','본인 제재 안내에만 사유 제공');
@@ -109,6 +112,7 @@ select lives_ok($$select pg_temp.apply_sanction('release','11400000-0000-0000-00
 select is((select status::text from public.profiles where id='11400000-0000-0000-0000-000000000002'),'active','해제 후 active');
 select is((select banned_until from auth.users where id='11400000-0000-0000-0000-000000000002'),null::timestamptz,'해제 후 Auth ban 해제');
 select throws_ok($$select private.assert_account_access()$$,'42501','not_authorized','해제해도 종료된 이전 세션은 다시 사용할 수 없음');
+select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'spam')$$,'42501','not_authorized','제한 해제 후에도 종료된 세션으로 신고 불가');
 update private.admin_users set disabled_at=now() where id='11400000-0000-0000-0000-000000000001';
 set local role service_role;
 select throws_ok($$select public.admin_report_groups('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001')$$,'42501','admin_required','비활성 관리자 즉시 접근 차단');

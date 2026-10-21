@@ -7,7 +7,8 @@ begin
   perform private.assert_can_write_community();
   select * into target from private.posts where id = target_post_id for update;
   if not found or target.deleted_at is not null or target.hidden_at is not null or
-     not private.community_author_visible(target.author_id) then
+     not private.community_author_visible(target.author_id) or
+     not private.community_content_visible('post', target.id) then
     raise exception 'post_not_found' using errcode = '42501';
   end if;
   return target;

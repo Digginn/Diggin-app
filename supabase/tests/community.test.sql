@@ -83,7 +83,7 @@ reset role;
 insert into private.reports(reporter_id,target_type,post_id,reported_user_id,reason)
  values ('94000000-0000-0000-0000-000000000002','post',current_setting('test.post')::bigint,'94000000-0000-0000-0000-000000000001','spam');
 set local role authenticated;
-select is(public.get_community_post(current_setting('test.post')::bigint),null,'신고한 작성자의 콘텐츠 제외');
+select is(public.get_community_post(current_setting('test.post')::bigint),null,'신고한 게시글 제외');
 reset role;
 update public.profiles set status='suspended',suspended_at=now() where id='94000000-0000-0000-0000-000000000002';
 set local role authenticated;

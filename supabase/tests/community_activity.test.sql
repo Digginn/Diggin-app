@@ -65,7 +65,8 @@ select is(jsonb_array_length(public.get_my_community_activity('liked')),0,'차�
 delete from private.user_blocks where blocker_id='99000000-0000-0000-0000-000000000001';
 insert into private.reports(reporter_id,target_type,post_id,reported_user_id,reason) values
  ('99000000-0000-0000-0000-000000000001','post',current_setting('test.other')::bigint,'99000000-0000-0000-0000-000000000002','spam');
-select is(jsonb_array_length(public.get_my_community_activity('liked')),0,'신고한 작성자 좋아요 제외');
+select is((select count(*) from jsonb_array_elements(public.get_my_community_activity('liked')) a where a->'post'->>'id'=current_setting('test.other')),0::bigint,'신고한 게시글을 좋아요 목록에서 제외');
+select is(jsonb_array_length(public.get_my_community_activity('liked')),20,'같은 작성자의 다른 좋아요 게시글은 유지');
 set local request.jwt.claims='{"sub":"99000000-0000-0000-0000-000000000003","role":"authenticated"}';
 set local role authenticated;
 select is(jsonb_array_length(public.get_my_community_activity('post')),0,'빈 계정은 다른 사람의 글을 볼 수 없다');

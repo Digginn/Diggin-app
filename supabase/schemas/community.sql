@@ -149,9 +149,17 @@ returns boolean language sql stable set search_path = '' as $$
   select not exists (
     select 1 from private.user_blocks b
     where b.blocker_id = (select auth.uid()) and b.blocked_id = target_author_id
-  ) and not exists (
+  );
+$$;
+
+-- 신고는 대상 콘텐츠만, 차단은 작성자 전체에 적용한다.
+create or replace function private.community_content_visible(content_type public.report_target, target_id bigint)
+returns boolean language sql stable set search_path = '' as $$
+  select not exists (
     select 1 from private.reports r
-    where r.reporter_id = (select auth.uid()) and r.reported_user_id = target_author_id
+    where r.reporter_id = (select auth.uid()) and r.target_type = content_type
+      and ((content_type = 'post' and r.post_id = target_id) or
+           (content_type = 'comment' and r.comment_id = target_id))
   );
 $$;
 
@@ -173,7 +181,8 @@ returns jsonb language sql stable set search_path = '' as $$
     'like_count', (select count(*) from private.post_likes l where l.post_id = p.id),
     'is_liked', exists(select 1 from private.post_likes l where l.post_id = p.id and l.user_id = (select auth.uid())),
     'comment_count', (select count(*) from private.comments c where c.post_id = p.id
-      and c.deleted_at is null and c.hidden_at is null and private.community_author_visible(c.author_id)),
+      and c.deleted_at is null and c.hidden_at is null and private.community_author_visible(c.author_id)
+        and private.community_content_visible('comment', c.id)),
     'my_choice', (select v.choice from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())),
     'buy_count', case when p.type = 'vote' and (p.author_id = (select auth.uid()) or p.ends_at <= now() or
       exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())))
@@ -210,6 +219,7 @@ begin
       where p.deleted_at is null and p.hidden_at is null
         and (feed_type = 'all' or p.type = 'vote')
         and private.community_author_visible(p.author_id)
+        and private.community_content_visible('post', p.id)
         and (after_created_at is null or (p.created_at, p.id) < (after_created_at, after_id))
       order by p.created_at desc, p.id desc limit 20
     ) p
@@ -230,6 +240,7 @@ begin
     select private.community_post_json(p.id, false) from private.posts p
     where p.id = target_post_id and p.deleted_at is null and p.hidden_at is null
       and private.community_author_visible(p.author_id)
+        and private.community_content_visible('post', p.id)
   );
 end;
 $$;
@@ -255,6 +266,7 @@ begin
       select c.* from private.comments c
       where c.post_id = target_post_id and c.deleted_at is null and c.hidden_at is null
         and private.community_author_visible(c.author_id)
+        and private.community_content_visible('comment', c.id)
         and (after_created_at is null or (c.created_at, c.id) > (after_created_at, after_id))
       order by c.created_at, c.id limit 20
     ) c
@@ -283,6 +295,7 @@ $$;
 
 revoke execute on function private.assert_can_write_community() from public, anon, authenticated;
 revoke execute on function private.community_author_visible(uuid) from public, anon, authenticated;
+revoke execute on function private.community_content_visible(public.report_target,bigint) from public, anon, authenticated;
 revoke execute on function private.community_post_json(bigint, boolean) from public, anon, authenticated;
 revoke execute on function private.get_community_feed(text, timestamptz, bigint) from public, anon, authenticated;
 revoke execute on function private.get_community_post(bigint) from public, anon, authenticated;
