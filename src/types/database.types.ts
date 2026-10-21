@@ -405,6 +405,7 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      get_push_enabled: { Args: Record<PropertyKey, never>; Returns: boolean };
       has_unread_notifications: { Args: Record<PropertyKey, never>; Returns: boolean };
       import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
       mark_notifications_checked: { Args: Record<PropertyKey, never>; Returns: string };
@@ -443,6 +444,7 @@ export type Database = {
         Args: { folder_ids: number[]; target_product_id: number };
         Returns: undefined;
       };
+      set_push_enabled: { Args: { enabled: boolean }; Returns: boolean };
       update_comment: {
         Args: { comment_content: string; target_comment_id: number };
         Returns: Json;

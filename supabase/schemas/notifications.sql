@@ -34,11 +34,19 @@ create table private.notification_checks (
   checked_at timestamptz not null default now()
 );
 
+-- MY-011 Push 수신 여부. 행이 없으면 켜진 것으로 본다. 꺼도 알림함에는 계속 쌓이고(NOTI-007) Push만 보내지 않는다.
+create table private.notification_settings (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  push_enabled boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
 alter table private.notifications enable row level security;
 alter table private.like_notification_log enable row level security;
 alter table private.notification_checks enable row level security;
-revoke all on table private.notifications, private.like_notification_log, private.notification_checks
-  from public, anon, authenticated;
+alter table private.notification_settings enable row level security;
+revoke all on table private.notifications, private.like_notification_log, private.notification_checks,
+  private.notification_settings from public, anon, authenticated;
 revoke all on sequence private.notifications_id_seq from public, anon, authenticated;
 
 -- 받는 사람이 차단했거나 신고한 사람의 행동은 알리지 않는다. 트리거는 행동한 사람 권한으로 돌아 auth.uid()를 쓸 수 없다.
@@ -223,6 +231,39 @@ begin
 end;
 $$;
 
+create or replace function private.get_push_enabled()
+returns boolean language plpgsql stable security definer set search_path = '' as $$
+declare
+  viewer_id uuid := private.notification_viewer();
+begin
+  return coalesce((select s.push_enabled from private.notification_settings s where s.user_id = viewer_id), true);
+end;
+$$;
+
+create or replace function private.set_push_enabled(enabled boolean)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare
+  viewer_id uuid := private.notification_viewer();
+begin
+  if enabled is null then
+    raise exception 'invalid_push_enabled' using errcode = '22023';
+  end if;
+  insert into private.notification_settings(user_id, push_enabled) values (viewer_id, enabled)
+  on conflict (user_id) do update set push_enabled = excluded.push_enabled, updated_at = now();
+  return enabled;
+end;
+$$;
+
+create or replace function public.get_push_enabled()
+returns boolean language sql security invoker set search_path = '' as $$
+  select private.get_push_enabled();
+$$;
+
+create or replace function public.set_push_enabled(enabled boolean)
+returns boolean language sql security invoker set search_path = '' as $$
+  select private.set_push_enabled(enabled);
+$$;
+
 create or replace function public.has_unread_notifications()
 returns boolean language sql security invoker set search_path = '' as $$
   select private.has_unread_notifications();
@@ -238,11 +279,15 @@ revoke execute on function private.notification_actor_visible(uuid, uuid), priva
   private.delete_old_notifications(), private.notification_viewer() from public, anon, authenticated;
 revoke execute on function private.get_notifications(timestamptz, bigint), public.get_notifications(timestamptz, bigint),
   private.has_unread_notifications(), public.has_unread_notifications(),
-  private.mark_notifications_checked(), public.mark_notifications_checked()
+  private.mark_notifications_checked(), public.mark_notifications_checked(),
+  private.get_push_enabled(), public.get_push_enabled(),
+  private.set_push_enabled(boolean), public.set_push_enabled(boolean)
   from public, anon;
 grant execute on function private.get_notifications(timestamptz, bigint), public.get_notifications(timestamptz, bigint),
   private.has_unread_notifications(), public.has_unread_notifications(),
-  private.mark_notifications_checked(), public.mark_notifications_checked()
+  private.mark_notifications_checked(), public.mark_notifications_checked(),
+  private.get_push_enabled(), public.get_push_enabled(),
+  private.set_push_enabled(boolean), public.set_push_enabled(boolean)
   to authenticated;
 
 select cron.schedule('notifications-vote-ended', '* * * * *', 'select private.create_vote_ended_notifications()');

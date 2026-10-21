@@ -21,6 +21,16 @@ CREATE TABLE "private"."notification_checks" (
 ALTER TABLE "private"."notification_checks"
   ENABLE ROW LEVEL SECURITY;
 
+CREATE TABLE "private"."notification_settings" (
+  "user_id"      uuid                     NOT NULL,
+  "push_enabled" boolean                  NOT NULL DEFAULT true,
+  "updated_at"   timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "notification_settings_pkey" PRIMARY KEY (user_id)
+);
+
+ALTER TABLE "private"."notification_settings"
+  ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE "private"."notifications" (
   "id"           bigint                   GENERATED ALWAYS AS IDENTITY NOT NULL,
   "recipient_id" uuid                     NOT NULL,
@@ -112,6 +122,20 @@ begin
     ) n
     join private.posts p on p.id = n.post_id
   );
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION private.get_push_enabled()
+  RETURNS boolean
+  LANGUAGE plpgsql
+  STABLE
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare
+  viewer_id uuid := private.notification_viewer();
+begin
+  return coalesce((select s.push_enabled from private.notification_settings s where s.user_id = viewer_id), true);
 end;
 $function$;
 
@@ -251,6 +275,26 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION private.set_push_enabled (
+  enabled boolean
+)
+  RETURNS boolean
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare
+  viewer_id uuid := private.notification_viewer();
+begin
+  if enabled is null then
+    raise exception 'invalid_push_enabled' using errcode = '22023';
+  end if;
+  insert into private.notification_settings(user_id, push_enabled) values (viewer_id, enabled)
+  on conflict (user_id) do update set push_enabled = excluded.push_enabled, updated_at = now();
+  return enabled;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.get_notifications (
   after_created_at timestamp with time zone DEFAULT NULL::timestamp WITH time zone,
   after_id         bigint                   DEFAULT NULL::bigint
@@ -263,6 +307,16 @@ CREATE OR REPLACE FUNCTION public.get_notifications (
 $function$;
 
 REVOKE ALL ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bigint) FROM PUBLIC, "anon";
+
+CREATE OR REPLACE FUNCTION public.get_push_enabled()
+  RETURNS boolean
+  LANGUAGE sql
+  SET search_path TO ''
+  AS $function$
+  select private.get_push_enabled();
+$function$;
+
+REVOKE ALL ON FUNCTION "public"."get_push_enabled"() FROM PUBLIC, "anon";
 
 CREATE OR REPLACE FUNCTION public.has_unread_notifications()
   RETURNS boolean
@@ -284,6 +338,18 @@ $function$;
 
 REVOKE ALL ON FUNCTION "public"."mark_notifications_checked"() FROM PUBLIC, "anon";
 
+CREATE OR REPLACE FUNCTION public.set_push_enabled (
+  enabled boolean
+)
+  RETURNS boolean
+  LANGUAGE sql
+  SET search_path TO ''
+  AS $function$
+  select private.set_push_enabled(enabled);
+$function$;
+
+REVOKE ALL ON FUNCTION "public"."set_push_enabled"(boolean) FROM PUBLIC, "anon";
+
 ALTER TABLE "private"."like_notification_log"
   ADD CONSTRAINT "like_notification_log_actor_id_fkey" FOREIGN KEY (actor_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
@@ -292,6 +358,9 @@ ALTER TABLE "private"."like_notification_log"
 
 ALTER TABLE "private"."notification_checks"
   ADD CONSTRAINT "notification_checks_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE "private"."notification_settings"
+  ADD CONSTRAINT "notification_settings_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 ALTER TABLE "private"."notifications"
   ADD CONSTRAINT "notifications_post_id_fkey" FOREIGN KEY (post_id) REFERENCES private.posts(id) ON DELETE CASCADE;
@@ -328,6 +397,10 @@ REVOKE ALL ON FUNCTION "private"."get_notifications"(timestamp WITH time zone, b
 
 GRANT EXECUTE ON FUNCTION "private"."get_notifications"(timestamp WITH time zone, bigint) TO "authenticated";
 
+REVOKE ALL ON FUNCTION "private"."get_push_enabled"() FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."get_push_enabled"() TO "authenticated";
+
 REVOKE ALL ON FUNCTION "private"."has_unread_notifications"() FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION "private"."has_unread_notifications"() TO "authenticated";
@@ -346,6 +419,10 @@ REVOKE ALL ON FUNCTION "private"."notify_post_commented"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "private"."notify_post_liked"() FROM PUBLIC;
 
+REVOKE ALL ON FUNCTION "private"."set_push_enabled"(boolean) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."set_push_enabled"(boolean) TO "authenticated";
+
 GRANT EXECUTE ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bigint) TO "authenticated";
 
 REVOKE ALL ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bigint) FROM "postgres";
@@ -353,6 +430,14 @@ REVOKE ALL ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bi
 GRANT EXECUTE ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bigint) TO "postgres";
 
 GRANT EXECUTE ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bigint) TO "service_role";
+
+GRANT EXECUTE ON FUNCTION "public"."get_push_enabled"() TO "authenticated";
+
+REVOKE ALL ON FUNCTION "public"."get_push_enabled"() FROM "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."get_push_enabled"() TO "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."get_push_enabled"() TO "service_role";
 
 GRANT EXECUTE ON FUNCTION "public"."has_unread_notifications"() TO "authenticated";
 
@@ -369,6 +454,14 @@ REVOKE ALL ON FUNCTION "public"."mark_notifications_checked"() FROM "postgres";
 GRANT EXECUTE ON FUNCTION "public"."mark_notifications_checked"() TO "postgres";
 
 GRANT EXECUTE ON FUNCTION "public"."mark_notifications_checked"() TO "service_role";
+
+GRANT EXECUTE ON FUNCTION "public"."set_push_enabled"(boolean) TO "authenticated";
+
+REVOKE ALL ON FUNCTION "public"."set_push_enabled"(boolean) FROM "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."set_push_enabled"(boolean) TO "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."set_push_enabled"(boolean) TO "service_role";
 
 SELECT cron.schedule_in_database('notifications-cleanup', '0 18 * * *', 'select private.delete_old_notifications()', 'postgres', NULL, true);
 
