@@ -7,6 +7,7 @@ import { formatCommunityTime } from "@/screens/diggle/utils/formatCommunityTime"
 import type { NotificationItem } from "@/screens/notification/components/NotificationRow";
 import { useDevicePushOff } from "@/screens/notification/hooks/useDevicePushOff";
 import { NotificationScreen } from "@/screens/notification/NotificationScreen";
+import { useNotificationCheck } from "@/screens/notification/queries/useNotificationCheck";
 import { useNotifications } from "@/screens/notification/queries/useNotifications";
 
 // 개발 빌드에서 ?preview= 로 화면 상태를 확인하는 샘플이다. 운영에서는 실제 알림만 보인다.
@@ -59,6 +60,7 @@ export default function NotificationsRoute() {
   const devicePush = useDevicePushOff();
   const showToast = useToast();
   const list = useNotifications();
+  const check = useNotificationCheck();
   const items = list.data?.pages.flat() ?? [];
   return (
     <NotificationScreen
@@ -78,7 +80,7 @@ export default function NotificationsRoute() {
             ? undefined
             : () => void list.refetch()
       }
-      isLoading={isPreview ? preview === "loading" : list.isPending}
+      isLoading={isPreview ? preview === "loading" : list.isPending || check.isPending}
       isLoadingMore={!isPreview && list.isFetchingNextPage}
       onEndReached={() => {
         if (!isPreview && list.hasNextPage && !list.isFetching && !list.isFetchNextPageError)
@@ -99,8 +101,11 @@ export default function NotificationsRoute() {
               title: notification.title,
               message: notification.body,
               timeLabel: formatCommunityTime(notification.createdAt),
-              // 읽음 상태를 두지 않아 모두 읽은 모양으로 보인다.
-              isRead: true,
+              // 확인 처리에 실패하면 점이 남아 있으니 목록은 모두 읽은 모양으로 둔다.
+              isRead:
+                check.isError ||
+                (check.data != null &&
+                  Date.parse(notification.createdAt) <= Date.parse(check.data)),
             }))
       }
       onPressNotification={(item) => {

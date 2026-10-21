@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
-import { IconNotification, IconSearch } from "@/assets/images/appbar";
+import { IconSearch } from "@/assets/images/appbar";
 import EmptyFolderIcon from "@/assets/images/folder/icon-empty-folder.svg";
 import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
 import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
@@ -125,12 +125,7 @@ export function FolderScreen({
                   onPress={onSearch}
                   disabled={!onSearch}
                 />
-                <AppBar.IconButton
-                  icon={IconNotification}
-                  accessibilityLabel="알림"
-                  onPress={onNotifications}
-                  disabled={!onNotifications}
-                />
+                <AppBar.NotificationButton onPress={onNotifications} disabled={!onNotifications} />
               </>
             )
           }

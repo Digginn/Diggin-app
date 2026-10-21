@@ -7,6 +7,7 @@ import { IconBack, type SvgIcon } from "@/assets/images/appbar";
 import LogoWordmark from "@/assets/images/logo-black.svg";
 
 import { IconButton } from "./IconButton";
+import { NotificationButton } from "./NotificationButton";
 import { TextButton } from "./TextButton";
 
 const BAR_HEIGHT = 56;
@@ -114,5 +115,6 @@ function AppBarRoot({
 
 export const AppBar = Object.assign(AppBarRoot, {
   IconButton,
+  NotificationButton,
   TextButton,
 });

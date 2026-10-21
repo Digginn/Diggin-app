@@ -4,6 +4,9 @@ export const NOTIFICATION_PAGE_SIZE = 20;
 export const notificationKeys = {
   all: ["notifications"] as const,
   list: (viewer: string | null) => [...notificationKeys.all, viewer] as const,
+  unread: (viewer: string | null) => [...notificationKeys.all, "unread", viewer] as const,
+  check: (viewer: string | null, openedAt: number) =>
+    [...notificationKeys.all, "check", viewer, openedAt] as const,
 };
 
 export type AppNotification = {
@@ -52,4 +55,19 @@ export async function fetchNotifications(after: AppNotification | null) {
   if (error) throw error;
   if (!Array.isArray(data)) throw new Error("invalid_notification_response");
   return data.map(parseNotification);
+}
+
+export async function fetchHasUnreadNotifications() {
+  const { data, error } = await supabase.rpc("has_unread_notifications");
+  if (error) throw error;
+  return data === true;
+}
+
+/** 알림함 확인 시각을 지금으로 바꾸고 이전 시각을 받는다. 처음 열면 null이다. */
+export async function markNotificationsChecked() {
+  const { data, error } = await supabase.rpc("mark_notifications_checked");
+  if (error) throw error;
+  if (data !== null && (typeof data !== "string" || !Number.isFinite(Date.parse(data))))
+    throw new Error("invalid_notification_response");
+  return data;
 }

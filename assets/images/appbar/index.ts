@@ -3,6 +3,7 @@ import type { FC } from "react";
 import type { SvgProps } from "react-native-svg";
 
 import IconBackRaw from "./icon-appbar-back.svg";
+import IconNotificationDotRaw from "./icon-appbar-notification-dot.svg";
 import IconNotificationRaw from "./icon-appbar-notification.svg";
 import IconReportRaw from "./icon-appbar-report.svg";
 import IconSearchRaw from "./icon-appbar-search.svg";
@@ -17,5 +18,6 @@ function withColorClass(Icon: FC<SvgProps>): SvgIcon {
 
 export const IconBack = withColorClass(IconBackRaw);
 export const IconNotification = withColorClass(IconNotificationRaw);
+export const IconNotificationDot = withColorClass(IconNotificationDotRaw);
 export const IconReport = withColorClass(IconReportRaw);
 export const IconSearch = withColorClass(IconSearchRaw);

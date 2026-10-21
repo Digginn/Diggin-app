@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Text, View } from "react-native";
 
-import { IconNotification } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -42,9 +41,7 @@ export function DiggleScreen() {
       <AppBar
         left="logo"
         right={
-          <AppBar.IconButton
-            icon={IconNotification}
-            accessibilityLabel="알림"
+          <AppBar.NotificationButton
             onPress={() => {
               if (!session) setLoginRequired(true);
               else router.push("/notifications");
