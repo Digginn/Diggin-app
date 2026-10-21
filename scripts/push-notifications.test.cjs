@@ -11,8 +11,9 @@ function loadPush({
   requestResult = "granted",
   tokenGate,
   rpcGate,
+  rpcGates = [],
 } = {}) {
-  const calls = { requests: 0, tokens: 0, channels: 0, rpc: [], deleted: [] };
+  const calls = { requests: 0, tokens: 0, channels: 0, rpc: [], deleted: [], events: [] };
   const state = { status };
   const compiled = ts.transpileModule(
     readFileSync(path.join(__dirname, "../src/lib/pushNotifications.ts"), "utf8"),
@@ -53,14 +54,16 @@ function loadPush({
         return {
           supabase: {
             rpc: async (fn, args) => {
-              calls.rpc.push([fn, args]);
-              await rpcGate;
+              const index = calls.rpc.push([fn, args]);
+              await (rpcGates[index - 1] ?? rpcGate);
+              calls.events.push(`rpc${index}`);
               return { error: null };
             },
             from: (table) => ({
               delete: () => ({
                 eq: async (column, value) => {
                   calls.deleted.push([table, column, value]);
+                  calls.events.push("delete");
                   return { error: null };
                 },
               }),
@@ -148,4 +151,26 @@ test("토큰을 받거나 등록 응답을 기다리는 중에 로그아웃해�
   await waitingToken;
   assert.equal(slowToken.calls.rpc.length, 0, "로그아웃한 뒤 받은 토큰은 등록하지 않는다");
   assert.equal(slowToken.calls.deleted.length, 0);
+});
+
+test("등록 요청이 겹친 채 로그아웃하면 모든 등록 응답이 끝난 뒤에 토큰을 지운다", async () => {
+  const release = [];
+  const gates = [0, 1].map(() => new Promise((resolve) => release.push(resolve)));
+  const { push, calls } = loadPush({ status: "granted", rpcGates: gates });
+  const first = push.registerDevicePush("user-a", true);
+  const second = push.registerDevicePush("user-a", false);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(calls.rpc.length, 2, "로그인 직후와 앱 복귀가 겹쳐 등록 요청이 두 번 나간 상태");
+  release[1]();
+  await second;
+  const loggingOut = push.unregisterDevicePush();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  release[0]();
+  await Promise.all([first, loggingOut]);
+  assert.deepEqual(
+    calls.events,
+    ["rpc2", "rpc1", "delete"],
+    "늦게 끝난 첫 요청이 저장한 뒤에 지운다",
+  );
+  assert.deepEqual(calls.deleted, [["push_tokens", "token", "ExponentPushToken[device]"]]);
 });
