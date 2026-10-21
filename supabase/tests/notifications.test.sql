@@ -94,6 +94,38 @@ select is((select array_agg(x->>'type' order by ordinality) from jsonb_array_ele
 select ok(not public.get_notifications()::text ~ '10400000-', '응답에 사용자 UUID가 없다');
 select is((select count(*) from jsonb_array_elements(public.get_notifications()) x where x ? 'event_key'), 0::bigint, '이벤트 키는 앱에 주지 않는다');
 
+-- 알림을 받은 뒤 차단·신고한 사람의 알림은 목록과 새 알림 점에서 뺀다
+reset role;
+select is((select count(*) from private.notifications where recipient_id = '10400000-0000-0000-0000-00000000000a'
+  and actor_id = '10400000-0000-0000-0000-00000000000b'), 2::bigint, '댓글·좋아요 알림에 행동한 사람을 남긴다');
+savepoint before_block;
+insert into private.user_blocks(blocker_id, blocked_id)
+ values ('10400000-0000-0000-0000-00000000000a', '10400000-0000-0000-0000-00000000000b');
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
+select is((select array_agg(x->>'type') from jsonb_array_elements(public.get_notifications()) x), array['vote_ended'],
+  '차단한 사람의 알림은 목록에서 빠지고 투표 마감 알림은 남는다');
+reset role;
+update private.notifications set created_at = now() - interval '1 minute'
+ where recipient_id = '10400000-0000-0000-0000-00000000000a' and type = 'vote_ended';
+insert into private.notification_checks(user_id, checked_at) values ('10400000-0000-0000-0000-00000000000a', now());
+update private.notifications set created_at = now() + interval '1 minute'
+ where recipient_id = '10400000-0000-0000-0000-00000000000a' and actor_id = '10400000-0000-0000-0000-00000000000b';
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
+select ok(not public.has_unread_notifications(), '차단한 사람의 새 알림으로는 점이 켜지지 않는다');
+rollback to savepoint before_block;
+savepoint before_report;
+insert into private.reports(reporter_id, target_type, post_id, reported_user_id, reason)
+ values ('10400000-0000-0000-0000-00000000000a', 'post', current_setting('test.post')::bigint, '10400000-0000-0000-0000-00000000000b', 'abuse');
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
+select is((select array_agg(x->>'type') from jsonb_array_elements(public.get_notifications()) x), array['vote_ended'],
+  '신고한 사람의 알림도 목록에서 빠진다');
+rollback to savepoint before_report;
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
+
 -- 알림함 확인: 처음엔 전부 안 읽음이고, 열면 이전 확인 시각을 돌려주고 점이 꺼진다
 select ok(public.has_unread_notifications(), '알림함을 연 적이 없으면 새 알림이 있다');
 select is(public.mark_notifications_checked(), null::timestamptz, '처음 열면 이전 확인 시각이 없다');
