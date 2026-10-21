@@ -1,6 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, Linking } from "react-native";
 
+import { TOAST_MESSAGES } from "@/constants/messages";
+import { useToast } from "@/hooks/useToast";
 import { formatCommunityTime } from "@/screens/diggle/utils/formatCommunityTime";
 import type { NotificationItem } from "@/screens/notification/components/NotificationRow";
 import { useDevicePushOff } from "@/screens/notification/hooks/useDevicePushOff";
@@ -55,6 +57,7 @@ export default function NotificationsRoute() {
   const isPreview = __DEV__ && preview !== undefined;
   const isErrorPreview = __DEV__ && preview === "error";
   const devicePush = useDevicePushOff();
+  const showToast = useToast();
   const list = useNotifications();
   const items = list.data?.pages.flat() ?? [];
   return (
@@ -103,7 +106,11 @@ export default function NotificationsRoute() {
       onPressNotification={(item) => {
         const notification = items.find((entry) => entry.id === item.id);
         if (!notification) return;
-        // 지워진 글은 상세가 '게시글을 찾을 수 없습니다'와 뒤로가기를 보여 준다(NOTI-006).
+        // NOTI-006 지워진 글은 이동하지 않고 목록에서 안내한다.
+        if (!notification.isPostAvailable) {
+          showToast(TOAST_MESSAGES.NOTI_004, "error");
+          return;
+        }
         router.push({
           pathname: notification.postType === "vote" ? "/votes/[id]" : "/posts/[id]",
           params: { id: notification.postId },
