@@ -231,7 +231,7 @@ export function BodyTextField({
 
   return (
     <View
-      className={`relative w-full border-field bg-gray-0 p-4 ${size === "compact" ? "h-[120px] rounded" : "h-[200px] rounded-field"} ${borderClassName} ${className ?? ""}`}
+      className={`relative w-full border-field bg-gray-0 p-4 ${size === "compact" ? "h-[100px] rounded" : "h-[200px] rounded-field"} ${borderClassName} ${className ?? ""}`}
     >
       <TextInput
         {...props}

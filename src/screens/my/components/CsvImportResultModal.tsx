@@ -32,7 +32,11 @@ export function CsvImportResultModal({
   const isSuccess = result.importedCount > 0;
   const hasOnlyDuplicates = !isSuccess && failedCount === 0 && duplicateCount > 0;
   const isCompleted = isSuccess || hasOnlyDuplicates;
-  const folderFailureCount = result.folderFailures?.length ?? 0;
+  const hasFolderLimitExceeded = result.folderFailures?.some(
+    (failure) => failure.reason === "FOLDER_LIMIT_EXCEEDED",
+  );
+  const folderSaveFailureCount =
+    result.folderFailures?.filter((failure) => failure.reason === "FOLDER_SAVE_FAILED").length ?? 0;
 
   return (
     <Modal
@@ -123,9 +127,17 @@ export function CsvImportResultModal({
               )}
             </Text>
           </View>
-          {folderFailureCount > 0 && (
+          <Text className="text-center text-gray-700 font-b3">
+            {`전체 ${result.importedCount + excluded.length}개 · 성공 ${result.importedCount}개\n실패 ${failedCount}개 · 중복 ${duplicateCount}개`}
+          </Text>
+          {hasFolderLimitExceeded && (
             <Text className="text-center text-gray-600 font-b3">
-              {`폴더에 담지 못한 항목이 ${folderFailureCount}건 있습니다.\n아이템은 ALL에서 확인할 수 있습니다.`}
+              폴더 최대 개수를 초과한 아이템은 ALL탭에 개별 아이템으로 저장되었습니다.
+            </Text>
+          )}
+          {folderSaveFailureCount > 0 && (
+            <Text className="text-center text-gray-600 font-b3">
+              {`폴더에 담지 못한 항목이 ${folderSaveFailureCount}건 있습니다.\n아이템은 ALL에서 확인할 수 있습니다.`}
             </Text>
           )}
           <View className="flex-row gap-modal-action">

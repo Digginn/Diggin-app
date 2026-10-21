@@ -126,9 +126,11 @@ function setup({
       },
     },
   });
-  const run = () =>
-    api.importCsv({ name: "wishlist.csv", uri: "file:///wishlist.csv" }, (value) =>
-      progress.push(JSON.parse(JSON.stringify(value))),
+  const run = (confirmFolderLimit) =>
+    api.importCsv(
+      { name: "wishlist.csv", uri: "file:///wishlist.csv" },
+      (value) => progress.push(JSON.parse(JSON.stringify(value))),
+      confirmFolderLimit,
     );
   return { run, calls, progress, storage };
 }
@@ -173,22 +175,42 @@ test("IMP-005 승인 판매처 가격을 실제 가져오기 RPC에 전달하고
     ["KREAM", "https://kream.co.kr/products/6", "-1", "1.5", null],
     ["ABLY", "https://mobile.a-bly.com/goods/7", "100", "80", "80"],
     ["4910", "https://www.4910.kr/desktop/goods/8", "100", "80", "80"],
-    ["무신사", "https://global.musinsa.com/products/9", "100", "80", null],
-    ["쿠팡", "https://www.tw.coupang.com/products/10", "100", "80", null],
-    ["쿠팡", "https://link.coupang.com/a/11", "100", "80", null],
-    ["ABLY", "https://click.linkprice.com/click?url=https://a-bly.com", "100", "80", null],
-    ["KREAM", "https://kream.co.kr.example.com/products/13", "100", "80", null],
+    ["무신사", "https://global.musinsa.com/products/9", "100", "80", "80"],
+    ["쿠팡", "https://www.tw.coupang.com/products/10", "100", "80", "80"],
+    ["쿠팡", "https://link.coupang.com/a/11", "100", "80", "80"],
+    ["ABLY", "https://click.linkprice.com/click?url=https://a-bly.com", "100", "80", "80"],
+    ["KREAM", "https://kream.co.kr.example.com/products/13", "100", "80", "80"],
     ["알리익스프레스", "https://aliexpress.com/item/14", "100", "80", null],
     ["", "https://WWW.MUSINSA.COM/products/15", "100", "80", "80"],
     ["무신사", "https://m.store.musinsa.com/app/goods/16", "100", "80", "80"],
     ["지그재그", "https://s.zigzag.kr/share/17", "100", "80", "80"],
-    ["네이버 브랜드스토어", "https://m.brand.naver.com/shop/products/18", "100", "80", "80"],
-    ["네이버 쇼핑", "https://m.shopping.naver.com/window/products/19", "100", "80", "80"],
-    ["네이버 쇼핑", "https://msearch.shopping.naver.com/catalog/20", "100", "80", "80"],
+    ["네이버 브랜드스토어", "https://m.brand.naver.com/shop/products/18", "100", "80", null],
+    ["네이버 쇼핑", "https://m.shopping.naver.com/window/products/19", "100", "80", null],
+    ["네이버 쇼핑", "https://msearch.shopping.naver.com/catalog/20", "100", "80", null],
     ["네이버", "https://m.shopping.naver.com.example.org/21", "100", "80", null],
-    ["지그재그", "https://s.zigzag.kr.example.org/22", "100", "80", null],
-    ["무신사", "https://global.store.musinsa.com/goods/23", "100", "80", null],
+    ["지그재그", "https://s.zigzag.kr.example.org/22", "100", "80", "80"],
+    ["무신사", "https://global.store.musinsa.com/goods/23", "100", "80", "80"],
+    ["  kReAm  ", "https://shop.test/24", "100", "80", "80"],
+    ["네이버 스마트스토어", "https://shop.test/25", "100", "80", "80"],
+    ["", "https://kream.co.kr.example.com/26", "100", "80", null],
+    ["", "https://fakecoupang.com/27", "100", "80", null],
+    ["", "https://a.custom.musinsa.com/28", "100", "80", "80"],
   ];
+  for (const [store, host] of [
+    ["쿠팡", "coupang.com"],
+    ["무신사", "musinsa.com"],
+    ["29CM", "29cm.co.kr"],
+    ["지그재그", "zigzag.kr"],
+    ["네이버 스마트스토어", "smartstore.naver.com"],
+    ["KREAM", "kream.co.kr"],
+    ["ABLY", "a-bly.com"],
+    ["4910", "4910.kr"],
+  ]) {
+    cases.push([`  ${store.toLowerCase()}  `, `https://shop.test/${host}`, "100", "80", "80"]);
+    cases.push(["미확인", `https://${host}/1`, "100", "80", "80"]);
+    cases.push(["미확인", `https://custom.sub.${host}/2`, "100", "80", "80"]);
+    cases.push(["미확인", `https://${host}.example.org/3`, "100", "80", null]);
+  }
   const bytes = new TextEncoder().encode(
     Papa.unparse([
       domain.CSV_REQUIRED_HEADERS,
@@ -284,7 +306,13 @@ test("폴더 한도로 제외된 원본도 서버에 전달하고 경고를 상�
       error: null,
     }),
   });
-  const result = await run();
+  let confirmed = 0;
+  const result = await run(async () => {
+    assert.equal(calls.length, 0);
+    confirmed++;
+    return true;
+  });
+  assert.equal(confirmed, 1);
   assert.deepEqual(calls[0].import_plan.products[0].folderNames, []);
   assert.deepEqual(calls[0].import_plan.products[0].sourceFolderNames, ["abcdefg-long"]);
   assert.equal(result.importedCount, 1);
@@ -306,4 +334,47 @@ test("로그인 없음·5MB 초과·잘못된 인코딩·빈 CSV는 서버 저�
     assert.equal((await run()).error, error);
     assert.equal(calls.length, 0);
   }
+});
+
+test("폴더 한도 확인을 취소하거나 확인 콜백이 없으면 저장하지 않는다", async () => {
+  for (const confirm of [undefined, async () => false]) {
+    const { run, calls, storage } = setup({
+      folders: Array.from({ length: 50 }, (_, i) => `폴더${i}`),
+    });
+    assert.equal(await run(confirm), null);
+    assert.equal(calls.length, 0);
+    assert.equal(storage.size, 0);
+  }
+});
+
+test("한도 이내이거나 기존 폴더를 재사용하면 한도 확인을 요청하지 않는다", async () => {
+  for (const options of [
+    { folders: Array.from({ length: 49 }, (_, i) => `폴더${i}`) },
+    {
+      folders: ["기존폴더", ...Array.from({ length: 49 }, (_, i) => `폴더${i}`)],
+      sources: { 기존폴더: "abcdefg-long" },
+    },
+  ]) {
+    const { run, calls } = setup(options);
+    await run(async () => assert.fail("한도 안내가 필요하지 않음"));
+    assert.equal(calls.length, 1);
+  }
+});
+
+test("충돌 재시도 중 처음 한도를 넘으면 저장 전에 한 번만 확인한다", async () => {
+  const { run, calls } = setup({
+    folders: (attempt) => (attempt === 0 ? [] : Array.from({ length: 50 }, (_, i) => `폴더${i}`)),
+    rpc: (_, attempt) =>
+      attempt < 3
+        ? { data: null, error: { code: "40001" } }
+        : { data: { importedCount: 1, excludedProducts: [], folderFailures: [] }, error: null },
+  });
+  let confirmations = 0;
+  await run(async () => {
+    assert.equal(calls.length, 1);
+    confirmations++;
+    return true;
+  });
+  assert.equal(confirmations, 1);
+  assert.equal(calls.length, 3);
 });

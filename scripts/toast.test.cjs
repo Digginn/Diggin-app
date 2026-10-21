@@ -82,7 +82,18 @@ test("성공·에러 토스트는 아이콘을 앞에 두고 좌측 정렬, 기�
       require: (name) => {
         if (name === "react-native") return { View: "View", Text: "Text" };
         if (name === "@/assets/images/toast")
-          return { IconToastError: "IconToastError", IconToastSuccess: "IconToastSuccess" };
+          return {
+            IconToastError: "IconToastError",
+            IconToastSuccess: "IconToastSuccess",
+            IconToastNotice: "IconToastNotice",
+          };
+        if (name === "@/theme")
+          return {
+            colors: {
+              gray: { 0: "#FFFFFF", 200: "#ECECEC", 700: "#5D5D5D", 800: "#3F3F3F" },
+              semantic: { "error-on-dark": "#FF7E7E" },
+            },
+          };
         return require(name);
       },
     },
@@ -91,11 +102,11 @@ test("성공·에러 토스트는 아이콘을 앞에 두고 좌측 정렬, 기�
   for (const [variant, icon] of [
     ["error", "IconToastError"],
     ["success", "IconToastSuccess"],
+    ["notice", "IconToastNotice"],
   ]) {
     const toast = ToastText({ message: "안내", variant });
-    // 시안: 세 타입 모두 같은 회색 배경, 아이콘은 세로 가운데.
-    assert.match(toast.props.className, /items-center/);
-    assert.match(toast.props.className, /bg-gray-700\/\[0\.92\]/);
+    assert.match(toast.props.className, variant === "error" ? /items-start/ : /items-center/);
+    assert.match(toast.props.className, /bg-semantic-toast/);
     const children = React.Children.toArray(toast.props.children);
     assert.equal(children[0].props.children.type, icon);
     assert.match(children[1].props.className, /text-left/);
