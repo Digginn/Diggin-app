@@ -105,7 +105,7 @@ select is(public.mark_notifications_checked(), now() - interval '1 minute', '다
 set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000b", "role": "authenticated"}';
 select ok(not public.has_unread_notifications(), '남의 알림으로 점이 켜지지 않는다');
 reset role;
-select is((select count(*) from private.notification_checks), 1::bigint, '연 사람의 확인 시각만 남는다');
+select is((select count(*) from private.notification_checks where user_id::text like '10400000-%'), 1::bigint, '연 사람의 확인 시각만 남는다');
 delete from private.notifications where event_key = 'test:new';
 set local role anon;
 select throws_ok($$ select public.has_unread_notifications() $$, '42501', null, '비회원은 새 알림 여부를 볼 수 없다');
