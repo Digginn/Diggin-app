@@ -401,7 +401,9 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      has_unread_notifications: { Args: Record<PropertyKey, never>; Returns: boolean };
       import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
+      mark_notifications_checked: { Args: Record<PropertyKey, never>; Returns: string };
       register_push_token: {
         Args: { new_platform: string; new_token: string };
         Returns: undefined;

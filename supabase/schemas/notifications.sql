@@ -27,9 +27,18 @@ create table private.like_notification_log (
 );
 create index like_notification_log_actor_idx on private.like_notification_log(actor_id);
 
+-- 알림함을 마지막으로 연 시각. 이보다 뒤에 온 알림이 안 읽은 알림이다(종 아이콘 점, 목록 Gray50 배경).
+-- 알림마다 읽음을 두지 않고 열면 전부 읽음으로 본다(개인정보처리방침 "알림함 마지막 확인 시각").
+create table private.notification_checks (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  checked_at timestamptz not null default now()
+);
+
 alter table private.notifications enable row level security;
 alter table private.like_notification_log enable row level security;
-revoke all on table private.notifications, private.like_notification_log from public, anon, authenticated;
+alter table private.notification_checks enable row level security;
+revoke all on table private.notifications, private.like_notification_log, private.notification_checks
+  from public, anon, authenticated;
 revoke all on sequence private.notifications_id_seq from public, anon, authenticated;
 
 -- 받는 사람이 차단했거나 신고한 사람의 행동은 알리지 않는다. 트리거는 행동한 사람 권한으로 돌아 auth.uid()를 쓸 수 없다.
@@ -133,12 +142,8 @@ returns integer language sql security definer set search_path = '' as $$
   select count(*)::integer from deleted;
 $$;
 
--- NOTI-007 최근 30일 알림을 최신순으로 20개씩 준다. 알림은 항상 받는 사람 자신의 글이라
--- 글이 지워졌거나 숨겨졌는지만 알려 주고, 앱은 누를 때 삭제 안내(NOTI-006)를 띄운다.
-create or replace function private.get_notifications(
-  after_created_at timestamptz default null, after_id bigint default null
-)
-returns jsonb language plpgsql stable security definer set search_path = '' as $$
+create or replace function private.notification_viewer()
+returns uuid language plpgsql stable security definer set search_path = '' as $$
 declare
   viewer_id uuid := (select auth.uid());
 begin
@@ -147,6 +152,19 @@ begin
   ) then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
+  return viewer_id;
+end;
+$$;
+
+-- NOTI-007 최근 30일 알림을 최신순으로 20개씩 준다. 알림은 항상 받는 사람 자신의 글이라
+-- 글이 지워졌거나 숨겨졌는지만 알려 주고, 앱은 누를 때 삭제 안내(NOTI-006)를 띄운다.
+create or replace function private.get_notifications(
+  after_created_at timestamptz default null, after_id bigint default null
+)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare
+  viewer_id uuid := private.notification_viewer();
+begin
   if (after_created_at is null) <> (after_id is null) then
     raise exception 'invalid_notification_cursor' using errcode = '22023';
   end if;
@@ -174,12 +192,55 @@ returns jsonb language sql security invoker set search_path = '' as $$
   select private.get_notifications(after_created_at, after_id);
 $$;
 
+-- 종 아이콘 빨간 점. 목록에 보이는 최근 30일 알림 중 마지막 확인 뒤에 온 것이 있는지 본다.
+create or replace function private.has_unread_notifications()
+returns boolean language plpgsql stable security definer set search_path = '' as $$
+declare
+  viewer_id uuid := private.notification_viewer();
+begin
+  return exists (
+    select 1 from private.notifications n
+    where n.recipient_id = viewer_id and n.created_at > now() - interval '30 days'
+      and n.created_at > coalesce(
+        (select c.checked_at from private.notification_checks c where c.user_id = viewer_id), '-infinity')
+  );
+end;
+$$;
+
+-- 알림함을 열 때 부른다. 확인 시각을 지금으로 바꾸고, 이번에 회색으로 보여 줄 기준인 이전 시각을 돌려준다.
+create or replace function private.mark_notifications_checked()
+returns timestamptz language plpgsql security definer set search_path = '' as $$
+declare
+  viewer_id uuid := private.notification_viewer();
+  previous timestamptz;
+begin
+  select checked_at into previous from private.notification_checks where user_id = viewer_id for update;
+  insert into private.notification_checks(user_id, checked_at) values (viewer_id, now())
+  on conflict (user_id) do update set checked_at = excluded.checked_at;
+  return previous;
+end;
+$$;
+
+create or replace function public.has_unread_notifications()
+returns boolean language sql security invoker set search_path = '' as $$
+  select private.has_unread_notifications();
+$$;
+
+create or replace function public.mark_notifications_checked()
+returns timestamptz language sql security invoker set search_path = '' as $$
+  select private.mark_notifications_checked();
+$$;
+
 revoke execute on function private.notification_actor_visible(uuid, uuid), private.notification_text(text),
   private.notify_post_commented(), private.notify_post_liked(), private.create_vote_ended_notifications(),
-  private.delete_old_notifications() from public, anon, authenticated;
-revoke execute on function private.get_notifications(timestamptz, bigint), public.get_notifications(timestamptz, bigint)
+  private.delete_old_notifications(), private.notification_viewer() from public, anon, authenticated;
+revoke execute on function private.get_notifications(timestamptz, bigint), public.get_notifications(timestamptz, bigint),
+  private.has_unread_notifications(), public.has_unread_notifications(),
+  private.mark_notifications_checked(), public.mark_notifications_checked()
   from public, anon;
-grant execute on function private.get_notifications(timestamptz, bigint), public.get_notifications(timestamptz, bigint)
+grant execute on function private.get_notifications(timestamptz, bigint), public.get_notifications(timestamptz, bigint),
+  private.has_unread_notifications(), public.has_unread_notifications(),
+  private.mark_notifications_checked(), public.mark_notifications_checked()
   to authenticated;
 
 select cron.schedule('notifications-vote-ended', '* * * * *', 'select private.create_vote_ended_notifications()');

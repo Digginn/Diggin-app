@@ -12,6 +12,15 @@ CREATE TABLE "private"."like_notification_log" (
 ALTER TABLE "private"."like_notification_log"
   ENABLE ROW LEVEL SECURITY;
 
+CREATE TABLE "private"."notification_checks" (
+  "user_id"    uuid                     NOT NULL,
+  "checked_at" timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "notification_checks_pkey" PRIMARY KEY (user_id)
+);
+
+ALTER TABLE "private"."notification_checks"
+  ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE "private"."notifications" (
   "id"           bigint                   GENERATED ALWAYS AS IDENTITY NOT NULL,
   "recipient_id" uuid                     NOT NULL,
@@ -83,13 +92,8 @@ CREATE OR REPLACE FUNCTION private.get_notifications (
   SET search_path TO ''
   AS $function$
 declare
-  viewer_id uuid := (select auth.uid());
+  viewer_id uuid := private.notification_viewer();
 begin
-  if viewer_id is null or not exists (
-    select 1 from public.profiles where id = viewer_id and status <> 'suspended'
-  ) then
-    raise exception 'not_authenticated' using errcode = '42501';
-  end if;
   if (after_created_at is null) <> (after_id is null) then
     raise exception 'invalid_notification_cursor' using errcode = '22023';
   end if;
@@ -107,6 +111,42 @@ begin
     ) n
     join private.posts p on p.id = n.post_id
   );
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION private.has_unread_notifications()
+  RETURNS boolean
+  LANGUAGE plpgsql
+  STABLE
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare
+  viewer_id uuid := private.notification_viewer();
+begin
+  return exists (
+    select 1 from private.notifications n
+    where n.recipient_id = viewer_id and n.created_at > now() - interval '30 days'
+      and n.created_at > coalesce(
+        (select c.checked_at from private.notification_checks c where c.user_id = viewer_id), '-infinity')
+  );
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION private.mark_notifications_checked()
+  RETURNS timestamp WITH time zone
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare
+  viewer_id uuid := private.notification_viewer();
+  previous timestamptz;
+begin
+  select checked_at into previous from private.notification_checks where user_id = viewer_id for update;
+  insert into private.notification_checks(user_id, checked_at) values (viewer_id, now())
+  on conflict (user_id) do update set checked_at = excluded.checked_at;
+  return previous;
 end;
 $function$;
 
@@ -135,6 +175,25 @@ CREATE OR REPLACE FUNCTION private.notification_text (
   SET search_path TO ''
   AS $function$
   select regexp_replace(coalesce(value, ''), '\r\n|\r|\n', ' ', 'g');
+$function$;
+
+CREATE OR REPLACE FUNCTION private.notification_viewer()
+  RETURNS uuid
+  LANGUAGE plpgsql
+  STABLE
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare
+  viewer_id uuid := (select auth.uid());
+begin
+  if viewer_id is null or not exists (
+    select 1 from public.profiles where id = viewer_id and status <> 'suspended'
+  ) then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+  return viewer_id;
+end;
 $function$;
 
 CREATE OR REPLACE FUNCTION private.notify_post_commented()
@@ -204,11 +263,34 @@ $function$;
 
 REVOKE ALL ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bigint) FROM PUBLIC, "anon";
 
+CREATE OR REPLACE FUNCTION public.has_unread_notifications()
+  RETURNS boolean
+  LANGUAGE sql
+  SET search_path TO ''
+  AS $function$
+  select private.has_unread_notifications();
+$function$;
+
+REVOKE ALL ON FUNCTION "public"."has_unread_notifications"() FROM PUBLIC, "anon";
+
+CREATE OR REPLACE FUNCTION public.mark_notifications_checked()
+  RETURNS timestamp WITH time zone
+  LANGUAGE sql
+  SET search_path TO ''
+  AS $function$
+  select private.mark_notifications_checked();
+$function$;
+
+REVOKE ALL ON FUNCTION "public"."mark_notifications_checked"() FROM PUBLIC, "anon";
+
 ALTER TABLE "private"."like_notification_log"
   ADD CONSTRAINT "like_notification_log_actor_id_fkey" FOREIGN KEY (actor_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 ALTER TABLE "private"."like_notification_log"
   ADD CONSTRAINT "like_notification_log_post_id_fkey" FOREIGN KEY (post_id) REFERENCES private.posts(id) ON DELETE CASCADE;
+
+ALTER TABLE "private"."notification_checks"
+  ADD CONSTRAINT "notification_checks_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 ALTER TABLE "private"."notifications"
   ADD CONSTRAINT "notifications_post_id_fkey" FOREIGN KEY (post_id) REFERENCES private.posts(id) ON DELETE CASCADE;
@@ -245,9 +327,19 @@ REVOKE ALL ON FUNCTION "private"."get_notifications"(timestamp WITH time zone, b
 
 GRANT EXECUTE ON FUNCTION "private"."get_notifications"(timestamp WITH time zone, bigint) TO "authenticated";
 
+REVOKE ALL ON FUNCTION "private"."has_unread_notifications"() FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."has_unread_notifications"() TO "authenticated";
+
+REVOKE ALL ON FUNCTION "private"."mark_notifications_checked"() FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."mark_notifications_checked"() TO "authenticated";
+
 REVOKE ALL ON FUNCTION "private"."notification_actor_visible"(uuid, uuid) FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "private"."notification_text"(text) FROM PUBLIC;
+
+REVOKE ALL ON FUNCTION "private"."notification_viewer"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "private"."notify_post_commented"() FROM PUBLIC;
 
@@ -260,6 +352,22 @@ REVOKE ALL ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bi
 GRANT EXECUTE ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bigint) TO "postgres";
 
 GRANT EXECUTE ON FUNCTION "public"."get_notifications"(timestamp WITH time zone, bigint) TO "service_role";
+
+GRANT EXECUTE ON FUNCTION "public"."has_unread_notifications"() TO "authenticated";
+
+REVOKE ALL ON FUNCTION "public"."has_unread_notifications"() FROM "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."has_unread_notifications"() TO "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."has_unread_notifications"() TO "service_role";
+
+GRANT EXECUTE ON FUNCTION "public"."mark_notifications_checked"() TO "authenticated";
+
+REVOKE ALL ON FUNCTION "public"."mark_notifications_checked"() FROM "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."mark_notifications_checked"() TO "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."mark_notifications_checked"() TO "service_role";
 
 SELECT cron.schedule_in_database('notifications-cleanup', '0 18 * * *', 'select private.delete_old_notifications()', 'postgres', NULL, true);
 
