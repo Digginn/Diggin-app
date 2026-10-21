@@ -9,6 +9,7 @@ import { Fab } from "@/components/Fab";
 import { Spinner } from "@/components/Loading";
 import { LoginRequiredModal } from "@/components/modal";
 import { Post } from "@/components/Post";
+import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { DIGGLE_EMPTY_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +28,7 @@ export function DiggleScreen() {
   const { tab: requestedTab } = useLocalSearchParams<{ tab?: string }>();
   const tab = requestedTab === "vote" ? "vote" : "all";
   const { session, isRestoring } = useAuth();
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [isLoginRequired, setLoginRequired] = useState(false);
   const showToast = useToast();
   const feed = useCommunityFeed(tab);
@@ -112,6 +114,11 @@ export function DiggleScreen() {
               authorLabel={item.isMine ? "글쓴이 (나)" : "글쓴이"}
               likeCount={item.type === "post" ? (item.likeCount ?? undefined) : undefined}
               commentCount={item.commentCount ?? 0}
+              onPressReport={
+                session && !item.isMine
+                  ? () => setReportTarget({ type: "post", id: item.id })
+                  : undefined
+              }
               onPress={() => {
                 if (!session) setLoginRequired(true);
                 else
@@ -134,6 +141,7 @@ export function DiggleScreen() {
           }}
         />
       </View>
+      <ReportFlow target={reportTarget} onClose={() => setReportTarget(null)} />
       <LoginRequiredModal
         visible={isLoginRequired && !session}
         onClose={() => setLoginRequired(false)}

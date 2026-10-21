@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Spinner } from "@/components/Loading";
 import { LoginRequiredModal } from "@/components/modal";
 import { Post } from "@/components/Post";
+import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
@@ -62,6 +63,7 @@ function PostRow({ item, onPress }: { item: MyPost; onPress?: () => void }) {
 }
 
 export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const activeKey = tab === "votes" ? "votes" : "posts";
   const insets = useSafeAreaInsets();
@@ -145,6 +147,11 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                     authorLabel={post.isMine ? "글쓴이 (나)" : "글쓴이"}
                     likeCount={post.likeCount ?? 0}
                     commentCount={post.commentCount ?? 0}
+                    onPressReport={
+                      !post.isMine
+                        ? () => setReportTarget({ type: "post", id: post.id })
+                        : undefined
+                    }
                     onPress={() => openPost(post)}
                   />
                 ) : post.type === "post" ? (
@@ -212,6 +219,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
           )}
         </>
       )}
+      <ReportFlow target={reportTarget} onClose={() => setReportTarget(null)} />
     </View>
   );
 }
