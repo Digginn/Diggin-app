@@ -74,6 +74,7 @@ declare
   failure_reason public.import_fail_reason;
   was_duplicate boolean;
 begin
+  perform private.assert_account_access();
   if current_user_id is null then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;

@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 
-from deploy_shared_db import CSV_RECOVERY, deployment_plan
+from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, deployment_plan, migration_files
 
 
 def validate():
@@ -18,10 +18,14 @@ def validate():
         config = (root / "supabase/config.toml").read_text(encoding="utf-8")
         config = config.replace('project_id = "Diggin-app"', 'project_id = "Diggin-app-csv-recovery"')
         (project / "config.toml").write_text(config, encoding="utf-8")
-        shutil.copytree(root / "supabase/migrations", project / "migrations")
+        migrations = migration_files(root / "supabase/migrations")
+        (project / "migrations").mkdir()
+        # Reproduce the history at the folder deployment, before later features
+        # started depending on the missing CSV tables.
+        for version, path in migrations.items():
+            if version <= RECOVERY_BASELINE and path.name not in CSV_RECOVERY:
+                shutil.copy2(path, project / "migrations" / path.name)
         shutil.copytree(root / "supabase/tests", project / "tests")
-        for name in CSV_RECOVERY:
-            (project / "migrations" / name).unlink()
 
         def cli(*args):
             subprocess.run(["supabase", *args], cwd=workdir, check=True)
@@ -33,12 +37,27 @@ def validate():
             for name in CSV_RECOVERY:
                 shutil.copy2(root / "supabase/migrations" / name, project / "migrations" / name)
             history = subprocess.run(
-                ["supabase", "migration", "list", "--local"],
+                ["supabase", "migration", "list", "--local", "--output-format", "text"],
                 cwd=workdir, text=True, capture_output=True, check=True,
             ).stdout
             pending, include_all = deployment_plan(project / "migrations", history)
             if set(pending) != set(CSV_RECOVERY) or not include_all:
                 raise ValueError("Disposable DB did not reproduce the expected CSV recovery state")
+            subprocess.run(
+                [sys.executable, str(root / "scripts/deploy_shared_db.py"), "--local"],
+                cwd=workdir, check=True,
+            )
+            # Only after recovery, apply later migrations through the normal path.
+            later = [path for version, path in migrations.items() if version > RECOVERY_BASELINE]
+            for path in later:
+                shutil.copy2(path, project / "migrations" / path.name)
+            history = subprocess.run(
+                ["supabase", "migration", "list", "--local", "--output-format", "text"],
+                cwd=workdir, text=True, capture_output=True, check=True,
+            ).stdout
+            pending, include_all = deployment_plan(project / "migrations", history)
+            if set(pending) != {path.name for path in later} or include_all:
+                raise ValueError("Post-recovery migrations must use the normal deployment path")
             subprocess.run(
                 [sys.executable, str(root / "scripts/deploy_shared_db.py"), "--local"],
                 cwd=workdir, check=True,

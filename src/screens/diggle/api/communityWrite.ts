@@ -1,3 +1,4 @@
+import { ensureCommunityWriteAllowed, restrictionMessage } from "@/api/accountAccess";
 import { supabase } from "@/lib/supabase";
 
 function productId(id: string) {
@@ -17,7 +18,10 @@ export async function fetchCommunityPolicy() {
 }
 
 export async function agreeCommunityPolicy() {
-  const { error } = await supabase.rpc("agree_community_policy");
+  const accessToken = await ensureCommunityWriteAllowed();
+  const request = supabase.rpc("agree_community_policy");
+  if (accessToken) request.setHeader("Authorization", `Bearer ${accessToken}`);
+  const { error } = await request;
   if (error) throw error;
 }
 
@@ -27,12 +31,15 @@ export async function createCommunityPost(input: {
   productIds: string[];
   requestId: string;
 }) {
-  const { data, error } = await supabase.rpc("create_post", {
+  const accessToken = await ensureCommunityWriteAllowed();
+  const request = supabase.rpc("create_post", {
     post_kind: input.type,
     post_content: input.body.normalize("NFC"),
     product_ids: input.productIds.map(productId),
     request_id: input.requestId,
   });
+  if (accessToken) request.setHeader("Authorization", `Bearer ${accessToken}`);
+  const { data, error } = await request;
   if (error) throw error;
   if (typeof data !== "string" || !/^\d+$/.test(data))
     throw new Error("invalid_community_response");
@@ -40,11 +47,16 @@ export async function createCommunityPost(input: {
 }
 
 export async function deleteCommunityPost(id: string) {
-  const { error } = await supabase.rpc("delete_community_post", { target_post_id: productId(id) });
+  const accessToken = await ensureCommunityWriteAllowed();
+  const request = supabase.rpc("delete_community_post", { target_post_id: productId(id) });
+  if (accessToken) request.setHeader("Authorization", `Bearer ${accessToken}`);
+  const { error } = await request;
   if (error) throw error;
 }
 
 export function communityWriteError(error: unknown) {
+  const restricted = restrictionMessage(error);
+  if (restricted) return restricted;
   const message =
     typeof error === "object" && error !== null && "message" in error ? String(error.message) : "";
   if (/community_restricted|not_authorized/.test(message))

@@ -357,6 +357,45 @@ export type Database = {
     };
     Functions: {
       accept_policy: { Args: { target_policy_id: number }; Returns: undefined };
+      acknowledge_sanction_notice: { Args: { sanction_id: number }; Returns: undefined };
+      admin_content_action: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          category: string;
+          explanation: string;
+          new_status: string;
+          operation: string;
+          report: number;
+          request_id: string;
+        };
+        Returns: string;
+      };
+      admin_prepare_sanction: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          category: string;
+          explanation: string;
+          operation: string;
+          report?: number;
+          request_id: string;
+          target_user: string;
+        };
+        Returns: Json;
+      };
+      admin_report_detail: {
+        Args: { actor: string; actor_session: string; before_report_id?: number; report: number };
+        Returns: Json;
+      };
+      admin_report_groups: {
+        Args: { actor: string; actor_session: string; before_id?: number };
+        Returns: Json;
+      };
+      admin_sanction_request: {
+        Args: { actor: string; actor_session: string; mark_failed?: boolean; request_id: string };
+        Returns: Json;
+      };
       agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
       block_community_author: {
         Args: { target_id: number; target_type: string };
@@ -377,6 +416,7 @@ export type Database = {
       };
       delete_comment: { Args: { target_comment_id: number }; Returns: undefined };
       delete_community_post: { Args: { target_post_id: number }; Returns: undefined };
+      get_account_access: { Args: Record<PropertyKey, never>; Returns: Json };
       get_community_comments: {
         Args: { after_created_at?: string; after_id?: number; target_post_id: number };
         Returns: Json;
@@ -412,6 +452,10 @@ export type Database = {
       get_push_enabled: { Args: Record<PropertyKey, never>; Returns: boolean };
       has_unread_notifications: { Args: Record<PropertyKey, never>; Returns: boolean };
       import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
+      lookup_suspended_identity: {
+        Args: { identity_provider: string; identity_subject: string };
+        Returns: Json;
+      };
       mark_notifications_checked: { Args: Record<PropertyKey, never>; Returns: string };
       register_push_token: {
         Args: { new_platform: string; new_token: string };

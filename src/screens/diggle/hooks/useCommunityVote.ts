@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 
+import { restrictionMessage } from "@/api/accountAccess";
 import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
 import { useToast } from "@/hooks/useToast";
 import type { VoteChoice } from "@/types/post";
@@ -80,7 +81,7 @@ export function useCommunityVote(
           : message === "vote_closed"
             ? "투표가 종료되었습니다."
             : communityWriteError(error),
-        "error",
+        restrictionMessage(error) ? "notice" : "error",
       );
       if (message === "vote_closed")
         void queryClient.invalidateQueries({ queryKey: communityKeys.all });
