@@ -1,7 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
-import { unregisterDevicePush } from "@/lib/pushNotifications";
+import { finishDeviceSignOut, unregisterDevicePush } from "@/lib/pushNotifications";
 import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 
@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
     } finally {
+      finishDeviceSignOut();
       isSigningOutRef.current = false;
     }
   }
