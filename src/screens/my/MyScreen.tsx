@@ -88,7 +88,7 @@ export function MyScreen({ isGuest = false, onLogout, onWithdraw }: MyScreenProp
       // 개발 중에는 길게 눌러 채널 이동 실패 화면을 확인합니다.
       onLongPress: __DEV__ ? () => router.push("/customer-support" as Href) : undefined,
     },
-    { label: "이용약관", onPress: () => router.push("/terms" as Href) },
+    { label: "약관 및 정책", onPress: () => router.push("/terms" as Href) },
     ...(!isGuest
       ? [
           {

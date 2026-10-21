@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppBar } from "@/components/app-bar";
 import { Toggle } from "@/components/Toggle";
 import { useToast } from "@/hooks/useToast";
+import { PushOffBanner } from "@/screens/notification/components/PushOffBanner";
 
 export type NotificationSettings = {
   isAllEnabled: boolean;
@@ -20,21 +21,18 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   isCommentEnabled: true,
   isLikeEnabled: true,
 };
-const ROWS: { key: keyof NotificationSettings; label: string }[] = [
-  { key: "isAllEnabled", label: "전체 알림" },
-  { key: "isVoteEndEnabled", label: "투표 종료 알림" },
-  { key: "isCommentEnabled", label: "게시글 댓글 알림" },
-  { key: "isLikeEnabled", label: "게시글 좋아요 알림" },
-];
-
 type NotificationSettingsScreenProps = {
   initialSettings?: NotificationSettings;
   onSaveSettings?: (settings: NotificationSettings) => Promise<void>;
+  isDevicePushEnabled?: boolean;
+  onOpenNotificationSettings?: () => void;
 };
 
 export function NotificationSettingsScreen({
   initialSettings = DEFAULT_SETTINGS,
   onSaveSettings,
+  isDevicePushEnabled = true,
+  onOpenNotificationSettings,
 }: NotificationSettingsScreenProps = {}) {
   const showToast = useToast();
   const insets = useSafeAreaInsets();
@@ -74,28 +72,34 @@ export function NotificationSettingsScreen({
   return (
     <View className="flex-1 bg-gray-0">
       <StatusBar style="dark" />
-      <AppBar title="알림 설정" titleClassName="font-label-20-medium" />
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="px-margin pt-6"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-      >
-        {ROWS.map(({ key, label }) => {
-          const isMaster = key === "isAllEnabled";
-          // 전체 알림에는 공지 알림도 포함합니다. 하위 선택은 전체 알림을 다시 켤 때 복원합니다.
-          const isOn = isMaster ? settings.isAllEnabled : settings.isAllEnabled && settings[key];
-          return (
-            <View key={key} className="h-12 flex-row items-center border-b border-gray-300 px-2">
-              <Text className="flex-1 text-gray-800 font-b1">{label}</Text>
-              <Toggle
-                accessibilityLabel={label}
-                isOn={isOn}
-                isDisabled={isSaving || (!isMaster && !settings.isAllEnabled)}
-                onChange={(value) => handleChange(key, value)}
-              />
+      <AppBar title="알림 설정" />
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+        {!isDevicePushEnabled && (
+          <PushOffBanner
+            title="기기 알림이 꺼져 있습니다."
+            description="알림을 받으려면 기기 설정에서 알림을 허용해 주세요."
+            onOpenSettings={onOpenNotificationSettings}
+          />
+        )}
+        <View className="px-margin pt-6">
+          <View className="flex-row items-center border-b border-gray-300 px-2">
+            <View className="flex-1 gap-0.5 py-3">
+              <Text className="text-gray-800 font-b1">푸시 알림</Text>
+              <Text className="text-gray-600 font-note">
+                투표 종료, 댓글, 좋아요 소식을 알려드립니다.
+              </Text>
             </View>
-          );
-        })}
+            <Toggle
+              accessibilityLabel="푸시 알림"
+              isOn={settings.isAllEnabled}
+              isDisabled={isSaving}
+              onChange={(value) => handleChange("isAllEnabled", value)}
+            />
+          </View>
+          <Text className="mt-3 px-2 text-gray-600 font-note">
+            푸시 알림을 꺼도 알림함에서 확인할 수 있습니다.
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
