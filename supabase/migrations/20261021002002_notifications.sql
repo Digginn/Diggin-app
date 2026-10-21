@@ -45,7 +45,7 @@ CREATE OR REPLACE FUNCTION private.create_vote_ended_notifications()
   AS $function$
   with inserted as (
     insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
-    select p.author_id, 'vote_ended', p.id, '투표 결과가 나왔어요',
+    select p.author_id, 'vote_ended', p.id, '투표 결과가 나왔어요.',
       '''' || private.notification_text(p.content) || ''' 투표가 종료됐어요. BUY ' ||
         (select count(*) from private.vote_responses v where v.post_id = p.id and v.choice = 'buy') ||
         ' · NOT ' ||
@@ -156,7 +156,7 @@ begin
   select number into anon_number from private.post_anon_numbers
   where post_id = new.post_id and user_id = new.author_id;
   insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
-  values (target.author_id, 'post_commented', target.id, '내 게시글에 댓글이 달렸어요',
+  values (target.author_id, 'post_commented', target.id, '내 게시글에 댓글이 달렸어요.',
           '디기 ' || coalesce(anon_number::text, '') || ': ' || private.notification_text(new.content),
           'comment:' || new.id)
   on conflict (event_key) do nothing;
@@ -183,7 +183,7 @@ begin
   on conflict do nothing;
   if not found then return new; end if;
   insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
-  values (target.author_id, 'post_liked', target.id, '내 게시글에 좋아요가 달렸어요',
+  values (target.author_id, 'post_liked', target.id, '내 게시글에 좋아요가 달렸어요.',
           '''' || private.notification_text(target.content) || ''' 게시글을 누군가 좋아해요.',
           'like:' || new.post_id || ':' || new.user_id)
   on conflict (event_key) do nothing;
