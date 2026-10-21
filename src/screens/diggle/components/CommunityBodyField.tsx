@@ -19,7 +19,7 @@ export function CommunityBodyField({
   const hasError = (value.length > 0 && count < 5) || hasOverflowed;
   return (
     <View
-      className={`w-full rounded-field border-field bg-gray-0 p-4 ${isVote ? "h-[120px]" : "h-[200px]"} ${hasError ? "border-semantic-error" : "border-gray-300"}`}
+      className={`w-full rounded-field border-field bg-gray-0 p-4 ${isVote ? "h-[100px]" : "h-[200px]"} ${hasError ? "border-semantic-error" : "border-gray-300"}`}
     >
       <TextInput
         accessibilityLabel={isVote ? "투표글 본문" : "게시글 본문"}

@@ -157,6 +157,77 @@ test("폴더 생성 완료 토스트는 모달 닫힌 뒤 표시되고 2초 후 
   }
 });
 
+test("일반 폴더 49개는 생성하고 50개부터는 모달 안에 제한 토스트를 표시한다", async () => {
+  for (const count of [49, 50, 51]) {
+    screenState = [];
+    let calls = 0;
+    const folders = [
+      { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
+      ...Array.from({ length: count }, (_, index) => ({
+        id: String(index),
+        name: `폴더${index}`,
+        itemCount: 0,
+      })),
+    ];
+    const render = () => {
+      screenCursor = 0;
+      return screenModule.exports.FolderScreen({ folders, onCreateFolder: () => calls++ });
+    };
+    try {
+      findAll(render(), "Pressable")
+        .find((node) => node.props.accessibilityLabel === "폴더 추가")
+        .props.onPress();
+      const modal = () => findAll(render(), "FolderNameModal")[0];
+      const result = await modal().props.onSubmit("보존할 이름");
+      assert.equal(result, count < 50);
+      assert.equal(
+        calls,
+        count < 50 ? 1 : 0,
+        "소장템은 제한 개수에서 제외하며 초과 요청은 전송하지 않는다",
+      );
+      if (count >= 50) {
+        assert.ok(modal(), "제한에 걸려도 생성 모달은 유지한다");
+        assert.equal(
+          findAll(modal().props.overlay, "FolderToast")[0].props.message,
+          "폴더는 최대 50개까지 만들 수 있습니다.",
+        );
+        assert.equal(modal().props.overlay.props.className, "absolute inset-x-0 bottom-40");
+        toastTimer();
+        assert.equal(modal().props.overlay, undefined, "토스트만 자동으로 사라진다");
+      }
+    } finally {
+      screenState = undefined;
+    }
+  }
+});
+
+test("최신 서버 응답의 폴더 제한과 일반 저장 실패를 구분한다", async () => {
+  for (const [error, message] of [
+    [{ reason: "limit" }, "폴더는 최대 50개까지 만들 수 있습니다."],
+    [new Error("network"), "폴더를 생성하지 못했습니다. 다시 시도해 주세요."],
+  ]) {
+    screenState = [];
+    const render = () => {
+      screenCursor = 0;
+      return screenModule.exports.FolderScreen({
+        onCreateFolder: async () => {
+          throw error;
+        },
+      });
+    };
+    try {
+      findAll(render(), "Pressable")
+        .find((node) => node.props.accessibilityLabel === "폴더 추가")
+        .props.onPress();
+      assert.equal(await findAll(render(), "FolderNameModal")[0].props.onSubmit("내 폴더"), false);
+      const modal = findAll(render(), "FolderNameModal")[0];
+      assert.equal(findAll(modal.props.overlay, "FolderToast")[0].props.message, message);
+    } finally {
+      screenState = undefined;
+    }
+  }
+});
+
 test("삭제 메뉴는 확인 모달을 열고 취소는 삭제하지 않으며 확인한 폴더만 콜백으로 전달한다", async () => {
   screenState = [];
   const calls = [];
@@ -432,6 +503,7 @@ test("새 폴더 모달은 공백 포함 7글자로 검증하고 초과 입력�
   focusCallback();
   assert.equal(focusCalls, 1);
   assert.equal(tree.props.isPrimaryDisabled, true);
+  assert.equal(tree.props.scrimOpacity, 0.36);
   assert.equal(findAll(tree, "TextField")[0].props.value, "새 폴더");
   assert.equal(findAll(tree, "Text").at(-1).props.children.join(""), "4/7");
   findAll(tree, "TextField")[0].props.onChangeText("  가족👨‍👩‍👧‍👦 여행  ");

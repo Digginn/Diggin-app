@@ -28,7 +28,8 @@ type CsvImportScreenProps = {
   onSelectCsv?: (
     file: DocumentPicker.DocumentPickerAsset,
     onProgress: (progress: CsvImportProgress) => void,
-  ) => void | Promise<CsvImportResult | CsvImportFailure | void>;
+    confirmFolderLimit: () => Promise<boolean>,
+  ) => void | Promise<CsvImportResult | CsvImportFailure | null | void>;
   progress?: CsvImportProgress;
   result?: CsvImportResult;
   error?: CsvImportFailure["error"];
@@ -55,6 +56,8 @@ export function CsvImportScreen({
   const [progress, setProgress] = useState<CsvImportProgress>();
   const [result, setResult] = useState<CsvImportResult | null>(null);
   const [isExcludedListOpen, setIsExcludedListOpen] = useState(false);
+  const [isFolderLimitNoticeVisible, setIsFolderLimitNoticeVisible] = useState(false);
+  const folderLimitResolver = useRef<((confirmed: boolean) => void) | null>(null);
   const activeResult = suppliedResult ?? result;
   const isLoading = isImporting || suppliedProgress !== undefined;
   const handleLoadingBack = () =>
@@ -67,16 +70,28 @@ export function CsvImportScreen({
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      folderLimitResolver.current?.(false);
+      folderLimitResolver.current = null;
     };
   }, []);
   useEffect(() => {
-    if (!isLoading) return;
+    if (!isLoading && !isFolderLimitNoticeVisible) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      (onBack ?? handleLoadingBack)();
+      if (isFolderLimitNoticeVisible) answerFolderLimit(false);
+      else (onBack ?? handleLoadingBack)();
       return true;
     });
     return () => subscription.remove();
-  }, [isLoading, onBack]);
+  }, [isLoading, isFolderLimitNoticeVisible, onBack]);
+
+  function answerFolderLimit(confirmed: boolean) {
+    const resolve = folderLimitResolver.current;
+    if (!resolve) return;
+    folderLimitResolver.current = null;
+    setIsFolderLimitNoticeVisible(false);
+    if (confirmed) setIsImporting(true);
+    resolve(confirmed);
+  }
 
   const handleConfirm = () => {
     setResult(null);
@@ -104,9 +119,19 @@ export function CsvImportScreen({
       if (onSelectCsv) {
         setProgress(undefined);
         setIsImporting(true);
-        const imported = await onSelectCsv(file, (value) => {
-          if (isMounted.current) setProgress(value);
-        });
+        const imported = await onSelectCsv(
+          file,
+          (value) => {
+            if (isMounted.current) setProgress(value);
+          },
+          () =>
+            new Promise<boolean>((resolve) => {
+              if (!isMounted.current) return resolve(false);
+              folderLimitResolver.current = resolve;
+              setIsImporting(false);
+              setIsFolderLimitNoticeVisible(true);
+            }),
+        );
         if (isMounted.current && imported && typeof imported === "object") {
           if ("error" in imported) showToast(IMPORT_ERROR_MESSAGES[imported.error], "error");
           else setResult(imported);
@@ -148,7 +173,11 @@ export function CsvImportScreen({
       <AppBar
         title="불러오기"
         colorScheme="dark"
-        onBack={onBack ?? (isLoading ? handleLoadingBack : undefined)}
+        onBack={
+          isFolderLimitNoticeVisible
+            ? () => answerFolderLimit(false)
+            : (onBack ?? (isLoading ? handleLoadingBack : undefined))
+        }
       />
       {isLoading ? (
         <>
@@ -171,20 +200,33 @@ export function CsvImportScreen({
                 }
               </Text>
             </View>
+            {isFolderLimitNoticeVisible && (
+              <View accessibilityRole="alert" className="mt-6 rounded-xl bg-gray-900 p-4">
+                <Text className="text-gray-0 font-b3">
+                  폴더는 최대 50개까지 만들 수 있습니다. 초과분은 ALL탭에 개별 아이템으로
+                  저장됩니다.
+                </Text>
+              </View>
+            )}
           </ScrollView>
           <View
-            className="px-margin pt-4"
+            className="gap-3 px-margin pt-4"
             style={{ paddingBottom: Math.max(MIN_BUTTON_BOTTOM_SPACING, insets.bottom + 10) }}
           >
             <Button
               variant="secondary"
               size="large"
               bgColor={colors.gray[0]}
-              isDisabled={isSelecting}
-              onPress={handleSelectCsv}
+              isDisabled={isSelecting && !isFolderLimitNoticeVisible}
+              onPress={isFolderLimitNoticeVisible ? () => answerFolderLimit(true) : handleSelectCsv}
             >
-              CSV 파일로 데이터 불러오기
+              {isFolderLimitNoticeVisible ? "계속 불러오기" : "CSV 파일로 데이터 불러오기"}
             </Button>
+            {isFolderLimitNoticeVisible && (
+              <Button variant="secondary" onPress={() => answerFolderLimit(false)}>
+                취소
+              </Button>
+            )}
           </View>
         </>
       )}

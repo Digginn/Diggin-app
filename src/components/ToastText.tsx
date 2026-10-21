@@ -1,11 +1,11 @@
 import { Text, View } from "react-native";
 
-import { IconToastError, IconToastSuccess } from "@/assets/images/toast";
+import { IconToastError, IconToastNotice, IconToastSuccess } from "@/assets/images/toast";
 import { colors } from "@/theme";
 
-export type ToastVariant = "default" | "success" | "error";
+export type ToastVariant = "default" | "success" | "error" | "notice";
 
-const ICONS = { success: IconToastSuccess, error: IconToastError };
+const ICONS = { success: IconToastSuccess, error: IconToastError, notice: IconToastNotice };
 
 type ToastTextProps = {
   message: string;
@@ -25,13 +25,25 @@ export function ToastText({ message, variant = "default" }: ToastTextProps) {
       {Icon && (
         <View className="size-4 shrink-0">
           <Icon
-            color={variant === "error" ? foreground : colors.gray[800]}
-            fill={variant === "error" ? colors.gray[700] : colors.gray[200]}
+            color={
+              variant === "notice"
+                ? colors.gray[0]
+                : variant === "error"
+                  ? foreground
+                  : colors.gray[800]
+            }
+            fill={
+              variant === "notice"
+                ? colors.gray[0]
+                : variant === "error"
+                  ? colors.gray[700]
+                  : colors.gray[200]
+            }
           />
         </View>
       )}
       <Text
-        className={`shrink font-label-14 ${variant === "error" ? "text-semantic-error-on-dark" : "text-gray-200"} ${Icon ? "text-left" : "text-center"}`}
+        className={`shrink font-label-14 ${variant === "error" ? "text-semantic-error-on-dark" : variant === "notice" ? "text-gray-0" : "text-gray-200"} ${Icon ? "text-left" : "text-center"}`}
         lineBreakStrategyIOS="hangul-word"
         style={{ includeFontPadding: false }}
       >

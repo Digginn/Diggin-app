@@ -52,6 +52,7 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
   return (
     <ActionModal
       visible
+      scrimOpacity={0.36}
       overlay={overlay}
       isKeyboardAvoiding
       keyboardGap={isEditing ? 24 : 40}
