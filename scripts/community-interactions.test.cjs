@@ -12,7 +12,16 @@ function load(file, mocks = {}) {
     ts.transpileModule(readFileSync(path.join(__dirname, "..", file), "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     }).outputText,
-    { module, exports: module.exports, URL, require: (name) => mocks[name] ?? require(name) },
+    {
+      module,
+      exports: module.exports,
+      URL,
+      require: (name) =>
+        mocks[name] ??
+        (name === "@/api/accountAccess"
+          ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
+          : require(name)),
+    },
   );
   return module.exports;
 }

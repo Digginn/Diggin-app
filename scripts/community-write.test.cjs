@@ -13,7 +13,15 @@ function load(file, mocks = {}) {
     ts.transpileModule(readFileSync(path.join(__dirname, "..", file), "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     }).outputText,
-    { module, exports: module.exports, require: (name) => mocks[name] ?? require(name) },
+    {
+      module,
+      exports: module.exports,
+      require: (name) =>
+        mocks[name] ??
+        (name === "@/api/accountAccess"
+          ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
+          : require(name)),
+    },
   );
   return module.exports;
 }
@@ -76,7 +84,11 @@ test("입력창은 50자 초과를 반영하지 않고 테두리·카운터를 �
   nodes(render(), "TextInput")[0].props.onChangeText("나" + fullBody.slice(1));
   assert.equal(value, "나" + fullBody.slice(1), "50자에서도 선택한 글자는 교체할 수 있다");
   nodes(render(), "TextInput")[0].props.onChangeText("붙여넣기" + fullBody);
-  assert.equal(value, body.limitPostBody("붙여넣기" + fullBody), "여러 글자 붙여넣기는 50자로 자른다");
+  assert.equal(
+    value,
+    body.limitPostBody("붙여넣기" + fullBody),
+    "여러 글자 붙여넣기는 50자로 자른다",
+  );
   nodes(render(), "TextInput")[0].props.onChangeText("가".repeat(49));
   assert.doesNotMatch(render().props.className, /border-semantic-error/);
   nodes(render(), "TextInput")[0].props.onChangeText("👍🏽".repeat(70));

@@ -132,17 +132,13 @@ revoke all on sequence private.posts_id_seq, private.vote_responses_id_seq,
 
 create or replace function private.assert_can_write_community()
 returns void language plpgsql security definer set search_path = '' as $$
-declare
-  viewer_id uuid := (select auth.uid());
-  profile public.profiles%rowtype;
+declare profile public.profiles%rowtype;
 begin
-  if viewer_id is null then
-    raise exception 'not_authenticated' using errcode = '42501';
-  end if;
-  select * into profile from public.profiles where id = viewer_id;
-  if not found or profile.status = 'suspended' or
-    (profile.status = 'community_restricted' and profile.restricted_until > now()) then
-    raise exception 'community_restricted' using errcode = '42501';
+  perform private.assert_account_access();
+  select * into profile from public.profiles where id=(select auth.uid()) for update;
+  if profile.status='community_restricted' and profile.restricted_until>now() then
+    raise exception 'community_restricted' using errcode='42501',
+      detail=jsonb_build_object('restricted_until',profile.restricted_until)::text;
   end if;
 end;
 $$;
@@ -205,6 +201,7 @@ returns jsonb language plpgsql stable security definer set search_path = '' as $
 declare
   viewer_id uuid := (select auth.uid());
 begin
+  if viewer_id is not null then perform private.assert_account_access(); end if;
   if feed_type not in ('all', 'vote') or feed_type is null or
     ((after_created_at is null) <> (after_id is null)) then
     raise exception 'invalid_feed_cursor' using errcode = '22023';
@@ -233,6 +230,7 @@ $$;
 create or replace function private.get_community_post(target_post_id bigint)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 begin
+  perform private.assert_account_access();
   if (select auth.uid()) is null or not exists (
     select 1 from public.profiles where id = (select auth.uid()) and status <> 'suspended'
   ) then

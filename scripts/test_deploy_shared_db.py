@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, deploy, deployment_plan, parse_history
+from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, deploy, deployment_plan, parse_history, run_cli
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -93,6 +93,14 @@ class DeploymentTests(unittest.TestCase):
         local, remote = parse_history("| Local | Remote | Time (UTC) |\n| --- | --- | --- |\n| `20261018114830` | `20261018114830` | date |")
         self.assertEqual(local, {RECOVERY_BASELINE})
         self.assertEqual(remote, local)
+
+    def test_history_requests_text_output_for_the_table_parser(self):
+        output = history(self.local, self.remote)
+        with patch("deploy_shared_db.subprocess.run") as command:
+            command.return_value.stdout = output
+            with patch("builtins.print"):
+                self.assertEqual(run_cli(["migration", "list", "--local"], capture=True), output)
+        self.assertEqual(command.call_args.args[0][-2:], ["--output-format", "text"])
 
     def test_changed_history_after_dry_run_prevents_push(self):
         initial = history(self.local, self.remote)

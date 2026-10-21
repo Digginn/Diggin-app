@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Text, View } from "react-native";
 
+import { ensureCommunityWriteAllowed, restrictionMessage } from "@/api/accountAccess";
 import { IconNotification } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
@@ -140,7 +141,15 @@ export function DiggleScreen() {
           isDisabled={isRestoring}
           onPress={() => {
             if (!session) setLoginRequired(true);
-            else router.push(tab === "vote" ? "/votes/write" : "/posts/write");
+            else
+              void ensureCommunityWriteAllowed()
+                .then(() => router.push(tab === "vote" ? "/votes/write" : "/posts/write"))
+                .catch((error) =>
+                  showToast(
+                    restrictionMessage(error) ?? "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+                    restrictionMessage(error) ? "notice" : "error",
+                  ),
+                );
           }}
         />
       </View>

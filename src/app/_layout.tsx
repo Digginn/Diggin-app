@@ -5,6 +5,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactNode } from "react";
 
+import { AccountAccessNotice } from "@/components/AccountAccessNotice";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { BlockedUsersProvider } from "@/contexts/BlockedUsersContext";
 import { BrowsingModeProvider } from "@/contexts/BrowsingModeContext";
@@ -72,6 +73,7 @@ export default function RootLayout() {
                       />
                     </Stack>
                     <SessionExpiredNotice />
+                    <AccountAccessNotice />
                   </PostsProvider>
                 </PostDraftProvider>
               </BlockedUsersProvider>

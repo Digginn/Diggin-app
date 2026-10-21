@@ -25,15 +25,16 @@ Environment에 아래 값을 등록한다. 접속 토큰과 비밀번호는 코�
 | -------- | ------------------------- | --------------------------------------------------------------------------------------- |
 | Variable | `SUPABASE_PROJECT_ID`     | **공유 개발 DB** 프로젝트의 Project Ref. Dashboard 프로젝트 URL에서 확인                |
 | Variable | `SUPABASE_DB_POOLER_HOST` | 해당 프로젝트 Connect → Session pooler의 호스트 이름만 입력 (포트·사용자·비밀번호 제외) |
+| Secret   | `SUPABASE_ACCESS_TOKEN`   | 대상 프로젝트의 Edge Functions Read-write 권한 토큰. 함수 배포에만 사용                 |
 | Secret   | `SUPABASE_DB_PASSWORD`    | 해당 프로젝트의 DB 비밀번호. 앱의 publishable/anon 키가 아님                            |
 
-Session pooler 주소는 해당 프로젝트의 Connect → Session pooler에서 확인한다. 지역 이름으로 주소를 추측하지 않는다. 워크플로가 `postgres.<Project Ref>` 사용자, 5432 포트, TLS(`sslmode=require`)로 DB URL을 구성하고 모든 원격 명령에 `--db-url`로 전달한다. 비밀번호의 특수문자는 URL 인코딩하며 완성된 URL은 로그에서 마스킹한다. `supabase link`와 Management API 토큰은 사용하지 않는다. 기존 `SUPABASE_ACCESS_TOKEN`은 이 워크플로에서 더 이상 참조하지 않는다. 운영 프로젝트의 값을 등록하지 않는다.
+Session pooler 주소는 해당 프로젝트의 Connect → Session pooler에서 확인한다. 지역 이름으로 주소를 추측하지 않는다. 워크플로가 `postgres.<Project Ref>` 사용자, 5432 포트, TLS(`sslmode=require`)로 DB URL을 구성하고 모든 원격 명령에 `--db-url`로 전달한다. 비밀번호의 특수문자는 URL 인코딩하며 완성된 URL은 로그에서 마스킹한다. DB 배포에는 `supabase link`와 Management API 토큰을 사용하지 않는다. `SUPABASE_ACCESS_TOKEN`은 마이그레이션 이후 관리자·제재 Edge Function 배포에만 사용한다. 운영 프로젝트의 값을 등록하지 않는다.
 
 GitHub Actions의 IPv4 환경에서 IPv6 직접 DB 연결을 시도하면 `IPv6 is not supported on your current network`로 실패할 수 있다. Session pooler는 IPv4를 지원하며, 연결 확인과 dry-run을 거쳐 실제 적용 여부를 검증한다. Transaction pooler(6543)가 아닌 Session pooler(5432)를 사용한다.
 
 등록 화면: https://github.com/Digginn/Diggin-app/settings/environments
 
-이 값이 비어 있으면 워크플로는 누락된 항목 이름을 표시하고 DB 적용 전에 중단한다. 실제 비밀값은 로그에 출력하지 않는다. OAuth 로그인 설정·프로젝트 설정·Edge Functions·기기별 로컬 DB는 이 워크플로의 배포 대상이 아니다.
+이 값이 비어 있으면 워크플로는 누락된 항목 이름을 표시하고 DB 적용 전에 중단한다. 실제 비밀값은 로그에 출력하지 않는다. DB 배포 성공 후 같은 커밋의 `admin-moderation`, `account-restriction` Edge Function을 배포한다. Deno 검사·테스트도 선행한다. OAuth 로그인 설정·프로젝트 설정·기기별 로컬 DB는 배포 대상이 아니다. 운영자 계정 등록과 OIDC audience 설정은 [MODERATION_API.md](MODERATION_API.md)를 따른다. 함수 배포 실패는 Actions 실패로 표시되며 DB 적용을 자동으로 되돌리지는 않는다.
 
 ## 최초 배포 전 확인
 
@@ -51,6 +52,8 @@ GitHub Actions의 IPv4 환경에서 IPv6 직접 DB 연결을 시도하면 `IPv6 
 - `20261017082235_csv_import_review_fixes.sql`
 
 두 파일은 Import 테이블·RPC와 CSV 원본 폴더 매핑을 추가하며 기존 `set_owned`·`set_product_folders` 함수를 교체하지 않는다. 전체 재적용과 폴더 우선 적용 후 복구를 모두 CI에서 검증한 커밋만 배포한다.
+
+복구 테스트는 폴더 배포 시점의 이력을 먼저 재현하고 CSV 두 파일만 복구한다. 그다음 최신 후속 마이그레이션을 일반 배포 경로로 적용해 전체 테스트·lint·Advisors를 확인한다. CSV 테이블에 의존하는 후속 변경이 복구보다 먼저 실행되지 않도록 한다.
 
 `scripts/deploy_shared_db.py`는 CLI 이력과 체크아웃의 버전을 대조한다. 과거 순서의 미적용 파일이 위 두 파일이며 검토한 SHA-256과 일치하고 폴더 마이그레이션이 이미 적용된 경우에만 dry-run·실제 push 양쪽에 `--include-all`을 붙인다. 줄바꿈 차이는 체크섬에서 제외한다. 한 파일만 적용된 뒤 실패한 경우 남은 파일로 재시도할 수 있으며, 둘 다 적용된 뒤에는 이 예외가 사용되지 않는다.
 

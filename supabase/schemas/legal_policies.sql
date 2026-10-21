@@ -47,6 +47,7 @@ as $$
 declare
   current_user_id uuid := (select auth.uid());
 begin
+  perform private.assert_account_access();
   if current_user_id is null then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
@@ -78,6 +79,7 @@ as $$
 declare
   current_user_id uuid := (select auth.uid());
 begin
+  perform private.assert_account_access();
   if current_user_id is null then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;

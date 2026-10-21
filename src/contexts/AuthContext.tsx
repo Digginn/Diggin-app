@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { fetchAccountAccess, type AccountAccess } from "@/api/accountAccess";
 import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 
@@ -12,6 +13,9 @@ type Auth = {
   isSessionExpired: boolean;
   confirmSessionExpired: () => void;
   signOut: () => Promise<void>;
+  suspension: AccountAccess | null;
+  confirmSuspension: () => void;
+  endSuspendedSession: (access: AccountAccess) => Promise<void>;
 };
 
 const AuthContext = createContext<Auth | undefined>(undefined);
@@ -21,19 +25,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isRestoring, setIsRestoring] = useState(true);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
   const isSigningOutRef = useRef(false);
+  const sessionRef = useRef<Session | null>(null);
+  const revision = useRef(0);
+  const [suspension, setSuspension] = useState<AccountAccess | null>(null);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
+      sessionRef.current = data.session;
       setSession(data.session);
       setIsRestoring(false);
     });
     // 갱신 토큰이 만료·철회되면 SDK가 SIGNED_OUT을 보낸다. 네트워크 오류는 세션을 유지한다.
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      const previous = sessionRef.current;
+      sessionRef.current = nextSession;
+      const currentRevision = ++revision.current;
       setSession(nextSession);
       if (event !== "SIGNED_OUT") return;
       // 다음에 로그인한 계정에 이전 계정의 상품이 잠깐이라도 보이지 않게 비운다.
       queryClient.clear();
-      if (!isSigningOutRef.current) setIsSessionExpired(true);
+      if (!isSigningOutRef.current) {
+        if (!previous) {
+          setIsSessionExpired(true);
+          return;
+        }
+        // SDK 콜백 안에서 Auth API를 기다리지 않는다. 이전 JWT는 본인 안내 조회에만 쓴다.
+        setTimeout(() => {
+          void fetchAccountAccess(previous.access_token)
+            .then((access) => {
+              if (revision.current !== currentRevision) return;
+              if (access.status === "suspended") {
+                setSuspension(access);
+                setIsSessionExpired(false);
+              } else setIsSessionExpired(true);
+            })
+            .catch(() => {
+              if (revision.current === currentRevision) setIsSessionExpired(true);
+            });
+        }, 0);
+      }
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -49,6 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function endSuspendedSession(access: AccountAccess) {
+    setSuspension(access);
+    setIsSessionExpired(false);
+    try {
+      await signOut();
+    } finally {
+      sessionRef.current = null;
+      setSession(null);
+      queryClient.clear();
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -57,6 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSessionExpired,
         confirmSessionExpired: () => setIsSessionExpired(false),
         signOut,
+        suspension,
+        confirmSuspension: () => setSuspension(null),
+        endSuspendedSession,
       }}
     >
       {children}

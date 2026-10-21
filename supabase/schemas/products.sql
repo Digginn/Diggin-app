@@ -186,6 +186,7 @@ declare
   saved_id bigint;
   is_owned boolean;
 begin
+  perform private.assert_account_access();
   if current_user_id is null then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
@@ -254,6 +255,7 @@ declare
   current_user_id uuid := (select auth.uid());
   owned_folder_id bigint;
 begin
+  perform private.assert_account_access();
   if current_user_id is null then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
@@ -343,6 +345,7 @@ declare
   owned_folder_id bigint;
   is_owned boolean;
 begin
+  perform private.assert_account_access();
   if current_user_id is null then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;

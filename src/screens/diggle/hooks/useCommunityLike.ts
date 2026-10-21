@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
+import { restrictionMessage } from "@/api/accountAccess";
 import { useToast } from "@/hooks/useToast";
 
 import { communityKeys } from "../api/community";
@@ -45,8 +46,12 @@ export function useCommunityLike(post: CommunityPost | null | undefined, viewer:
         (previous) => (previous ? { ...previous, ...saved } : previous),
       );
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
-    } catch {
-      if (current.active) showToast("좋아요를 처리하지 못했습니다. 다시 시도해 주세요.", "error");
+    } catch (error) {
+      if (current.active)
+        showToast(
+          restrictionMessage(error) ?? "좋아요를 처리하지 못했습니다. 다시 시도해 주세요.",
+          restrictionMessage(error) ? "notice" : "error",
+        );
     } finally {
       if (current.active) {
         busy.current = false;

@@ -8,16 +8,45 @@ import {
 import { initializeKakaoSDK } from "@react-native-kakao/core";
 import { me as getKakaoProfile, login as loginWithKakao } from "@react-native-kakao/user";
 import * as AppleAuthentication from "expo-apple-authentication";
-import * as Linking from "expo-linking";
-import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
 
+import { fetchAccountAccess, parseAccountAccess, type AccountAccess } from "@/api/accountAccess";
 import { saveAvatar } from "@/api/avatar";
 import { supabase } from "@/lib/supabase";
 
 import type { LoginProvider } from "../components/SocialLoginButton";
 
-export type SignInResult = { status: "cancelled" } | { status: "success"; isNewUser: boolean };
+export type SignInResult =
+  | { status: "cancelled" }
+  | { status: "success"; isNewUser: boolean }
+  | { status: "suspended"; access: AccountAccess };
+
+const UNKNOWN_SUSPENSION: AccountAccess = {
+  status: "suspended",
+  restrictedUntil: null,
+  sanctionId: null,
+  reasonCategory: null,
+  noticeSeenAt: null,
+};
+function isBanned(error: unknown) {
+  return !!error && typeof error === "object" && "code" in error && error.code === "user_banned";
+}
+async function signInWithIdentity(
+  provider: "google" | "kakao" | "apple",
+  token: string,
+): Promise<SignInResult> {
+  const { error } = await supabase.auth.signInWithIdToken({ provider, token });
+  if (error) {
+    if (!isBanned(error)) throw error;
+    const result = await supabase.functions.invoke("account-restriction", {
+      body: { provider, id_token: token },
+    });
+    if (result.error || !result.data?.notice)
+      return { status: "suspended", access: UNKNOWN_SUSPENSION };
+    return { status: "suspended", access: parseAccountAccess(result.data.notice) };
+  }
+  return finishSignIn();
+}
 
 const NEW_USER_WINDOW_MS = 60_000;
 const SIGNUP_COMPLETE_SHOWN_KEY = "signup-complete-shown";
@@ -34,6 +63,11 @@ if (kakaoNativeAppKey) void initializeKakaoSDK(kakaoNativeAppKey);
 // 가입 1분 안에 다시 로그인해도 가입 완료 안내는 이 기기에서 한 번만 보여 준다.
 // shortcut: 시각 차이와 기기 기록으로 판단한다. 서버에 가입 완료 안내 노출 여부를 저장하게 되면 그 값으로 바꾼다.
 async function finishSignIn(): Promise<SignInResult> {
+  const access = await fetchAccountAccess();
+  if (access.status === "suspended") {
+    await supabase.auth.signOut({ scope: "local" });
+    return { status: "suspended", access };
+  }
   const { data, error } = await supabase.auth.getUser();
   if (error) throw error;
   const createdAt = Date.parse(data.user.created_at);
@@ -56,12 +90,7 @@ async function signInWithAppleNative(): Promise<SignInResult> {
   try {
     const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
     if (!credential.identityToken) throw new Error("apple_identity_token_missing");
-    const { error } = await supabase.auth.signInWithIdToken({
-      provider: "apple",
-      token: credential.identityToken,
-    });
-    if (error) throw error;
-    return finishSignIn();
+    return signInWithIdentity("apple", credential.identityToken);
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ERR_REQUEST_CANCELED") {
       return { status: "cancelled" };
@@ -76,12 +105,7 @@ async function signInWithGoogle(): Promise<SignInResult> {
     const response = await GoogleSignin.signIn();
     if (isCancelledResponse(response)) return { status: "cancelled" };
     if (!response.data.idToken) throw new Error("google_id_token_missing");
-    const { error } = await supabase.auth.signInWithIdToken({
-      provider: "google",
-      token: response.data.idToken,
-    });
-    if (error) throw error;
-    return finishSignIn();
+    return signInWithIdentity("google", response.data.idToken);
   } catch (error) {
     if (isErrorWithCode(error) && error.code === statusCodes.IN_PROGRESS) {
       return { status: "cancelled" };
@@ -109,12 +133,7 @@ async function signInWithKakao(): Promise<SignInResult> {
     const token = await loginWithKakao();
     // 카카오 콘솔에서 OpenID Connect를 켜야 idToken이 온다.
     if (!token.idToken) throw new Error("kakao_id_token_missing");
-    const { error } = await supabase.auth.signInWithIdToken({
-      provider: "kakao",
-      token: token.idToken,
-    });
-    if (error) throw error;
-    const result = await finishSignIn();
+    const result = await signInWithIdentity("kakao", token.idToken);
     if (result.status === "success" && result.isNewUser) await importKakaoAvatar();
     return result;
   } catch (error) {
@@ -125,32 +144,9 @@ async function signInWithKakao(): Promise<SignInResult> {
   }
 }
 
-// 기기 애플 로그인이 없는 Android의 애플은 브라우저 로그인 후 딥링크로 돌아온다.
-async function signInWithAppleBrowser(): Promise<SignInResult> {
-  const provider = "apple";
-  const redirectTo = Linking.createURL("auth/callback");
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: { redirectTo, skipBrowserRedirect: true },
-  });
-  if (error) throw error;
-
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== "success") return { status: "cancelled" };
-
-  const { queryParams } = Linking.parse(result.url);
-  if (typeof queryParams?.error_description === "string") {
-    throw new Error(queryParams.error_description);
-  }
-  if (typeof queryParams?.code !== "string") throw new Error("oauth_code_missing");
-
-  const exchanged = await supabase.auth.exchangeCodeForSession(queryParams.code);
-  if (exchanged.error) throw exchanged.error;
-  return finishSignIn();
-}
-
 export function signIn(provider: LoginProvider): Promise<SignInResult> {
   if (provider === "google") return signInWithGoogle();
   if (provider === "kakao") return signInWithKakao();
-  return Platform.OS === "ios" ? signInWithAppleNative() : signInWithAppleBrowser();
+  if (Platform.OS !== "ios") return Promise.reject(new Error("apple_login_not_supported"));
+  return signInWithAppleNative();
 }

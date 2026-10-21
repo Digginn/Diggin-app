@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { randomUUID } from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
 
+import { restrictionMessage } from "@/api/accountAccess";
 import { useToast } from "@/hooks/useToast";
 import { normalizeText, textLength } from "@/utils/text";
 
@@ -18,6 +19,7 @@ function initialState(scope: string) {
     editing: null as CommunityComment | null,
     deleteTarget: null as CommunityComment | null,
     deleteError: "",
+    deleteIsRestricted: false,
     isSending: false,
     isDeleting: false,
     changes: {} as Record<string, CommunityComment | null>,
@@ -70,8 +72,11 @@ export function useCommentActions(postId: string, viewer: string | null) {
     } catch (error) {
       if (current.active)
         showToast(
-          editing ? "댓글을 수정하지 못했습니다. 다시 시도해 주세요." : communityWriteError(error),
-          "error",
+          restrictionMessage(error) ??
+            (editing
+              ? "댓글을 수정하지 못했습니다. 다시 시도해 주세요."
+              : communityWriteError(error)),
+          restrictionMessage(error) ? "notice" : "error",
         );
       return null;
     } finally {
@@ -101,7 +106,11 @@ export function useCommentActions(postId: string, viewer: string | null) {
       return true;
     } catch (error) {
       if (current.active)
-        setState((prev) => ({ ...prev, deleteError: communityWriteError(error) }));
+        setState((prev) => ({
+          ...prev,
+          deleteError: communityWriteError(error),
+          deleteIsRestricted: !!restrictionMessage(error),
+        }));
       return false;
     } finally {
       if (current.active) {

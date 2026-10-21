@@ -1,19 +1,30 @@
 import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SANCTION_REASON_LABELS, type AccountAccess } from "@/api/accountAccess";
 import BackIcon from "@/assets/images/icon-login-back.svg";
 import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
+import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeModal";
 
 import { signIn } from "./api/signIn";
 import { SocialLoginButton, type LoginProvider } from "./components/SocialLoginButton";
 
-const LOGIN_PROVIDERS: LoginProvider[] = ["google", "kakao", "apple"];
+const LOGIN_PROVIDERS: LoginProvider[] =
+  Platform.OS === "ios" ? ["google", "kakao", "apple"] : ["google", "kakao"];
 
 type LoginScreenProps = {
   isLoginError?: boolean;
@@ -29,6 +40,7 @@ export function LoginScreen({
   const insets = useSafeAreaInsets();
   const [hasError, setHasError] = useState(isLoginError);
   const [isLoading, setIsLoading] = useState(isLoginLoading);
+  const [suspension, setSuspension] = useState<AccountAccess | null>(null);
 
   async function handleLogin(provider: LoginProvider) {
     if (isLoading) return;
@@ -37,10 +49,14 @@ export function LoginScreen({
     try {
       const result = await signIn(provider);
       if (result.status === "cancelled") return;
+      if (result.status === "suspended") {
+        setSuspension(result.access);
+        return;
+      }
       // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다.
       router.replace((result.isNewUser ? "/signup-complete" : "/(tabs)/all") as Href);
-    } catch (error) {
-      console.warn("소셜 로그인에 실패했습니다.", error);
+    } catch {
+      console.warn("소셜 로그인에 실패했습니다.");
       setHasError(true);
     } finally {
       setIsLoading(false);
@@ -138,6 +154,18 @@ export function LoginScreen({
         </View>
       </ScrollView>
       {isLoading && <LoadingDialog message="로그인 중입니다." />}
+      {suspension && (
+        <SanctionNoticeModal
+          visible
+          notice={{
+            type: "suspended",
+            reasonLabel: suspension.reasonCategory
+              ? SANCTION_REASON_LABELS[suspension.reasonCategory]
+              : "1:1 문의로 확인해 주세요.",
+          }}
+          onConfirm={() => setSuspension(null)}
+        />
+      )}
     </View>
   );
 }

@@ -2,6 +2,7 @@
 create or replace function private.assert_can_report_community()
 returns void language plpgsql set search_path = '' as $$
 begin
+  perform private.assert_account_access();
   if (select auth.uid()) is null then raise exception 'not_authenticated' using errcode = '42501'; end if;
   if not exists (select 1 from public.profiles where id = (select auth.uid()) and status <> 'suspended') then
     raise exception 'not_authorized' using errcode = '42501';

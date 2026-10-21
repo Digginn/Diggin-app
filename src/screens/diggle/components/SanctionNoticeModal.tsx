@@ -11,10 +11,20 @@ type SanctionNoticeModalProps = {
   visible: boolean;
   notice: SanctionNotice;
   onConfirm: () => void;
+  isConfirming?: boolean;
+  confirmationError?: string;
+  onErrorDismiss?: () => void;
 };
 
 // 표시 조건·제재 건별 확인 기록·세션 종료는 관리자 API 연결 시 처리한다 (#114).
-export function SanctionNoticeModal({ visible, notice, onConfirm }: SanctionNoticeModalProps) {
+export function SanctionNoticeModal({
+  visible,
+  notice,
+  onConfirm,
+  isConfirming = false,
+  confirmationError,
+  onErrorDismiss,
+}: SanctionNoticeModalProps) {
   const { title, description } = sanctionNoticeMessage(notice);
   const [error, setError] = useState("");
   const isOpening = useRef(false);
@@ -39,8 +49,11 @@ export function SanctionNoticeModal({ visible, notice, onConfirm }: SanctionNoti
       onRequestClose={() => {}}
       scrimOpacity={0.36}
       className="px-2.5 pb-4 pt-2"
-      toastMessage={error || undefined}
-      onToastDismiss={clearError}
+      toastMessage={confirmationError || error || undefined}
+      onToastDismiss={() => {
+        clearError();
+        onErrorDismiss?.();
+      }}
     >
       <View className="w-full items-center gap-4">
         <View className="w-full items-center gap-1 pt-2.5">
@@ -71,7 +84,7 @@ export function SanctionNoticeModal({ visible, notice, onConfirm }: SanctionNoti
           </View>
         )}
         <View className="flex-1">
-          <ModalButton action={{ label: "확인", onPress: onConfirm }} />
+          <ModalButton action={{ label: "확인", onPress: onConfirm, isDisabled: isConfirming }} />
         </View>
       </View>
     </Modal>

@@ -3,7 +3,7 @@
 이 문서는 DIGGIN DB의 최종 설계와 구현 방식을 정리한다. DB 작업 절차는 `docs/DB_RULES.md`를 따르고, 무엇을 어떤 모양으로 만들지는 이 문서를 따른다.
 
 - 설계 원본: FigJam '스키마 최종 · 2026.10.14' 영역 (25개 테이블, 관계선, enum, 핵심 규칙)
-- 기준 명세: 기능명세서 2026.10.14 변경이력까지
+- 기준 명세: 기능명세서 2026.10.14 변경이력 및 RPT-005~006 2026.10.18 기준
 - 구현 위치: `supabase/schemas/` (선언형 스키마, 실제 기준은 이 SQL 파일)
 - 이 문서와 SQL이 다르면 SQL이 맞다. 설계를 바꾸면 SQL과 이 문서를 같은 PR에서 같이 고친다.
 
@@ -15,7 +15,7 @@
 | 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다          |
 | 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69) |
 | 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)        |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions                                         | 신고·차단 (#112), 운영·알림 후속                                     |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 후속                        |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -47,6 +47,7 @@ private  API에 노출하지 않는 곳. 앱은 RPC로만 접근한다.
 
 - 앱이 부르는 함수는 public에 얇은 래퍼를 두고(`security invoker`, `language sql`), 실제 로직은 private의 `security definer` 함수에 둔다.
 - definer 함수는 전부 `set search_path = ''`, 함수 안에서 테이블 스키마를 명시하고, 첫 줄에서 `(select auth.uid())`가 null이면 `raise exception 'not_authenticated' using errcode = '42501'`.
+- 관리자 RPC는 서비스 전용으로 검증한 actor/session을 받아 재검사한다(#114). 일반 앱 쓰기에는 `assert_account_access()`를, 직접 테이블·Storage 접근에는 `account_is_active()` 제한 정책을 적용해 정지 계정과 폐기된 세션을 차단한다. 본인 제재 안내 RPC만 미만료 JWT의 제한된 조회를 허용한다.
 - 함수를 만들면 `revoke execute ... from public, anon` 후 필요한 역할에만 grant한다. 트리거 함수와 내부 함수는 authenticated에게도 주지 않는다.
 - private 스키마는 authenticated에게 usage만 준다(래퍼와 check 제약이 private 함수를 부르기 때문).
 - 오류 처리
@@ -186,7 +187,7 @@ import_failures
 
 #### #94 구현된 읽기 기반
 
-`supabase/schemas/community.sql`에 posts, post_products, vote_responses, post_likes, comments, post_anon_numbers와 조회 제외에 필요한 user_blocks, reports를 구현했다. 전부 RLS를 활성화하고 앱 역할의 테이블·시퀀스 직접 접근을 회수한다. 작성·정책 동의·삭제는 아래 #95 구현을 따른다. 투표는 아래 #96, 댓글·좋아요는 #97 구현을 따른다. 운영·알림은 후속 작업이다. hidden_at/deleted_at은 구현했고 운영자 hidden_by FK는 운영 스키마 작업에서 추가한다.
+`supabase/schemas/community.sql`에 posts, post_products, vote_responses, post_likes, comments, post_anon_numbers와 조회 제외에 필요한 user_blocks, reports를 구현했다. 전부 RLS를 활성화하고 앱 역할의 테이블·시퀀스 직접 접근을 회수한다. 작성·정책 동의·삭제는 아래 #95 구현을 따른다. 투표는 아래 #96, 댓글·좋아요는 #97 구현을 따른다. 운영·제재는 #114, 알림은 후속 작업이다. hidden_at/deleted_at과 운영자 hidden_by FK를 구현했다.
 
 - `get_community_feed(feed_type = 'all', after_created_at?, after_id?)`: 일반글·투표글 통합 또는 투표글만 최신순 20개를 반환한다. `(created_at, id)` 커서로 같은 시각의 글·앞쪽 신규 삽입에도 중복 페이지를 방지한다. 비회원은 첫 줄 본문과 Snapshot 이미지만 받으며 상품명·브랜드·가격·원본 링크·집계·본인 여부는 받지 않는다. 페이지 경계용 id/type/created_at은 포함한다.
 - `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·차단한 작성자의 글 또는 내가 신고한 해당 글은 null이다. 작성자 UUID는 응답에 없고 `is_mine`만 반환한다.
@@ -194,7 +195,7 @@ import_failures
 - 투표 집계는 참여자·작성자에게 공개하고, 마감 후에는 미참여 회원에게도 공개한다(2026-10-20 사용자 확정). 진행 중 미참여 회원의 집계는 null이다. 비회원에게는 항상 집계를 반환하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
 - definer 구현은 private, invoker 래퍼는 public이다. 비회원 피드 래퍼에 필요한 private 스키마 usage와 피드 함수 execute만 anon에 허용하고 원본·내부 helper·상세·댓글 권한은 주지 않는다.
-- 커뮤니티 기능 연결: 작성·삭제·정책 동의는 #95, 투표 참여는 #96, 댓글·좋아요는 #97, 상품 저장은 #98, 내 활동은 #99에서 연결했다. 신고·차단 쓰기는 #112에서 연결했으며 운영·알림은 후속 작업이다.
+- 커뮤니티 기능 연결: 작성·삭제·정책 동의는 #95, 투표 참여는 #96, 댓글·좋아요는 #97, 상품 저장은 #98, 내 활동은 #99에서 연결했다. 신고·차단 쓰기는 #112, 운영·제재는 #114에서 연결했으며 알림은 후속 작업이다.
 
 마이그레이션은 로컬 Docker가 없는 환경에서 PR의 임시 CI가 CLI 2.120.0 `db schema declarative sync -f community_read --no-apply`로 생성한 artifact를 검토해 추가했다. 같은 임시 DB에서 전체 마이그레이션·pgTAP·lint·Advisors와 타입 생성을 수행했으며 생성용 워크플로는 최종 변경에서 제거한다. 이후 검증은 공통 DB 배포 워크플로를 따른다.
 
@@ -204,7 +205,7 @@ import_failures
 - `agree_community_policy()`: 인증·커뮤니티 쓰기 제한 검사 후 서버 시각을 저장한다. 이미 동의했다면 최초 시각을 보존한다. 일반 게시글 편집기는 동의 여부 조회·저장에 성공한 뒤에만 표시한다. 최초 필수 동의는 DGL-006의 일반글 진입에 적용하며 투표 진입에 추가 강제하지 않는다.
 - `create_post(post_kind, post_content, product_ids, request_id) → text`: 인증·제재, NFC 정규화 후 공백 제외 5~50자, 중복 없는 본인 상품(일반글 1~4개·투표글 1개), 일반글 정책 동의를 검증한다. 앱과 DB가 NBSP·전각 공백을 포함한 같은 공백 집합을 제외한다. 상품 행을 id 순으로 잠근 뒤 선택 순서대로 이미지·이름·브랜드·가격·URL을 Snapshot에 복사한다. 글과 Snapshot은 한 트랜잭션이며 원본 상품 수정·삭제 후에도 유지한다. 투표 종료 시각은 서버 생성 시각 +24시간이다.
 - `posts.creation_request_id uuid`와 `(author_id, creation_request_id)` unique로 응답 유실 후 같은 등록 요청을 재시도해도 기존 글 id를 반환한다. 앱은 같은 본문·첨부로 재시도할 때 키를 유지하고 내용을 바꾸면 새 키를 사용한다. 글 id는 bigint 정밀도를 잃지 않도록 문자열로 반환한다.
-- `delete_community_post(target_post_id)`: 인증된 본인 글만 잠근 뒤 글·댓글을 soft delete하고 투표 응답은 실제 삭제한다. 재시도는 안전하며 원본 ALL 상품은 변경하지 않는다. 커뮤니티 작성 제한 중에도 본인 콘텐츠 정리는 허용한다. 후속 댓글·투표 쓰기 RPC도 부모 글 행을 먼저 잠그고 삭제 여부를 검사해야 삭제와의 경합을 막을 수 있다.
+- `delete_community_post(target_post_id)`: 인증된 본인 글만 잠근 뒤 글·댓글을 soft delete하고 투표 응답은 실제 삭제한다. 재시도는 안전하며 원본 ALL 상품은 변경하지 않는다. RPT-006 최신 기준에 따라 커뮤니티 작성 제한 중 본인 글 삭제도 차단한다. 후속 댓글·투표 쓰기 RPC도 부모 글 행을 먼저 잠그고 삭제 여부를 검사해야 삭제와의 경합을 막을 수 있다.
 - 작성 후 수정·이미지 교체 API는 제공하지 않는다. 등록·삭제 성공 시 `community` 캐시 전체를 무효화한다. 후속 내 활동 조회도 이 키 아래에 둔다.
 - 작성 이탈 확정 시 초안을 폐기한다. 상품 상세로 돌아갈 대상이 없는 DIGGLE 직접 진입은 DIGGLE로 복귀한다(사용자 확인, 2026-10-19). 이어 쓰기는 본문·첨부를 유지한다.
 - 기준: [최신 기능명세](https://docs.google.com/spreadsheets/d/1Q7K3St6Kl0jSTVTvoBYdSzdioU4xfd0dXI_NpNYZ2fQ/edit?gid=1996326967)의 DGL-004~010·013, VOTE-001~003·012, SYS-006. 정책 Banner 문구와 읽기 전용 보기도 동일 기준으로 연결한다.
@@ -297,8 +298,8 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 - 신고만 하면 해당 게시글·투표글·댓글만 신고자의 조회에서 제외한다. 같은 작성자의 다른 콘텐츠는 유지한다. 차단하기를 선택했을 때만 해당 작성자의 기존·신규 피드/상세/댓글/활동 전체를 제외한다. `community_content_visible`은 대상별 신고, `community_author_visible`은 단방향 차단을 검사하며 댓글 수와 쓰기 가드에도 같은 기준을 적용한다. 차단당한 사용자에게는 반대 방향 필터를 만들지 않는다.
 - 앱의 피드·상세·댓글·좋아요 목록에서 공통 ReportFlow를 사용한다. 본인·탈퇴 댓글에는 신고 버튼이 없고, 한 NativeModal에서 사유 입력 → 차단 여부 확인을 전환한다. 실패 시 입력·단계를 유지하고 모달 위 Toast를 표시한다. 요청 중 입력·연타·닫기를 막는다.
 - 신고·차단 후 community 캐시를 갱신하고 조회 실패도 성공 완료로 표시하지 않는다. 재시도는 서버의 기존 신고/차단을 재사용한다. 계정 변경·화면 이탈 후 늦은 응답은 모달이나 완료 Toast를 변경하지 않는다.
-- 관리자 신고 목록·상태 전환·제재·감사 로그·Retool은 RPT-005~006 후속 범위다. 최신 RPT-006의 모든 커뮤니티 변경 차단(본인 글 삭제 포함)과 제재 안내/세션 종료는 해당 작업에서 기존 예외와 함께 정리해야 한다.
-- 검증: `community_reporting.test.sql`, `community-reporting.test.cjs`와 `check_report_concurrency.py --container supabase_db_diggin-112`. 실제 동시 신고·차단, Snapshot 보존·단방향·권한·실패 재시도를 확인한다.
+- 관리자 신고 목록·상태 전환·제재·감사 로그와 모든 커뮤니티 변경 차단(본인 글 삭제 포함), 제재 안내·세션 종료는 #114에서 구현한다. Retool 운영 화면은 #115에서 API에 연결한다.
+- 검증: `community_reporting.test.sql`, `community_report_scope.test.sql`, `community-reporting.test.cjs`와 `check_report_concurrency.py --container supabase_db_diggin-112`. 실제 동시 신고·차단, Snapshot 보존·단방향·권한·실패 재시도를 확인한다.
 
 ### 6-4. 알림 (notifications는 public select만, 나머지 private)
 
@@ -316,21 +317,21 @@ like_notification_log  (post_id, actor_id) PK, created_at
 - 본인 댓글·본인 좋아요는 알림 없음. 투표 마감 전에 글이 삭제되면 종료 알림을 만들지 않는다.
 - Push는 사용자의 토큰 전체에 보낸다. 발송 결과가 DeviceNotRegistered면 토큰을 지운다. push_sent_at이 null이면 다음 실행 때 다시 보낸다.
 
-### 6-5. 운영 (private, Edge Function의 service_role만)
+### 6-5. 운영 (#114, private)
 
-```
-admin_users    id, email unique, role admin_role, created_at, disabled_at null
-admin_actions  id, admin_id, action, target_type, target_id, report_id null, reason 필수,
-               before_state jsonb, after_state jsonb, created_at   INSERT-only
-```
-
-- admin_actions는 update·delete를 막는 트리거를 건다. 조치와 로그 insert는 한 함수에서 같이 실행한다.
-- 운영자 숨김(hidden_at)만 복구할 수 있다. 작성자 삭제(deleted_at)는 복구하지 않는다.
+- `admin_users`: Supabase Auth UUID, 이메일, operator/super_admin 역할, 비활성화 시각. 실제 Auth 세션과 ban·프로필 상태를 매 요청에서 검사한다.
+- `admin_actions`: 운영자·request_id(unique)·조치·대상·신고·위반 유형·필수 상세 사유·전후 상태·시각. UPDATE·DELETE·TRUNCATE를 거부하는 감사 기록이다.
+- `user_sanctions`: 제재 건별 유형·종료일·위반 유형·최초 확인 시각·해제 시각. 새 제재는 이전 확인 여부를 공유하지 않는다.
+- `moderation_requests`: 제재 준비와 Auth 적용 결과(pending/applied/failed), 요청자·대상·사유·감사 ID. 대상별 진행 중 요청은 하나만 허용한다.
+- 모두 RLS를 켜고 service_role을 포함해 직접 테이블 접근을 회수한다. 관리자 API는 `service_role` 전용 public invoker/private definer RPC를 호출하며 검증한 관리자 UUID와 실제 세션을 전달한다. 일반 앱 RPC의 auth.uid() 검사와 구분한다.
+- 신고는 콘텐츠별 그룹·상세·50건 커서 조회를 제공한다. 상태는 received → reviewing → resolved/rejected이며 자동 숨김·자동 제재는 없다. 운영자가 숨긴 콘텐츠만 복구하고 작성자 삭제는 복구하지 않는다.
+- 제재는 준비 RPC → Auth Admin 변경 → auth.users 지연 트리거 순서다. Auth 트랜잭션 안에서 최종 ban 확인·프로필·제재·감사 기록·세션 제거를 함께 확정하며 실패하면 함께 롤백한다. 재시도는 같은 request_id로 최초 적용 결과를 반환한다.
+- API 계약·관리자 등록·OIDC 설정·검증 방법과 남은 실기기 확인은 [MODERATION_API.md](MODERATION_API.md)를 따른다.
 
 ## 7. 제재 (RPT-006)
 
 - warning: 기능 제한 없이 이력과 안내만.
-- community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 쓰기 RPC(create_post, set_community_vote, set_community_like, create_comment, update_comment, delete_comment)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. #95의 본인 게시글 삭제는 콘텐츠 정리를 위해 예외로 허용한다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다.
+- community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 모든 쓰기 RPC(본인 게시글 삭제 포함)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. 프로필 행을 잠가 운영자 제재와 변경 요청의 경합을 보호한다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다.
 - suspended: profiles.status 변경과 함께 Supabase Auth 계정 정지(ban)와 전체 세션 무효화를 한다. status만으로는 상품·폴더 접근을 못 막기 때문이다. 해제할 때 둘 다 푼다.
 
 ## 8. 탈퇴 (MY-007, Edge Function)
@@ -352,7 +353,7 @@ admin_actions  id, admin_id, action, target_type, target_id, report_id null, rea
 - 가입 시 약관 동의 화면이 명세에 없다. 처음 동의 기록을 언제 만들지(MY-009)
 - 닉네임 "한글"에 자음·모음 단독(ㄱ, ㅏ)을 허용할지. 지금은 허용하지 않는다
 - 차단 해제 화면 없음. 차단 방향은 RPT-004 단방향으로 확정했으며, 앱 모달의 "서로의 게시글" 문구는 후속 작업에서 맞춘다.
-- 관리자 인증 방식, CSV 처리 위치(Edge Function / 클라이언트 + RPC), import 실패 사유 코드 추가 여부
+- 영구 제한 상태에서 JWT가 이미 만료된 경우의 안내 흐름은 사용자 확인으로 유지한다. [MODERATION_API.md](MODERATION_API.md)의 실기기 QA가 남아 있다.
 - CSV 한도 초과 시 신규 버킷 선택 순서: 기존 DB 설계는 상품 많은 순, 현재 CSV 저장 계획은 최초 등장 순이다. 이번에 구체화된 기준에는 우선순위가 없어 추가 확인한다.
 - IMP-005 원화 판별 규칙 미완료: 검증된 스토어·도메인 목록을 PM과 확정해야 한다. 현재 실사용 CSV 가격은 모두 null이다.
 - IMP-006의 기존 정보 유지와 PDT-008의 소장 시 위시레벨 제거가 충돌한다. 현재 소장 Y를 추가하면 공통 규칙대로 위시레벨을 비우며, 명세 예외를 PM과 확인한다.

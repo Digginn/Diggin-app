@@ -76,12 +76,16 @@ update public.profiles set status='community_restricted',restricted_until=now()+
 set local request.jwt.claims='{"sub":"99000000-0000-0000-0000-000000000001","role":"authenticated"}';
 set local role authenticated;
 select is(jsonb_array_length(public.get_my_community_activity('post')),20,'커뮤니티 작성 제한 중 조회 허용');
-select lives_ok($$select public.delete_community_post(current_setting('test.vote')::bigint)$$,'본인 글 삭제 흐름 재사용');
+select throws_ok($$select public.delete_community_post(current_setting('test.vote')::bigint)$$,'42501','community_restricted','기간 제한 중 본인 글 삭제 차단');
+reset role;
+update public.profiles set restricted_until=now()-interval '1 second' where id=auth.uid();
+set local role authenticated;
+select lives_ok($$select public.delete_community_post(current_setting('test.vote')::bigint)$$,'제한 만료 후 본인 글 삭제 흐름 재사용');
 select is(jsonb_array_length(public.get_my_community_activity('vote')),0,'삭제한 본인 투표는 목록에서 제외');
 reset role;
 update public.profiles set status='suspended',suspended_at=now() where id='99000000-0000-0000-0000-000000000001';
 set local role authenticated;
-select throws_ok($$select public.get_my_community_activity('post')$$,'42501','not_authorized','정지 계정 조회 차단');
+select throws_ok($$select public.get_my_community_activity('post')$$,'42501','suspended','정지 계정 조회 차단');
 reset role;
 select * from finish();
 rollback;

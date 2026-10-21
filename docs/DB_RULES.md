@@ -163,10 +163,12 @@ Codex와 Claude Code는 동일한 DB 관리 규칙을 따른다.
 - GitHub Environment `shared-development`에 대상 프로젝트와 접속 정보를 보관하고 develop에서만 사용한다.
 - 원격 DB 연결은 명시적인 IPv4 Session pooler(5432, TLS)를 사용한다. 원격 이력 조회와 `db push --dry-run` 성공 후에만 실제 적용한다.
 - 배포는 한 번에 하나씩 실행하며 실행 중인 배포를 취소하지 않는다. 각 실행의 정확한 push 커밋을 검증·배포하며 대기 중 실행이 통합돼도 해당 커밋에 포함된 미적용 마이그레이션을 함께 반영한다.
-- 원격 적용은 대기 중인 마이그레이션의 `db push --dry-run` 확인 후 `db push`만 실행한다. 원격 reset·자동 repair·seed·Vault 설정 변경은 수행하지 않는다.
+- DB 원격 적용은 대기 중인 마이그레이션의 `db push --dry-run` 확인 후 `db push`만 실행한다. 원격 reset·자동 repair·seed·Vault 설정 변경은 수행하지 않는다.
 - 실패하면 GitHub Actions에서 원인을 확인하고 해결 후 같은 실행을 다시 실행한다. 승인되지 않은 PR을 관리자 권한으로 먼저 병합한 경우 승인된 후속 PR로 정상 배포 경로를 복구한다.
 
 초기 접속 정보 등록·최초 배포 전 기존 DB의 마이그레이션 이력 확인·장애 대응은 `docs/DB_DEPLOYMENT.md`를 따른다. 운영 DB 자동 배포는 이번 설정에 포함하지 않는다.
+
+관련 Edge Function은 같은 커밋의 Deno 검증과 DB 마이그레이션 적용 성공 후 배포한다. DB 적용은 위 `db push` 경로만 사용한다. 함수 배포 권한·설정은 `docs/MODERATION_API.md`를 따른다.
 
 개별 기능 브랜치에서 공유 DB에 직접 `db push`하지 않는다.
 

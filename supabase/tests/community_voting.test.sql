@@ -97,7 +97,7 @@ select lives_ok($$select public.set_community_vote(current_setting('test.vote'):
 reset role;
 update public.profiles set status='suspended',suspended_at=now() where id='96000000-0000-0000-0000-000000000002';
 set local role authenticated;
-select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'not')$$,'42501','community_restricted','정지 계정 투표 차단');
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'not')$$,'42501','suspended','정지 계정 투표 차단');
 reset role;
 select * from finish();
 rollback;

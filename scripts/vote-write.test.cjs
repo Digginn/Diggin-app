@@ -21,7 +21,11 @@ function load(filename, mocks) {
     setInterval: mocks.setInterval,
     clearInterval: mocks.clearInterval ?? (() => {}),
     Date: mocks.Date ?? Date,
-    require: (name) => mocks[name] ?? require(name),
+    require: (name) =>
+      mocks[name] ??
+      (name === "@/api/accountAccess"
+        ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
+        : require(name)),
   });
   return module.exports;
 }
