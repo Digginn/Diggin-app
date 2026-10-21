@@ -286,6 +286,7 @@ private.notifications
   title, body, event_key text unique, created_at, push_sent_at null
 
 private.like_notification_log  (post_id, actor_id) PK, created_at
+private.notification_checks    user_id PK FK profiles cascade, checked_at
 ```
 
 처음엔 notifications를 public에 두고 select만 열 생각이었는데, 알림을 눌렀을 때 글이 지워졌는지(NOTI-006)를 앱이 알아야 해서 private.posts를 같이 봐야 했다. 그래서 커뮤니티처럼 원본은 private에 두고 `get_notifications(after_created_at, after_id)`로만 읽는다.
@@ -296,7 +297,10 @@ private.like_notification_log  (post_id, actor_id) PK, created_at
 - 투표 마감은 pg_cron `notifications-vote-ended`가 1분마다 `ends_at`이 지난 투표를 찾아 작성자에게 만든다(NOTI-003). 마감 전에 지워진 글은 건너뛴다. 작업이 밀려도 놓치지 않게 시각 범위가 아니라 event_key로 중복을 막는다.
 - event_key는 `comment:{comment_id}`, `like:{post_id}:{actor_id}`, `vote_ended:{post_id}`. 앱에는 주지 않는다.
 - 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 글자 수는 자르지 않는다(Push 줄 수는 OS에 맡긴다).
-- 목록은 최근 30일, 최신순 20개씩. 알림은 항상 받는 사람 자신의 글이라 `is_post_available`은 삭제·숨김만 본다. 읽음 상태는 없다.
+- 목록은 최근 30일, 최신순 20개씩. 알림은 항상 받는 사람 자신의 글이라 `is_post_available`은 삭제·숨김만 본다.
+- 읽음은 알림마다 두지 않고 알림함을 마지막으로 연 시각(notification_checks) 하나로 본다. 명세(NOTI-007)는 개발 검토로 남겨 뒀고, 시안의 종 아이콘 점(Dot=On), 목록 주석 "읽지 않은 알림은 배경(Gray50)으로 구분", 개인정보처리방침의 "알림함 마지막 확인 시각"에 맞췄다.
+  - `has_unread_notifications()`: 확인 시각 뒤에 온 최근 30일 알림이 있으면 true. 종 아이콘 점.
+  - `mark_notifications_checked()`: 알림함을 열 때 부른다. 확인 시각을 지금으로 바꾸고 이전 시각을 돌려준다(처음이면 null). 앱은 이전 시각보다 뒤에 온 알림을 Gray50으로 보여 주고, 다음에 열면 흰색이 된다.
 - pg_cron `notifications-cleanup`이 매일 03:00(KST)에 30일 지난 알림을 지운다.
 - 알림 종류별 수신 설정은 없다(MY-011 MVP 제외). 수신 설정·OS 권한과 관계없이 알림은 목록에 남긴다(NOTI-007).
 - 목록 문구는 시안(NOTI-07)대로 저장한다. 제목은 "투표 결과가 나왔어요.", "내 게시글에 댓글이 달렸어요.", "내 게시글에 좋아요가 달렸어요."이다.
