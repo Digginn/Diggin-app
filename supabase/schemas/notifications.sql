@@ -121,8 +121,8 @@ create trigger post_likes_notify_post_author
 after insert on private.post_likes
 for each row execute function private.notify_post_liked();
 
--- NOTI-003 마감된 투표를 작성자에게 한 번 알린다. 마감 전에 지워지거나 숨겨진 글은 알리지 않고, 마감 뒤
--- 작업이 돌기 전에 지운 글은 알린다(누르면 NOTI-006 안내).
+-- NOTI-003 마감된 투표를 작성자에게 한 번 알린다. 알림을 만들 때 지워졌거나 숨겨진 투표는 알리지 않는다.
+-- 삭제 시 투표 응답도 지워져(VOTE-012) 보여 줄 결과가 없다. 알림을 받은 뒤 지워지면 누를 때 NOTI-006 안내를 띄운다.
 -- 작업이 밀려도 놓치지 않게 시각 범위가 아니라 키로 중복을 막고, 30일 넘은 투표는 목록에서도 안 보여 건너뛴다.
 create or replace function private.create_vote_ended_notifications()
 returns integer language sql security definer set search_path = '' as $$
@@ -136,8 +136,7 @@ returns integer language sql security definer set search_path = '' as $$
       'vote_ended:' || p.id
     from private.posts p
     where p.type = 'vote' and p.ends_at <= now() and p.ends_at > now() - interval '30 days'
-      and (p.deleted_at is null or p.deleted_at > p.ends_at)
-      and (p.hidden_at is null or p.hidden_at > p.ends_at)
+      and p.deleted_at is null and p.hidden_at is null
     on conflict (event_key) do nothing
     returning 1
   )
