@@ -239,6 +239,10 @@ test("뒤로 가기는 이전 화면으로, 직접 진입한 경우에는 탭 �
           useNotifications: () => ({ data: undefined, isPending: false, isError: false }),
         },
         "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "방금 전" },
+        "@/hooks/useToast": { useToast: () => () => {} },
+        "@/constants/messages": {
+          TOAST_MESSAGES: { NOTI_004: "삭제되었거나 더 이상 볼 수 없는 콘텐츠입니다." },
+        },
       },
       { __DEV__: false },
     );
@@ -267,6 +271,10 @@ test("개발용 미리보기는 ?preview가 있을 때만 샘플을 보이고, �
       useNotifications: () => ({ data: undefined, isPending: false, isError: false }),
     },
     "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "방금 전" },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/constants/messages": {
+      TOAST_MESSAGES: { NOTI_004: "삭제되었거나 더 이상 볼 수 없는 콘텐츠입니다." },
+    },
   };
   const { default: PreviewRoute } = load("../src/app/notifications.tsx", mocks, { __DEV__: true });
   assert.equal(PreviewRoute().props.isError, true);
@@ -420,8 +428,9 @@ test("기기 알림이 꺼져 있으면 안내를 띄우고, 닫은 기한은 �
   assert.equal(render().isPushOff, false, "아직 정하지 않은 권한은 꺼진 것으로 보지 않는다");
 });
 
-test("운영 알림 목록은 실제 알림을 보여 주고, 누르면 글 종류에 맞는 상세로 이동하며 끝에서 다음 페이지를 부른다", () => {
+test("운영 알림 목록은 실제 알림을 보여 주고, 누르면 글 종류에 맞는 상세로 이동하거나 지워진 글을 안내하며 끝에서 다음 페이지를 부른다", () => {
   const pushed = [];
+  const toasts = [];
   let fetchedNext = 0;
   let refetched = 0;
   const list = {
@@ -476,6 +485,12 @@ test("운영 알림 목록은 실제 알림을 보여 주고, 누르면 글 종�
       },
       "@/screens/notification/queries/useNotifications": { useNotifications: () => list },
       "@/screens/diggle/utils/formatCommunityTime": { formatCommunityTime: () => "1시간 전" },
+      "@/hooks/useToast": {
+        useToast: () => (message, variant) => toasts.push([message, variant]),
+      },
+      "@/constants/messages": {
+        TOAST_MESSAGES: { NOTI_004: "삭제되었거나 더 이상 볼 수 없는 콘텐츠입니다." },
+      },
     },
     { __DEV__: false },
   );
@@ -491,8 +506,12 @@ test("운영 알림 목록은 실제 알림을 보여 주고, 누르면 글 종�
   props.onPressNotification(props.notifications[1]);
   assert.deepEqual(JSON.parse(JSON.stringify(pushed)), [
     { pathname: "/votes/[id]", params: { id: "41" } },
-    { pathname: "/posts/[id]", params: { id: "40" } },
   ]);
+  assert.deepEqual(
+    toasts,
+    [["삭제되었거나 더 이상 볼 수 없는 콘텐츠입니다.", "error"]],
+    "지워진 글은 이동하지 않고 목록에서 안내한다(NOTI-006)",
+  );
   props.onEndReached();
   assert.equal(fetchedNext, 1);
   props.onRetry();
