@@ -11,10 +11,10 @@ export type MyProfile = {
 // AUTH-008 Validation 문구. 서버가 돌려준 첫 오류 코드에 맞춰 보여준다.
 const NICKNAME_ERROR_MESSAGES: Record<string, string> = {
   length: "닉네임은 2~10자로 입력해 주세요.",
-  whitespace: "닉네임에는 공백을 사용할 수 없습니다.",
-  invalid_characters: "닉네임은 한글·영문·숫자만 사용할 수 있습니다.",
-  profanity: "욕설·혐오 등 부적절한 표현은 사용할 수 없습니다.",
-  impersonation: "공식 계정으로 오해할 수 있는 닉네임은 사용할 수 없습니다.",
+  whitespace: "공백·특수문자는 사용할 수 없습니다.",
+  invalid_characters: "공백·특수문자는 사용할 수 없습니다.",
+  profanity: "사용할 수 없는 닉네임입니다.",
+  impersonation: "사용할 수 없는 닉네임입니다.",
   duplicate: "이미 사용 중인 닉네임입니다.",
 };
 

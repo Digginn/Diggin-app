@@ -8,7 +8,7 @@ export function validateNickname(value: string): string | undefined {
     return NICKNAME_HELPER_MESSAGE;
   }
   if (/[^가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9]/u.test(value)) {
-    return "특수문자는 사용이 불가능합니다.";
+    return "공백·특수문자는 사용할 수 없습니다.";
   }
   return undefined;
 }

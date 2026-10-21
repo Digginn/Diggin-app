@@ -94,18 +94,18 @@ test("CSV 완료 후 ALL·개수·폴더 목록/상품/관계는 재조회하고
 });
 
 test("CSV 검증 실패·서버 오류는 성공으로 처리하거나 캐시를 갱신하지 않는다", async () => {
-  for (const failsWithException of [false, true]) {
+  for (const failsWithException of [false, true, "cancel"]) {
     const client = new QueryClient();
     try {
       client.setQueryData(productKeys.counts(), "before import");
       client.setQueryData(["folders", "list"], "before import");
       const error = new Error("network");
-      const result = { error: "missing-product-info" };
+      const result = failsWithException === "cancel" ? null : { error: "missing-product-info" };
       const run = importer(client, async () => {
-        if (failsWithException) throw error;
+        if (failsWithException === true) throw error;
         return result;
       });
-      if (failsWithException) await assert.rejects(() => run({}, () => {}), error);
+      if (failsWithException === true) await assert.rejects(() => run({}, () => {}), error);
       else assert.equal(await run({}, () => {}), result);
       assert.equal(client.getQueryState(productKeys.counts()).isInvalidated, false);
       assert.equal(client.getQueryState(["folders", "list"]).isInvalidated, false);
