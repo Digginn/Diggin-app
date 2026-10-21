@@ -4,6 +4,7 @@ import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactNode } from "react";
+import { AppState } from "react-native";
 
 import { AccountAccessNotice } from "@/components/AccountAccessNotice";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -12,6 +13,7 @@ import { BrowsingModeProvider } from "@/contexts/BrowsingModeContext";
 import { PostDraftProvider } from "@/contexts/PostDraftContext";
 import { PostsProvider } from "@/contexts/PostsContext";
 import { ToastProvider } from "@/contexts/ToastContext";
+import { registerDevicePush } from "@/lib/pushNotifications";
 import { queryClient } from "@/lib/queryClient";
 import { SessionExpiredModal } from "@/screens/login/components/SessionExpiredModal";
 
@@ -47,6 +49,27 @@ function SessionExpiredNotice() {
   );
 }
 
+// NOTI-001 로그인한 계정이 바뀌면 Push 토큰을 등록한다. 설정에서 알림을 켜고 돌아온 경우도 앱 복귀 때 등록한다.
+function PushRegistration() {
+  const { session } = useAuth();
+  const userId = session?.user.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    const register = (shouldAsk: boolean) =>
+      void registerDevicePush(userId, shouldAsk).catch((error: unknown) =>
+        console.warn("Push 토큰을 등록하지 못했습니다.", error),
+      );
+    register(true);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") register(false);
+    });
+    return () => subscription.remove();
+  }, [userId]);
+
+  return null;
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     "Pretendard-Regular": require("@/assets/fonts/Pretendard-Regular.otf"),
@@ -73,6 +96,7 @@ export default function RootLayout() {
                       />
                     </Stack>
                     <SessionExpiredNotice />
+                    <PushRegistration />
                     <AccountAccessNotice />
                   </PostsProvider>
                 </PostDraftProvider>

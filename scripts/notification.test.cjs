@@ -231,6 +231,9 @@ test("뒤로 가기는 이전 화면으로, 직접 진입한 경우에는 탭 �
           }),
         },
         "@/screens/notification/NotificationScreen": { NotificationScreen: "NotificationScreen" },
+        "@/screens/notification/hooks/useDevicePushOff": {
+          useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
+        },
       },
       { __DEV__: false },
     );
@@ -252,6 +255,9 @@ test("개발용 오류 미리보기의 다시 시도는 목록으로 복귀하�
       }),
     },
     "@/screens/notification/NotificationScreen": { NotificationScreen: "NotificationScreen" },
+    "@/screens/notification/hooks/useDevicePushOff": {
+      useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
+    },
   };
   const { default: PreviewRoute } = load("../src/app/notifications.tsx", mocks, { __DEV__: true });
   assert.equal(PreviewRoute().props.isError, true);
@@ -341,4 +347,64 @@ test("기기 알림 배너는 공용 설정 버튼과 닫기 동작을 제공한
   assert.equal(findAll(settingsBanner, "CloseIcon").length, 0);
   assert.equal(findAll(settingsBanner, "Pressable").length, 0);
   assert.equal(findAll(settingsBanner, "Text")[0].props.children, "기기 알림이 꺼져 있습니다.");
+});
+
+test("기기 알림이 꺼져 있으면 안내를 띄우고, 닫은 기한은 기기에 저장한다", async () => {
+  const storage = { "push-off-banner-dismissed-until": null };
+  let status = "denied";
+  let onAppState;
+  const state = [];
+  let cursor = 0;
+  let effect;
+  const { useDevicePushOff } = load("../src/screens/notification/hooks/useDevicePushOff.ts", {
+    "react": {
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [state[index], (value) => (state[index] = value)];
+      },
+      useEffect: (callback) => (effect = callback),
+    },
+    "react-native": {
+      AppState: {
+        addEventListener: (_event, handler) => {
+          onAppState = handler;
+          return { remove() {} };
+        },
+      },
+    },
+    "expo-notifications": { getPermissionsAsync: async () => ({ status }) },
+    "@react-native-async-storage/async-storage": {
+      __esModule: true,
+      default: {
+        getItem: async (key) => storage[key],
+        setItem: async (key, value) => {
+          storage[key] = value;
+        },
+      },
+    },
+  });
+  const render = () => {
+    cursor = 0;
+    return useDevicePushOff();
+  };
+  assert.equal(render().isPushOff, false, "권한과 닫은 기한을 읽기 전에는 띄우지 않는다");
+  effect();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(render().isPushOff, true);
+
+  render().dismiss(1234);
+  assert.equal(storage["push-off-banner-dismissed-until"], "1234");
+  assert.equal(render().dismissedUntil, 1234);
+
+  // 설정에서 알림을 켜고 돌아오면 다시 확인한다.
+  status = "granted";
+  onAppState("active");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(render().isPushOff, false);
+
+  status = "undetermined";
+  onAppState("active");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(render().isPushOff, false, "아직 정하지 않은 권한은 꺼진 것으로 보지 않는다");
 });

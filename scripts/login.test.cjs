@@ -106,6 +106,7 @@ test("루트는 폰트·세션 복원이 끝난 뒤 앱과 전역 제재 안내�
     "@/screens/login/components/SessionExpiredModal": {
       SessionExpiredModal: "SessionExpiredModal",
     },
+    "@/lib/pushNotifications": { registerDevicePush: async () => {} },
   };
   for (const name of providers)
     mocks[`@/contexts/${name}Context`] = {
@@ -128,6 +129,7 @@ test("루트는 폰트·세션 복원이 끝난 뒤 앱과 전역 제재 안내�
     tree.some((node) => node.type === "Stack" && node.props.screenOptions.headerShown === false),
   );
   assert.ok(tree.some((node) => node.type === "AccountAccessNotice"));
+  assert.ok(tree.some((node) => node.type?.name === "PushRegistration"));
   isRestoring = true;
   assert.equal(gate().type(gate().props), null);
 });
@@ -334,6 +336,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   let cursor = 0;
   let emit;
   const signOutOptions = [];
+  const order = [];
   const cacheClears = [];
   const supabase = {
     auth: {
@@ -344,6 +347,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
       },
       signOut: async (options) => {
         signOutOptions.push(options);
+        order.push("signOut");
         emit("SIGNED_OUT", null);
         return { error: null };
       },
@@ -369,6 +373,12 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     },
     "@/lib/supabase": { supabase },
     "@/lib/queryClient": { queryClient: { clear: () => cacheClears.push(true) } },
+    "@/lib/pushNotifications": {
+      unregisterDevicePush: async () => {
+        order.push("unregisterPush");
+      },
+      finishDeviceSignOut: () => order.push("finishPush"),
+    },
   });
   const render = () => {
     cursor = 0;
@@ -378,6 +388,11 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   await render().signOut();
   assert.equal(signOutOptions.length, 1);
   assert.equal(signOutOptions[0].scope, "local", "이 기기 세션만 끊는다");
+  assert.deepEqual(
+    order,
+    ["unregisterPush", "signOut", "finishPush"],
+    "세션을 끊기 전에 이 기기 Push 토큰을 지우고, 세션을 끊은 뒤에야 등록 막기를 푼다",
+  );
   assert.equal(render().isSessionExpired, false);
   emit("TOKEN_REFRESHED", { id: "s2" });
   assert.equal(render().isSessionExpired, false);

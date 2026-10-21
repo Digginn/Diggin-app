@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, Linking } from "react-native";
 
 import type { NotificationItem } from "@/screens/notification/components/NotificationRow";
+import { useDevicePushOff } from "@/screens/notification/hooks/useDevicePushOff";
 import { NotificationScreen } from "@/screens/notification/NotificationScreen";
 
 // UI 확인용 샘플입니다. 운영 앱에서는 실제 알림 데이터 연결 전까지 빈 목록을 표시합니다.
@@ -50,10 +51,13 @@ export default function NotificationsRoute() {
   const router = useRouter();
   const { preview } = useLocalSearchParams<{ preview?: string }>();
   const isErrorPreview = __DEV__ && preview === "error";
+  const devicePush = useDevicePushOff();
   return (
     <NotificationScreen
       isError={isErrorPreview}
-      isDevicePushEnabled={!(__DEV__ && preview === "push-off")}
+      isDevicePushEnabled={!(__DEV__ && preview === "push-off") && !devicePush.isPushOff}
+      bannerDismissedUntil={devicePush.dismissedUntil}
+      onDismissPushBanner={devicePush.dismiss}
       onOpenNotificationSettings={() => {
         Linking.openSettings().catch(() =>
           Alert.alert("설정을 열지 못했습니다", "기기 설정에서 앱 알림을 허용해 주세요."),
