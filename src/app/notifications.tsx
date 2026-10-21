@@ -113,7 +113,10 @@ export default function NotificationsRoute() {
         if (!notification) return;
         // NOTI-006 지워진 글은 이동하지 않고 목록에서 안내한다.
         if (!notification.isPostAvailable) {
-          showToast(TOAST_MESSAGES.NOTI_004, "error");
+          showToast(
+            notification.postType === "vote" ? TOAST_MESSAGES.VOTE_007 : TOAST_MESSAGES.NOTI_004,
+            "error",
+          );
           return;
         }
         router.push({
