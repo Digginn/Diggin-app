@@ -81,9 +81,8 @@ select is((select count(*) from private.notifications where recipient_id = '1040
 select lives_ok($$ select private.create_vote_ended_notifications() $$, '마감 작업이 돈다');
 select lives_ok($$ select private.create_vote_ended_notifications() $$, '마감 작업이 다시 돈다');
 select is((select array_agg(post_id order by post_id) from pg_temp.notifications_for('vote_ended')),
-  array[current_setting('test.ended_vote')::bigint, current_setting('test.deleted_after_end_vote')::bigint],
-  '마감 뒤에 지운 투표도 한 번 알리고, 진행 중이거나 마감 전에 지운 투표는 알리지 않는다');
-delete from private.notifications where post_id = current_setting('test.deleted_after_end_vote')::bigint;
+  array[current_setting('test.ended_vote')::bigint],
+  '마감된 투표만 한 번 알리고, 진행 중이거나 알림 전에 지운 투표는 마감 뒤에 지웠어도 알리지 않는다');
 select is((select body from pg_temp.notifications_for('vote_ended')), '''알림 테스트 마감 투표'' 투표가 종료됐어요. BUY 1 · NOT 1', '최종 집계를 본문에 담는다');
 
 -- NOTI-007 목록
