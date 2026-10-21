@@ -299,6 +299,8 @@ private.like_notification_log  (post_id, actor_id) PK, created_at
 - 목록은 최근 30일, 최신순 20개씩. 알림은 항상 받는 사람 자신의 글이라 `is_post_available`은 삭제·숨김만 본다. 읽음 상태는 없다.
 - pg_cron `notifications-cleanup`이 매일 03:00(KST)에 30일 지난 알림을 지운다.
 - 알림 종류별 수신 설정은 없다(MY-011 MVP 제외). 수신 설정·OS 권한과 관계없이 알림은 목록에 남긴다(NOTI-007).
+- 목록 문구는 시안(NOTI-07)대로 저장한다. 제목은 "투표 결과가 나왔어요.", "내 게시글에 댓글이 달렸어요.", "내 게시글에 좋아요가 달렸어요."이다.
+- Push 문구는 목록 문구와 다르다(시안 NOTI-03~05). 투표 마감은 "투표가 종료됐어요." / "내 투표 결과를 확인해 보세요.", 좋아요는 본문 자리에 게시글 본문을 쓴다. 댓글은 목록과 같다. 발송할 때 종류별로 만든다.
 - Push 발송은 다음 작업이다. 사용자의 토큰 전체에 보내고, DeviceNotRegistered면 토큰을 지우고, push_sent_at이 null이면 다음 실행 때 다시 보낸다.
 
 ### 6-5. 운영 (private, Edge Function의 service_role만)
