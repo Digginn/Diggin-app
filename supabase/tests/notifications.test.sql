@@ -86,6 +86,34 @@ select is((select array_agg(x->>'type' order by ordinality) from jsonb_array_ele
   array['vote_ended', 'post_liked', 'post_commented'], '가장 최근 알림이 먼저 온다');
 select ok(not public.get_notifications()::text ~ '10400000-', '응답에 사용자 UUID가 없다');
 select is((select count(*) from jsonb_array_elements(public.get_notifications()) x where x ? 'event_key'), 0::bigint, '이벤트 키는 앱에 주지 않는다');
+
+-- 알림함 확인: 처음엔 전부 안 읽음이고, 열면 이전 확인 시각을 돌려주고 점이 꺼진다
+select ok(public.has_unread_notifications(), '알림함을 연 적이 없으면 새 알림이 있다');
+select is(public.mark_notifications_checked(), null::timestamptz, '처음 열면 이전 확인 시각이 없다');
+select ok(not public.has_unread_notifications(), '열고 나면 새 알림이 없다');
+reset role;
+update private.notification_checks set checked_at = now() - interval '1 minute'
+ where user_id = '10400000-0000-0000-0000-00000000000a';
+update private.notifications set created_at = now() - interval '2 minutes'
+ where recipient_id = '10400000-0000-0000-0000-00000000000a';
+insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
+ values ('10400000-0000-0000-0000-00000000000a', 'post_liked', current_setting('test.post')::bigint, '새 알림', '본문', 'test:new');
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
+select ok(public.has_unread_notifications(), '확인 뒤에 온 알림이 있으면 점이 켜진다');
+select is(public.mark_notifications_checked(), now() - interval '1 minute', '다시 열면 지난번 확인 시각을 돌려준다');
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000b", "role": "authenticated"}';
+select ok(not public.has_unread_notifications(), '남의 알림으로 점이 켜지지 않는다');
+reset role;
+select is((select count(*) from private.notification_checks), 1::bigint, '연 사람의 확인 시각만 남는다');
+delete from private.notifications where event_key = 'test:new';
+set local role anon;
+select throws_ok($$ select public.has_unread_notifications() $$, '42501', null, '비회원은 새 알림 여부를 볼 수 없다');
+select throws_ok($$ select public.mark_notifications_checked() $$, '42501', null, '비회원은 확인 처리를 할 수 없다');
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000b", "role": "authenticated"}';
+select throws_ok($$ select count(*) from private.notification_checks $$, '42501', null, '확인 시각 원본은 직접 읽을 수 없다');
 reset role;
 update private.posts set deleted_at = now() where id = current_setting('test.post')::bigint;
 set local role authenticated;
