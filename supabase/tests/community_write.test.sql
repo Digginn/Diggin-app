@@ -69,7 +69,11 @@ set local request.jwt.claims = '{"sub":"95000000-0000-0000-0000-000000000001","r
 update public.profiles set status='community_restricted',restricted_until=now()+interval '7 days' where id=auth.uid();
 set local role authenticated;
 select throws_ok($$select public.create_post('vote','제한 계정 본문',(current_setting('test.products')::bigint[])[3:3],gen_random_uuid())$$,'42501','community_restricted','제한 계정 신규 등록 차단');
-select lives_ok($$select public.delete_community_post(current_setting('test.vote')::bigint)$$,'제한 중에도 본인 글 정리 가능');
+select throws_ok($$select public.delete_community_post(current_setting('test.vote')::bigint)$$,'42501','community_restricted','제한 중 본인 글 삭제 차단');
+reset role;
+update public.profiles set restricted_until=now()-interval '1 second' where id=auth.uid();
+set local role authenticated;
+select lives_ok($$select public.delete_community_post(current_setting('test.vote')::bigint)$$,'제한 만료 후 본인 글 삭제 가능');
 select lives_ok($$select public.delete_community_post(current_setting('test.vote')::bigint)$$,'삭제 재시도 안전');
 reset role;
 select ok((select deleted_at is not null from private.posts where id=current_setting('test.vote')::bigint),'글 soft delete');

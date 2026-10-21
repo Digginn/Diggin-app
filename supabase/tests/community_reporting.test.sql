@@ -116,8 +116,8 @@ select lives_ok($$select public.block_community_author('post',current_setting('t
 reset role;
 update public.profiles set status='suspended',suspended_at=now() where id='11200000-0000-0000-0000-000000000003';
 set local role authenticated;
-select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'spam')$$,'42501','not_authorized','정지 계정 신고 거부');
-select throws_ok($$select public.block_community_author('post',current_setting('test.other')::bigint)$$,'42501','not_authorized','정지 계정 차단 거부');
+select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'spam')$$,'42501','suspended','정지 계정 신고 거부');
+select throws_ok($$select public.block_community_author('post',current_setting('test.other')::bigint)$$,'42501','suspended','정지 계정 차단 거부');
 reset role;
 select * from finish();
 rollback;

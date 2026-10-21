@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+import { restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { HelperText } from "@/components/Field";
@@ -148,7 +149,8 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
       setLeaving(true);
       showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글을 등록했습니다.");
     } catch (error) {
-      if (mounted.current) showToast(communityWriteError(error));
+      if (mounted.current)
+        showToast(communityWriteError(error), restrictionMessage(error) ? "notice" : "error");
     } finally {
       busy.current = false;
       if (mounted.current) setSubmitting(false);

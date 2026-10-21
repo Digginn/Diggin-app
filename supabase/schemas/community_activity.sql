@@ -6,6 +6,7 @@ returns jsonb language plpgsql stable security definer set search_path = '' as $
 declare
   viewer_id uuid := (select auth.uid());
 begin
+  perform private.assert_account_access();
   if viewer_id is null then raise exception 'not_authenticated' using errcode = '42501'; end if;
   if not exists (select 1 from public.profiles where id = viewer_id and status <> 'suspended') then
     raise exception 'not_authorized' using errcode = '42501';

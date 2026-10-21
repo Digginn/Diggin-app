@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { Comment, type MenuAnchor } from "@/components/Comment";
@@ -56,6 +57,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const [isDeleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [deleteIsRestricted, setDeleteRestricted] = useState(false);
   const deleting = useRef(false);
   const currentViewer = useRef(session?.user.id);
   useEffect(() => {
@@ -156,7 +158,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         });
       showToast(post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.");
     } catch (error) {
-      if (currentViewer.current === viewer) setDeleteError(communityWriteError(error));
+      if (currentViewer.current === viewer) {
+        setDeleteError(communityWriteError(error));
+        setDeleteRestricted(!!restrictionMessage(error));
+      }
     } finally {
       deleting.current = false;
       setDeleting(false);
@@ -489,7 +494,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         overlay={
           deleteError ? (
             <View className="absolute bottom-12 self-center">
-              <ToastText message={deleteError} variant="error" />
+              <ToastText message={deleteError} variant={deleteIsRestricted ? "notice" : "error"} />
             </View>
           ) : undefined
         }
@@ -507,7 +512,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         overlay={
           actions.deleteError ? (
             <View className="absolute bottom-12 self-center">
-              <ToastText message={actions.deleteError} variant="error" />
+              <ToastText
+                message={actions.deleteError}
+                variant={actions.deleteIsRestricted ? "notice" : "error"}
+              />
             </View>
           ) : undefined
         }

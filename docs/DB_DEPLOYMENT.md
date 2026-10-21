@@ -25,15 +25,16 @@ Environment에 아래 값을 등록한다. 접속 토큰과 비밀번호는 코�
 | -------- | ------------------------- | --------------------------------------------------------------------------------------- |
 | Variable | `SUPABASE_PROJECT_ID`     | **공유 개발 DB** 프로젝트의 Project Ref. Dashboard 프로젝트 URL에서 확인                |
 | Variable | `SUPABASE_DB_POOLER_HOST` | 해당 프로젝트 Connect → Session pooler의 호스트 이름만 입력 (포트·사용자·비밀번호 제외) |
+| Secret   | `SUPABASE_ACCESS_TOKEN`   | 대상 프로젝트의 Edge Functions Read-write 권한 토큰. 함수 배포에만 사용                 |
 | Secret   | `SUPABASE_DB_PASSWORD`    | 해당 프로젝트의 DB 비밀번호. 앱의 publishable/anon 키가 아님                            |
 
-Session pooler 주소는 해당 프로젝트의 Connect → Session pooler에서 확인한다. 지역 이름으로 주소를 추측하지 않는다. 워크플로가 `postgres.<Project Ref>` 사용자, 5432 포트, TLS(`sslmode=require`)로 DB URL을 구성하고 모든 원격 명령에 `--db-url`로 전달한다. 비밀번호의 특수문자는 URL 인코딩하며 완성된 URL은 로그에서 마스킹한다. `supabase link`와 Management API 토큰은 사용하지 않는다. 기존 `SUPABASE_ACCESS_TOKEN`은 이 워크플로에서 더 이상 참조하지 않는다. 운영 프로젝트의 값을 등록하지 않는다.
+Session pooler 주소는 해당 프로젝트의 Connect → Session pooler에서 확인한다. 지역 이름으로 주소를 추측하지 않는다. 워크플로가 `postgres.<Project Ref>` 사용자, 5432 포트, TLS(`sslmode=require`)로 DB URL을 구성하고 모든 원격 명령에 `--db-url`로 전달한다. 비밀번호의 특수문자는 URL 인코딩하며 완성된 URL은 로그에서 마스킹한다. DB 배포에는 `supabase link`와 Management API 토큰을 사용하지 않는다. `SUPABASE_ACCESS_TOKEN`은 마이그레이션 이후 관리자·제재 Edge Function 배포에만 사용한다. 운영 프로젝트의 값을 등록하지 않는다.
 
 GitHub Actions의 IPv4 환경에서 IPv6 직접 DB 연결을 시도하면 `IPv6 is not supported on your current network`로 실패할 수 있다. Session pooler는 IPv4를 지원하며, 연결 확인과 dry-run을 거쳐 실제 적용 여부를 검증한다. Transaction pooler(6543)가 아닌 Session pooler(5432)를 사용한다.
 
 등록 화면: https://github.com/Digginn/Diggin-app/settings/environments
 
-이 값이 비어 있으면 워크플로는 누락된 항목 이름을 표시하고 DB 적용 전에 중단한다. 실제 비밀값은 로그에 출력하지 않는다. OAuth 로그인 설정·프로젝트 설정·Edge Functions·기기별 로컬 DB는 이 워크플로의 배포 대상이 아니다.
+이 값이 비어 있으면 워크플로는 누락된 항목 이름을 표시하고 DB 적용 전에 중단한다. 실제 비밀값은 로그에 출력하지 않는다. DB 배포 성공 후 같은 커밋의 `admin-moderation`, `account-restriction` Edge Function을 배포한다. Deno 검사·테스트도 선행한다. OAuth 로그인 설정·프로젝트 설정·기기별 로컬 DB는 배포 대상이 아니다. 운영자 계정 등록과 OIDC audience 설정은 [MODERATION_API.md](MODERATION_API.md)를 따른다. 함수 배포 실패는 Actions 실패로 표시되며 DB 적용을 자동으로 되돌리지는 않는다.
 
 ## 최초 배포 전 확인
 

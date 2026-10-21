@@ -433,6 +433,13 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # Set enabled = false to fall back to the legacy migra engine.
 [experimental.pgdelta]
 enabled = true
+
+[functions.admin-moderation]
+verify_jwt = true
+
+# Supabase 세션 대신 함수 내부에서 제공자 ID token의 서명·issuer·audience를 검증한다.
+[functions.account-restriction]
+verify_jwt = false
 # Directory under `supabase/` where declarative files are written.
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting. When omitted, SQL is

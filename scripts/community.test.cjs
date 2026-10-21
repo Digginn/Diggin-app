@@ -17,7 +17,13 @@ function load(file, mocks = {}, globals = {}) {
     {
       module,
       exports: module.exports,
-      require: (name) => mocks[name] ?? (name.endsWith(".svg") ? name : require(name)),
+      require: (name) =>
+        mocks[name] ??
+        (name === "@/api/accountAccess"
+          ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
+          : name.endsWith(".svg")
+            ? name
+            : require(name)),
       ...globals,
     },
   );
