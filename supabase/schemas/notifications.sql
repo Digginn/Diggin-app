@@ -7,6 +7,8 @@ create table private.notifications (
   recipient_id uuid not null references public.profiles(id) on delete cascade,
   type public.notification_type not null,
   post_id bigint not null references private.posts(id) on delete cascade,
+  -- 댓글·좋아요를 한 사람. 나중에 차단·신고하면 목록과 새 알림 점에서 뺀다. 투표 마감은 없다.
+  actor_id uuid references public.profiles(id) on delete set null,
   title text not null,
   body text not null,
   -- 수신자·유형·원본 이벤트로 만든 키. 트리거 재실행·투표 마감 작업 반복에도 한 번만 남긴다.
@@ -17,6 +19,7 @@ create table private.notifications (
 create index notifications_recipient_idx on private.notifications(recipient_id, created_at desc, id desc);
 create index notifications_push_pending_idx on private.notifications(created_at) where push_sent_at is null;
 create index notifications_post_idx on private.notifications(post_id);
+create index notifications_actor_idx on private.notifications(actor_id);
 
 -- 좋아요는 취소 후 다시 눌러도 같은 사람·같은 글에 한 번만 알린다. 취소해도 지우지 않는다.
 create table private.like_notification_log (
@@ -80,8 +83,8 @@ begin
   end if;
   select number into anon_number from private.post_anon_numbers
   where post_id = new.post_id and user_id = new.author_id;
-  insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
-  values (target.author_id, 'post_commented', target.id, '내 게시글에 댓글이 달렸어요.',
+  insert into private.notifications(recipient_id, type, post_id, actor_id, title, body, event_key)
+  values (target.author_id, 'post_commented', target.id, new.author_id, '내 게시글에 댓글이 달렸어요.',
           '디기 ' || coalesce(anon_number::text, '') || ': ' || private.notification_text(new.content),
           'comment:' || new.id)
   on conflict (event_key) do nothing;
@@ -104,8 +107,8 @@ begin
   insert into private.like_notification_log(post_id, actor_id) values (new.post_id, new.user_id)
   on conflict do nothing;
   if not found then return new; end if;
-  insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
-  values (target.author_id, 'post_liked', target.id, '내 게시글에 좋아요가 달렸어요.',
+  insert into private.notifications(recipient_id, type, post_id, actor_id, title, body, event_key)
+  values (target.author_id, 'post_liked', target.id, new.user_id, '내 게시글에 좋아요가 달렸어요.',
           '''' || private.notification_text(target.content) || ''' 게시글을 누군가 좋아해요.',
           'like:' || new.post_id || ':' || new.user_id)
   on conflict (event_key) do nothing;
@@ -184,9 +187,10 @@ begin
       'is_post_available', p.deleted_at is null and p.hidden_at is null
     ) order by n.created_at desc, n.id desc), '[]'::jsonb)
     from (
-      select * from private.notifications
-      where recipient_id = viewer_id and created_at > now() - interval '30 days'
-        and (after_created_at is null or (created_at, id) < (after_created_at, after_id))
+      select * from private.notifications n
+      where n.recipient_id = viewer_id and n.created_at > now() - interval '30 days'
+        and (n.actor_id is null or private.notification_actor_visible(viewer_id, n.actor_id))
+        and (after_created_at is null or (n.created_at, n.id) < (after_created_at, after_id))
       order by created_at desc, id desc limit 20
     ) n
     join private.posts p on p.id = n.post_id
@@ -210,6 +214,7 @@ begin
   return exists (
     select 1 from private.notifications n
     where n.recipient_id = viewer_id and n.created_at > now() - interval '30 days'
+      and (n.actor_id is null or private.notification_actor_visible(viewer_id, n.actor_id))
       and n.created_at > coalesce(
         (select c.checked_at from private.notification_checks c where c.user_id = viewer_id), '-infinity')
   );
