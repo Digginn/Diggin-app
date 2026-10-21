@@ -1,16 +1,17 @@
+import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconMyChevron } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
-import { useToast } from "@/hooks/useToast";
 
-export type TermsDocument = "terms" | "privacy" | "licenses";
+export type TermsDocument = "terms" | "privacy" | "community" | "licenses";
 
 const DOCUMENTS: { key: TermsDocument; label: string }[] = [
   { key: "terms", label: "이용약관" },
   { key: "privacy", label: "개인정보 처리방침" },
+  { key: "community", label: "커뮤니티 이용정책" },
   { key: "licenses", label: "오픈소스 라이센스" },
 ];
 
@@ -20,12 +21,12 @@ type TermsScreenProps = {
 
 export function TermsScreen({ onPressDocument }: TermsScreenProps = {}) {
   const insets = useSafeAreaInsets();
-  const showToast = useToast();
+  const router = useRouter();
 
   return (
     <View className="flex-1 bg-gray-0">
       <StatusBar style="dark" />
-      <AppBar title="이용약관" />
+      <AppBar title="약관 및 정책" />
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-margin pt-6"
@@ -38,7 +39,7 @@ export function TermsScreen({ onPressDocument }: TermsScreenProps = {}) {
             accessibilityRole="button"
             accessibilityLabel={label}
             onPress={() =>
-              onPressDocument ? onPressDocument(key) : showToast("약관 본문은 준비 중입니다.")
+              onPressDocument ? onPressDocument(key) : router.push(`/policies/${key}` as Href)
             }
             className="h-12 flex-row items-center justify-between border-b border-gray-300"
           >

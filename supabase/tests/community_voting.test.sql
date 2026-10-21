@@ -84,7 +84,7 @@ delete from private.user_blocks where blocker_id='96000000-0000-0000-0000-000000
 insert into private.reports(reporter_id,target_type,post_id,reported_user_id,reason) values
  ('96000000-0000-0000-0000-000000000002','post',current_setting('test.vote')::bigint,'96000000-0000-0000-0000-000000000001','spam');
 set local role authenticated;
-select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','post_not_found','신고한 작성자 투표 차단');
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'buy')$$,'42501','post_not_found','신고한 투표글 참여 차단');
 reset role;
 delete from private.reports where reporter_id='96000000-0000-0000-0000-000000000002';
 update public.profiles set status='community_restricted',restricted_until=now()+interval '7 days' where id='96000000-0000-0000-0000-000000000002';
@@ -97,7 +97,7 @@ select lives_ok($$select public.set_community_vote(current_setting('test.vote'):
 reset role;
 update public.profiles set status='suspended',suspended_at=now() where id='96000000-0000-0000-0000-000000000002';
 set local role authenticated;
-select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'not')$$,'42501','community_restricted','정지 계정 투표 차단');
+select throws_ok($$select public.set_community_vote(current_setting('test.vote')::bigint,'not')$$,'42501','suspended','정지 계정 투표 차단');
 reset role;
 select * from finish();
 rollback;

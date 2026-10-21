@@ -1,59 +1,127 @@
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { Text, View } from "react-native";
 
-import { ActionModal, ReportModal } from "@/components/modal";
+import { Modal } from "@/components/modal/Modal";
+import { ModalButton } from "@/components/modal/ModalButton";
+import { ReportForm } from "@/components/modal/ReportModal";
+import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
+import { REPORT_MESSAGES, type ReportReason, type ReportTarget } from "@/constants/report";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/useToast";
+import { communityKeys } from "@/screens/diggle/api/community";
+import {
+  blockCommunityAuthor,
+  reportCommunityContent,
+} from "@/screens/diggle/api/communityReporting";
+import { communityWriteError } from "@/screens/diggle/api/communityWrite";
 
-/** null 이면 아무 모달도 떠 있지 않다. */
-export type ReportTarget = { authorId: string };
+export type { ReportTarget } from "@/constants/report";
 
-type ReportFlowProps = {
+export function ReportFlow({
+  target,
+  onClose,
+}: {
   target: ReportTarget | null;
   onClose: () => void;
-  onBlock: (authorId: string) => void;
-};
+}) {
+  return target ? (
+    <ReportDialog key={`${target.type}:${target.id}`} target={target} onClose={onClose} />
+  ) : null;
+}
 
-/**
- * 신고 사유 선택부터 차단 여부 확인까지를 한 묶음으로 처리한다.
- * 피드 · 게시글 상세 · 댓글이 같은 흐름을 쓰므로 화면마다 다시 쓰지 않는다.
- */
-export function ReportFlow({ target, onClose, onBlock }: ReportFlowProps) {
-  const [blockingId, setBlockingId] = useState<string | null>(null);
+// 한 NativeModal에서 신고 → 차단 확인을 전환해 iOS 모달 연속 표시 경합을 피한다.
+export function ReportDialog({ target, onClose }: { target: ReportTarget; onClose: () => void }) {
+  const { session } = useAuth();
+  const viewer = session?.user.id ?? null;
+  const [owner] = useState(viewer);
+  const [phase, setPhase] = useState<"report" | "block">("report");
+  const [isPending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const busy = useRef(false);
+  const lifetime = useRef({ active: true });
+  const queryClient = useQueryClient();
+  const showToast = useToast();
+  useEffect(() => {
+    const current = { active: true };
+    lifetime.current = current;
+    return () => {
+      current.active = false;
+    };
+  }, [viewer]);
+  useEffect(() => {
+    if (viewer !== owner) onClose();
+  }, [viewer, owner, onClose]);
+  const close = () => {
+    if (!busy.current) onClose();
+  };
 
-  function closeBlockConfirm() {
-    setBlockingId(null);
+  async function submit(reason?: ReportReason, detail = "") {
+    if (!viewer || viewer !== owner || busy.current) return;
+    const current = lifetime.current;
+    busy.current = true;
+    setPending(true);
+    setError("");
+    try {
+      if (phase === "report") {
+        if (!reason) return;
+        await reportCommunityContent(target, reason, detail);
+      } else await blockCommunityAuthor(target);
+      if (!current.active) return;
+      await queryClient.invalidateQueries({ queryKey: communityKeys.all }, { throwOnError: true });
+      if (!current.active) return;
+      if (phase === "report") setPhase("block");
+      else {
+        showToast(DIGGLE_TOAST_MESSAGES.REPORT_004);
+        onClose();
+      }
+    } catch (failure) {
+      if (current.active)
+        setError(phase === "block" ? REPORT_MESSAGES.blockFailed : communityWriteError(failure));
+    } finally {
+      if (current.active) {
+        busy.current = false;
+        setPending(false);
+      }
+    }
   }
 
   return (
-    <>
-      <ReportModal
-        // 대상이 바뀌면 고른 사유와 입력이 남지 않도록 새로 만든다.
-        key={target?.authorId ?? "closed"}
-        visible={target !== null}
-        onCancel={onClose}
-        onRequestClose={onClose}
-        onReport={() => {
-          // TODO: 신고 접수 API 연결. 지금은 접수된 것으로 보고 차단 여부만 묻는다.
-          if (target) setBlockingId(target.authorId);
-          onClose();
-        }}
-      />
-
-      <ActionModal
-        visible={blockingId !== null}
-        type="2Btn"
-        title="신고가 접수되었습니다."
-        description={
-          "이 사용자를 차단하시겠습니까?\n차단하면 서로의 게시글과 댓글을 볼 수 없습니다."
-        }
-        secondaryAction={{ label: "괜찮아요", onPress: closeBlockConfirm }}
-        primaryAction={{
-          label: "차단하기",
-          onPress: () => {
-            if (blockingId) onBlock(blockingId);
-            closeBlockConfirm();
-          },
-        }}
-        onRequestClose={closeBlockConfirm}
-      />
-    </>
+    <Modal
+      visible={!!viewer && viewer === owner}
+      onRequestClose={close}
+      toastMessage={error || undefined}
+      onToastDismiss={() => setError("")}
+    >
+      {phase === "report" ? (
+        <ReportForm
+          onCancel={close}
+          onReport={(reason, detail) => void submit(reason, detail)}
+          isPending={isPending}
+        />
+      ) : (
+        <>
+          <Text className="text-gray-900 font-label-16-semibold">{REPORT_MESSAGES.title}</Text>
+          <Text className="text-gray-500 font-b3">{REPORT_MESSAGES.blockDescription}</Text>
+          <View className="w-[295px] flex-row gap-modal-action">
+            <View className="w-[140px]">
+              <ModalButton
+                variant="secondary"
+                action={{ label: "괜찮아요", onPress: close, isDisabled: isPending }}
+              />
+            </View>
+            <View className="w-[140px]">
+              <ModalButton
+                action={{
+                  label: isPending ? "차단 중…" : "차단하기",
+                  onPress: () => void submit(),
+                  isDisabled: isPending,
+                }}
+              />
+            </View>
+          </View>
+        </>
+      )}
+    </Modal>
   );
 }

@@ -357,7 +357,50 @@ export type Database = {
     };
     Functions: {
       accept_policy: { Args: { target_policy_id: number }; Returns: undefined };
+      acknowledge_sanction_notice: { Args: { sanction_id: number }; Returns: undefined };
+      admin_content_action: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          category: string;
+          explanation: string;
+          new_status: string;
+          operation: string;
+          report: number;
+          request_id: string;
+        };
+        Returns: string;
+      };
+      admin_prepare_sanction: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          category: string;
+          explanation: string;
+          operation: string;
+          report?: number;
+          request_id: string;
+          target_user: string;
+        };
+        Returns: Json;
+      };
+      admin_report_detail: {
+        Args: { actor: string; actor_session: string; before_report_id?: number; report: number };
+        Returns: Json;
+      };
+      admin_report_groups: {
+        Args: { actor: string; actor_session: string; before_id?: number };
+        Returns: Json;
+      };
+      admin_sanction_request: {
+        Args: { actor: string; actor_session: string; mark_failed?: boolean; request_id: string };
+        Returns: Json;
+      };
       agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
+      block_community_author: {
+        Args: { target_id: number; target_type: string };
+        Returns: undefined;
+      };
       create_comment: {
         Args: { comment_content: string; request_id: string; target_post_id: number };
         Returns: Json;
@@ -373,6 +416,7 @@ export type Database = {
       };
       delete_comment: { Args: { target_comment_id: number }; Returns: undefined };
       delete_community_post: { Args: { target_post_id: number }; Returns: undefined };
+      get_account_access: { Args: Record<PropertyKey, never>; Returns: Json };
       get_community_comments: {
         Args: { after_created_at?: string; after_id?: number; target_post_id: number };
         Returns: Json;
@@ -382,6 +426,10 @@ export type Database = {
         Returns: Json;
       };
       get_community_post: { Args: { target_post_id: number }; Returns: Json };
+      get_my_community_activity: {
+        Args: { activity_type: string; after_activity_at?: string; after_id?: number };
+        Returns: Json;
+      };
       get_pending_policies: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -401,9 +449,22 @@ export type Database = {
         };
       };
       import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
+      lookup_suspended_identity: {
+        Args: { identity_provider: string; identity_subject: string };
+        Returns: Json;
+      };
       register_push_token: {
         Args: { new_platform: string; new_token: string };
         Returns: undefined;
+      };
+      report_community_content: {
+        Args: {
+          report_detail?: string;
+          report_reason: string;
+          target_id: number;
+          target_type: string;
+        };
+        Returns: string;
       };
       save_product: {
         Args: {

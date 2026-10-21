@@ -15,10 +15,22 @@ function load(relativePath, mocks = {}) {
   const componentModule = { exports: {} };
   runInNewContext(compiled, {
     process: { env: {} },
+    setTimeout: (callback) => callback(),
     exports: componentModule.exports,
     module: componentModule,
     require: (name) => {
       if (name in mocks) return mocks[name];
+      if (name === "@/api/accountAccess")
+        return {
+          ensureCommunityWriteAllowed: async () => undefined,
+          restrictionMessage: () => null,
+          fetchAccountAccess: async () => ({ status: "active" }),
+        };
+      if (name === "@/components/AccountAccessNotice")
+        return { AccountAccessNotice: "AccountAccessNotice" };
+      if (name === "@/theme") return load("theme/colors.ts");
+      if (name === "@/screens/diggle/components/SanctionNoticeModal")
+        return { SanctionNoticeModal: "SanctionNoticeModal" };
       if (name.endsWith(".svg")) return { __esModule: true, default: name };
       if (name === "react-native") return { View: "View", Text: "Text", Pressable: "Pressable" };
       return require(name);
@@ -67,22 +79,20 @@ test("소셜 버튼이 공통 Button과 지정 로고·색상·콜백을 사용�
   }
 });
 
-test("루트는 폰트 준비 후 스플래시를 닫고 전역 토스트·상태바·라우터를 함께 제공한다", () => {
-  let isLoaded = false;
-  let fontError = null;
-  let effect;
-  let hidden = 0;
-  let prevented = 0;
-  const { default: RootLayout } = load("app/_layout.tsx", {
-    "expo-font": { useFonts: () => [isLoaded, fontError] },
+test("루트는 폰트·세션 복원이 끝난 뒤 앱과 전역 제재 안내를 표시한다", () => {
+  let isLoaded = false,
+    isRestoring = false,
+    effect,
+    hidden = 0;
+  const providers = ["Auth", "BlockedUsers", "BrowsingMode", "PostDraft", "Posts", "Toast"];
+  const mocks = {
+    "expo-font": { useFonts: () => [isLoaded, null] },
     "expo-router": { Stack: "Stack" },
     "expo-status-bar": { StatusBar: "StatusBar" },
     "expo-splash-screen": {
-      preventAutoHideAsync: () => {
-        prevented += 1;
-      },
-      hideAsync: () => {
-        hidden += 1;
+      preventAutoHideAsync() {},
+      hideAsync() {
+        hidden++;
       },
     },
     "react": {
@@ -91,105 +101,116 @@ test("루트는 폰트 준비 후 스플래시를 닫고 전역 토스트·상�
       },
     },
     "@/global.css": {},
-    "@/contexts/ToastContext": { ToastProvider: "ToastProvider" },
-    "@/components/LinkDetectModal": { LinkDetectModal: "LinkDetectModal" },
-    "@/assets/fonts/Pretendard-Regular.otf": 1,
-    "@/assets/fonts/Pretendard-Medium.otf": 2,
-    "@/assets/fonts/Pretendard-SemiBold.otf": 3,
-    "@/assets/fonts/Pretendard-Bold.otf": 4,
-  });
-  assert.equal(prevented, 1);
-  assert.equal(RootLayout(), null);
+    "@/lib/queryClient": { queryClient: {} },
+    "@tanstack/react-query": { QueryClientProvider: "QueryClientProvider" },
+    "@/screens/login/components/SessionExpiredModal": {
+      SessionExpiredModal: "SessionExpiredModal",
+    },
+    "@/lib/pushNotifications": { registerDevicePush: async () => {} },
+  };
+  for (const name of providers)
+    mocks[`@/contexts/${name}Context`] = {
+      [`${name}Provider`]: `${name}Provider`,
+      ...(name === "Auth" ? { useAuth: () => ({ isRestoring }) } : {}),
+    };
+  for (const name of ["Regular", "Medium", "SemiBold", "Bold"])
+    mocks[`@/assets/fonts/Pretendard-${name}.otf`] = 1;
+  const { default: RootLayout } = load("app/_layout.tsx", mocks);
+  const gate = () => RootLayout().props.children.props.children;
+  assert.equal(gate().type(gate().props), null);
   effect();
   assert.equal(hidden, 0);
   isLoaded = true;
-  const root = RootLayout();
+  const content = gate().type(gate().props);
   effect();
   assert.equal(hidden, 1);
-  assert.equal(root.type, "ToastProvider");
-  const children = React.Children.toArray(root.props.children);
-  assert.equal(children[0].type, "StatusBar");
-  assert.equal(children[0].props.style, "auto");
-  assert.equal(children[1].type, "Stack");
-  assert.equal(children[1].props.screenOptions.headerShown, false);
-  assert.equal(children[2].type, "LinkDetectModal");
-  isLoaded = false;
-  fontError = new Error("폰트 로딩 실패");
-  assert.equal(RootLayout().type, "ToastProvider");
-  effect();
-  assert.equal(hidden, 2);
+  const tree = nodes(content);
+  assert.ok(
+    tree.some((node) => node.type === "Stack" && node.props.screenOptions.headerShown === false),
+  );
+  assert.ok(tree.some((node) => node.type === "AccountAccessNotice"));
+  assert.ok(tree.some((node) => node.type?.name === "PushRegistration"));
+  isRestoring = true;
+  assert.equal(gate().type(gate().props), null);
 });
 
-test("로그인 화면의 둘러보기·뒤로 가기와 소셜 로그인 호출이 정상 동작한다", () => {
-  const routes = [];
-  const alerts = [];
-  const signIns = [];
-  let canGoBack = false;
-  const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
-    "react": { useState: (initial) => [initial, () => {}] },
-    "./api/signIn": {
-      signIn: (provider) => {
-        signIns.push(provider);
-        return Promise.resolve({ status: "cancelled" });
+for (const os of ["ios", "android"]) {
+  test(`${os}: 로그인 화면의 둘러보기·뒤로 가기와 OS별 소셜 로그인이 정상 동작한다`, () => {
+    const expectedProviders = os === "ios" ? "google,kakao,apple" : "google,kakao";
+    const routes = [];
+    const alerts = [];
+    const signIns = [];
+    let canGoBack = false;
+    const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+      "react": { useState: (initial) => [initial, () => {}] },
+      "./api/signIn": {
+        signIn: (provider) => {
+          signIns.push(provider);
+          return Promise.resolve({ status: "cancelled" });
+        },
       },
-    },
-    "expo-router": {
-      useRouter: () => ({
-        replace: (route) => routes.push(route),
-        back: () => routes.push("back"),
-        canGoBack: () => canGoBack,
-      }),
-    },
-    "expo-status-bar": { StatusBar: "StatusBar" },
-    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) },
-    "react-native": {
-      View: "View",
-      Text: "Text",
-      Pressable: "Pressable",
-      ScrollView: "ScrollView",
-      useWindowDimensions: () => ({ height: 812 }),
-      Alert: { alert: (...args) => alerts.push(args) },
-    },
-    "@/components/app-bar": { AppBar: "AppBar" },
-    "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
-    "@/components/ToastText": { ToastText: "ToastText" },
-    "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+      "expo-router": {
+        useRouter: () => ({
+          replace: (route) => routes.push(route),
+          back: () => routes.push("back"),
+          canGoBack: () => canGoBack,
+        }),
+      },
+      "expo-status-bar": { StatusBar: "StatusBar" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) },
+      "react-native": {
+        Platform: { OS: os },
+        View: "View",
+        Text: "Text",
+        Pressable: "Pressable",
+        ScrollView: "ScrollView",
+        useWindowDimensions: () => ({ height: 812 }),
+        Alert: { alert: (...args) => alerts.push(args) },
+      },
+      "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/ToastText": { ToastText: "ToastText" },
+      "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+    });
+    const tree = nodes(LoginScreen());
+    const bar = tree.find((node) => node.type === "AppBar");
+    assert.equal(bar.props.backIconSize, 24);
+    assert.equal(bar.props.left, "back");
+    assert.ok(!tree.some((node) => node.type === "ToastText"));
+    bar.props.onBack();
+    assert.equal(routes.at(-1), "/");
+    canGoBack = true;
+    bar.props.onBack();
+    assert.equal(routes.at(-1), "back");
+    const scroll = tree.find((node) => node.type === "ScrollView");
+    assert.equal(scroll.props.contentContainerStyle.minHeight, 706);
+    assert.equal(scroll.props.contentContainerStyle.paddingBottom, 36);
+    const providers = tree.filter((node) => node.type === "SocialLoginButton");
+    assert.equal(providers.map((node) => node.props.provider).join(","), expectedProviders);
+    for (const button of providers) button.props.onPress();
+    assert.equal(signIns.join(","), expectedProviders);
+    assert.equal(alerts.length, 0);
+    const buttons = tree.filter((node) => node.type === "Pressable");
+    buttons[0].props.onPress();
+    assert.equal(routes.at(-1), "/browse");
+    buttons[1].props.onPress();
+    buttons[2].props.onPress();
+    assert.equal(alerts.at(-2)[0], "이용약관");
+    assert.equal(alerts.at(-1)[0], "개인정보 처리방침");
+    const errorTree = nodes(LoginScreen({ isLoginError: true }));
+    const toast = errorTree.find((node) => node.type === "ToastText");
+    assert.equal(toast.props.message, "로그인에 실패했습니다. 다시 시도해 주세요.");
+    assert.equal(errorTree.find((node) => node.type === "AppBar").props.left, "none");
+    assert.equal(
+      errorTree.filter((node) => node.type === "SocialLoginButton").length,
+      os === "ios" ? 3 : 2,
+    );
+    assert.ok(errorTree.some((node) => node.props.className?.includes("top-[-54px]")));
+    const loadingTree = nodes(LoginScreen({ isLoginLoading: true }));
+    const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
+    assert.equal(loadingDialog.props.message, "로그인 중입니다.");
   });
-  const tree = nodes(LoginScreen());
-  const bar = tree.find((node) => node.type === "AppBar");
-  assert.equal(bar.props.backIconSize, 24);
-  assert.equal(bar.props.left, "back");
-  assert.ok(!tree.some((node) => node.type === "ToastText"));
-  bar.props.onBack();
-  assert.equal(routes.at(-1), "/");
-  canGoBack = true;
-  bar.props.onBack();
-  assert.equal(routes.at(-1), "back");
-  const scroll = tree.find((node) => node.type === "ScrollView");
-  assert.equal(scroll.props.contentContainerStyle.minHeight, 706);
-  assert.equal(scroll.props.contentContainerStyle.paddingBottom, 36);
-  const providers = tree.filter((node) => node.type === "SocialLoginButton");
-  assert.equal(providers.map((node) => node.props.provider).join(","), "google,kakao,apple");
-  for (const button of providers) button.props.onPress();
-  assert.equal(signIns.join(","), "google,kakao,apple");
-  assert.equal(alerts.length, 0);
-  const buttons = tree.filter((node) => node.type === "Pressable");
-  buttons[0].props.onPress();
-  assert.equal(routes.at(-1), "/browse");
-  buttons[1].props.onPress();
-  buttons[2].props.onPress();
-  assert.equal(alerts.at(-2)[0], "이용약관");
-  assert.equal(alerts.at(-1)[0], "개인정보 처리방침");
-  const errorTree = nodes(LoginScreen({ isLoginError: true }));
-  const toast = errorTree.find((node) => node.type === "ToastText");
-  assert.equal(toast.props.message, "로그인에 실패했습니다. 다시 시도해 주세요.");
-  assert.equal(errorTree.find((node) => node.type === "AppBar").props.left, "none");
-  assert.equal(errorTree.filter((node) => node.type === "SocialLoginButton").length, 3);
-  assert.ok(errorTree.some((node) => node.props.className?.includes("top-[-54px]")));
-  const loadingTree = nodes(LoginScreen({ isLoginLoading: true }));
-  const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
-  assert.equal(loadingDialog.props.message, "로그인 중입니다.");
-});
+}
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
   const { ToastText } = load("components/ToastText.tsx", {
@@ -199,7 +220,7 @@ test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류�
   assert.equal(toast.props.pointerEvents, "none");
   assert.equal(toast.props.accessibilityRole, "alert");
   assert.equal(toast.props.accessibilityLiveRegion, "polite");
-  for (const token of ["border-gray-800", "bg-gray-700", "p-3"]) {
+  for (const token of ["bg-semantic-toast", "p-3"]) {
     assert.ok(toast.props.className.includes(token));
   }
   const text = nodes(toast).find((node) => node.type === "Text");
@@ -376,13 +397,21 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   emit("TOKEN_REFRESHED", { id: "s2" });
   assert.equal(render().isSessionExpired, false);
   emit("SIGNED_OUT", null);
+  await Promise.resolve();
   assert.equal(render().isSessionExpired, true);
   assert.equal(cacheClears.length, 2, "로그아웃·만료 모두 상품 캐시를 비운다");
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);
 });
 
-function loadSignIn({ getUser, kakao = {}, saveAvatar = async () => {} }) {
+function loadSignIn({
+  getUser,
+  kakao = {},
+  saveAvatar = async () => {},
+  authError = null,
+  restrictionNotice = null,
+  os = "ios",
+}) {
   const storage = new Map();
   return load("screens/login/api/signIn.ts", {
     "@react-native-async-storage/async-storage": {
@@ -411,12 +440,27 @@ function loadSignIn({ getUser, kakao = {}, saveAvatar = async () => {} }) {
     "expo-apple-authentication": {},
     "expo-linking": {},
     "expo-web-browser": {},
-    "react-native": { Platform: { OS: "ios" } },
+    "react-native": { Platform: { OS: os } },
     "@/api/avatar": { saveAvatar },
+    "@/api/accountAccess": {
+      ...load("api/accountAccess.ts", {
+        "@/lib/supabase": { supabase: {} },
+        "@/screens/diggle/utils/sanctionMessages": load("screens/diggle/utils/sanctionMessages.ts"),
+      }),
+      fetchAccountAccess: async () => ({ status: "active" }),
+    },
     "@/lib/supabase": {
       supabase: {
+        functions: {
+          invoke: async (name, input) => {
+            assert.equal(name, "account-restriction");
+            assert.equal(input.body.provider, "google");
+            assert.equal(input.body.id_token, "token");
+            return { data: { notice: restrictionNotice }, error: null };
+          },
+        },
         auth: {
-          signInWithIdToken: async () => ({ error: null }),
+          signInWithIdToken: async () => ({ error: authError }),
           getUser: async () => ({ data: { user: getUser() }, error: null }),
         },
       },
@@ -472,4 +516,32 @@ test("카카오 신규 가입만 카카오 프로필 사진을 복사하고, 실
   } finally {
     console.warn = warn;
   }
+});
+
+test("Auth ban 로그인은 가입 처리 없이 검증된 본인 제재 안내로 전환한다", async () => {
+  const { signIn } = loadSignIn({
+    getUser: () => assert.fail("must_not_load_user"),
+    authError: { code: "user_banned" },
+    restrictionNotice: { status: "suspended", sanction_id: "4", reason_category: "spam" },
+  });
+  const result = await signIn("google");
+  assert.equal(result.status, "suspended");
+  assert.equal(result.access.reasonCategory, "spam");
+});
+test("제재 상세를 조회하지 못해도 로그인 성공이나 임의 위반 유형을 만들지 않는다", async () => {
+  const { signIn } = loadSignIn({
+    getUser: () => assert.fail("must_not_load_user"),
+    authError: { code: "user_banned" },
+  });
+  const result = await signIn("google");
+  assert.equal(result.status, "suspended");
+  assert.equal(result.access.reasonCategory, null);
+});
+
+test("Android에서는 Apple 인증을 직접 호출해도 실행하지 않는다", async () => {
+  const { signIn } = loadSignIn({
+    os: "android",
+    getUser: () => assert.fail("must_not_load_user"),
+  });
+  await assert.rejects(signIn("apple"), /apple_login_not_supported/);
 });

@@ -75,11 +75,12 @@ function readResult(value: unknown): CsvImportResult {
   return { importedCount: value.importedCount, excludedProducts, folderFailures };
 }
 
-/** 같은 파일의 응답을 잃은 경우, 앱을 다시 열어도 동일 요청으로 결과를 확인한다. */
+/** 응답 유실 시 동일 요청을 재사용한다. 폴더 한도 안내를 취소하면 저장 없이 null을 반환한다. */
 export async function importCsv(
   asset: DocumentPickerAsset,
   onProgress: (progress: CsvImportProgress) => void,
-): Promise<CsvImportResult | CsvImportFailure> {
+  confirmFolderLimit?: () => Promise<boolean>,
+): Promise<CsvImportResult | CsvImportFailure | null> {
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (!auth.user) {
     if (authError && authError.status !== 401 && authError.name !== "AuthSessionMissingError")
@@ -129,7 +130,7 @@ export async function importCsv(
     }
   }
   pending ??= { fingerprint, requestId: Crypto.randomUUID(), importedAt: options.importedAt };
-  await AsyncStorage.setItem(storageKey, JSON.stringify(pending));
+  let isFolderLimitConfirmed = false;
 
   // 폴더 이름이 조회 이후 바뀌면 전체 트랜잭션이 취소된다. 최신 목록으로 최대 두 번 재계산한다.
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -154,6 +155,14 @@ export async function importCsv(
     );
     if (!prepared.ok) throw new Error("CSV 파일을 읽을 수 없습니다.");
     const plan = prepared.plan;
+    if (
+      !isFolderLimitConfirmed &&
+      plan.folderFailures.some((failure) => failure.reason === "FOLDER_LIMIT_EXCEEDED")
+    ) {
+      if (!confirmFolderLimit || !(await confirmFolderLimit())) return null;
+      isFolderLimitConfirmed = true;
+    }
+    await AsyncStorage.setItem(storageKey, JSON.stringify(pending));
     const { data, error } = await supabase.rpc("import_csv", {
       request_id: pending.requestId,
       import_plan: {

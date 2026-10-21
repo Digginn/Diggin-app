@@ -79,6 +79,8 @@ def deployment_plan(directory, history):
 
 def run_cli(args, capture=False):
     # Never print the command: --db-url contains the database password.
+    if args[:2] == ["migration", "list"]:
+        args = [*args, "--output-format", "text"]
     result = subprocess.run(["supabase", *args], text=True, capture_output=capture, check=True)
     if capture:
         print(result.stdout, end="")

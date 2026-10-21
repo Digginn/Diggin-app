@@ -20,6 +20,10 @@ function loadModule(filename) {
     exports: loaded.exports,
     module: loaded,
     require: (name) => {
+      if (name === "@/constants/report")
+        return loadModule(path.join(__dirname, "../src/constants/report.ts"));
+      if (name === "@/utils/text")
+        return { normalizeText: (value) => value.normalize("NFC").replace(/\r\n?/g, "\n") };
       if (name === "@/components/ToastText") return { ToastText: "ToastText" };
       if (name === "@/hooks/useNativeModalVisible")
         return { useNativeModalVisible: (visible) => visible };

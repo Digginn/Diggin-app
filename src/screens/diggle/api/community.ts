@@ -15,6 +15,8 @@ export const communityKeys = {
   post: (viewer: string | null, id: string) => [...communityKeys.all, viewer, "post", id] as const,
   comments: (viewer: string | null, id: string) =>
     [...communityKeys.all, viewer, "comments", id] as const,
+  activity: (viewer: string | null, kind: string) =>
+    [...communityKeys.all, viewer, "activity", kind] as const,
 };
 
 function record(value: unknown): Record<string, unknown> {

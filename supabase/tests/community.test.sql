@@ -83,11 +83,11 @@ reset role;
 insert into private.reports(reporter_id,target_type,post_id,reported_user_id,reason)
  values ('94000000-0000-0000-0000-000000000002','post',current_setting('test.post')::bigint,'94000000-0000-0000-0000-000000000001','spam');
 set local role authenticated;
-select is(public.get_community_post(current_setting('test.post')::bigint),null,'신고한 작성자의 콘텐츠 제외');
+select is(public.get_community_post(current_setting('test.post')::bigint),null,'신고한 게시글 제외');
 reset role;
 update public.profiles set status='suspended',suspended_at=now() where id='94000000-0000-0000-0000-000000000002';
 set local role authenticated;
-select throws_ok($$select public.get_community_feed()$$,'42501','not_authorized','정지 계정 피드 접근 차단');
+select throws_ok($$select public.get_community_feed()$$,'42501','suspended','정지 계정 피드 접근 차단');
 reset role;
 select throws_ok($$insert into private.posts(author_id,type,content) values ('94000000-0000-0000-0000-000000000001','post','네글자요')$$,'23514',null,'공백 제외 최소 길이 검증');
 select lives_ok($$insert into private.posts(author_id,type,content) values ('94000000-0000-0000-0000-000000000001','post',repeat('가',50))$$,'일반글도 최신 명세의 50자 허용');

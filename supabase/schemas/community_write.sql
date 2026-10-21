@@ -79,7 +79,8 @@ begin
   if viewer_id is null then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
-  -- 제재 중에도 본인 글 삭제는 허용한다. 타인 글 존재 여부는 공개하지 않는다.
+  perform private.assert_can_write_community();
+  -- RPT-006: 기간 제한 중에는 본인 게시글 삭제도 차단한다.
   select * into target from private.posts where id = target_post_id and author_id = viewer_id for update;
   if not found then raise exception 'post_not_found' using errcode = '42501'; end if;
   if target.deleted_at is not null then return; end if;

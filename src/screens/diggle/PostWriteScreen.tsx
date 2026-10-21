@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+import { restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { HelperText } from "@/components/Field";
@@ -148,7 +149,8 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
       setLeaving(true);
       showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글을 등록했습니다.");
     } catch (error) {
-      if (mounted.current) showToast(communityWriteError(error));
+      if (mounted.current)
+        showToast(communityWriteError(error), restrictionMessage(error) ? "notice" : "error");
     } finally {
       busy.current = false;
       if (mounted.current) setSubmitting(false);
@@ -176,13 +178,15 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
           contentContainerStyle={{ gap: 24, paddingTop: 16, paddingBottom: 24 }}
           keyboardShouldPersistTaps="handled"
         >
-          <CommunityBodyField isVote={isVote} value={body} onChangeText={setBody} />
-          {body.length > 0 && count < 5 && (
-            <HelperText
-              status="error"
-              message="공백을 제외하고 5자 이상 입력해 주세요. (이모지 포함)"
-            />
-          )}
+          <View className="gap-2.5">
+            <CommunityBodyField isVote={isVote} value={body} onChangeText={setBody} />
+            {body.length > 0 && count < 5 && (
+              <HelperText
+                status="error"
+                message="공백을 제외하고 5자 이상 입력해 주세요. (이모지 포함)"
+              />
+            )}
+          </View>
           <View className="gap-3">
             <View className="flex-row justify-between">
               <Text className="text-gray-900 font-label-14">아이템 첨부</Text>

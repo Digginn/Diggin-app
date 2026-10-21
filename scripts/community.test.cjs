@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
+const { setImmediate } = require("node:timers");
 const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
@@ -16,7 +17,13 @@ function load(file, mocks = {}, globals = {}) {
     {
       module,
       exports: module.exports,
-      require: (name) => mocks[name] ?? (name.endsWith(".svg") ? name : require(name)),
+      require: (name) =>
+        mocks[name] ??
+        (name === "@/api/accountAccess"
+          ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
+          : name.endsWith(".svg")
+            ? name
+            : require(name)),
       ...globals,
     },
   );
@@ -297,6 +304,7 @@ function screenMocks({
   comments = [],
   postResult = {},
   commentsResult = {},
+  params = { id: "12" },
 } = {}) {
   let destination;
   const toasts = [];
@@ -327,8 +335,11 @@ function screenMocks({
     },
     "expo-router": {
       useFocusEffect: () => {},
-      useLocalSearchParams: () => ({ id: "12" }),
+      useLocalSearchParams: () => params,
       useRouter: () => ({
+        dismissTo: (value) => {
+          destination = value;
+        },
         canGoBack: () => true,
         back: () => {},
         push: (value) => {
@@ -342,6 +353,7 @@ function screenMocks({
     },
     "expo-router/react-navigation": { usePreventRemove() {} },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+    "@/components/ReportFlow": { ReportFlow: "ReportFlow" },
     "@/components/CommentInput": { CommentInput: "CommentInput" },
     "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
     "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
@@ -529,6 +541,9 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   assert.equal(comments[1].props.author, "디기 1(나)");
   assert.equal(comments[1].props.body, "줄바꿈 댓글");
   assert.equal(comments[2].props.isDeleted, true);
+  assert.equal(typeof comments[0].props.onPressReport, "function");
+  assert.equal(comments[1].props.onPressReport, undefined);
+  assert.equal(comments[2].props.onPressReport, undefined);
   assert.equal(typeof nodes(screen, "LikeCommentRow")[0].props.onPressLike, "function");
   assert.equal(nodes(screen, "PostItemInfoSheet")[0].props.onSaveToAll, undefined);
 });
@@ -676,4 +691,50 @@ test("투표 블록은 본문 컨테이너의 좌우 여백을 그대로 사용�
     vote: { buyCount: 0, notCount: 0, myChoice: null, isClosed: false, remainingLabel: "1시간" },
   });
   assert.equal(tree.props.className.includes("px-margin"), false);
+});
+
+test("삭제 성공은 진입 목록과 탭으로 복귀하며 일반 DIGGLE 진입은 기존 경로를 유지한다", async () => {
+  for (const [returnTo, type, pathname, tab] of [
+    ["my-posts", "post", "/my-posts", "posts"],
+    ["my-posts", "vote", "/my-posts", "votes"],
+    ["liked", "post", "/my-liked-posts", undefined],
+    [undefined, "post", "/(tabs)/diggle", "all"],
+    [undefined, "vote", "/(tabs)/diggle", "vote"],
+  ]) {
+    const post = await api({ ...MEMBER, type, is_mine: true }).fetchCommunityPost("12");
+    const state = screenMocks({ post, params: { id: "12", returnTo } });
+    const invalidations = [];
+    state.mocks["@tanstack/react-query"] = {
+      useQueryClient: () => ({ invalidateQueries: (input) => invalidations.push(input) }),
+    };
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const tree = PostDetailScreen({ type: type === "vote" ? "vote" : "all" });
+    await nodes(tree, "ActionModal")
+      .find((node) => node.props.primaryAction?.label === "삭제")
+      .props.primaryAction.onPress();
+    await new Promise(setImmediate);
+    const target = state.destination();
+    assert.equal(typeof target === "string" ? target : target.pathname, pathname);
+    if (tab) assert.equal(target.params.tab, tab);
+    assert.equal(invalidations.length, 1);
+  }
+});
+
+test("삭제 실패는 원래 상세에 남고 잘못된 글 종류를 교정해도 복귀 목록을 보존한다", async () => {
+  const post = await api({ ...MEMBER, type: "vote", is_mine: true }).fetchCommunityPost("12");
+  const state = screenMocks({ post, params: { id: "12", returnTo: "my-posts" } });
+  state.mocks["./api/communityWrite"].deleteCommunityPost = async () => {
+    throw Error("offline");
+  };
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const tree = PostDetailScreen({ type: "vote" });
+  await nodes(tree, "ActionModal")
+    .find((node) => node.props.primaryAction?.label === "삭제")
+    .props.primaryAction.onPress();
+  await new Promise(setImmediate);
+  assert.equal(state.destination(), undefined);
+  state.mocks.react.useEffect = (effect) => effect();
+  const corrected = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks).PostDetailScreen;
+  corrected({ type: "all" });
+  assert.equal(state.destination().params.returnTo, "my-posts");
 });

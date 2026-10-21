@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { Comment, type MenuAnchor } from "@/components/Comment";
@@ -25,6 +26,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { FloatingToolbar } from "@/components/FloatingToolbar";
 import { Spinner } from "@/components/Loading";
 import { ActionModal, LoginRequiredModal } from "@/components/modal";
+import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
@@ -46,14 +48,16 @@ import type { CommunityComment, CommunityItem } from "./types/community";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
   const router = useRouter();
   const { session, isRestoring } = useAuth();
   const showToast = useToast();
   const queryClient = useQueryClient();
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [deleteIsRestricted, setDeleteRestricted] = useState(false);
   const deleting = useRef(false);
   const currentViewer = useRef(session?.user.id);
   useEffect(() => {
@@ -141,13 +145,23 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
       if (currentViewer.current !== viewer) return;
       setDeleteOpen(false);
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
-      router.dismissTo({
-        pathname: "/(tabs)/diggle",
-        params: { tab: post.type === "vote" ? "vote" : "all" },
-      });
+      if (returnTo === "my-posts")
+        router.dismissTo({
+          pathname: "/my-posts",
+          params: { tab: post.type === "vote" ? "votes" : "posts" },
+        });
+      else if (returnTo === "liked") router.dismissTo("/my-liked-posts");
+      else
+        router.dismissTo({
+          pathname: "/(tabs)/diggle",
+          params: { tab: post.type === "vote" ? "vote" : "all" },
+        });
       showToast(post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.");
     } catch (error) {
-      if (currentViewer.current === viewer) setDeleteError(communityWriteError(error));
+      if (currentViewer.current === viewer) {
+        setDeleteError(communityWriteError(error));
+        setDeleteRestricted(!!restrictionMessage(error));
+      }
     } finally {
       deleting.current = false;
       setDeleting(false);
@@ -192,10 +206,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
     if (!isRestoring && session && post && isWrongRoute) {
       router.replace({
         pathname: post.type === "vote" ? "/votes/[id]" : "/posts/[id]",
-        params: { id: post.id },
+        params: { id: post.id, ...(returnTo ? { returnTo } : {}) },
       });
     }
-  }, [isRestoring, session, post, isWrongRoute, router]);
+  }, [isRestoring, session, post, isWrongRoute, router, returnTo]);
 
   if (!isRestoring && !session)
     return (
@@ -232,6 +246,13 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               }}
             >
               삭제
+            </AppBar.TextButton>
+          ) : post && !isWrongRoute ? (
+            <AppBar.TextButton
+              disabled={isBusy || infoItem !== null}
+              onPress={() => setReportTarget({ type: "post", id: post.id })}
+            >
+              신고
             </AppBar.TextButton>
           ) : null
         }
@@ -338,6 +359,14 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               body={normalizeText(comment.body ?? "").replace(/\n/g, " ")}
               timeLabel={formatCommunityTime(comment.createdAt)}
               isDeleted={comment.isWithdrawn}
+              onPressReport={
+                !comment.isMine && !comment.isWithdrawn && !isBusy
+                  ? () => {
+                      Keyboard.dismiss();
+                      setReportTarget({ type: "comment", id: comment.id });
+                    }
+                  : undefined
+              }
               isHighlighted={actions.editing?.id === comment.id}
               onPressMenu={
                 comment.isMine && !comment.isWithdrawn && !isBusy
@@ -437,6 +466,13 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           );
         }}
       />
+      <ReportFlow
+        target={reportTarget}
+        onClose={() => {
+          setReportTarget(null);
+          if (!post) goBack();
+        }}
+      />
       <ActionModal
         visible={isDeleteOpen}
         type="2Btn"
@@ -458,7 +494,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         overlay={
           deleteError ? (
             <View className="absolute bottom-12 self-center">
-              <ToastText message={deleteError} variant="error" />
+              <ToastText message={deleteError} variant={deleteIsRestricted ? "notice" : "error"} />
             </View>
           ) : undefined
         }
@@ -476,7 +512,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         overlay={
           actions.deleteError ? (
             <View className="absolute bottom-12 self-center">
-              <ToastText message={actions.deleteError} variant="error" />
+              <ToastText
+                message={actions.deleteError}
+                variant={actions.deleteIsRestricted ? "notice" : "error"}
+              />
             </View>
           ) : undefined
         }

@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactNode } from "react";
 import { AppState } from "react-native";
 
+import { AccountAccessNotice } from "@/components/AccountAccessNotice";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { BlockedUsersProvider } from "@/contexts/BlockedUsersContext";
 import { BrowsingModeProvider } from "@/contexts/BrowsingModeContext";
@@ -96,6 +97,7 @@ export default function RootLayout() {
                     </Stack>
                     <SessionExpiredNotice />
                     <PushRegistration />
+                    <AccountAccessNotice />
                   </PostsProvider>
                 </PostDraftProvider>
               </BlockedUsersProvider>

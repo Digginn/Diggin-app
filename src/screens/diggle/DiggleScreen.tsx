@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Text, View } from "react-native";
 
+import { ensureCommunityWriteAllowed, restrictionMessage } from "@/api/accountAccess";
 import { IconNotification } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
@@ -10,6 +11,7 @@ import { Fab } from "@/components/Fab";
 import { Spinner } from "@/components/Loading";
 import { LoginRequiredModal } from "@/components/modal";
 import { Post } from "@/components/Post";
+import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { DIGGLE_EMPTY_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,6 +30,7 @@ export function DiggleScreen() {
   const { tab: requestedTab } = useLocalSearchParams<{ tab?: string }>();
   const tab = requestedTab === "vote" ? "vote" : "all";
   const { session, isRestoring } = useAuth();
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [isLoginRequired, setLoginRequired] = useState(false);
   const showToast = useToast();
   const feed = useCommunityFeed(tab);
@@ -115,6 +118,11 @@ export function DiggleScreen() {
               authorLabel={item.isMine ? "글쓴이 (나)" : "글쓴이"}
               likeCount={item.type === "post" ? (item.likeCount ?? undefined) : undefined}
               commentCount={item.commentCount ?? 0}
+              onPressReport={
+                session && !item.isMine
+                  ? () => setReportTarget({ type: "post", id: item.id })
+                  : undefined
+              }
               onPress={() => {
                 if (!session) setLoginRequired(true);
                 else
@@ -133,10 +141,19 @@ export function DiggleScreen() {
           isDisabled={isRestoring}
           onPress={() => {
             if (!session) setLoginRequired(true);
-            else router.push(tab === "vote" ? "/votes/write" : "/posts/write");
+            else
+              void ensureCommunityWriteAllowed()
+                .then(() => router.push(tab === "vote" ? "/votes/write" : "/posts/write"))
+                .catch((error) =>
+                  showToast(
+                    restrictionMessage(error) ?? "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+                    restrictionMessage(error) ? "notice" : "error",
+                  ),
+                );
           }}
         />
       </View>
+      <ReportFlow target={reportTarget} onClose={() => setReportTarget(null)} />
       <LoginRequiredModal
         visible={isLoginRequired && !session}
         onClose={() => setLoginRequired(false)}
