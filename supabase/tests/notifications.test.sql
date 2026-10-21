@@ -122,6 +122,24 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000b", "role": "authenticated"}';
 select throws_ok($$ select count(*) from private.notification_checks $$, '42501', null, '확인 시각 원본은 직접 읽을 수 없다');
+
+-- MY-011 Push 수신 설정
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
+select ok(public.get_push_enabled(), '설정한 적 없으면 Push를 받는다');
+select is(public.set_push_enabled(false), false, 'Push를 끈다');
+select ok(not public.get_push_enabled(), '끈 값이 저장된다');
+select throws_ok($$ select public.set_push_enabled(null) $$, '22023', null, '빈 값은 저장하지 않는다');
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000b", "role": "authenticated"}';
+select ok(public.get_push_enabled(), '남이 끈 설정은 내 설정에 영향이 없다');
+select throws_ok($$ select count(*) from private.notification_settings $$, '42501', null, '설정 원본은 직접 읽을 수 없다');
+set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
+select is(public.set_push_enabled(true), true, 'Push를 다시 켠다');
+select ok(public.get_push_enabled(), '켠 값이 저장된다');
+reset role;
+set local role anon;
+select throws_ok($$ select public.get_push_enabled() $$, '42501', null, '비회원은 설정을 볼 수 없다');
+select throws_ok($$ select public.set_push_enabled(false) $$, '42501', null, '비회원은 설정을 바꿀 수 없다');
 reset role;
 update private.posts set deleted_at = now() where id = current_setting('test.post')::bigint;
 set local role authenticated;
