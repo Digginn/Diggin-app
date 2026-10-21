@@ -74,6 +74,7 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 
 3. 프로젝트 담당자가 Supabase Auth에 확인된 운영자 계정을 만들고, 승인된 데이터 등록 절차로 `private.admin_users`에 그 계정 UUID·이메일·operator/super_admin을 등록한다. 이메일 도메인이나 user_metadata로 자동 승격하지 않는다. 앱 일반 사용자 UUID를 운영자로 잘못 등록하지 않는다.
    - #115 최초 Retool 계정은 `20261021173103_register_retool_operator.sql` 데이터 마이그레이션으로 등록한다. 지정한 UID의 이메일 확인이 완료된 Auth 계정만 `operator`로 추가하며, 계정이 없는 로컬/CI에서는 건너뛴다. 기존 운영자의 권한·비활성화 상태는 바꾸지 않는다. PR 승인·병합 후 자동 배포가 끝나야 Retool에서 관리자 API를 사용할 수 있다.
+   - #121은 승인 리뷰 없이 병합되어 배포의 승인 검사에서 중단됐다. 사용자 지시에 따라 복구 PR #122만 팀원 승인 예외로 배포하며 다른 PR의 승인 조건은 유지한다. DB 등록 SQL은 직접 실행하지 않는다. #122의 `deploy` 성공 후 Retool 관리자 로그인과 `list_reports` 성공을 확인한다. 신고가 없어 빈 배열이 반환되어도 정상이며, 403이면 Auth 이메일 확인과 해당 UID의 운영자 등록·비활성화 상태를 확인한다.
 4. 승인된 PR을 develop에 병합하면 기존 검증과 DB 배포 후 두 Edge Function을 배포한다. 함수 배포 실패는 Actions 실패로 남기며 설정을 고쳐 같은 실행을 다시 실행한다. API 설정·관리자 계정·audience 값은 코드에서 임의 생성하지 않는다.
 
 ## 로컬 검증
