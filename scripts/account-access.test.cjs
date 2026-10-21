@@ -143,7 +143,13 @@ function noticeHarness() {
     cacheSets = 0,
     confirmed = 0;
   const routes = [];
-  const refetch = async () => {};
+  let isFetching = false,
+    queryOptions,
+    appListener,
+    refetches = 0;
+  const refetch = async () => {
+    refetches++;
+  };
   const endSuspendedSession = async (access) => {
     suspension = access;
     viewer = null;
@@ -176,7 +182,10 @@ function noticeHarness() {
       },
     },
     "@tanstack/react-query": {
-      useQuery: () => ({ data: viewer ? value : undefined, isFetching: false, refetch }),
+      useQuery: (options) => {
+        queryOptions = options;
+        return { data: viewer ? value : undefined, isFetching, refetch };
+      },
       useQueryClient: () => ({
         setQueryData: (_key, next) => {
           cacheSets++;
@@ -188,7 +197,18 @@ function noticeHarness() {
       usePathname: () => pathname,
       useRouter: () => ({ replace: (path) => routes.push(path) }),
     },
-    "react-native": { AppState: { addEventListener: () => ({ remove() {} }) } },
+    "react-native": {
+      AppState: {
+        addEventListener: (_event, listener) => {
+          appListener = listener;
+          return {
+            remove() {
+              appListener = null;
+            },
+          };
+        },
+      },
+    },
     "@/api/accountAccess": {
       fetchAccountAccess: async () => value,
       acknowledgeSanction: () => {
@@ -223,6 +243,18 @@ function noticeHarness() {
       const tree = AccountAccessNotice();
       pending.forEach((effect) => effect());
       return tree;
+    },
+    setFetching(value) {
+      isFetching = value;
+    },
+    appState(value) {
+      appListener?.(value);
+    },
+    get queryOptions() {
+      return queryOptions;
+    },
+    get refetches() {
+      return refetches;
     },
     setPath(path) {
       pathname = path;
@@ -294,4 +326,41 @@ test("영구 제한은 DIGGLE 밖에서도 세션 종료·비회원 로그인 �
   assert.deepEqual(harness.routes, ["/login"]);
   tree.props.onConfirm();
   assert.equal(harness.confirmed, 1);
+});
+
+test("재조회 중 경고·7일 제한 모달을 유지하고 확인·해제 응답에서 닫는다", () => {
+  for (const status of ["warning", "community_restricted"]) {
+    const harness = noticeHarness();
+    harness.setPath("/diggle");
+    const access = {
+      status,
+      sanctionId: "1",
+      noticeSeenAt: null,
+      restrictedUntil: "2026-10-30T00:00:00Z",
+    };
+    harness.setAccess(access);
+    assert.equal(harness.render().props.notice.type, status);
+    harness.setFetching(true);
+    assert.equal(harness.render()?.props.notice.type, status);
+    harness.setFetching(false);
+    harness.setAccess({ ...access, noticeSeenAt: "2026-10-22T00:00:00Z" });
+    assert.equal(harness.render(), null);
+    harness.setAccess(access);
+    assert.ok(harness.render());
+    harness.setAccess({ status: "active", sanctionId: null });
+    assert.equal(harness.render(), null);
+  }
+});
+test("주기 조회 없이 화면 이동·앱 복귀에 상태를 다시 조회한다", () => {
+  const harness = noticeHarness();
+  harness.render();
+  assert.equal(harness.queryOptions.refetchInterval ?? false, false);
+  const before = harness.refetches;
+  harness.setPath("/diggle");
+  harness.render();
+  assert.equal(harness.refetches, before + 1);
+  harness.appState("background");
+  assert.equal(harness.refetches, before + 1);
+  harness.appState("active");
+  assert.equal(harness.refetches, before + 2);
 });

@@ -25,7 +25,6 @@ export function AccountAccessNotice() {
     queryKey: key,
     queryFn: () => fetchAccountAccess(),
     enabled: !!viewer,
-    refetchInterval: 30000,
     retry: 1,
   });
   const { refetch } = access;
@@ -75,8 +74,7 @@ export function AccountAccessNotice() {
   const state = suspension ?? access.data;
   const isSuspended = !!suspension;
   const shouldShow =
-    isSuspended ||
-    (pathname === "/diggle" && !access.isFetching && !state?.noticeSeenAt && !!state?.sanctionId);
+    isSuspended || (pathname === "/diggle" && !state?.noticeSeenAt && !!state?.sanctionId);
   const reasonLabel = state?.reasonCategory
     ? SANCTION_REASON_LABELS[state.reasonCategory]
     : "1:1 문의로 확인해 주세요.";
