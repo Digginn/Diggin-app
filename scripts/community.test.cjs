@@ -347,6 +347,7 @@ function screenMocks({
     },
     "expo-router/react-navigation": { usePreventRemove() {} },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+    "@/components/ReportFlow": { ReportFlow: "ReportFlow" },
     "@/components/CommentInput": { CommentInput: "CommentInput" },
     "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
     "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
@@ -534,6 +535,9 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   assert.equal(comments[1].props.author, "디기 1(나)");
   assert.equal(comments[1].props.body, "줄바꿈 댓글");
   assert.equal(comments[2].props.isDeleted, true);
+  assert.equal(typeof comments[0].props.onPressReport, "function");
+  assert.equal(comments[1].props.onPressReport, undefined);
+  assert.equal(comments[2].props.onPressReport, undefined);
   assert.equal(typeof nodes(screen, "LikeCommentRow")[0].props.onPressLike, "function");
   assert.equal(nodes(screen, "PostItemInfoSheet")[0].props.onSaveToAll, undefined);
 });

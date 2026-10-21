@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { FloatingToolbar } from "@/components/FloatingToolbar";
 import { Spinner } from "@/components/Loading";
 import { ActionModal, LoginRequiredModal } from "@/components/modal";
+import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
@@ -51,6 +52,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const { session, isRestoring } = useAuth();
   const showToast = useToast();
   const queryClient = useQueryClient();
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -240,6 +242,13 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             >
               삭제
             </AppBar.TextButton>
+          ) : post && !isWrongRoute ? (
+            <AppBar.TextButton
+              disabled={isBusy || infoItem !== null}
+              onPress={() => setReportTarget({ type: "post", id: post.id })}
+            >
+              신고
+            </AppBar.TextButton>
           ) : null
         }
       />
@@ -345,6 +354,14 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               body={normalizeText(comment.body ?? "").replace(/\n/g, " ")}
               timeLabel={formatCommunityTime(comment.createdAt)}
               isDeleted={comment.isWithdrawn}
+              onPressReport={
+                !comment.isMine && !comment.isWithdrawn && !isBusy
+                  ? () => {
+                      Keyboard.dismiss();
+                      setReportTarget({ type: "comment", id: comment.id });
+                    }
+                  : undefined
+              }
               isHighlighted={actions.editing?.id === comment.id}
               onPressMenu={
                 comment.isMine && !comment.isWithdrawn && !isBusy
@@ -442,6 +459,13 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           void Linking.openURL(url).catch(() =>
             showToast("아이템 페이지를 열지 못했습니다. 다시 시도해 주세요."),
           );
+        }}
+      />
+      <ReportFlow
+        target={reportTarget}
+        onClose={() => {
+          setReportTarget(null);
+          if (!post) goBack();
         }}
       />
       <ActionModal

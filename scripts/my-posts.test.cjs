@@ -25,7 +25,7 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
               ...React,
               useEffect: (callback) => callback(),
               useCallback: (callback) => callback,
-              useState: () => [activeKey, (key) => (activeKey = key)],
+              useState: (initial) => [initial, options.onReportTarget ?? (() => {})],
             };
           if (name === "expo-router")
             return {
@@ -83,6 +83,7 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
           if (name === "@/components/EmptyState") return { EmptyState: "EmptyState" };
           if (name === "@/components/Loading") return { Spinner: "Spinner" };
           if (name === "@/components/modal") return { LoginRequiredModal: "LoginRequiredModal" };
+          if (name === "@/components/ReportFlow") return { ReportFlow: "ReportFlow" };
           if (name === "@/components/Post") return { Post: "Post" };
           if (name === "react-native")
             return { FlatList: "FlatList", Pressable: "Pressable", Text: "Text", View: "View" };

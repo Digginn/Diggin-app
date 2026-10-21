@@ -148,7 +148,10 @@ export function Post({
                 accessibilityLabel="신고하기"
                 accessibilityRole="button"
                 className="size-12 flex-row items-center justify-end active:opacity-75"
-                onPress={onPressReport}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onPressReport();
+                }}
               >
                 <ReportSvg width={18} height={18} color={colors.gray[400]} />
               </Pressable>

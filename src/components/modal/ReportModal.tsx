@@ -1,25 +1,25 @@
 import { cssInterop } from "nativewind";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
+import { graphemeSegments } from "unicode-segmenter/grapheme";
 
 import RadioActiveSvg from "@/assets/images/icon-radio-active.svg";
 import RadioInactiveSvg from "@/assets/images/icon-radio-inactive.svg";
+import { REPORT_REASONS, type ReportReason } from "@/constants/report";
 import { colors } from "@/theme";
+import { normalizeText } from "@/utils/text";
 
 import { Modal, type ModalProps } from "./Modal";
 import { ModalButton } from "./ModalButton";
 
-type ReportModalProps = Omit<ModalProps, "children"> & {
+type ReportFormProps = {
   onCancel: () => void;
-  onReport: (reason: string, detail: string) => void;
+  onReport: (reason: ReportReason, detail: string) => void;
+  isPending?: boolean;
+  error?: string;
 };
+type ReportModalProps = Omit<ModalProps, "children"> & ReportFormProps;
 
-const REPORT_REASONS = [
-  "욕설, 비방, 인신 공격",
-  "게시글 도배",
-  "부적절한 게시글 (선정적 / 홍보 / 유언비어 / 초상권 위배 등)",
-  "직접 작성",
-] as const;
 const RadioActiveIcon = cssInterop(RadioActiveSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
@@ -28,38 +28,47 @@ const RadioInactiveIcon = cssInterop(RadioInactiveSvg, {
 });
 
 export function ReportModal({
-  visible,
-  onRequestClose,
-  onDismiss,
   onCancel,
   onReport,
+  isPending,
+  error,
+  ...modalProps
 }: ReportModalProps) {
-  const [reason, setReason] = useState<(typeof REPORT_REASONS)[number] | undefined>();
+  return (
+    <Modal {...modalProps}>
+      <ReportForm onCancel={onCancel} onReport={onReport} isPending={isPending} error={error} />
+    </Modal>
+  );
+}
+
+export function ReportForm({ onCancel, onReport, isPending = false, error }: ReportFormProps) {
+  const [reason, setReason] = useState<ReportReason>();
   const [detail, setDetail] = useState("");
   const [isDetailFocused, setIsDetailFocused] = useState(false);
-  const isOther = reason === "직접 작성";
-  const canSubmit = reason !== undefined && (!isOther || detail.trim().length > 0);
+  const isOther = reason === "other";
+  const canSubmit = reason !== undefined && !isPending;
   return (
-    <Modal visible={visible} onRequestClose={onRequestClose} onDismiss={onDismiss}>
+    <>
       <Text className="text-gray-900 font-label-16-semibold">신고 사유</Text>
       <View className="w-[295px] gap-2">
         {REPORT_REASONS.map((item) => (
           <Pressable
-            key={item}
+            key={item.value}
+            disabled={isPending}
             className="min-h-12 flex-row items-center gap-2 rounded-field border-[1.5px] border-gray-300 px-4 py-[11px]"
             onPress={() => {
-              setReason(item);
-              if (item !== "직접 작성") {
+              setReason(item.value);
+              if (item.value !== "other") {
                 setIsDetailFocused(false);
               }
             }}
           >
-            {reason === item ? (
+            {reason === item.value ? (
               <RadioActiveIcon className="size-5" />
             ) : (
               <RadioInactiveIcon className="size-5" />
             )}
-            <Text className="flex-1 text-gray-900 font-label-16-medium">{item}</Text>
+            <Text className="flex-1 text-gray-900 font-label-16-medium">{item.label}</Text>
           </Pressable>
         ))}
         {isOther && (
@@ -69,8 +78,14 @@ export function ReportModal({
             <TextInput
               className="flex-1 p-0 text-gray-900 font-label-16-medium"
               multiline
-              maxLength={50}
-              onChangeText={setDetail}
+              editable={!isPending}
+              onChangeText={(value) =>
+                setDetail(
+                  Array.from(graphemeSegments(normalizeText(value)), ({ segment }) => segment)
+                    .slice(0, 50)
+                    .join(""),
+                )
+              }
               onFocus={() => setIsDetailFocused(true)}
               onBlur={() => setIsDetailFocused(false)}
               placeholder="신고 사유를 작성해 주세요."
@@ -86,17 +101,31 @@ export function ReportModal({
           </View>
         )}
       </View>
+      {error && (
+        <Text accessibilityRole="alert" className="text-semantic-error font-b3">
+          {error}
+        </Text>
+      )}
       <View className="w-[295px] flex-row gap-modal-action">
         <View className="w-[140px]">
-          <ModalButton action={{ label: "취소", onPress: onCancel }} variant="secondary" />
+          <ModalButton
+            action={{ label: "취소", onPress: onCancel, isDisabled: isPending }}
+            variant="secondary"
+          />
         </View>
         <View className="w-[140px]">
           <ModalButton
-            action={{ label: "신고하기", onPress: () => onReport(reason ?? "", detail) }}
+            action={{
+              label: isPending ? "신고 중…" : "신고하기",
+              onPress: () => {
+                if (canSubmit && reason) onReport(reason, detail);
+              },
+              isDisabled: !canSubmit,
+            }}
             variant={canSubmit ? "primary" : "disabled"}
           />
         </View>
       </View>
-    </Modal>
+    </>
   );
 }

@@ -358,6 +358,10 @@ export type Database = {
     Functions: {
       accept_policy: { Args: { target_policy_id: number }; Returns: undefined };
       agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
+      block_community_author: {
+        Args: { target_id: number; target_type: string };
+        Returns: undefined;
+      };
       create_comment: {
         Args: { comment_content: string; request_id: string; target_post_id: number };
         Returns: Json;
@@ -408,6 +412,15 @@ export type Database = {
       register_push_token: {
         Args: { new_platform: string; new_token: string };
         Returns: undefined;
+      };
+      report_community_content: {
+        Args: {
+          report_detail?: string;
+          report_reason: string;
+          target_id: number;
+          target_type: string;
+        };
+        Returns: string;
       };
       save_product: {
         Args: {

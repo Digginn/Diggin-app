@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 
 import KebabSvg from "@/assets/images/icon-kebab.svg";
+import ReportSvg from "@/assets/images/icon-report.svg";
 import { colors } from "@/theme";
 import { httpLinkParts } from "@/utils/httpLinks";
 
@@ -20,6 +21,7 @@ type CommentProps = {
   isDeleted?: boolean;
   /** 케밥의 창 기준 좌표를 같이 넘김 */
   onPressMenu?: (anchor: MenuAnchor) => void;
+  onPressReport?: () => void;
   onOpenLink?: (url: string) => void;
 };
 
@@ -50,6 +52,7 @@ export function Comment({
   isHighlighted = false,
   isDeleted = false,
   onPressMenu,
+  onPressReport,
   onOpenLink,
 }: CommentProps) {
   const kebabRef = useRef<View>(null);
@@ -73,6 +76,16 @@ export function Comment({
         </View>
         {/* 케밥(48)이 이 줄의 높이를 만든다. 삭제된 댓글이라 숨겨도 높이는 유지한다. */}
         <View className="h-12 w-[120px] flex-row items-center justify-end gap-1.5">
+          {!isDeleted && onPressReport && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="댓글 신고하기"
+              className="size-12 items-center justify-center"
+              onPress={onPressReport}
+            >
+              <ReportSvg width={18} height={18} color={colors.gray[400]} />
+            </Pressable>
+          )}
           {isDeleted || !onPressMenu ? null : (
             <Pressable
               ref={kebabRef}
