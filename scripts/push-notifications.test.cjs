@@ -118,11 +118,13 @@ test("안드로이드는 권한을 묻기 전에 알림 채널을 만든다", as
 test("로그아웃하면 이 기기에 등록한 토큰만 지우고, 등록한 적 없으면 아무것도 하지 않는다", async () => {
   const { push, calls } = loadPush();
   await push.unregisterDevicePush();
+  push.finishDeviceSignOut();
   assert.equal(calls.deleted.length, 0);
 
   await push.registerDevicePush("user-a", true);
   await push.unregisterDevicePush();
   assert.deepEqual(calls.deleted, [["push_tokens", "token", "ExponentPushToken[device]"]]);
+  push.finishDeviceSignOut();
   await push.registerDevicePush("user-a", true);
   assert.equal(calls.rpc.length, 2, "로그아웃 뒤 같은 계정으로 다시 로그인하면 다시 등록한다");
 });
@@ -173,4 +175,45 @@ test("등록 요청이 겹친 채 로그아웃하면 모든 등록 응답이 끝
     "늦게 끝난 첫 요청이 저장한 뒤에 지운다",
   );
   assert.deepEqual(calls.deleted, [["push_tokens", "token", "ExponentPushToken[device]"]]);
+});
+
+test("로그아웃이 끝날 때까지는 앱 복귀로 새 등록이 시작되지 않는다", async () => {
+  let releaseFirst;
+  const { push, calls } = loadPush({
+    status: "granted",
+    rpcGates: [new Promise((resolve) => (releaseFirst = resolve))],
+  });
+  const first = push.registerDevicePush("user-a", true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const loggingOut = push.unregisterDevicePush();
+  await push.registerDevicePush("user-a", false);
+  assert.equal(
+    calls.rpc.length,
+    1,
+    "처리 중인 등록을 기다리는 동안 앱으로 돌아와도 새 등록을 보내지 않는다",
+  );
+  releaseFirst();
+  await Promise.all([first, loggingOut]);
+  await push.registerDevicePush("user-a", false);
+  assert.equal(calls.rpc.length, 1, "토큰을 지운 뒤 세션 종료 전에도 새 등록을 보내지 않는다");
+  assert.deepEqual(calls.events, ["rpc1", "delete"]);
+
+  push.finishDeviceSignOut();
+  await push.registerDevicePush("user-a", false);
+  assert.equal(
+    calls.rpc.length,
+    2,
+    "로그아웃이 끝나면(실패해 로그인 상태가 남은 경우 포함) 다시 등록할 수 있다",
+  );
+});
+
+test("로그아웃이 겹치면 모두 끝난 뒤에야 등록을 다시 허용한다", async () => {
+  const { push, calls } = loadPush({ status: "granted" });
+  await Promise.all([push.unregisterDevicePush(), push.unregisterDevicePush()]);
+  push.finishDeviceSignOut();
+  await push.registerDevicePush("user-a", false);
+  assert.equal(calls.rpc.length, 0, "한쪽만 끝났으면 아직 막는다");
+  push.finishDeviceSignOut();
+  await push.registerDevicePush("user-a", false);
+  assert.equal(calls.rpc.length, 1);
 });
