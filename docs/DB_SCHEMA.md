@@ -189,8 +189,8 @@ import_failures
 `supabase/schemas/community.sql`에 posts, post_products, vote_responses, post_likes, comments, post_anon_numbers와 조회 제외에 필요한 user_blocks, reports를 구현했다. 전부 RLS를 활성화하고 앱 역할의 테이블·시퀀스 직접 접근을 회수한다. 작성·정책 동의·삭제는 아래 #95 구현을 따른다. 투표는 아래 #96, 댓글·좋아요는 #97 구현을 따른다. 운영·알림은 후속 작업이다. hidden_at/deleted_at은 구현했고 운영자 hidden_by FK는 운영 스키마 작업에서 추가한다.
 
 - `get_community_feed(feed_type = 'all', after_created_at?, after_id?)`: 일반글·투표글 통합 또는 투표글만 최신순 20개를 반환한다. `(created_at, id)` 커서로 같은 시각의 글·앞쪽 신규 삽입에도 중복 페이지를 방지한다. 비회원은 첫 줄 본문과 Snapshot 이미지만 받으며 상품명·브랜드·가격·원본 링크·집계·본인 여부는 받지 않는다. 페이지 경계용 id/type/created_at은 포함한다.
-- `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·내가 차단하거나 신고한 작성자의 글은 null이다. 작성자 UUID는 응답에 없고 `is_mine`만 반환한다.
-- `get_community_comments(target_post_id, after_created_at?, after_id?)`: 동일한 게시글 접근 조건을 확인한 뒤 오래된 순 20개를 반환한다. 댓글도 삭제·숨김·작성자 차단/신고를 제외한다. UUID 없이 글쓴이/본인/탈퇴 여부와 게시물 단위 익명번호를 반환하며 탈퇴 사용자 본문은 항상 null이다.
+- `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·차단한 작성자의 글 또는 내가 신고한 해당 글은 null이다. 작성자 UUID는 응답에 없고 `is_mine`만 반환한다.
+- `get_community_comments(target_post_id, after_created_at?, after_id?)`: 동일한 게시글 접근 조건을 확인한 뒤 오래된 순 20개를 반환한다. 댓글도 삭제·숨김·작성자 차단과 해당 댓글 신고를 제외한다. UUID 없이 글쓴이/본인/탈퇴 여부와 게시물 단위 익명번호를 반환하며 탈퇴 사용자 본문은 항상 null이다.
 - 투표 집계는 참여자·작성자에게 공개하고, 마감 후에는 미참여 회원에게도 공개한다(2026-10-20 사용자 확정). 진행 중 미참여 회원의 집계는 null이다. 비회원에게는 항상 집계를 반환하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
 - definer 구현은 private, invoker 래퍼는 public이다. 비회원 피드 래퍼에 필요한 private 스키마 usage와 피드 함수 execute만 anon에 허용하고 원본·내부 helper·상세·댓글 권한은 주지 않는다.
@@ -237,7 +237,7 @@ import_failures
 - `get_my_community_activity(activity_type, after_activity_at?, after_id?)`는 `post`/`vote`/`liked` 목록을 20개씩 반환한다. 계정 ID를 인자로 받지 않고 JWT의 본인만 조회한다. 비회원·정지 계정은 차단하고 커뮤니티 작성 제한 중 조회는 허용한다.
 - 본인 글은 `(posts.created_at, posts.id)` 최신순으로 일반글·투표를 분리한다. 좋아요한 글은 현재 유효한 본인의 일반글 좋아요만 `(post_likes.created_at, post_likes.id)` 최신순으로 반환한다. 취소·재등록은 새로운 활동으로 정렬한다.
 - 각 행은 `{post, activity_at, activity_id}`다. `post`는 기존 공개 JSON 계약을 재사용하고 작성자 UUID는 반환하지 않는다. 앱은 좋아요 목록의 다음 페이지에 글 작성일·글 ID를 쓰지 않고 활동 커서를 그대로 보존한다.
-- 삭제·숨김·차단/신고 작성자의 콘텐츠는 모든 활동 목록에서 제외한다. 본인 글에는 신고 Action을 제공하지 않고 기존 공통 상세의 삭제 흐름을 재사용한다.
+- 삭제·숨김·차단한 작성자의 콘텐츠와 본인이 신고한 해당 게시글은 모든 활동 목록에서 제외한다. 본인 글에는 신고 Action을 제공하지 않고 기존 공통 상세의 삭제 흐름을 재사용한다.
 - 앱의 두 메뉴와 실제 목록을 연결했다. 작성한 일반글은 기존 한 줄 목록, 투표는 두 줄·상품 이미지 목록, 좋아요한 일반글은 공통 게시글 카드로 표시한다. 목록에서 종류에 맞는 공통 상세로 이동한다. 투표 참여 목록은 추가하지 않는다.
 - 활동 캐시는 `community/viewer/activity/kind`로 계정·종류별 분리한다. 기존 작성·삭제·댓글·좋아요 성공의 community 무효화에 포함되며 화면 복귀 때 재조회한다. 최초 오류·빈 목록·추가 페이지 재시도를 구분하고 재조회 실패 시 기존 목록과 Toast를 유지한다. 이동 예외는 현재 화면에서 안내한다.
 - 검증은 `supabase/tests/community_activity.test.sql`, `scripts/community-activity.test.cjs`, `scripts/my-posts.test.cjs`에 권한·정렬·커서·취소·삭제 제외와 UI 복귀·오류·로그인 차단을 포함한다.
@@ -269,7 +269,7 @@ post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)
 - 투표 결과는 진행 중 참여자·작성자, 마감 후 미참여 회원에게도 공개한다. 진행 중 미참여자는 buy_count·not_count가 null이고 비회원 미리보기에는 필드 자체가 없다. 퍼센트는 앱이 계산한다.
 - 좋아요는 일반글만(LIKE-001).
 - 익명 번호는 그 사용자의 첫 댓글일 때 posts.next_anon_number를 올리며 받는다. 글쓴이는 번호를 받지 않는다. 댓글 조회는 author_id 대신 `is_post_author, anon_number, is_mine, is_withdrawn`을 돌려준다.
-- 모든 커뮤니티 조회는 삭제·숨김, 내가 차단한 작성자, 내가 신고한 작성자의 콘텐츠를 뺀다.
+- 모든 커뮤니티 조회는 삭제·숨김 콘텐츠와 차단한 작성자의 전체 콘텐츠, 본인이 신고한 해당 콘텐츠만 뺀다.
 
 ### 6-3. 신고·차단 (private)
 
@@ -291,10 +291,10 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 #### #112 신고·단방향 차단 (RPT-001~004)
 
 - `report_community_content(target_type, target_id, report_reason, report_detail?)`는 `post`(일반글·투표글) 또는 `comment` ID와 사유만 받는다. 서버가 작성자를 결정하고 신고 ID만 반환한다. 클라이언트는 실제 사용자 UUID와 원문 테이블을 조회하지 않는다.
-- 인증·정지·본인·삭제·숨김·이미 제외된 작성자를 검증한다. 커뮤니티 작성 제한 중 신고·차단은 허용한다. 사유는 abuse/spam/inappropriate/other 중 하나이며 other만 NFC 정규화한 0~50자 상세를 허용한다. 앱과 DB 모두 사용자 인식 문자 기준이다.
+- 인증·정지·본인·삭제·숨김·차단한 작성자·신고한 해당 콘텐츠를 검증한다. 커뮤니티 작성 제한 중 신고·차단은 허용한다. 사유는 abuse/spam/inappropriate/other 중 하나이며 other만 NFC 정규화한 0~50자 상세를 허용한다. 앱과 DB 모두 사용자 인식 문자 기준이다.
 - 신고자는 같은 콘텐츠를 1건만 신고한다. 계정·종류·대상별 트랜잭션 잠금과 기존 unique 제약으로 동시 재시도를 보호하고 최초 사유·상태·Snapshot을 보존한다. 댓글은 부모 글 → 댓글 행 잠금 안에서 접수 시점 본문을 복사한다. 수정 불가 글은 별도 Snapshot을 만들지 않는다.
 - `block_community_author(target_type, target_id)`는 해당 계정의 기존 신고에서 작성자를 결정해 단방향 관계를 저장한다. 신고로 이미 숨겨진 대상도 차단할 수 있으며 같은 관계 재시도는 안전하다. 신고만으로 user_blocks를 만들지 않는다. 계정 ID를 임의 입력해 차단하거나 다른 계정의 신고를 사용할 수 없다.
-- 기존 공통 조회 필터로 신고·차단 작성자의 기존·신규 피드/상세/댓글/활동을 서버에서 제외한다. 차단당한 사용자에게는 반대 방향 필터를 만들지 않는다. 같은 작성자의 다른 콘텐츠까지 제외하는 기존 읽기 계약을 유지한다.
+- 신고만 하면 해당 게시글·투표글·댓글만 신고자의 조회에서 제외한다. 같은 작성자의 다른 콘텐츠는 유지한다. 차단하기를 선택했을 때만 해당 작성자의 기존·신규 피드/상세/댓글/활동 전체를 제외한다. `community_content_visible`은 대상별 신고, `community_author_visible`은 단방향 차단을 검사하며 댓글 수와 쓰기 가드에도 같은 기준을 적용한다. 차단당한 사용자에게는 반대 방향 필터를 만들지 않는다.
 - 앱의 피드·상세·댓글·좋아요 목록에서 공통 ReportFlow를 사용한다. 본인·탈퇴 댓글에는 신고 버튼이 없고, 한 NativeModal에서 사유 입력 → 차단 여부 확인을 전환한다. 실패 시 입력·단계를 유지하고 모달 위 Toast를 표시한다. 요청 중 입력·연타·닫기를 막는다.
 - 신고·차단 후 community 캐시를 갱신하고 조회 실패도 성공 완료로 표시하지 않는다. 재시도는 서버의 기존 신고/차단을 재사용한다. 계정 변경·화면 이탈 후 늦은 응답은 모달이나 완료 Toast를 변경하지 않는다.
 - 관리자 신고 목록·상태 전환·제재·감사 로그·Retool은 RPT-005~006 후속 범위다. 최신 RPT-006의 모든 커뮤니티 변경 차단(본인 글 삭제 포함)과 제재 안내/세션 종료는 해당 작업에서 기존 예외와 함께 정리해야 한다.
