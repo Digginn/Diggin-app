@@ -297,6 +297,7 @@ private.notifications
 
 private.like_notification_log  (post_id, actor_id) PK, created_at
 private.notification_checks    user_id PK FK profiles cascade, checked_at
+private.notification_settings  user_id PK FK profiles cascade, push_enabled default true, updated_at
 ```
 
 처음엔 notifications를 public에 두고 select만 열 생각이었는데, 알림을 눌렀을 때 글이 지워졌는지(NOTI-006)를 앱이 알아야 해서 private.posts를 같이 봐야 했다. 그래서 커뮤니티처럼 원본은 private에 두고 `get_notifications(after_created_at, after_id)`로만 읽는다.
@@ -312,7 +313,8 @@ private.notification_checks    user_id PK FK profiles cascade, checked_at
   - `has_unread_notifications()`: 확인 시각 뒤에 온 최근 30일 알림이 있으면 true. 종 아이콘 점.
   - `mark_notifications_checked()`: 알림함을 열 때 부른다. 확인 시각을 지금으로 바꾸고 이전 시각을 돌려준다(처음이면 null). 앱은 이전 시각보다 뒤에 온 알림을 Gray50으로 보여 주고, 다음에 열면 흰색이 된다.
 - pg_cron `notifications-cleanup`이 매일 03:00(KST)에 30일 지난 알림을 지운다.
-- 알림 종류별 수신 설정은 없다(MY-011 MVP 제외). 수신 설정·OS 권한과 관계없이 알림은 목록에 남긴다(NOTI-007).
+- 수신 설정(MY-011)은 시안대로 Push 토글 하나다. `get_push_enabled()`·`set_push_enabled(enabled)`로 읽고 쓰며, 행이 없으면 켜진 것으로 본다. 종류별 설정은 없다.
+- 수신 설정·OS 권한과 관계없이 알림은 목록에 남긴다(NOTI-007). Push를 끈 사용자에게는 발송만 하지 않는다(발송 작업에서 반영).
 - 목록 문구는 시안(NOTI-07)대로 저장한다. 제목은 "투표 결과가 나왔어요.", "내 게시글에 댓글이 달렸어요.", "내 게시글에 좋아요가 달렸어요."이다.
 - Push 문구는 목록 문구와 다르다(시안 NOTI-03~05). 투표 마감은 "투표가 종료됐어요." / "내 투표 결과를 확인해 보세요.", 좋아요는 본문 자리에 게시글 본문을 쓴다. 댓글은 목록과 같다. 발송할 때 종류별로 만든다.
 - Push 발송은 다음 작업이다. 사용자의 토큰 전체에 보내고, DeviceNotRegistered면 토큰을 지우고, push_sent_at이 null이면 다음 실행 때 다시 보낸다.
