@@ -22,6 +22,11 @@ insert into private.posts(author_id, type, content, created_at, ends_at, deleted
  values ('10400000-0000-0000-0000-00000000000a','vote','알림 테스트 삭제 투표',
          now() - interval '25 hours', now() - interval '1 hour', now() - interval '2 hours');
 select set_config('test.deleted_vote', (select max(id)::text from private.posts), true);
+-- 마감된 뒤 작업이 돌기 전에 지운 투표
+insert into private.posts(author_id, type, content, created_at, ends_at, deleted_at)
+ values ('10400000-0000-0000-0000-00000000000a','vote','알림 테스트 마감 후 삭제 투표',
+         now() - interval '25 hours', now() - interval '1 hour', now() - interval '30 minutes');
+select set_config('test.deleted_after_end_vote', (select max(id)::text from private.posts), true);
 insert into private.vote_responses(post_id, user_id, choice) values
  (current_setting('test.ended_vote')::bigint, '10400000-0000-0000-0000-00000000000b', 'buy'),
  (current_setting('test.ended_vote')::bigint, '10400000-0000-0000-0000-00000000000c', 'not');
@@ -75,7 +80,10 @@ select is((select count(*) from private.notifications where recipient_id = '1040
 -- NOTI-003 투표 마감
 select lives_ok($$ select private.create_vote_ended_notifications() $$, '마감 작업이 돈다');
 select lives_ok($$ select private.create_vote_ended_notifications() $$, '마감 작업이 다시 돈다');
-select is((select count(*) from pg_temp.notifications_for('vote_ended')), 1::bigint, '마감된 투표만 한 번 알리고 진행 중·삭제된 투표는 알리지 않는다');
+select is((select array_agg(post_id order by post_id) from pg_temp.notifications_for('vote_ended')),
+  array[current_setting('test.ended_vote')::bigint, current_setting('test.deleted_after_end_vote')::bigint],
+  '마감 뒤에 지운 투표도 한 번 알리고, 진행 중이거나 마감 전에 지운 투표는 알리지 않는다');
+delete from private.notifications where post_id = current_setting('test.deleted_after_end_vote')::bigint;
 select is((select body from pg_temp.notifications_for('vote_ended')), '''알림 테스트 마감 투표'' 투표가 종료됐어요. BUY 1 · NOT 1', '최종 집계를 본문에 담는다');
 
 -- NOTI-007 목록
