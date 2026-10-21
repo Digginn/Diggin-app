@@ -2,7 +2,7 @@
 
 관련 이슈: [#69](https://github.com/Digginn/Diggin-app/issues/69)
 
-2026.10.15에 확인한 기능명세 IMP-001~011·FLD-008과 2026.10.16에 구체화된 폴더 50개·기존 폴더 재사용 기준으로 `prepareCsvImport`가 파일 바이트를 검증하고 저장 계획을 계산한다. 이 순수 함수는 로그인·네트워크·DB에 의존하지 않는다. `/csv-import` 라우트는 `api/importCsv.ts`를 통해 실제 파일 읽기·로그인 확인·서버 저장·결과 표시까지 연결한다.
+2026.10.17 기능명세 IMP-001~011·FLD-008과 폴더 50개·기존 폴더 재사용 기준으로 `prepareCsvImport`가 파일 바이트를 검증하고 저장 계획을 계산한다. 이 순수 함수는 로그인·네트워크·DB에 의존하지 않는다. `/csv-import` 라우트는 `api/importCsv.ts`를 통해 실제 파일 읽기·로그인 확인·서버 저장·결과 표시까지 연결한다.
 
 ## 입력과 출력
 
@@ -10,7 +10,7 @@
 - UTF-8을 strict decode하고 BOM을 허용한다. Expo 57의 기본 `TextDecoder`를 사용한다.
 - `importedAt`은 실행 시작 시각을 한 번만 정해 전달한다. 유효하지 않은 CSV 등록일은 모두 이 시각을 사용한다.
 - `registeredAtUtcOffsetMinutes`는 CSV 원본 시간대를 호출부가 명시한다. 실제 가져오기는 확인된 한국 시간(UTC+9, 540분)을 전달한다. 기기 시간대에 따라 날짜가 달라지지 않는다.
-- `isKrw`는 원화 판별 함수다. 실제 가져오기는 PM이 승인한 8개 판매처의 국내 쇼핑 호스트를 확인하는 `isKrwCsvSource`를 전달한다. 확인되지 않으면 가격은 NULL이다.
+- `isKrw`는 원화 판별 함수다. 실제 가져오기는 PM이 승인한 8개 판매처명 또는 도메인·하위 도메인을 확인하는 `isKrwCsvSource`를 전달한다. 확인되지 않으면 가격은 NULL이다.
 - `existingProducts`는 로그인 사용자 범위에서 조회한 URL·ID·폴더·소장 상태만 전달한다. 가격·이미지 등 기존 저장 정보는 변경 계획에 포함하지 않는다.
 - `existingFolderNames`는 계정의 전체 일반 폴더 이름 목록이다. 비어 있으면 `[]`를 명시한다. 소장템 고정 폴더는 50개 제한에서 제외하며 이름 충돌 검사에서는 예약한다.
 - `previousFolderMappings`는 동일 Import의 재시도에서 확정된 원본 버킷명→최종 폴더명을 유지하는 입력이다. 호출부는 해당 Import의 `folderMappings`를 보존해 전달해야 한다.
@@ -37,9 +37,13 @@ CSV로 새로 만든 폴더에는 `folders.csv_source_name`으로 정규화한 �
 
 ## 실제 저장 연결
 
-`useImportCsv`는 서버가 완료 결과를 반환한 후 `products`·`folders` prefix의 조회 캐시를 무효화한다. ALL 목록·필터·개수·상세, 폴더 목록·폴더별 상품·개수·소장 관계가 대상이다. 화면에서 사용 중인 쿼리는 즉시 재조회하며, 닫힌 화면의 캐시는 stale로 표시해 다음 진입 시 새 데이터를 가져온다. 신규 저장 0건이어도 기존 상품에 폴더·소장 관계가 추가될 수 있어 동일하게 갱신한다. 검증 실패나 RPC 오류는 완료로 취급하지 않고 캐시를 갱신하지 않는다. 폴더 prefix는 PR #86의 `folderKeys.all` 계약에 맞췄으며 아직 해당 PR의 코드를 병합하지는 않았다.
+`useImportCsv`는 서버가 완료 결과를 반환한 후 `products`·`folders` prefix의 조회 캐시를 무효화한다. ALL 목록·필터·개수·상세, 폴더 목록·폴더별 상품·개수·소장 관계가 대상이다. 화면에서 사용 중인 쿼리는 즉시 재조회하며, 닫힌 화면의 캐시는 stale로 표시해 다음 진입 시 새 데이터를 가져온다. 신규 저장 0건이어도 기존 상품에 폴더·소장 관계가 추가될 수 있어 동일하게 갱신한다. 안내 취소·검증 실패나 RPC 오류는 완료로 취급하지 않고 캐시를 갱신하지 않는다. 폴더 prefix는 병합된 PR #86의 `folderKeys.all` 계약과 일치한다.
 
 `importCsv`는 실제 파일 크기와 바이트를 확인하고 `supabase.auth.getUser()`로 사용자를 확인한다. 기존 일반 폴더 이름을 조회해 계획을 만든 뒤, `import_csv(request_id, import_plan)` RPC로 전달한다. 기존 상품을 전부 미리 조회하지 않으므로 API의 1000행 조회 제한과 무관하게 서버에서 URL 중복을 판정한다.
+
+IMP-001에 따라 신규 폴더가 남은 한도를 넘을 때만 “폴더는 최대 50개까지 만들 수 있습니다. 초과분은 ALL탭에 개별 아이템으로 저장됩니다.” 배너와 계속·취소 버튼을 표시한다. 계속을 누르기 전에는 요청 기록을 새로 만들거나 RPC 저장을 실행하지 않는다. 취소·뒤로가기·화면 이탈은 가져오기를 중단한다. 충돌 재시도 중 처음 한도를 넘는 경우도 확인하며, 같은 작업에서 이미 확인했다면 다시 묻지 않는다.
+
+IMP-009 결과에는 전체 대상·성공·실패·중복 수를 0건까지 표시한다. 전체 대상은 서버의 성공 수와 실패·중복 제외 목록 길이의 합이다. 제외 목록에서 아이템별 사유를 확인할 수 있다. `FOLDER_LIMIT_EXCEEDED` 결과가 있을 때만 “폴더 최대 개수를 초과한 아이템은 ALL탭에 개별 아이템으로 저장되었습니다.”를 표시한다. 일반 폴더 저장 실패는 별도의 안내를 사용한다.
 
 - 서버는 JWT 소유자를 기준으로 저장한다. 파일을 선택한 계정과 요청 시 계정이 다르면 거부한다. 상품 입력은 공통 `private.product_input_error`로 재검증하며, 유한하지 않거나 서버 현재 시각보다 미래인 `saved_at`은 `INVALID_PRODUCT_DATA`로 제외한다.
 - 프로필 행을 잠그고 기존 상품·폴더를 id 순으로 잠근 뒤, 일반 폴더 고유 이름·공백 포함 1~7자·50개 한도를 검증한다. 조회 이후 생긴 이름 충돌이나 교착은 전체 저장을 취소하고 클라이언트가 최신 목록으로 최대 두 번 재계산한다.
@@ -55,31 +59,30 @@ CSV 담당 범위는 파일 검증·파싱·중복 병합, CSV 버킷의 폴더 
 
 2026.10.17 사용자 전달 PM 승인 기준으로 쿠팡·무신사·29CM·지그재그·네이버 스마트스토어·KREAM·ABLY·4910을 원화 인정 판매처로 확정했다. `api/importCsv.ts`의 최초 계획과 재시도 계획에 같은 판별 함수를 연결한다.
 
-| 판매처                                              | 허용 호스트                                                                                                                 |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| [쿠팡](https://www.coupang.com)                     | `coupang.com`, `www.coupang.com`, `m.coupang.com`                                                                           |
-| [무신사](https://www.musinsa.com)                   | `musinsa.com`, `www.musinsa.com`, `m.musinsa.com`, `store.musinsa.com`, `m.store.musinsa.com`                               |
-| [29CM](https://www.29cm.co.kr)                      | `29cm.co.kr`, `www.29cm.co.kr`, `m.29cm.co.kr`, `shop.29cm.co.kr`, `product.29cm.co.kr`                                     |
-| [지그재그](https://zigzag.kr)                       | `zigzag.kr`, `www.zigzag.kr`, `m.zigzag.kr`, `s.zigzag.kr`                                                                  |
-| [네이버 스마트스토어](https://smartstore.naver.com) | `smartstore.naver.com`, `m.smartstore.naver.com`, `m.brand.naver.com`, `m.shopping.naver.com`, `msearch.shopping.naver.com` |
-| [KREAM](https://www.kream.co.kr)                    | `kream.co.kr`, `www.kream.co.kr`, `m.kream.co.kr`                                                                           |
-| [ABLY](https://mobile.a-bly.com)                    | `a-bly.com`, `www.a-bly.com`, `m.a-bly.com`, `mobile.a-bly.com`                                                             |
-| [4910](https://www.4910.kr)                         | `4910.kr`, `www.4910.kr`, `m.4910.kr`                                                                                       |
+스토어명은 앞뒤 공백을 제거하고 영문 대소문자를 구분하지 않는다. 위 8개 스토어명과 일치하거나 다음 도메인 및 그 하위 도메인에 해당하면 원화로 판단한다.
 
-호스트는 소문자로 비교하며 정확히 일치해야 한다. 모든 하위 도메인을 일괄 허용하지 않는다. `global.musinsa.com`, `www.tw.coupang.com` 같은 해외몰, `link.coupang.com`·`click.linkprice.com` 같은 제휴·단축 링크와 미확인 호스트는 가격을 비운다. CSV 스토어명은 개별 입점 판매자명일 수도 있으므로 단독 판별 근거로 쓰지 않고, 승인 판매처명이 적혀 있어도 미확인 도메인을 원화로 바꾸지 않는다. 원본 URL을 그대로 저장하고 redirect 확인이나 환율 변환은 하지 않는다.
+| 판매처              | 기준 도메인            |
+| ------------------- | ---------------------- |
+| 쿠팡                | `coupang.com`          |
+| 무신사              | `musinsa.com`          |
+| 29CM                | `29cm.co.kr`           |
+| 지그재그            | `zigzag.kr`            |
+| 네이버 스마트스토어 | `smartstore.naver.com` |
+| KREAM               | `kream.co.kr`          |
+| ABLY                | `a-bly.com`            |
+| 4910                | `4910.kr`              |
 
-2026.10.18 리뷰에서 확인한 국내 주소 5개(`m.store.musinsa.com`, `s.zigzag.kr`, `m.brand.naver.com`, `m.shopping.naver.com`, `msearch.shopping.naver.com`)를 추가했다. 지그재그가 직접 제공하는 공유 호스트 `s.zigzag.kr`는 명시적으로 허용하지만 일반 제휴·단축 링크를 일괄 허용하지 않는다. 네이버 쇼핑은 CSV에 기록된 국내 쇼핑 노출 가격을 원화로 취급하는 규칙이며 외부 판매처의 가격을 새로 추출하거나 변환하지 않는다.
+호스트는 소문자로 비교하며 `hostname === domain` 또는 `hostname.endsWith("." + domain)`을 만족해야 한다. 따라서 `global.musinsa.com`·`link.coupang.com`도 포함한다. 미확인 스토어명의 `fakecoupang.com`·`kream.co.kr.example.com`은 제외한다. 승인 스토어명이면 도메인이 달라도 원화 조건을 충족한다. `m.brand.naver.com`·`m.shopping.naver.com`은 승인 도메인이 아니므로 승인 스토어명 조건을 별도로 충족하지 않으면 가격을 비운다. 원본 URL을 그대로 저장하고 redirect 확인이나 환율 변환은 하지 않는다.
 
 기존 상품 가격은 재업로드로 보정하지 않는다(IMP-006). 이전 버전에서 가격 없이 저장된 상품도 기존 정보 유지 정책을 따른다.
 
 ## 확인 필요 (PR #80 리뷰)
 
-- **통합 확인:** 폴더 PR #86 병합 후 실제 CSV 저장으로 ALL·폴더 목록과 개수가 앱 재시작 없이 갱신되는지 화면 검증한다. 캐시 갱신 자체는 실제 TanStack QueryClient를 사용하는 자동 테스트로 검증한다.
+- **통합 확인:** 병합된 폴더 기능과 실제 CSV 저장을 연결해 ALL·폴더 목록과 개수가 앱 재시작 없이 갱신되는지 화면 검증한다. 캐시 갱신 자체는 실제 TanStack QueryClient를 사용하는 자동 테스트로 검증한다.
 
 - **IMP-008 폴더명:** 구현은 사용자 확인에 따라 공백 포함 7자다. 예시의 `맥북 파우치 케`는 공백 포함 8자이므로 이 기준의 결과는 `맥북 파우치`이며, 충돌한 두 번째 후보는 `맥북 파우치2`다. 명세 예시·QA 기준은 PM과 맞춘다.
 - **폴더 생성 우선순위:** 현재 유효 행 최초 등장 순을 유지한다. 기존 설계의 상품 많은 순과 어떤 기준으로 통일할지 미확정이다.
 - **IMP-006/PDT-008 충돌:** 기존 상품의 이름·브랜드·가격·등록일은 유지하지만 소장 Y를 추가하면 기존 공통 규칙에 따라 위시레벨은 NULL이 된다. 이 예외를 명세에 명시할지 PM 확인이 필요하다.
-- **화면 문구 후속:** 파일 선택 전 MSG-CSV-008, 결과 화면 MSG-CSV-006 상시 노출, 전체 대상 수 표시를 디자인 정리 시 반영한다.
 
 ## 검증
 
