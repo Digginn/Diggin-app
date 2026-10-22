@@ -55,7 +55,8 @@ function loadStorage(os, shared = {}) {
       return files.has(this.path);
     }
     async text() {
-      return files.get(this.path);
+      const full = files.get(this.path);
+      return hooks.readText ? hooks.readText(full) : full;
     }
     write(value) {
       hooks.beforeFileWrite?.();
@@ -74,6 +75,7 @@ function loadStorage(os, shared = {}) {
     module,
     exports: module.exports,
     crypto: webcrypto,
+    setTimeout,
     process: {
       env: {
         EXPO_PUBLIC_SUPABASE_URL: "http://local",
@@ -84,7 +86,10 @@ function loadStorage(os, shared = {}) {
       if (name === "react-native-get-random-values") return {};
       if (name === "@/constants/appGroup") return { APP_GROUP };
       if (name === "react-native")
-        return { Platform: { OS: os }, AppState: { addEventListener: () => {} } };
+        return {
+          Platform: { OS: os },
+          AppState: { currentState: shared.appState ?? "active", addEventListener: () => {} },
+        };
       if (name === "@react-native-async-storage/async-storage")
         return {
           __esModule: true,
@@ -183,6 +188,73 @@ test("앱과 공유 확장이 같은 세션을 쓰는 중에 읽어도 깨진 �
   for (const value of seen)
     assert.ok(['{"access_token":"a"}', '{"access_token":"b"}'].includes(value), value);
   assert.equal(await extension.storage.getItem("sb-auth"), '{"access_token":"b"}');
+});
+
+test("저장할 때마다 다른 시작값으로 암호화하고, 예전 형식 파일도 읽는다", async () => {
+  const { storage, files, keychain } = loadStorage("ios");
+  await storage.setItem("sb-auth", '{"access_token":"a"}');
+  const first = files.get("/shared/sb-auth.session");
+  await storage.setItem("sb-auth", '{"access_token":"a"}');
+  const second = files.get("/shared/sb-auth.session");
+  assert.notEqual(first, second, "같은 키·같은 시작값을 다시 쓰지 않는다");
+  assert.notEqual(JSON.parse(first).iv, JSON.parse(second).iv);
+  assert.equal(await storage.getItem("sb-auth"), '{"access_token":"a"}');
+
+  // 시작값을 1로 고정하던 예전 형식(앞선 #91 빌드)으로 저장된 파일
+  const aesjs = require("aes-js");
+  const keyHex = await keychain.getItemAsync("sb-auth", {
+    accessGroup: APP_GROUP,
+    keychainService: "diggin.shared-session",
+  });
+  const keyBytes = aesjs.utils.hex.toBytes(keyHex);
+  const legacy = new aesjs.ModeOfOperation.ctr(keyBytes, new aesjs.Counter(1));
+  files.set(
+    "/shared/sb-auth.session",
+    aesjs.utils.hex.fromBytes(legacy.encrypt(aesjs.utils.utf8.toBytes('{"access_token":"old"}'))),
+  );
+  assert.equal(await storage.getItem("sb-auth"), '{"access_token":"old"}');
+});
+
+test("다른 쪽이 파일을 쓰는 중이라 빈 값이나 앞부분만 읽으면 다시 읽는다", async () => {
+  const { storage, hooks } = loadStorage("ios");
+  await storage.setItem("sb-auth", '{"access_token":"a"}');
+  for (const torn of [() => "", (full) => full.slice(0, Math.floor(full.length / 2))]) {
+    let reads = 0;
+    hooks.readText = (full) => (reads++ === 0 ? torn(full) : full);
+    assert.equal(await storage.getItem("sb-auth"), '{"access_token":"a"}');
+    assert.equal(reads, 2);
+  }
+});
+
+test("처음 저장이 한꺼번에 와도 암호화 키는 하나만 만든다", async () => {
+  const { storage, hooks } = loadStorage("ios");
+  let keyWrites = 0;
+  hooks.beforeKeyWrite = async () => {
+    keyWrites += 1;
+  };
+  await Promise.all([
+    storage.setItem("sb-auth", '{"access_token":"a"}'),
+    storage.setItem("sb-auth", '{"access_token":"b"}'),
+  ]);
+  assert.equal(keyWrites, 1, "두 저장이 각자 키를 만들면 한쪽 파일을 다른 키로 읽게 된다");
+  assert.equal(await storage.getItem("sb-auth"), '{"access_token":"b"}');
+});
+
+test("공유 확장은 암호화 키를 만들지 않아, 앱과 동시에 처음 키를 만드는 일이 없다", async () => {
+  const extension = loadStorage("ios", { appState: "extension" });
+  await extension.storage.setItem("sb-auth", '{"access_token":"a"}');
+  assert.equal(extension.keychain.items.size, 0);
+  assert.equal(extension.files.size, 0, "키가 없으면 로그인 전이라 저장하지 않는다");
+
+  const app = loadStorage("ios");
+  await app.storage.setItem("sb-auth", '{"access_token":"a"}');
+  const sharedExtension = loadStorage("ios", {
+    appState: "extension",
+    keychain: app.keychain,
+    files: app.files,
+  });
+  await sharedExtension.storage.setItem("sb-auth", '{"access_token":"refreshed"}');
+  assert.equal(await app.storage.getItem("sb-auth"), '{"access_token":"refreshed"}');
 });
 
 test("안드로이드는 지금처럼 AsyncStorage와 앱 키체인을 쓴다", async () => {
