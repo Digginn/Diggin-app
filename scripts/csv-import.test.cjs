@@ -53,6 +53,7 @@ function setup(pick, bottomInset = 34) {
           return {
             View: "View",
             Text: "Text",
+            Pressable: "Pressable",
             ScrollView: "ScrollView",
             Alert: { alert: (...args) => alerts.push(args) },
             useWindowDimensions: () => ({ width: 375, height: 812 }),
@@ -65,6 +66,7 @@ function setup(pick, bottomInset = 34) {
         if (name === "@/components/Button") return { Button: "Button" };
         if (name === "@/hooks/useToast") return { useToast: () => showToast };
         if (name === "@/theme") return { colors: { gray: { 0: "#FFFFFF" } } };
+        if (name.endsWith("icon-csv-folder-limit-close.svg")) return "FolderLimitClose";
         if (name === "./components/CsvImportIllustration")
           return { CsvImportIllustration: "CsvImportIllustration" };
         if (name === "./components/CsvImportLoading")
@@ -365,7 +367,7 @@ test("제외 목록은 필요한 행만 렌더링하고 X와 확인은 서로 �
   assert.equal(children.at(-1).props.onPress, onConfirm);
 });
 
-test("폴더 한도 배너에서 계속·취소·뒤로가기·화면 이탈을 선택할 때만 대기를 종료한다", async () => {
+test("폴더 한도 배너에서 불러오기·닫기·뒤로가기·화면 이탈을 선택할 때만 대기를 종료한다", async () => {
   for (const action of ["continue", "cancel", "back", "unmount"]) {
     const ui = setup(async () => ({ canceled: false, assets: [{ name: "wishlist.csv" }] }));
     let writes = 0;
@@ -380,6 +382,7 @@ test("폴더 한도 배너에서 계속·취소·뒤로가기·화면 이탈을 
       },
     };
     const originalSelect = ui.find(ui.render(props), "Button").props.onPress;
+    assert.equal(ui.find(ui.render(props), "FolderLimitClose"), undefined);
     const pending = originalSelect();
     await new Promise((resolve) => setImmediate(resolve));
     const notice = ui.render(props);
@@ -392,7 +395,7 @@ test("폴더 한도 배너에서 계속·취소·뒤로가기·화면 이탈을 
     assert.equal(writes, 0);
     const continueButton = ui.find(
       notice,
-      (node) => node.type === "Button" && node.props.children === "계속 불러오기",
+      (node) => node.type === "Button" && node.props.children === "CSV 파일로 데이터 불러오기",
     );
     assert.equal(continueButton.props.isDisabled, false);
     // 확인 대기 중 파일 선택 콜백을 다시 실행해도 중복 작업이 생기지 않는다.
@@ -401,7 +404,7 @@ test("폴더 한도 배너에서 계속·취소·뒤로가기·화면 이탈을 
     else if (action === "cancel")
       ui.find(
         notice,
-        (node) => node.type === "Button" && node.props.children === "취소",
+        (node) => node.props.accessibilityLabel === "폴더 한도 안내 닫기",
       ).props.onPress();
     else if (action === "back") ui.find(notice, "AppBar").props.onBack();
     else ui.unmount();

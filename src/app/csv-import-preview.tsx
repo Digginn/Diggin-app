@@ -40,9 +40,20 @@ const SCENARIOS: { label: string; result: CsvImportResult }[] = [
 
 export default function CsvImportPreview() {
   const [scenario, setScenario] = useState<
-    number | "intro" | "loading" | "animation" | "error" | null
+    number | "intro" | "loading" | "animation" | "error" | "folder-limit" | null
   >(null);
   if (scenario === "intro") return <CsvImportScreen onBack={() => setScenario(null)} />;
+  if (scenario === "folder-limit")
+    return (
+      <CsvImportScreen
+        onBack={() => setScenario(null)}
+        onSelectCsv={async (_file, _onProgress, confirmFolderLimit) => {
+          // 선택한 파일을 저장하지 않고 검증 후 확인 대기 화면만 재현한다.
+          await confirmFolderLimit();
+          return null;
+        }}
+      />
+    );
   if (scenario === "error")
     return <CsvImportScreen error="missing-product-info" onBack={() => setScenario(null)} />;
   if (scenario === "animation")
@@ -72,6 +83,7 @@ export default function CsvImportPreview() {
           디자인 예시 데이터이며 실제 아이템은 등록되지 않습니다.
         </Text>
         <Button onPress={() => setScenario("intro")}>CSV 소개 애니메이션</Button>
+        <Button onPress={() => setScenario("folder-limit")}>폴더 한도 안내 (CSV 선택 후)</Button>
         <Button onPress={() => setScenario("loading")}>불러오는 중 (12 / 48)</Button>
         <Button onPress={() => setScenario("animation")}>진행 개수 수신 전 애니메이션</Button>
         {SCENARIOS.map(({ label }, index) => (
