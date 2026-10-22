@@ -9,6 +9,18 @@ const ts = require("typescript");
 
 const CHANNEL_URL = "http://pf.kakao.com/_zIxnrX";
 
+function loadLoginIntent() {
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(readFileSync(path.join(__dirname, "../src/lib/loginIntent.ts"), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText,
+    { module, exports: module.exports },
+  );
+  return module.exports;
+}
+const loginIntent = loadLoginIntent();
+
 function setup(screenName) {
   const toasts = [],
     routes = [],
@@ -78,7 +90,10 @@ function setup(screenName) {
           };
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
         if (name === "expo-router")
-          return { useIsFocused: () => true, useRouter: () => ({ push: (route) => routes.push(route) }) };
+          return {
+            useIsFocused: () => true,
+            useRouter: () => ({ push: (route) => routes.push(route) }),
+          };
         if (name === "react-native-safe-area-context")
           return { useSafeAreaInsets: () => ({ bottom: 34 }) };
         if (name === "@/hooks/useToast") return { useToast: () => (text) => toasts.push(text) };
@@ -123,6 +138,7 @@ function setup(screenName) {
         }
         if (name === "./constants/openSourceLicenses.json")
           return require("../src/screens/my/constants/openSourceLicenses.json");
+        if (name === "@/lib/loginIntent") return loginIntent;
         return require(name);
       },
     },

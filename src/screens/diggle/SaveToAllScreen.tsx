@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFolders } from "@/hooks/useFolders";
 import { useToast } from "@/hooks/useToast";
+import { startLogin } from "@/lib/loginIntent";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
 import type { ItemSaveValues } from "@/types/wish-item";
 
@@ -40,7 +41,7 @@ export function SaveToAllScreen() {
   const back = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/diggle"));
   if (isRestoring) return <Spinner />;
   if (!session)
-    return <LoginRequiredModal visible onClose={back} onLogin={() => router.replace("/login")} />;
+    return <LoginRequiredModal visible onClose={back} onLogin={() => startLogin(router)} />;
   if (typeof postId !== "string" || typeof itemId !== "string")
     return <SaveUnavailable onBack={back} />;
   return (

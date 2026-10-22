@@ -15,6 +15,7 @@ import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
+import { startLogin } from "@/lib/loginIntent";
 import { communityKeys } from "@/screens/diggle/api/community";
 import type { CommunityPost } from "@/screens/diggle/types/community";
 import {
@@ -106,7 +107,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
         <LoginRequiredModal
           visible={isFocused}
           onClose={goBack}
-          onLogin={() => router.push("/login")}
+          onLogin={() => startLogin(router)}
         />
       ) : isRestoring ? (
         <Spinner />

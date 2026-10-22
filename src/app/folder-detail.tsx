@@ -1,6 +1,7 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 
+import { MemberOnly } from "@/components/MemberOnly";
 import { ActionModal } from "@/components/modal";
 import { useToast } from "@/hooks/useToast";
 import { FolderNameModal } from "@/screens/folder/components/FolderNameModal";
@@ -12,7 +13,7 @@ import { useFolderCounts } from "@/screens/folder/queries/useFolderCounts";
 import { useFolderItems } from "@/screens/folder/queries/useFolderItems";
 import type { WishLevelKey } from "@/types/wish-item";
 
-export default function FolderDetailRoute() {
+function FolderDetailContent() {
   const params = useLocalSearchParams<{ id: string; name?: string; owned?: string }>();
   const router = useRouter();
   const [name, setName] = useState(params.name ?? "");
@@ -93,5 +94,13 @@ export default function FolderDetailRoute() {
         primaryAction={{ label: "취소", onPress: () => setIsDeleteConfirmOpen(false) }}
       />
     </>
+  );
+}
+
+export default function FolderDetailRoute() {
+  return (
+    <MemberOnly>
+      <FolderDetailContent />
+    </MemberOnly>
   );
 }

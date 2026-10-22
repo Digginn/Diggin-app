@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { ImageMyVotePlaceholder } from "@/assets/images/my";
+import { MemberOnly } from "@/components/MemberOnly";
 import { ReportModal } from "@/components/modal";
 import type { VoteListItemData } from "@/screens/my/components/VoteListItem";
 import { MyVotedPostsScreen } from "@/screens/my/MyVotedPostsScreen";
@@ -16,7 +17,7 @@ const VOTES: VoteListItemData[] = Array.from({ length: 4 }, (_, index) => ({
   imageSource: ImageMyVotePlaceholder,
 }));
 
-export default function MyVotedPostsRoute() {
+function MyVotedPostsContent() {
   const [reportedVoteId, setReportedVoteId] = useState<string>();
   const closeReport = () => setReportedVoteId(undefined);
 
@@ -34,5 +35,13 @@ export default function MyVotedPostsRoute() {
         />
       )}
     </>
+  );
+}
+
+export default function MyVotedPostsRoute() {
+  return (
+    <MemberOnly title="내가 투표한 글">
+      <MyVotedPostsContent />
+    </MemberOnly>
   );
 }

@@ -5,6 +5,7 @@ import { AppBar } from "@/components/app-bar";
 import { LoginRequiredModal } from "@/components/modal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
+import { startLogin } from "@/lib/loginIntent";
 
 import { MyMenuList } from "./components/MyMenuList";
 
@@ -28,7 +29,7 @@ export function MyActivityScreen() {
         <LoginRequiredModal
           visible={isFocused}
           onClose={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/my"))}
-          onLogin={() => router.push("/login")}
+          onLogin={() => startLogin(router)}
         />
       ) : (
         !isRestoring && (

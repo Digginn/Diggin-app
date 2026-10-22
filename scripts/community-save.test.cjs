@@ -7,6 +7,11 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const LOGIN_SOURCES = {
+  "@/lib/loginIntent": "src/lib/loginIntent.ts",
+  "@/hooks/useLoginGate": "src/hooks/useLoginGate.tsx",
+};
+
 function load(file, mocks = {}) {
   const module = { exports: {} };
   runInNewContext(
@@ -16,7 +21,13 @@ function load(file, mocks = {}) {
     {
       module,
       exports: module.exports,
-      require: (name) => mocks[name] ?? (name.endsWith(".svg") ? name : require(name)),
+      require: (name) =>
+        mocks[name] ??
+        (name.endsWith(".svg")
+          ? name
+          : LOGIN_SOURCES[name]
+            ? load(LOGIN_SOURCES[name], mocks)
+            : require(name)),
     },
   );
   return module.exports;

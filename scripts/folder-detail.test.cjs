@@ -7,6 +7,11 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const LOGIN_SOURCES = {
+  "@/lib/loginIntent": "../src/lib/loginIntent.ts",
+  "@/hooks/useLoginGate": "../src/hooks/useLoginGate.tsx",
+};
+
 function load(filename, mocks) {
   const loaded = { exports: {} };
   const compiled = ts.transpileModule(readFileSync(path.join(__dirname, filename), "utf8"), {
@@ -19,7 +24,13 @@ function load(filename, mocks) {
     exports: loaded.exports,
     module: loaded,
     require: (name) =>
-      name in mocks ? mocks[name] : name.endsWith(".svg") ? { default: name } : require(name),
+      name in mocks
+        ? mocks[name]
+        : name.endsWith(".svg")
+          ? { default: name }
+          : LOGIN_SOURCES[name]
+            ? load(LOGIN_SOURCES[name], mocks)
+            : require(name),
   });
   return loaded.exports;
 }
@@ -91,8 +102,10 @@ test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연
     },
     "@/screens/folder/FolderDetailScreen": { FolderDetailScreen: "FolderDetailScreen" },
     "@/assets/images/folder/image-item-preview.png": 123,
+    "@/components/MemberOnly": { MemberOnly: "MemberOnly" },
   });
-  const screen = React.Children.toArray(route.default().props.children).find(
+  const content = route.default().props.children;
+  const screen = React.Children.toArray(content.type(content.props).props.children).find(
     (node) => node.type === "FolderDetailScreen",
   );
   assert.equal(screen.props.folderName, "내 폴더");

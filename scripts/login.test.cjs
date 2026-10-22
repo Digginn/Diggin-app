@@ -7,6 +7,18 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+function loadLoginIntent() {
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(readFileSync(path.join(__dirname, "../src/lib/loginIntent.ts"), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText,
+    { module, exports: module.exports },
+  );
+  return module.exports;
+}
+const loginIntent = loadLoginIntent();
+
 function load(relativePath, mocks = {}) {
   const source = readFileSync(path.join(__dirname, "../src", relativePath), "utf8");
   const compiled = ts.transpileModule(source, {
@@ -33,6 +45,7 @@ function load(relativePath, mocks = {}) {
         return { SanctionNoticeModal: "SanctionNoticeModal" };
       if (name.endsWith(".svg")) return { __esModule: true, default: name };
       if (name === "react-native") return { View: "View", Text: "Text", Pressable: "Pressable" };
+      if (name === "@/lib/loginIntent") return loginIntent;
       return require(name);
     },
   });
@@ -142,7 +155,11 @@ for (const os of ["ios", "android"]) {
     const signIns = [];
     let canGoBack = false;
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
-      "react": { useState: (initial) => [initial, () => {}] },
+      "react": {
+        useState: (initial) => [initial, () => {}],
+        useRef: (current) => ({ current }),
+        useEffect: () => {},
+      },
       "./api/signIn": {
         signIn: (provider) => {
           signIns.push(provider);
@@ -545,4 +562,116 @@ test("Android에서는 Apple 인증을 직접 호출해도 실행하지 않는�
     getUser: () => assert.fail("must_not_load_user"),
   });
   await assert.rejects(signIn("apple"), /apple_login_not_supported/);
+});
+
+test("로그인 필요 모달에서 온 로그인은 성공하면 원래 화면으로 돌아가 이어 하고, 그만두면 버린다", async () => {
+  const render = (result) => {
+    const routes = [];
+    let cleanup;
+    const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+      "react": {
+        useState: (initial) => [initial, () => {}],
+        useRef: (current) => ({ current }),
+        useEffect: (effect) => {
+          cleanup = effect();
+        },
+      },
+      "./api/signIn": { signIn: async () => result },
+      "expo-router": {
+        useRouter: () => ({
+          replace: (route) => routes.push(route),
+          back: () => routes.push("back"),
+          canGoBack: () => true,
+          push: (route) => routes.push(route),
+        }),
+      },
+      "expo-status-bar": { StatusBar: "StatusBar" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+      "react-native": {
+        Platform: { OS: "ios" },
+        View: "View",
+        Text: "Text",
+        Pressable: "Pressable",
+        ScrollView: "ScrollView",
+        useWindowDimensions: () => ({ height: 812 }),
+        Alert: { alert: () => {} },
+      },
+      "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/ToastText": { ToastText: "ToastText" },
+      "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+    });
+    const press = () =>
+      nodes(LoginScreen())
+        .find((node) => node.type === "SocialLoginButton")
+        .props.onPress();
+    return { routes, press, unmount: () => cleanup?.() };
+  };
+  const resumed = [];
+  const router = { push: () => {} };
+
+  loginIntent.startLogin(router, () => resumed.push("like"));
+  const member = render({ status: "success", isNewUser: false });
+  await member.press();
+  member.unmount();
+  assert.deepEqual(member.routes, ["back"], "원래 화면으로 돌아간다");
+  assert.deepEqual(resumed, ["like"], "하려던 동작을 이어 한다");
+
+  loginIntent.startLogin(router, () => resumed.push("vote"));
+  const newbie = render({ status: "success", isNewUser: true });
+  await newbie.press();
+  newbie.unmount();
+  assert.deepEqual(newbie.routes, ["/signup-complete"], "신규 회원은 가입 완료 안내를 먼저 본다");
+  assert.deepEqual(resumed, ["like"]);
+  loginIntent.takeLoginIntent()();
+  assert.deepEqual(resumed, ["like", "vote"], "가입 완료 안내 뒤에 이어 한다");
+
+  loginIntent.startLogin(router, () => resumed.push("write"));
+  const leaving = render({ status: "cancelled" });
+  await leaving.press();
+  leaving.unmount();
+  assert.equal(loginIntent.takeLoginIntent(), null, "로그인을 그만두면 버린다");
+
+  const direct = render({ status: "success", isNewUser: false });
+  await direct.press();
+  assert.deepEqual(direct.routes, ["/(tabs)/all"], "모달 없이 온 로그인은 ALL로 간다");
+});
+
+test("회원 전용 화면은 비회원에게 화면 위 로그인 모달을 보이고, 로그인하면 이 화면으로 돌아오게 한다", () => {
+  const routes = [];
+  const render = (auth, isFocused = true) => {
+    const { MemberOnly } = load("components/MemberOnly.tsx", {
+      "expo-router": {
+        useIsFocused: () => isFocused,
+        useRouter: () => ({
+          push: (route) => routes.push(route),
+          back: () => routes.push("back"),
+          canGoBack: () => true,
+          replace: (route) => routes.push(route),
+        }),
+      },
+      "react-native": { View: "View" },
+      "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/modal": { LoginRequiredModal: "LoginRequiredModal" },
+      "@/contexts/AuthContext": { useAuth: () => auth },
+    });
+    return MemberOnly({ title: "알림", children: "CONTENT" });
+  };
+  assert.equal(render({ session: { user: { id: "u" } }, isRestoring: false }), "CONTENT");
+  const guest = nodes(render({ session: null, isRestoring: false }));
+  assert.ok(!guest.includes("CONTENT"), "비회원에게 내용을 그리지 않는다");
+  assert.equal(guest.find((node) => node.type === "AppBar").props.title, "알림");
+  const modal = guest.find((node) => node.type === "LoginRequiredModal");
+  assert.equal(modal.props.visible, true);
+  modal.props.onClose();
+  assert.deepEqual(routes, ["back"]);
+  modal.props.onLogin();
+  assert.deepEqual(routes, ["back", "/login"]);
+  assert.equal(typeof loginIntent.takeLoginIntent(), "function", "로그인하면 이 화면으로 돌아온다");
+  assert.ok(
+    !nodes(render({ session: null, isRestoring: true })).some(
+      (node) => node.type === "LoginRequiredModal",
+    ),
+    "로그인 복원 중에는 모달을 띄우지 않는다",
+  );
 });

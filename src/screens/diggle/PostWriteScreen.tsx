@@ -24,6 +24,7 @@ import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePostDraft } from "@/contexts/PostDraftContext";
 import { useToast } from "@/hooks/useToast";
+import { startLogin } from "@/lib/loginIntent";
 
 import { communityKeys } from "./api/community";
 import {
@@ -51,7 +52,7 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
       <LoginRequiredModal
         visible
         onClose={() => router.dismissTo("/(tabs)/diggle")}
-        onLogin={() => router.replace("/login")}
+        onLogin={() => startLogin(router)}
       />
     );
   return <WriteEditor key={session.user.id} viewer={session.user.id} isVote={type === "vote"} />;

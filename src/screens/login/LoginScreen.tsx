@@ -1,6 +1,6 @@
 import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -18,6 +18,7 @@ import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
+import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
 import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeModal";
 
 import { signIn } from "./api/signIn";
@@ -41,6 +42,15 @@ export function LoginScreen({
   const [hasError, setHasError] = useState(isLoginError);
   const [isLoading, setIsLoading] = useState(isLoginLoading);
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
+  const hasSignedIn = useRef(false);
+
+  // AUTH-001 로그인을 그만두고 나가면 이어 하려던 동작을 버린다.
+  useEffect(
+    () => () => {
+      if (!hasSignedIn.current) takeLoginIntent();
+    },
+    [],
+  );
 
   async function handleLogin(provider: LoginProvider) {
     if (isLoading) return;
@@ -53,8 +63,20 @@ export function LoginScreen({
         setSuspension(result.access);
         return;
       }
-      // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다.
-      router.replace((result.isNewUser ? "/signup-complete" : "/(tabs)/all") as Href);
+      hasSignedIn.current = true;
+      const resume = takeLoginIntent();
+      // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다. 이어 할 동작은 안내를 지난 뒤에 한다.
+      if (result.isNewUser) {
+        if (resume) keepLoginIntent(resume);
+        router.replace("/signup-complete" as Href);
+        return;
+      }
+      if (resume && router.canGoBack()) {
+        router.back();
+        resume();
+        return;
+      }
+      router.replace("/(tabs)/all" as Href);
     } catch {
       console.warn("소셜 로그인에 실패했습니다.");
       setHasError(true);

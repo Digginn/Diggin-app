@@ -7,13 +7,23 @@ const { runInNewContext } = require("node:vm");
 const { QueryClient, QueryObserver } = require("@tanstack/react-query");
 const ts = require("typescript");
 
+const LOGIN_SOURCES = {
+  "@/lib/loginIntent": "../src/lib/loginIntent.ts",
+  "@/hooks/useLoginGate": "../src/hooks/useLoginGate.tsx",
+};
+
 function load(file, mocks) {
   const module = { exports: {} };
   runInNewContext(
     ts.transpileModule(readFileSync(path.join(__dirname, file), "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     }).outputText,
-    { module, exports: module.exports, require: (name) => mocks[name] ?? require(name) },
+    {
+      module,
+      exports: module.exports,
+      require: (name) =>
+        mocks[name] ?? (LOGIN_SOURCES[name] ? load(LOGIN_SOURCES[name], mocks) : require(name)),
+    },
   );
   return module.exports;
 }
@@ -27,6 +37,11 @@ function importer(client, run) {
     "@/api/products": { productKeys },
     "../api/importCsv": { importCsv: run },
   }).useImportCsv();
+}
+
+function member(Route) {
+  const content = Route().props.children;
+  return content.type(content.props);
 }
 
 test("CSV 완료 후 ALL·개수·폴더 목록/상품/관계는 재조회하고 다른 캐시는 유지한다", async () => {
@@ -120,6 +135,7 @@ test("CSV 라우트는 캐시 갱신이 포함된 가져오기 콜백을 화면�
   const { default: Route } = load("../src/app/csv-import.tsx", {
     "@/screens/my/hooks/useImportCsv": { useImportCsv: () => callback },
     "@/screens/my/CsvImportScreen": { CsvImportScreen: "CsvImportScreen" },
+    "@/components/MemberOnly": { MemberOnly: "MemberOnly" },
   });
-  assert.equal(Route().props.onSelectCsv, callback);
+  assert.equal(member(Route).props.onSelectCsv, callback);
 });
