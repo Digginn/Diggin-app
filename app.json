@@ -16,7 +16,7 @@
       "usesAppleSignIn": true
     },
     "android": {
-      "package": "com.diggin.app.preview",
+      "package": "com.diggin.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
