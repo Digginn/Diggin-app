@@ -83,7 +83,7 @@ export default function SavePreviewRoute() {
 
       {open === "no_url" || open === "deeplink" || open === "invalid_format" ? (
         // 실제로는 공유 확장이 띄운다. 여기서는 생김새만 확인한다.
-        <View className="absolute inset-x-0 bottom-0">
+        <View className="absolute inset-x-0 bottom-0 top-14">
           <ShareErrorSheet reason={open} onClose={() => setOpen(null)} />
         </View>
       ) : null}

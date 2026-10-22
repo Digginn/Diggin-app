@@ -3,9 +3,11 @@ import { useFonts } from "expo-font";
 import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { AppState } from "react-native";
 
+import { folderKeys } from "@/api/folders";
+import { productKeys } from "@/api/products";
 import { AccountAccessNotice } from "@/components/AccountAccessNotice";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { BlockedUsersProvider } from "@/contexts/BlockedUsersContext";
@@ -15,6 +17,7 @@ import { PostsProvider } from "@/contexts/PostsContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { registerDevicePush } from "@/lib/pushNotifications";
 import { queryClient } from "@/lib/queryClient";
+import { readSharedSaveTime } from "@/lib/sharedSaves";
 import { SessionExpiredModal } from "@/screens/login/components/SessionExpiredModal";
 
 import "@/global.css";
@@ -70,6 +73,29 @@ function PushRegistration() {
   return null;
 }
 
+// 공유 확장(#91)에서 저장하면 앱으로 돌아올 때 상품·폴더 목록을 다시 불러온다. 저장이 없었으면 그대로 둔다.
+function SharedSaveSync() {
+  const lastSeen = useRef<number | null>(null);
+
+  useEffect(() => {
+    const sync = () =>
+      void readSharedSaveTime().then((savedAt) => {
+        const previous = lastSeen.current;
+        lastSeen.current = savedAt;
+        if (previous === null || savedAt <= previous) return;
+        void queryClient.invalidateQueries({ queryKey: productKeys.all });
+        void queryClient.invalidateQueries({ queryKey: folderKeys.all });
+      });
+    sync();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") sync();
+    });
+    return () => subscription.remove();
+  }, []);
+
+  return null;
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     "Pretendard-Regular": require("@/assets/fonts/Pretendard-Regular.otf"),
@@ -97,6 +123,7 @@ export default function RootLayout() {
                     </Stack>
                     <SessionExpiredNotice />
                     <PushRegistration />
+                    <SharedSaveSync />
                     <AccountAccessNotice />
                   </PostsProvider>
                 </PostDraftProvider>
