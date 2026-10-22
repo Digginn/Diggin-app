@@ -273,6 +273,22 @@ test("광고 추적값만 떼고 상품을 가르는 쿼리 값은 남긴다", (
   );
 });
 
+test("AppsFlyer 공유 링크의 추적값을 떼어 같은 상품이 같은 링크로 저장되게 한다", () => {
+  // 29CM 공유 링크는 추적값과 순서가 매번 달라 같은 상품이 따로 저장됐다(#91).
+  for (const url of [
+    "https://www.29cm.co.kr/products/4310987?deep_link_value=app29cm%3A%2F%2Fweb&af_dp=app29cm%3A%2F%2Fweb&af_click_lookback=7d&pid=29cm_pdp_share&shortlink=7j3yhnmw&onelink_id=1080201211",
+    "https://www.29cm.co.kr/products/4310987?shortlink=7j3yhnmw&af_dp=app29cm%3A%2F%2Fweb&onelink_id=1080201211&pid=29cm_pdp_share&af_click_lookback=7d&deep_link_value=app29cm%3A%2F%2Fweb",
+    "https://www.29cm.co.kr/products/4310987?c=campaign&deep_link_sub1=x&af_sub1=y",
+  ]) {
+    assert.equal(stripTrackingParams(url), "https://www.29cm.co.kr/products/4310987");
+  }
+  assert.equal(
+    stripTrackingParams("https://shop.example.com/view?pid=123&c=blue"),
+    "https://shop.example.com/view?pid=123&c=blue",
+    "AppsFlyer 링크가 아니면 pid·c는 상품 값일 수 있어 남긴다",
+  );
+});
+
 test("에이블리처럼 product:brand 메타만 있어도 브랜드를 채우고 공유 링크 추적값을 뗀다", () => {
   const { values } = normalizeProductPage(
     {

@@ -87,6 +87,10 @@ function isSiteDefault(ogUrl: unknown) {
 // 광고·유입 추적용 이름이 확실한 값만 뗀다. 상품 옵션이나 쿠팡 vendorItemId처럼 상품을 가르는 값은 남긴다.
 const TRACKING_PARAM =
   /^(utm_.*|nt_.*|airbridge.*|fbclid|gclid|igshid|napm|is_retargeting|source_caller|sourcetype|searchid|tracking_content|https_deeplink|short_id)$/i;
+// AppsFlyer 앱 공유 링크(29CM 등)가 붙이는 값. 순서·값이 매번 달라 같은 상품이 따로 저장됐다(#91).
+// pid·c는 다른 쇼핑몰에선 상품 값일 수 있어 AppsFlyer 표시가 있을 때만 뗀다.
+const APPSFLYER_MARK = /^(af_.*|shortlink|onelink_id)$/i;
+const APPSFLYER_PARAM = /^(af_.*|shortlink|onelink_id|pid|c|deep_link_value|deep_link_sub\d+)$/i;
 
 /** 같은 상품이 추적값만 달라 다른 링크로 저장되지 않게 한다(SAVE-012 중복 검사). */
 export function stripTrackingParams(url: string) {
@@ -95,10 +99,12 @@ export function stripTrackingParams(url: string) {
   const beforeHash = hashAt === -1 ? url : url.slice(0, hashAt);
   const queryAt = beforeHash.indexOf("?");
   if (queryAt === -1) return url;
-  const kept = beforeHash
-    .slice(queryAt + 1)
-    .split("&")
-    .filter((pair) => pair && !TRACKING_PARAM.test(pair.split("=")[0]));
+  const pairs = beforeHash.slice(queryAt + 1).split("&");
+  const isAppsFlyer = pairs.some((pair) => APPSFLYER_MARK.test(pair.split("=")[0]));
+  const kept = pairs.filter((pair) => {
+    const key = pair.split("=")[0];
+    return pair && !TRACKING_PARAM.test(key) && !(isAppsFlyer && APPSFLYER_PARAM.test(key));
+  });
   return beforeHash.slice(0, queryAt) + (kept.length ? `?${kept.join("&")}` : "") + hash;
 }
 
