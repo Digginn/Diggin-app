@@ -1,1 +1,5 @@
-export { LoginScreen as default } from "@/screens/login/LoginScreen";
+import { LoginScreen } from "@/screens/login/LoginScreen";
+
+export default function LoginRoute() {
+  return <LoginScreen isRedirectedWhenSignedIn />;
+}

@@ -180,6 +180,7 @@ for (const os of ["ios", "android"]) {
       "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+      "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
     });
     const tree = nodes(LoginScreen());
     const bar = tree.find((node) => node.type === "AppBar");
@@ -310,6 +311,7 @@ test("로그인 화면은 주소로 온 공유 링크를 받지 않고, 로그�
       "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+      "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
     });
     const press = () =>
       nodes(LoginScreen())
@@ -339,6 +341,54 @@ test("로그인 화면은 주소로 온 공유 링크를 받지 않고, 로그�
   const fromLink = render(async () => ({ status: "success", isNewUser: false }), external.pending);
   await fromLink.press();
   assert.equal(await external.pending.takeShareLink(), null, "주소의 shareUrl은 맡기지 않는다");
+});
+
+test("이미 로그인한 사람이 로그인 주소로 들어오면 ALL로 보내고, 로그인 중에 생긴 세션으로는 보내지 않는다", () => {
+  const render = (props, session, loading = false) => {
+    let stateIndex = 0;
+    const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+      "react": {
+        // 두 번째 상태가 로그인 진행 중(isLoading)이다.
+        useState: (initial) => [stateIndex++ === 1 && loading ? true : initial, () => {}],
+        useRef: (current) => ({ current }),
+        useEffect: () => {},
+      },
+      "./api/signIn": { signIn: async () => ({ status: "cancelled" }) },
+      "@/lib/pendingShareLink": { discardShareLink: () => {} },
+      "expo-router": {
+        Redirect: "Redirect",
+        useRouter: () => ({ replace: () => {}, back: () => {}, canGoBack: () => false }),
+      },
+      "expo-status-bar": { StatusBar: "StatusBar" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+      "react-native": {
+        Platform: { OS: "ios" },
+        View: "View",
+        Text: "Text",
+        Pressable: "Pressable",
+        ScrollView: "ScrollView",
+        useWindowDimensions: () => ({ height: 812 }),
+        Alert: { alert: () => {} },
+      },
+      "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/ToastText": { ToastText: "ToastText" },
+      "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+      "@/contexts/AuthContext": { useAuth: () => ({ session }) },
+    });
+    return LoginScreen(props);
+  };
+  const member = { user: { id: "u" } };
+  const redirect = render({ isRedirectedWhenSignedIn: true }, member);
+  assert.equal(redirect.type, "Redirect");
+  assert.equal(redirect.props.href, "/(tabs)/all");
+  assert.notEqual(render({ isRedirectedWhenSignedIn: true }, null).type, "Redirect");
+  assert.notEqual(render({}, member).type, "Redirect", "미리보기 화면은 그대로 보인다");
+  assert.notEqual(
+    render({ isRedirectedWhenSignedIn: true }, member, true).type,
+    "Redirect",
+    "로그인 중에 생긴 세션은 가입 완료 안내 등 원래 이동에 맡긴다",
+  );
 });
 
 test("ALL 탭은 로그인한 뒤에만 맡긴 공유 링크를 꺼내 저장을 이어 간다", async () => {
