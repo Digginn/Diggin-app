@@ -224,9 +224,10 @@ test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류�
     assert.ok(toast.props.className.includes(token));
   }
   const text = nodes(toast).find((node) => node.type === "Text");
-  assert.ok(text.props.className.includes("text-gray-200"));
+  assert.ok(text.props.className.includes("text-gray-0"));
   assert.ok(text.props.className.includes("font-label-14"));
-  assert.equal(text.props.children, "로그인 실패");
+  assert.equal(text.props.accessibilityLabel, "로그인 실패");
+  assert.equal(text.props.children.replaceAll("\u2060", ""), "로그인 실패");
 });
 
 test("AppBar는 로그인용 아이콘 옵션과 develop의 다크모드·제목 옵션을 함께 유지한다", () => {
