@@ -724,6 +724,61 @@ test("컬리는 페이지 데이터에서 상품명·판매가·브랜드를 읽
   assert.equal(values.brand, "Dole", "판매자(컬리)가 아니라 브랜드를 쓴다");
 });
 
+test("무신사는 쿠폰 적용가와 페이지 데이터의 상품명·브랜드를 쓴다", () => {
+  const sent = [];
+  const metas = {
+    "og:title": "라운드랩(ROUNDLAB) 소나무 진정 시카 로션 250ml - 후기 | 무신사",
+    "og:image": "https://image.msscdn.net/a.jpg",
+    "product:price:amount": "20000",
+    "product:price:currency": "KRW",
+  };
+  const nextData = {
+    props: {
+      pageProps: {
+        meta: {
+          data: {
+            goodsPrice: {
+              salePrice: 20000,
+              normalPrice: 25000,
+              couponPrice: 16000,
+              finalPrice: 16000,
+            },
+            goodsNm: "소나무 진정 시카 로션 250ml",
+            brandInfo: { brandName: "라운드랩", brandEnglishName: "ROUNDLAB" },
+          },
+        },
+      },
+    },
+  };
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+    document: {
+      readyState: "complete",
+      querySelector: (selector) => {
+        const key = /"([^"]+)"/.exec(selector)[1];
+        return metas[key] ? { getAttribute: () => metas[key] } : null;
+      },
+      querySelectorAll: () => [],
+      getElementById: (id) =>
+        id === "__NEXT_DATA__" ? { textContent: JSON.stringify(nextData) } : null,
+    },
+    location: {
+      href: "https://www.musinsa.com/products/2823000",
+      hostname: "www.musinsa.com",
+      search: "",
+    },
+    URLSearchParams,
+    Date,
+    JSON,
+    setInterval: () => 1,
+    clearInterval: () => {},
+  });
+  const { values } = normalizeProductPage(sent[0], "https://www.musinsa.com/products/2823000");
+  assert.equal(values.price, "16000");
+  assert.equal(values.name, "소나무 진정 시카 로션 250ml", "제목의 브랜드와 '- 후기'를 빼고 쓴다");
+  assert.equal(values.brand, "라운드랩");
+});
+
 test("전용 처리가 없는 쇼핑몰도 표준 형식(ProductGroup·priceSpecification·할인가 메타·마이크로데이터·eg: 메타)에서 가격과 브랜드를 읽는다", () => {
   const read = ({ metas = {}, lds = [], microdata = null }) => {
     const sent = [];
