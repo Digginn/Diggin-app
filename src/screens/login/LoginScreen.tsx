@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter, type Href } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -18,7 +18,7 @@ import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
-import { keepShareLink } from "@/lib/pendingShareLink";
+import { discardShareLink } from "@/lib/pendingShareLink";
 import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeModal";
 
 import { signIn } from "./api/signIn";
@@ -37,12 +37,20 @@ export function LoginScreen({
   isLoginLoading = false,
 }: LoginScreenProps = {}) {
   const router = useRouter();
-  const { shareUrl } = useLocalSearchParams<{ shareUrl?: string }>();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [hasError, setHasError] = useState(isLoginError);
   const [isLoading, setIsLoading] = useState(isLoginLoading);
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
+  const hasSignedIn = useRef(false);
+
+  // AUTH-001 공유하러 왔다가 로그인하지 않고 나가면 맡긴 링크를 버린다. 로그인 실패는 다시 시도할 수 있게 둔다.
+  useEffect(
+    () => () => {
+      if (!hasSignedIn.current) discardShareLink();
+    },
+    [],
+  );
 
   async function handleLogin(provider: LoginProvider) {
     if (isLoading) return;
@@ -55,7 +63,7 @@ export function LoginScreen({
         setSuspension(result.access);
         return;
       }
-      keepShareLink(shareUrl);
+      hasSignedIn.current = true;
       // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다.
       router.replace((result.isNewUser ? "/signup-complete" : "/(tabs)/all") as Href);
     } catch {

@@ -39,6 +39,7 @@ function loadShareSave({
   const calls = {
     started: [],
     opened: [],
+    kept: [],
     closed: 0,
     marked: 0,
     timers: [],
@@ -121,6 +122,7 @@ function loadShareSave({
           "@/hooks/useToast": { useToast: () => (message) => calls.toasts.push(message) },
           "@/lib/queryClient": { queryClient: {} },
           "@/lib/sharedSaves": { markSharedSave: () => calls.marked++ },
+          "@/lib/pendingShareLink": { keepShareLink: (url) => calls.kept.push(url) },
           "@/lib/supabase": {
             supabase: {
               auth: {
@@ -217,10 +219,15 @@ test("이미 저장한 링크는 저장하지 않고 안내하며, 확인하면 
   assert.equal(calls.closed, 1, "괜찮아요는 공유를 닫는다");
 });
 
-test("로그인이 풀렸으면 링크를 들고 앱의 로그인으로 보낸다", async () => {
+test("로그인이 풀렸으면 링크는 앱과 확장만 쓰는 보관함에 맡기고, 주소에 싣지 않고 앱의 로그인으로 보낸다", async () => {
   const { run, calls } = loadShareSave({ error: { message: "invalid refresh token" } });
   await run(LINK);
-  assert.deepEqual(calls.opened, [`login?shareUrl=${encodeURIComponent(LINK)}`]);
+  assert.deepEqual(calls.kept, [LINK]);
+  assert.deepEqual(
+    calls.opened,
+    ["login"],
+    "주소로 넘기면 다른 앱도 같은 주소로 링크를 넣을 수 있다",
+  );
   assert.deepEqual(calls.started, []);
 });
 

@@ -145,8 +145,12 @@ for (const os of ["ios", "android"]) {
     const signIns = [];
     let canGoBack = false;
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
-      "react": { useState: (initial) => [initial, () => {}] },
-      "@/lib/pendingShareLink": { keepShareLink: () => {} },
+      "react": {
+        useState: (initial) => [initial, () => {}],
+        useRef: (current) => ({ current }),
+        useEffect: () => {},
+      },
+      "@/lib/pendingShareLink": { discardShareLink: () => {} },
       "./api/signIn": {
         signIn: (provider) => {
           signIns.push(provider);
@@ -217,22 +221,78 @@ for (const os of ["ios", "android"]) {
   });
 }
 
-test("공유 확장에서 로그인하러 온 링크는 로그인에 성공했을 때만 ALL 탭에 넘긴다", async () => {
+function loadPendingShare() {
+  const files = new Map();
+  class File {
+    constructor(folder, name) {
+      this.path = `${folder.path}/${name}`;
+    }
+    get exists() {
+      return files.has(this.path);
+    }
+    async text() {
+      return files.get(this.path);
+    }
+    write(value) {
+      files.set(this.path, value);
+    }
+    delete() {
+      files.delete(this.path);
+    }
+  }
   const pending = load("lib/pendingShareLink.ts", {
+    "expo-file-system": {
+      File,
+      Paths: { appleSharedContainers: { "group.com.diggin.app.preview": { path: "/group" } } },
+    },
+    "react-native": { Platform: { OS: "ios" } },
+    "@/constants/appGroup": { APP_GROUP: "group.com.diggin.app.preview" },
     "@/utils/itemLink": load("utils/itemLink.ts"),
   });
+  return { pending, files };
+}
+
+test("비회원 공유 링크는 App Group에 맡겨 로그인 뒤 한 번만 꺼내고, 오래됐거나 웹 링크가 아니면 버린다", async () => {
   const LINK = "https://www.musinsa.com/products/1";
-  for (const [result, expected] of [
-    [{ status: "cancelled" }, null],
-    [{ status: "suspended", access: {} }, null],
-    [{ status: "success", isNewUser: false }, LINK],
-  ]) {
+  const { pending, files } = loadPendingShare();
+  pending.keepShareLink(LINK);
+  assert.ok(files.has("/group/pending-share"), "앱과 확장만 쓰는 보관함에 둔다");
+  assert.equal(await pending.takeShareLink(), LINK);
+  assert.equal(await pending.takeShareLink(), null, "한 번만 꺼낸다");
+  assert.equal(files.size, 0, "꺼내면 지운다");
+
+  pending.keepShareLink("javascript:alert(1)");
+  assert.equal(await pending.takeShareLink(), null, "웹 링크가 아니면 버린다");
+  files.set("/group/pending-share", "{깨진");
+  assert.equal(await pending.takeShareLink(), null);
+  files.set(
+    "/group/pending-share",
+    JSON.stringify({ url: LINK, savedAt: Date.now() - 11 * 60 * 1000 }),
+  );
+  assert.equal(await pending.takeShareLink(), null, "10분 넘게 묵은 공유는 버린다");
+
+  pending.keepShareLink(LINK);
+  pending.discardShareLink();
+  assert.equal(await pending.takeShareLink(), null);
+});
+
+test("로그인 화면은 주소로 온 공유 링크를 받지 않고, 로그인하지 않고 나가면 맡긴 링크를 버린다", async () => {
+  const LINK = "https://www.musinsa.com/products/1";
+  const render = (signIn, pending) => {
+    let cleanup;
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
-      "react": { useState: (initial) => [initial, () => {}] },
-      "./api/signIn": { signIn: async () => result },
+      "react": {
+        useState: (initial) => [initial, () => {}],
+        useRef: (current) => ({ current }),
+        useEffect: (effect) => {
+          cleanup = effect();
+        },
+      },
+      "./api/signIn": { signIn },
       "@/lib/pendingShareLink": pending,
       "expo-router": {
-        useLocalSearchParams: () => ({ shareUrl: LINK }),
+        // 다른 앱이 diggin://login?shareUrl=… 로 열어도 쓰지 않는다.
+        useLocalSearchParams: () => ({ shareUrl: "https://attacker.example/x" }),
         useRouter: () => ({ replace: () => {}, back: () => {}, canGoBack: () => false }),
       },
       "expo-status-bar": { StatusBar: "StatusBar" },
@@ -251,17 +311,76 @@ test("공유 확장에서 로그인하러 온 링크는 로그인에 성공했�
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
     });
-    await nodes(LoginScreen())
-      .find((node) => node.type === "SocialLoginButton")
-      .props.onPress();
+    const press = () =>
+      nodes(LoginScreen())
+        .find((node) => node.type === "SocialLoginButton")
+        .props.onPress();
+    return { press, leave: () => cleanup?.() };
+  };
+
+  const success = loadPendingShare();
+  success.pending.keepShareLink(LINK);
+  const loggedIn = render(async () => ({ status: "success", isNewUser: false }), success.pending);
+  await loggedIn.press();
+  loggedIn.leave();
+  assert.equal(await success.pending.takeShareLink(), LINK, "로그인하면 ALL 탭이 꺼내도록 남긴다");
+
+  const failed = loadPendingShare();
+  failed.pending.keepShareLink(LINK);
+  const retry = render(async () => {
+    throw new Error("network");
+  }, failed.pending);
+  await retry.press();
+  assert.ok(failed.files.size > 0, "로그인 실패는 다시 시도할 수 있게 둔다");
+  retry.leave();
+  assert.equal(failed.files.size, 0, "로그인하지 않고 나가면 버린다");
+
+  const external = loadPendingShare();
+  const fromLink = render(async () => ({ status: "success", isNewUser: false }), external.pending);
+  await fromLink.press();
+  assert.equal(await external.pending.takeShareLink(), null, "주소의 shareUrl은 맡기지 않는다");
+});
+
+test("ALL 탭은 로그인한 뒤에만 맡긴 공유 링크를 꺼내 저장을 이어 간다", async () => {
+  const run = async (session, pathname) => {
+    const started = [];
+    let taken = 0;
+    const effects = [];
+    const { default: TabLayout } = load("app/(tabs)/_layout.tsx", {
+      "react": { useEffect: (effect) => effects.push(effect) },
+      "expo-router": {
+        Tabs: Object.assign(() => null, { Screen: "Screen" }),
+        usePathname: () => pathname,
+      },
+      "@/contexts/AuthContext": { useAuth: () => ({ session }) },
+      "@/hooks/useItemSave": {
+        useItemSave: () => ({ start: (url) => started.push(url), isBusy: false }),
+      },
+      "@/lib/pendingShareLink": {
+        takeShareLink: async () => {
+          taken += 1;
+          return "https://www.musinsa.com/products/1";
+        },
+      },
+      "@/components/ItemSaveFlow": { ItemSaveFlow: "ItemSaveFlow" },
+      "@/components/LinkDetectModal": { LinkDetectModal: "LinkDetectModal" },
+      "@/components/NavigationBar": { NavigationBar: "NavigationBar" },
+    });
+    TabLayout();
+    for (const effect of effects) effect();
     await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(pending.takeShareLink(), expected, result.status);
-  }
-  pending.keepShareLink("javascript:alert(1)");
-  assert.equal(pending.takeShareLink(), null, "웹 링크가 아니면 버린다");
-  pending.keepShareLink(LINK);
-  pending.takeShareLink();
-  assert.equal(pending.takeShareLink(), null, "한 번만 꺼낸다");
+    return { started, taken };
+  };
+  assert.deepEqual(
+    await run(null, "/all"),
+    { started: [], taken: 0 },
+    "둘러보기 비회원은 꺼내지 않는다",
+  );
+  assert.deepEqual(await run({ user: { id: "u" } }, "/folder"), { started: [], taken: 0 });
+  assert.deepEqual(await run({ user: { id: "u" } }, "/all"), {
+    started: ["https://www.musinsa.com/products/1"],
+    taken: 1,
+  });
 });
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {

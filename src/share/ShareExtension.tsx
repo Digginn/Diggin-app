@@ -12,6 +12,7 @@ import { TOAST_MESSAGES } from "@/constants/messages";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
+import { keepShareLink } from "@/lib/pendingShareLink";
 import { queryClient } from "@/lib/queryClient";
 import { markSharedSave } from "@/lib/sharedSaves";
 import { supabase } from "@/lib/supabase";
@@ -68,7 +69,8 @@ function ShareSave({ shared }: { shared: string }) {
         // 만료된 토큰을 갱신하다 연결이 끊긴 것은 로그인이 풀린 게 아니다. 여기서 알리고 앱으로 보내지 않는다.
         if (isAuthRetryableFetchError(error)) return setSessionError("network");
         // 비회원은 앱에서 로그인한 뒤 이 링크로 저장을 이어 간다(SAVE-002).
-        openHostApp(`login?shareUrl=${encodeURIComponent(link)}`);
+        keepShareLink(link);
+        openHostApp("login");
       })
       .catch(() => setSessionError("network"));
   }, [link, start]);
