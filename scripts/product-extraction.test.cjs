@@ -280,13 +280,32 @@ test("AppsFlyer 공유 링크의 추적값을 떼어 같은 상품이 같은 링
     "https://www.29cm.co.kr/products/4310987?shortlink=7j3yhnmw&af_dp=app29cm%3A%2F%2Fweb&onelink_id=1080201211&pid=29cm_pdp_share&af_click_lookback=7d&deep_link_value=app29cm%3A%2F%2Fweb",
     "https://www.29cm.co.kr/products/4310987?c=campaign&deep_link_sub1=x&af_sub1=y",
   ]) {
-    assert.equal(stripTrackingParams(url), "https://www.29cm.co.kr/products/4310987");
+    assert.equal(stripTrackingParams(url, true), "https://www.29cm.co.kr/products/4310987");
   }
   assert.equal(
-    stripTrackingParams("https://shop.example.com/view?pid=123&c=blue"),
+    stripTrackingParams("https://shop.example.com/view?pid=123&c=blue", true),
     "https://shop.example.com/view?pid=123&c=blue",
     "AppsFlyer 링크가 아니면 pid·c는 상품 값일 수 있어 남긴다",
   );
+});
+
+test("상품 페이지를 못 읽어 원래 공유 링크를 저장할 때는 상품을 가리키는 AppsFlyer 값을 남긴다", () => {
+  const shared =
+    "https://29cm.onelink.me/1080201211/7j3yhnmw?af_dp=app29cm%3A%2F%2Fproduct%2F4310987&deep_link_value=4310987&pid=29cm_pdp_share&utm_source=share";
+  const kept =
+    "https://29cm.onelink.me/1080201211/7j3yhnmw?af_dp=app29cm%3A%2F%2Fproduct%2F4310987&deep_link_value=4310987&pid=29cm_pdp_share";
+  assert.equal(stripTrackingParams(shared), kept, "일반 추적값(utm)만 뗀다");
+  const failed = normalizeProductPage({ finalUrl: shared, og: og({ title: "29CM" }) }, shared);
+  assert.equal(failed.hasFailed, true);
+  assert.equal(failed.values.sourceUrl, kept);
+  const landed = normalizeProductPage(
+    {
+      finalUrl: "https://www.29cm.co.kr/products/4310987?af_dp=x&shortlink=y&pid=z",
+      og: og({ title: "후드 집업", image: "https://img.29cm.co.kr/a.jpg" }),
+    },
+    shared,
+  );
+  assert.equal(landed.values.sourceUrl, "https://www.29cm.co.kr/products/4310987");
 });
 
 test("에이블리처럼 product:brand 메타만 있어도 브랜드를 채우고 공유 링크 추적값을 뗀다", () => {
