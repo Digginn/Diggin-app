@@ -22,9 +22,14 @@ import { AuthProviderIcon, type AuthProvider } from "@/components/AuthProviderIc
 import { Button } from "@/components/Button";
 import { HelperText, TextField } from "@/components/Field";
 import { useToast } from "@/hooks/useToast";
+import { textLength } from "@/utils/text";
 
 import { PROFILE_MESSAGES } from "./constants/profileMessages";
-import { NICKNAME_HELPER_MESSAGE, validateNickname } from "./utils/validateNickname";
+import {
+  MAX_NICKNAME_LENGTH,
+  NICKNAME_HELPER_MESSAGE,
+  validateNickname,
+} from "./utils/validateNickname";
 import { validateProfileImage } from "./utils/validateProfileImage";
 
 const Image = cssInterop(ExpoImage, { className: "style" });
@@ -53,6 +58,8 @@ export function ProfileEditScreen({
   const [nickname, setNickname] = useState("");
   const [profileImageUri, setProfileImageUri] = useState<string>();
   const [helperStatus, setHelperStatus] = useState<"default" | "error">("default");
+  // MY-002 오류 문구가 보이는 동안 저장을 막고, 닉네임을 고치면 다시 연다.
+  const isNicknameError = helperStatus === "error";
   const [helperMessage, setHelperMessage] = useState(NICKNAME_HELPER_MESSAGE);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -117,7 +124,7 @@ export function ProfileEditScreen({
 
   const handleSave = async () => {
     Keyboard.dismiss();
-    if (isSaving || (!nickname && !profileImageUri)) return;
+    if (isSaving || isNicknameError || (!nickname && !profileImageUri)) return;
 
     const errorMessage = validateNickname(nickname);
     if (errorMessage) {
@@ -199,18 +206,26 @@ export function ProfileEditScreen({
         </View>
 
         <View className="mt-6">
-          <TextField
-            accessibilityLabel="닉네임"
-            onChangeText={(value) => {
-              setNickname(value);
-              setHelperStatus("default");
-              setHelperMessage(NICKNAME_HELPER_MESSAGE);
-            }}
-            onSubmitEditing={handleSave}
-            placeholder={currentNickname ?? "현재 닉네임"}
-            returnKeyType="done"
-            value={nickname}
-          />
+          <View className="justify-center">
+            <TextField
+              accessibilityLabel="닉네임"
+              inputClassName="pr-12"
+              isError={isNicknameError}
+              onChangeText={(value) => {
+                setNickname(value);
+                setHelperStatus("default");
+                setHelperMessage(NICKNAME_HELPER_MESSAGE);
+              }}
+              onSubmitEditing={handleSave}
+              placeholder={currentNickname ?? "현재 닉네임"}
+              returnKeyType="done"
+              value={nickname}
+            />
+            {/* AUTH-08 입력칸 오른쪽 글자 수 */}
+            <Text pointerEvents="none" className="absolute right-4 text-gray-600 font-note">
+              {textLength(nickname)}/{MAX_NICKNAME_LENGTH}
+            </Text>
+          </View>
           <HelperText className="mt-2.5 h-5" message={helperMessage} status={helperStatus} />
         </View>
 
@@ -226,7 +241,7 @@ export function ProfileEditScreen({
       </ScrollView>
 
       <View className="absolute left-6 right-6" style={{ bottom: insets.bottom + 10 }}>
-        <Button size="large" isDisabled={isSaving} onPress={handleSave}>
+        <Button size="large" isDisabled={isSaving || isNicknameError} onPress={handleSave}>
           저장하기
         </Button>
       </View>
