@@ -22,17 +22,30 @@ if (!supabaseUrl || !supabasePublishableKey) {
 // iOS 공유 확장(#91)도 같은 세션을 쓰도록 앱과 확장이 함께 쓰는 App Group에 둔다.
 // 세션을 복사하면 한쪽의 토큰 갱신이 다른 쪽 토큰을 무효로 만들어서, 같은 저장소를 함께 읽고 쓴다.
 const sharedFolder = Platform.OS === "ios" ? Paths.appleSharedContainers[APP_GROUP] : undefined;
-const sharedKeychain = sharedFolder ? { accessGroup: APP_GROUP } : undefined;
+// iOS는 그룹 없이 지우면 모든 그룹에서 같은 서비스·키를 지운다. 예전 키를 지울 때 공유 키가 같이 지워지지 않게 서비스를 나눈다.
+const sharedKeychain = sharedFolder
+  ? { accessGroup: APP_GROUP, keychainService: "diggin.shared-session" }
+  : undefined;
 
 // SecureStore는 값 하나에 2KB까지만 저장해서 세션을 직접 넣을 수 없다.
 // 세션은 암호화해 파일(iOS는 공유 폴더, 그 밖은 AsyncStorage)에 두고, 암호화 키만 SecureStore에 둔다(Supabase Expo 가이드).
 class LargeSecureStore {
+  // 앱과 확장이 같은 세션을 읽고 쓴다. 저장마다 키를 바꾸면 키와 파일 사이에 끼어 읽은 쪽이 깨진 값을 받아,
+  // 처음 만든 키를 계속 쓰고 저장할 때는 파일만 바꾼다.
+  private async encryptionKey(key: string) {
+    const stored = await SecureStore.getItemAsync(key, sharedKeychain);
+    if (stored) return aesjs.utils.hex.toBytes(stored);
+    const created = crypto.getRandomValues(new Uint8Array(256 / 8));
+    await SecureStore.setItemAsync(key, aesjs.utils.hex.fromBytes(created), sharedKeychain);
+    return created;
+  }
+
   private async encrypt(key: string, value: string) {
-    const encryptionKey = crypto.getRandomValues(new Uint8Array(256 / 8));
-    const cipher = new aesjs.ModeOfOperation.ctr(encryptionKey, new aesjs.Counter(1));
-    const encryptedBytes = cipher.encrypt(aesjs.utils.utf8.toBytes(value));
-    await SecureStore.setItemAsync(key, aesjs.utils.hex.fromBytes(encryptionKey), sharedKeychain);
-    return aesjs.utils.hex.fromBytes(encryptedBytes);
+    const cipher = new aesjs.ModeOfOperation.ctr(
+      await this.encryptionKey(key),
+      new aesjs.Counter(1),
+    );
+    return aesjs.utils.hex.fromBytes(cipher.encrypt(aesjs.utils.utf8.toBytes(value)));
   }
 
   private async decrypt(
