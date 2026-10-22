@@ -457,6 +457,10 @@ export type Database = {
         Returns: Json;
       };
       mark_notifications_checked: { Args: Record<PropertyKey, never>; Returns: string };
+      record_withdrawal_survey: {
+        Args: { custom_text: string; reasons: Database["public"]["Enums"]["withdrawal_reason"][] };
+        Returns: undefined;
+      };
       register_push_token: {
         Args: { new_platform: string; new_token: string };
         Returns: undefined;
