@@ -78,7 +78,10 @@ function setup(screenName) {
           };
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
         if (name === "expo-router")
-          return { useIsFocused: () => true, useRouter: () => ({ push: (route) => routes.push(route) }) };
+          return {
+            useIsFocused: () => true,
+            useRouter: () => ({ push: (route) => routes.push(route) }),
+          };
         if (name === "react-native-safe-area-context")
           return { useSafeAreaInsets: () => ({ bottom: 34 }) };
         if (name === "@/hooks/useToast") return { useToast: () => (text) => toasts.push(text) };
@@ -102,7 +105,6 @@ function setup(screenName) {
           return {
             ImageSupportApp: "ImageSupportApp",
             IconMyChevron: "IconMyChevron",
-            IconWithdrawalClose: "IconWithdrawalClose",
           };
         if (name === "./constants/supportChannel") return { SUPPORT_CHANNEL_URL: CHANNEL_URL };
         if (name === "@/constants/policyDocuments.json")
@@ -399,7 +401,8 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
 test("MY 회원탈퇴 메뉴가 확인 창을 열고 취소하며 콜백을 전달한다", () => {
   const { Screen } = setup("MyScreen");
   const onWithdraw = async () => {};
-  const nodes = () => descendants(Screen({ onWithdraw }));
+  const onWithdrawComplete = () => {};
+  const nodes = () => descendants(Screen({ onWithdraw, onWithdrawComplete }));
   const modal = () => nodes().find((node) => node.type === "AccountWithdrawalModal")?.props;
   nodes()
     .find((node) => node.props.title === "설정")
@@ -407,6 +410,7 @@ test("MY 회원탈퇴 메뉴가 확인 창을 열고 취소하며 콜백을 전�
     .onPress();
   assert.equal(modal().isVisible, true);
   assert.equal(modal().onWithdraw, onWithdraw);
+  assert.equal(modal().onComplete, onWithdrawComplete);
   modal().onClose();
   assert.equal(modal(), undefined);
 });
@@ -415,10 +419,12 @@ test("탈퇴 확인 → 설문 제출 성공 후에만 완료를 표시하고 �
   for (const hasFailure of [false, true]) {
     const { Screen, toasts } = setup("components/AccountWithdrawalModal");
     let calls = 0,
-      closes = 0;
+      closes = 0,
+      completes = 0;
     const props = {
       isVisible: true,
       onClose: () => closes++,
+      onComplete: () => completes++,
       onWithdraw: async () => {
         calls++;
         if (hasFailure) throw new Error("withdrawal failure");
@@ -451,14 +457,14 @@ test("탈퇴 확인 → 설문 제출 성공 후에만 완료를 표시하고 �
       descendants(tree()).some((node) => node.props.children === "회원 탈퇴가 완료되었습니다."),
     );
     assert.ok(
-      descendants(tree()).some(
-        (node) => node.type === "IconWithdrawalClose" && node.props.width === undefined,
-      ),
+      !descendants(tree()).some((node) => node.props.accessibilityRole === "button"),
+      "시안처럼 완료 창에는 닫기 버튼이 없다",
     );
     assert.equal(buttons()[0].props.children, "확인");
     await buttons()[0].props.onPress();
     assert.equal(calls, 1, "완료 확인은 탈퇴 요청을 반복하지 않는다.");
     assert.equal(closes, 1);
+    assert.equal(completes, 1, "확인하면 앱 처음으로 보낸다");
     assert.deepEqual(toasts, []);
   }
 });
@@ -496,10 +502,8 @@ test("미연결 탈퇴는 성공 처리하지 않고, 설문 취소·요청 연�
   finish();
   await pending;
   assert.equal(closes, 1);
-  descendants(tree())
-    .find((node) => node.props.accessibilityLabel === "회원탈퇴 완료 창 닫기")
-    .props.onPress();
-  assert.equal(closes, 2);
+  tree().props.onRequestClose();
+  assert.equal(closes, 2, "완료 창은 뒤로 가기로 닫아도 확인과 같다");
 });
 
 test("탈퇴 설문은 복수 선택·해제, 직접 작성 30자 제한, 빈 입력 방지와 payload를 처리한다", () => {
@@ -583,4 +587,50 @@ test("MY 정책과 작성 동의·보기는 동일한 커뮤니티 전문을 표
       assert.equal(closed, 1);
     }
   }
+});
+
+test("탈퇴 설문 문구를 DB 사유 값으로 보내고, 실패는 알리되 이미 지워진 계정은 성공으로 본다", async () => {
+  const sent = [];
+  let failure = null,
+    userError = null;
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(
+      readFileSync(path.join(__dirname, "../src/screens/my/api/withdrawal.ts"), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+    ).outputText,
+    {
+      module,
+      exports: module.exports,
+      require: (name) => {
+        if (name === "@/lib/supabase")
+          return {
+            supabase: {
+              auth: { getUser: async () => ({ error: userError }) },
+              functions: {
+                invoke: async (fn, options) => {
+                  sent.push([fn, options.body]);
+                  return { error: failure };
+                },
+              },
+            },
+          };
+        throw new Error(`unexpected require ${name}`);
+      },
+    },
+  );
+  const { withdrawAccount } = module.exports;
+  await withdrawAccount({
+    reasons: ["자주 사용하지 않아요.", "오류가 자주 생겨요.", "직접 작성"],
+    detail: "그냥요",
+  });
+  await withdrawAccount({ reasons: ["다른 서비스를 이용해요."], detail: "" });
+  assert.deepEqual(JSON.parse(JSON.stringify(sent)), [
+    ["account-withdrawal", { reasons: ["rarely_used", "frequent_error"], custom_text: "그냥요" }],
+    ["account-withdrawal", { reasons: ["other_service"], custom_text: null }],
+  ]);
+  failure = new Error("withdrawal_failed");
+  await assert.rejects(withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }));
+  userError = { code: "user_not_found" };
+  await withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" });
 });

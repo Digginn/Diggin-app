@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
-import { IconWithdrawalClose } from "@/assets/images/my";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/modal";
 
@@ -12,12 +11,15 @@ type AccountWithdrawalModalProps = {
   onClose: () => void;
   // 실제 탈퇴 요청은 설문 제출 시 실행하며, 성공한 뒤에만 완료 창을 표시합니다.
   onWithdraw?: (survey: WithdrawalSurvey) => Promise<void>;
+  /** MY-007 완료 확인. 계정이 이미 없어 앱 처음으로 보낸다. */
+  onComplete?: () => void;
 };
 
 export function AccountWithdrawalModal({
   isVisible,
   onClose,
   onWithdraw,
+  onComplete,
 }: AccountWithdrawalModalProps) {
   const [modalToast, setModalToast] = useState<string>();
   const [isCompletionOpen, setIsCompletionOpen] = useState(false);
@@ -37,6 +39,10 @@ export function AccountWithdrawalModal({
     setIsSurveyOpen(false);
     setModalToast(undefined);
     onClose();
+  };
+  const handleComplete = () => {
+    handleClose();
+    onComplete?.();
   };
   const handleAgree = () => {
     setIsSurveyOpen(true);
@@ -78,7 +84,7 @@ export function AccountWithdrawalModal({
   return (
     <Modal
       visible={isVisible}
-      onRequestClose={handleClose}
+      onRequestClose={isCompletionOpen ? handleComplete : handleClose}
       scrimOpacity={0.36}
       backdropClassName={isCompletionOpen ? "bg-gray-0" : undefined}
       toastMessage={modalToast}
@@ -90,20 +96,6 @@ export function AccountWithdrawalModal({
           <Text className="text-center text-gray-900 font-label-16-semibold">
             {isCompletionOpen ? "회원 탈퇴가 완료되었습니다." : "회원 탈퇴하시겠습니까?"}
           </Text>
-          {isCompletionOpen && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="회원탈퇴 완료 창 닫기"
-              accessibilityState={{ disabled: isWithdrawing }}
-              disabled={isWithdrawing}
-              onPress={handleClose}
-              className="absolute right-0 h-12 w-12 items-center justify-center"
-            >
-              <View className="size-4 items-center justify-center">
-                <IconWithdrawalClose />
-              </View>
-            </Pressable>
-          )}
         </View>
         <Text className="text-center text-gray-700 font-b3">
           {isCompletionOpen
@@ -113,7 +105,7 @@ export function AccountWithdrawalModal({
       </View>
       {isCompletionOpen ? (
         <View className="w-full">
-          <Button isDisabled={isWithdrawing} onPress={handleClose}>
+          <Button isDisabled={isWithdrawing} onPress={handleComplete}>
             확인
           </Button>
         </View>
