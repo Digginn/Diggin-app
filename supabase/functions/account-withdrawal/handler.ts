@@ -41,7 +41,8 @@ function parseSurvey(value: unknown): Survey {
     throw new Error("invalid_request");
   }
   if (custom_text != null && typeof custom_text !== "string") throw new Error("invalid_request");
-  const customText = custom_text?.trim() || null;
+  // 자모가 나뉜 한글(NFD)은 DB가 자모마다 1자로 세서, 합친 형태로 세고 저장한다.
+  const customText = custom_text?.normalize("NFC").trim() || null;
   const length = customText ? [...graphemes.segment(customText)].length : 0;
   if (length > CUSTOM_TEXT_MAX || (!reasons.length && !customText)) {
     throw new Error("invalid_request");

@@ -85,6 +85,10 @@ Deno.test("직접 작성은 앱 화면처럼 조합 이모지를 1자로 센다"
     assert((await handler(request({ reasons: [], custom_text: text }))).status === status);
     assert(calls.length === (status === 200 ? 3 : 0));
   }
+  const { handler, calls } = setup();
+  const decomposed = "탈퇴".normalize("NFD").repeat(50);
+  assert((await handler(request({ reasons: [], custom_text: decomposed }))).status === 200);
+  assert(calls[2] === `survey:${JSON.stringify({ reasons: [], customText: "탈퇴".repeat(50) })}`);
 });
 
 Deno.test("사진이나 계정 삭제에 실패하면 실패로 알리고 설문은 남기지 않는다", async () => {
