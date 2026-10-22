@@ -1,3 +1,4 @@
+/* global __dirname */
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
@@ -48,6 +49,7 @@ function loadStorage(os) {
     },
     require: (name) => {
       if (name === "react-native-get-random-values") return {};
+      if (name === "@/constants/appGroup") return { APP_GROUP };
       if (name === "react-native")
         return { Platform: { OS: os }, AppState: { addEventListener: () => {} } };
       if (name === "@react-native-async-storage/async-storage")

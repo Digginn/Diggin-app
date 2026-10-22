@@ -7,6 +7,7 @@ import { File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import { AppState, Platform } from "react-native";
 
+import { APP_GROUP } from "@/constants/appGroup";
 import type { Database } from "@/types/database.types";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -20,7 +21,6 @@ if (!supabaseUrl || !supabasePublishableKey) {
 
 // iOS 공유 확장(#91)도 같은 세션을 쓰도록 앱과 확장이 함께 쓰는 App Group에 둔다.
 // 세션을 복사하면 한쪽의 토큰 갱신이 다른 쪽 토큰을 무효로 만들어서, 같은 저장소를 함께 읽고 쓴다.
-const APP_GROUP = "group.com.diggin.app.preview";
 const sharedFolder = Platform.OS === "ios" ? Paths.appleSharedContainers[APP_GROUP] : undefined;
 const sharedKeychain = sharedFolder ? { accessGroup: APP_GROUP } : undefined;
 
