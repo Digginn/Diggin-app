@@ -6,6 +6,7 @@ on:
     paths:
       - "supabase/**"
       - "scripts/*shared_db*.py"
+      - "scripts/shared-db-approval.test.cjs"
       - "scripts/*migration_recovery*.py"
       - ".github/workflows/deploy-shared-db.yml"
   push:
@@ -13,6 +14,7 @@ on:
     paths:
       - "supabase/**"
       - "scripts/*shared_db*.py"
+      - "scripts/shared-db-approval.test.cjs"
       - "scripts/*migration_recovery*.py"
       - ".github/workflows/deploy-shared-db.yml"
 
@@ -50,6 +52,12 @@ jobs:
               core.setFailed("The deploy commit must be a pull request merged into develop. Direct pushes cannot deploy.");
               return;
             }
+            // 사용자 승인 예외: 최초 Retool 운영자 등록 복구 PR 한 건에만 적용한다.
+            if (context.repo.owner === "Digginn" && context.repo.repo === "Diggin-app" &&
+                mergedPr.number === 122 && mergedPr.head.ref === "chore/115-retool-registration-deploy") {
+              core.info("PR #122: user authorized deployment without a teammate approval.");
+              return;
+            }
             const { repository } = await github.graphql(`
               query($owner: String!, $repo: String!, $number: Int!) {
                 repository(owner: $owner, name: $repo) {
@@ -84,7 +92,9 @@ jobs:
           supabase db advisors --local --level warn --fail-on error
 
       - name: Test shared database deployment guards
-        run: python3 -m unittest discover -s scripts -p 'test_deploy_shared_db.py'
+        run: |
+          node --test scripts/shared-db-approval.test.cjs
+          python3 -m unittest discover -s scripts -p 'test_deploy_shared_db.py'
 
       - name: Remove the disposable local database
         if: always() && steps.local_db.outcome != 'skipped' && steps.local_db.outcome != ''

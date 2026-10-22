@@ -73,12 +73,15 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 | APPLE_OIDC_AUDIENCES  | 네이티브 Bundle ID, 사용하는 경우 Apple Service ID                       |
 
 3. 프로젝트 담당자가 Supabase Auth에 확인된 운영자 계정을 만들고, 승인된 데이터 등록 절차로 `private.admin_users`에 그 계정 UUID·이메일·operator/super_admin을 등록한다. 이메일 도메인이나 user_metadata로 자동 승격하지 않는다. 앱 일반 사용자 UUID를 운영자로 잘못 등록하지 않는다.
+   - #115 최초 Retool 계정은 `20261021173103_register_retool_operator.sql` 데이터 마이그레이션으로 등록한다. 지정한 UID의 이메일 확인이 완료된 Auth 계정만 `operator`로 추가하며, 계정이 없는 로컬/CI에서는 건너뛴다. 기존 운영자의 권한·비활성화 상태는 바꾸지 않는다. PR 승인·병합 후 자동 배포가 끝나야 Retool에서 관리자 API를 사용할 수 있다.
+   - #121은 승인 리뷰 없이 병합되어 배포의 승인 검사에서 중단됐다. 사용자 지시에 따라 복구 PR #122만 팀원 승인 예외로 배포하며 다른 PR의 승인 조건은 유지한다. DB 등록 SQL은 직접 실행하지 않는다. #122의 `deploy` 성공 후 Retool 관리자 로그인과 `list_reports` 성공을 확인한다. 신고가 없어 빈 배열이 반환되어도 정상이며, 403이면 Auth 이메일 확인과 해당 UID의 운영자 등록·비활성화 상태를 확인한다.
 4. 승인된 PR을 develop에 병합하면 기존 검증과 DB 배포 후 두 Edge Function을 배포한다. 함수 배포 실패는 Actions 실패로 남기며 설정을 고쳐 같은 실행을 다시 실행한다. API 설정·관리자 계정·audience 값은 코드에서 임의 생성하지 않는다.
 
 ## 로컬 검증
 
 - `npm run test:community`, `npm run test:moderation`, 타입·린트 검사
 - `supabase db reset --local --no-seed`, `supabase test db --local`, DB lint·Advisors, public 타입 재생성
+- #115 등록 데이터 검증: 전체 마이그레이션을 적용한 **별도 로컬 임시 DB**에서 `pg_prove --dbname "$LOCAL_TEST_DB_URL" scripts/check_retool_operator.sql`을 실행한다. 실제 등록 마이그레이션을 읽어 계정 누락·이메일 미확인·정상 등록·타 계정 제외·재실행을 검사하고 롤백한다. 이 검사는 공유/운영 DB에서 실행하지 않는다.
 - `deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts`
 - `scripts/check_moderation_auth.cjs`: **project_id diggin-114, API 55481 / DB 55482** 전용 임시 환경에서만 실행. `MODERATION_TEST_WORKDIR`, `DENO_BIN`을 지정한다. Deno 테스트 서버가 기본 포트 8000을 쓰므로 다른 서비스가 없는지 확인한다. 실제 Auth API·동시 요청·강제 롤백·ban·갱신 차단·미만료 JWT·해제를 검증한다. 테스트 계정과 변경 불가 감사 기록을 생성하며 검증 후 해당 임시 DB만 reset/stop으로 제거한다.
 
