@@ -14,6 +14,11 @@ function nodes(node) {
   return [node, ...React.Children.toArray(node.props.children).flatMap(nodes)];
 }
 
+const LOGIN_SOURCES = {
+  "@/lib/loginIntent": "../src/lib/loginIntent.ts",
+  "@/hooks/useLoginGate": "../src/hooks/useLoginGate.tsx",
+};
+
 function load(file, mocks) {
   const module = { exports: {} };
   runInNewContext(
@@ -23,7 +28,13 @@ function load(file, mocks) {
     {
       module,
       exports: module.exports,
-      require: (name) => mocks[name] ?? (name.startsWith("@/assets/") ? name : require(name)),
+      require: (name) =>
+        mocks[name] ??
+        (name.startsWith("@/assets/")
+          ? name
+          : LOGIN_SOURCES[name]
+            ? load(LOGIN_SOURCES[name], mocks)
+            : require(name)),
     },
   );
   return module.exports;
@@ -251,6 +262,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   const listArgs = [];
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", {
     "react": {
+      useCallback: (callback) => callback,
       useLayoutEffect: () => {},
       useState: (initial) => {
         const index = cursor++;
@@ -275,7 +287,8 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "@/components/ErrorState": { ErrorState: "ErrorState" },
     "@/components/FirstVisitGuide": { FirstVisitGuide: "FirstVisitGuide" },
     "@/components/ItemSaveFlow": { ItemSaveFlow: "ItemSaveFlow" },
-    "@/components/modal": { ActionModal: "ActionModal" },
+    "@/components/modal": { ActionModal: "ActionModal", LoginRequiredModal: "LoginRequiredModal" },
+    "@/contexts/AuthContext": { useAuth: () => ({ session: { user: { id: "u" } } }) },
     "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
     "@/constants/messages": {
@@ -327,4 +340,90 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   header(grid, "SortLabel").props.onChange("oldest");
   render();
   assert.deepEqual(listArgs.at(-1), ["oldest", null], "같은 저장 신호로는 다시 되돌리지 않는다");
+});
+
+test("비회원 ALL은 개인 목록을 조회하지 않고 빈 상태를 보이며, 아이템 추가는 로그인 후 이어 연다", () => {
+  const state = [];
+  let cursor = 0;
+  const enabled = [];
+  const routes = [];
+  const loginIntent = load("../src/lib/loginIntent.ts", {});
+  const { AllScreen } = load("../src/screens/all/AllScreen.tsx", {
+    "react": {
+      useCallback: (callback) => callback,
+      useLayoutEffect: () => {},
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [
+          state[index],
+          (next) => {
+            state[index] = typeof next === "function" ? next(state[index]) : next;
+          },
+        ];
+      },
+    },
+    "react-native": { Platform: { OS: "ios" }, Pressable: "Pressable", Text: "Text", View: "View" },
+    "expo-router": {
+      useLocalSearchParams: () => ({}),
+      useNavigation: () => ({ setOptions: () => {} }),
+      useRouter: () => ({ push: (route) => routes.push(route) }),
+    },
+    "@/assets/images/appbar": { IconNotification: "IconNotification", IconSearch: "IconSearch" },
+    "@/components/app-bar": { AppBar: Object.assign(() => null, { IconButton: "IconButton" }) },
+    "@/components/EmptyState": { EmptyState: "EmptyState" },
+    "@/components/ErrorState": { ErrorState: "ErrorState" },
+    "@/components/FirstVisitGuide": { FirstVisitGuide: "FirstVisitGuide" },
+    "@/components/ItemSaveFlow": { ItemSaveFlow: "ItemSaveFlow" },
+    "@/components/modal": { ActionModal: "ActionModal", LoginRequiredModal: "LoginRequiredModal" },
+    "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
+    "@/lib/loginIntent": loginIntent,
+    "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
+    "@/components/WishLevel": { WishLevel: "WishLevel" },
+    "@/constants/messages": {
+      selectDeletedMessage: () => "",
+      STATE_MESSAGES: { allEmpty: "빈 ALL" },
+      TOAST_MESSAGES: {},
+    },
+    "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: false }) },
+    "@/hooks/useItemSave": { useItemSave: () => ({ start: () => {} }) },
+    "@/hooks/useLinkDetectionPause": { useLinkDetectionPause: () => {} },
+    "@/hooks/useProductCounts": {
+      useProductCounts: (_query, isEnabled) => {
+        enabled.push(isEnabled);
+        return { isPending: true, isError: false };
+      },
+    },
+    "@/hooks/useProductList": {
+      useProductList: (_sort, _level, _query, isEnabled) => {
+        enabled.push(isEnabled);
+        return { isPending: true, isError: false };
+      },
+    },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/screens/save/components/ItemLinkSheet": { ItemLinkSheet: "ItemLinkSheet" },
+    "./components/DeleteBar": { DeleteBar: "DeleteBar" },
+    "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
+    "./components/SortLabel": { SortLabel: "SortLabel" },
+    "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
+  });
+  const render = () => {
+    cursor = 0;
+    return nodes(AllScreen());
+  };
+  const tree = render();
+  assert.deepEqual(enabled, [false, false], "비회원은 상품을 조회하지 않는다");
+  assert.equal(tree.find((node) => node.type === "EmptyState").props.message, "빈 ALL");
+  assert.ok(!tree.some((node) => node.type === "ErrorState"));
+
+  tree.find((node) => node.props.accessibilityLabel === "아이템 추가").props.onPress();
+  const sheet = () => render().find((node) => node.type === "ItemLinkSheet");
+  const modal = () => render().find((node) => node.type === "LoginRequiredModal");
+  assert.equal(sheet().props.visible, false, "비회원은 링크 시트를 열지 않는다");
+  assert.equal(modal().props.visible, true);
+  modal().props.onLogin();
+  assert.deepEqual(routes, ["/login"]);
+  assert.equal(modal().props.visible, false);
+  loginIntent.takeLoginIntent()();
+  assert.equal(sheet().props.visible, true, "로그인하면 아이템 추가를 이어 연다");
 });

@@ -17,6 +17,7 @@ import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constant
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useItemSave } from "@/hooks/useItemSave";
 import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
+import { useLoginGate } from "@/hooks/useLoginGate";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useProductList } from "@/hooks/useProductList";
 import { useToast } from "@/hooks/useToast";
@@ -49,15 +50,16 @@ export function AllScreen() {
     setWishLevel(null);
   }
 
-  const list = useProductList(sortOrder, wishLevel);
-  const counts = useProductCounts();
+  const { requireLogin, loginModal, isGuest } = useLoginGate();
+  const list = useProductList(sortOrder, wishLevel, "", !isGuest);
+  const counts = useProductCounts("", !isGuest);
   const deleteProducts = useDeleteProducts();
   const items = list.data?.pages.flat() ?? [];
   const totalCount = counts.data?.total ?? 0;
   const shownCount = wishLevel ? (counts.data?.levels[wishLevel] ?? 0) : totalCount;
   // 빈 화면 시안에는 상단 영역이 없다. 개수로 먼저 판단해야 상단이 잠깐 보였다 사라지지 않는다.
   // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
-  const isEmpty = wishLevel === null && totalCount === 0;
+  const isEmpty = isGuest || (wishLevel === null && totalCount === 0);
 
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -143,6 +145,8 @@ export function AllScreen() {
 
       {guide.isVisible ? (
         <View className="flex-1" />
+      ) : isGuest ? (
+        <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : list.isError || counts.isError ? (
         <ErrorState
           message={STATE_MESSAGES.loadFailed}
@@ -224,6 +228,7 @@ export function AllScreen() {
       />
 
       <ItemSaveFlow itemSave={itemSave} />
+      {loginModal}
 
       <ActionModal
         visible={confirming === "cancel"}
@@ -247,10 +252,12 @@ export function AllScreen() {
             accessibilityLabel="아이템 추가"
             accessibilityRole="button"
             className="absolute left-[73px] top-[73px] size-[54px] items-center justify-center rounded-full bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.1)] active:opacity-75"
-            onPress={() => {
-              setLinkSheetKey((key) => key + 1);
-              setLinkSheetOpen(true);
-            }}
+            onPress={() =>
+              requireLogin(() => {
+                setLinkSheetKey((key) => key + 1);
+                setLinkSheetOpen(true);
+              })
+            }
           >
             <PlusIcon />
           </Pressable>

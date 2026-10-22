@@ -8,6 +8,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
 import { STATE_MESSAGES } from "@/constants/messages";
+import { useAuth } from "@/contexts/AuthContext";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useProductList } from "@/hooks/useProductList";
 import { SortLabel, type SortOrder } from "@/screens/all/components/SortLabel";
@@ -38,8 +39,9 @@ export function SearchScreen() {
   }, [keyword]);
 
   const isSearching = query.length > 0;
-  const list = useProductList(sortOrder, wishLevel, query, isSearching);
-  const counts = useProductCounts(query, isSearching);
+  const isGuest = !useAuth().session;
+  const list = useProductList(sortOrder, wishLevel, query, isSearching && !isGuest);
+  const counts = useProductCounts(query, isSearching && !isGuest);
   const items = list.data?.pages.flat() ?? [];
   const totalCount = counts.data?.total ?? 0;
   const shownCount = wishLevel ? (counts.data?.levels[wishLevel] ?? 0) : totalCount;
@@ -91,6 +93,8 @@ export function SearchScreen() {
           onRemove={recentSearches.remove}
           onClearAll={recentSearches.clear}
         />
+      ) : isGuest ? (
+        <EmptyState message={STATE_MESSAGES.searchEmpty} />
       ) : list.isError || counts.isError ? (
         <ErrorState
           message={STATE_MESSAGES.loadFailed}
