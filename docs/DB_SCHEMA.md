@@ -103,7 +103,7 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 - folders: 사용자별 이름 중복 금지, 일반 폴더 최대 50개(프로필 행을 잠근 뒤 센다), 나의 소장템은 만들기·고치기·지우기 불가. `last_added_at`은 상품을 담을 때 트리거로 갱신한다(#78).
 - legal_policies(public, 비회원도 조회) / user_policy_consents(private): `get_pending_policies()`, `accept_policy(policy_id)`.
 - push_tokens: 등록은 `register_push_token(token, platform)`만(같은 토큰은 마지막 로그인 계정으로 옮김), 앱은 본인 토큰 select·delete.
-- withdrawal_surveys(private, user_id 없음): 탈퇴 Edge Function이 service_role 전용 `record_withdrawal_survey(reasons, custom_text)`로만 쓴다.
+- withdrawal_surveys(private, user_id 없음): 탈퇴 Edge Function이 service_role 전용 `record_withdrawal_survey(reasons, custom_text)`로만 쓴다. 직접 작성은 앱 화면처럼 조합 이모지를 1자로 세(`private.char_count`, Edge는 grapheme) 100자까지 받는다.
 - Storage avatars 버킷: 비공개, WebP, 512KB 이하, 경로 `{user_id}/파일명`, 본인 폴더만 select·insert·update·delete.
 - 카카오 프로필 이미지(AUTH-006)는 URL로 두지 않고 신규 가입 때 앱이 받아 avatars에 512 WebP로 복사한다(`set_avatar`). 카카오에서 사진을 바꾸거나 지워도 앱 사진이 깨지지 않는다.
 

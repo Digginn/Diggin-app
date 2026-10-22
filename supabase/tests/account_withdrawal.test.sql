@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(14);
+select plan(16);
 
 -- AUTH-008 korcen 사전
 select is(private.nickname_error('시발놈', null), 'profanity', 'korcen 비속어는 걸린다');
@@ -57,6 +57,14 @@ select throws_ok(
 reset role;
 
 set local role service_role;
+select lives_ok(
+  $$ select public.record_withdrawal_survey('{}', repeat('👍🏻', 100)) $$,
+  '직접 작성은 앱처럼 조합 이모지를 1자로 세 100자까지 남긴다'
+);
+select throws_ok(
+  $$ select public.record_withdrawal_survey('{}', repeat('👍🏻', 101)) $$,
+  '23514', null, '100자를 넘으면 남기지 않는다'
+);
 select lives_ok(
   $$ select public.record_withdrawal_survey('{rarely_used,hard_to_use}', '  ') $$,
   'service_role은 설문을 남긴다'

@@ -9,6 +9,8 @@ const REASONS = new Set([
   "frequent_error",
 ]);
 const CUSTOM_TEXT_MAX = 100;
+// 앱 화면과 DB(private.char_count)처럼 👍🏻 같은 조합 이모지를 1자로 센다. string.length는 UTF-16 단위라 4자로 센다.
+const graphemes = new Intl.Segmenter("ko", { granularity: "grapheme" });
 
 type Survey = { reasons: string[]; customText: string | null };
 type Services = {
@@ -40,7 +42,8 @@ function parseSurvey(value: unknown): Survey {
   }
   if (custom_text != null && typeof custom_text !== "string") throw new Error("invalid_request");
   const customText = custom_text?.trim() || null;
-  if ((customText?.length ?? 0) > CUSTOM_TEXT_MAX || (!reasons.length && !customText)) {
+  const length = customText ? [...graphemes.segment(customText)].length : 0;
+  if (length > CUSTOM_TEXT_MAX || (!reasons.length && !customText)) {
     throw new Error("invalid_request");
   }
   return { reasons, customText };

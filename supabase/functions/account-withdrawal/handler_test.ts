@@ -78,6 +78,15 @@ Deno.test("잘못된 설문은 지우기 전에 거부한다", async () => {
   assert((await handler(request({ reasons: [], custom_text: "가".repeat(100) }))).status === 200);
 });
 
+Deno.test("직접 작성은 앱 화면처럼 조합 이모지를 1자로 센다", async () => {
+  // 👍🏻는 UTF-16으로 4, 코드 포인트로 2지만 화면에서는 1자다.
+  for (const [text, status] of [["👍🏻".repeat(100), 200], ["👍🏻".repeat(101), 400]] as const) {
+    const { handler, calls } = setup();
+    assert((await handler(request({ reasons: [], custom_text: text }))).status === status);
+    assert(calls.length === (status === 200 ? 3 : 0));
+  }
+});
+
 Deno.test("사진이나 계정 삭제에 실패하면 실패로 알리고 설문은 남기지 않는다", async () => {
   for (const fail of [{ avatars: true }, { user: true }]) {
     const { handler, calls } = setup(fail);

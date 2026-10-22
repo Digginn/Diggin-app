@@ -266,7 +266,7 @@ create table private.withdrawal_surveys (
   reasons public.withdrawal_reason[] not null default '{}',
   custom_text text,
   created_at timestamptz not null default now(),
-  constraint withdrawal_surveys_custom_text_length check (char_length(custom_text) <= 100),
+  constraint withdrawal_surveys_custom_text_length check (private.char_count(custom_text) <= 100),
   constraint withdrawal_surveys_has_reason check (cardinality(reasons) > 0 or coalesce(length(btrim(custom_text)), 0) > 0)
 );
 

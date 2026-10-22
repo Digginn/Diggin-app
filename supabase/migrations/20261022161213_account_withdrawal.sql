@@ -1,6 +1,9 @@
 SET local check_function_bodies = off;
 
 ALTER TABLE "private"."withdrawal_surveys"
+  DROP CONSTRAINT "withdrawal_surveys_custom_text_length";
+
+ALTER TABLE "private"."withdrawal_surveys"
   DROP CONSTRAINT "withdrawal_surveys_has_reason";
 
 CREATE OR REPLACE FUNCTION private.clear_withdrawn_comments()
@@ -60,3 +63,6 @@ REVOKE ALL ON FUNCTION "public"."record_withdrawal_survey"(public.withdrawal_rea
 GRANT EXECUTE ON FUNCTION "public"."record_withdrawal_survey"(public.withdrawal_reason[], text) TO "postgres";
 
 GRANT EXECUTE ON FUNCTION "public"."record_withdrawal_survey"(public.withdrawal_reason[], text) TO "service_role";
+
+ALTER TABLE "private"."withdrawal_surveys"
+  ADD CONSTRAINT "withdrawal_surveys_custom_text_length" CHECK ((private.char_count(custom_text) <= 100));
