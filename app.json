@@ -59,7 +59,38 @@
       ],
       "expo-notifications",
       "expo-secure-store",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "./plugins/withShareExtensionBuild",
+      [
+        "expo-share-extension",
+        {
+          "activationRules": [
+            {
+              "type": "url"
+            },
+            {
+              "type": "text"
+            }
+          ],
+          "backgroundColor": {
+            "red": 0,
+            "green": 0,
+            "blue": 0,
+            "alpha": 0
+          },
+          "excludedPackages": [
+            "expo-dev-client",
+            "expo-splash-screen",
+            "expo-updates",
+            "expo-notifications",
+            "expo-image-picker",
+            "expo-apple-authentication",
+            "@react-native-google-signin/google-signin",
+            "@react-native-kakao/core",
+            "@react-native-kakao/user"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
