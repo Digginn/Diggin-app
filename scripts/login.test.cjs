@@ -146,6 +146,7 @@ for (const os of ["ios", "android"]) {
     let canGoBack = false;
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
       "react": { useState: (initial) => [initial, () => {}] },
+      "@/lib/pendingShareLink": { keepShareLink: () => {} },
       "./api/signIn": {
         signIn: (provider) => {
           signIns.push(provider);
@@ -153,6 +154,7 @@ for (const os of ["ios", "android"]) {
         },
       },
       "expo-router": {
+        useLocalSearchParams: () => ({}),
         useRouter: () => ({
           replace: (route) => routes.push(route),
           back: () => routes.push("back"),
@@ -214,6 +216,53 @@ for (const os of ["ios", "android"]) {
     assert.equal(loadingDialog.props.message, "로그인 중입니다.");
   });
 }
+
+test("공유 확장에서 로그인하러 온 링크는 로그인에 성공했을 때만 ALL 탭에 넘긴다", async () => {
+  const pending = load("lib/pendingShareLink.ts", {
+    "@/utils/itemLink": load("utils/itemLink.ts"),
+  });
+  const LINK = "https://www.musinsa.com/products/1";
+  for (const [result, expected] of [
+    [{ status: "cancelled" }, null],
+    [{ status: "suspended", access: {} }, null],
+    [{ status: "success", isNewUser: false }, LINK],
+  ]) {
+    const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+      "react": { useState: (initial) => [initial, () => {}] },
+      "./api/signIn": { signIn: async () => result },
+      "@/lib/pendingShareLink": pending,
+      "expo-router": {
+        useLocalSearchParams: () => ({ shareUrl: LINK }),
+        useRouter: () => ({ replace: () => {}, back: () => {}, canGoBack: () => false }),
+      },
+      "expo-status-bar": { StatusBar: "StatusBar" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+      "react-native": {
+        Platform: { OS: "ios" },
+        View: "View",
+        Text: "Text",
+        Pressable: "Pressable",
+        ScrollView: "ScrollView",
+        useWindowDimensions: () => ({ height: 812 }),
+        Alert: { alert: () => {} },
+      },
+      "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/ToastText": { ToastText: "ToastText" },
+      "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+    });
+    await nodes(LoginScreen())
+      .find((node) => node.type === "SocialLoginButton")
+      .props.onPress();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(pending.takeShareLink(), expected, result.status);
+  }
+  pending.keepShareLink("javascript:alert(1)");
+  assert.equal(pending.takeShareLink(), null, "웹 링크가 아니면 버린다");
+  pending.keepShareLink(LINK);
+  pending.takeShareLink();
+  assert.equal(pending.takeShareLink(), null, "한 번만 꺼낸다");
+});
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
   const { ToastText } = load("components/ToastText.tsx", {
