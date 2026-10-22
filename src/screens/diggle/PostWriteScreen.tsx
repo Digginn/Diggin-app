@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { randomUUID } from "expo-crypto";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useIsFocused, useRouter } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -41,6 +41,7 @@ import { postBodyLength } from "./domain/postBody";
 export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const { session, isRestoring } = useAuth();
   const router = useRouter();
+  const isFocused = useIsFocused();
   if (isRestoring)
     return (
       <View className="flex-1 items-center justify-center bg-gray-0">
@@ -50,7 +51,7 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
   if (!session)
     return (
       <LoginRequiredModal
-        visible
+        visible={isFocused}
         onClose={() => router.dismissTo("/(tabs)/diggle")}
         onLogin={() => startLogin(router)}
       />

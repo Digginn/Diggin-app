@@ -197,6 +197,7 @@ function editor({ isVote = false, agreed = true, save, agree } = {}) {
         push: () => {},
       }),
       useFocusEffect: () => {},
+      useIsFocused: () => true,
     },
     "expo-router/react-navigation": {
       usePreventRemove: (value, callback) => {
