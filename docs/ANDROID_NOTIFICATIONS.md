@@ -14,8 +14,9 @@
 - 앱은 기존 `GoogleSignin.configure({ webClientId, iosClientId })`와 Supabase 로그인 흐름을 사용한다. Firebase Authentication으로 전환하지 않는다. 현재 JSON의 웹 클라이언트 ID는 앱 설정과 일치한다.
 - Google 로그인은 Android 패키지와 실제 APK의 SHA-1에 맞는 Android OAuth 클라이언트가 필요하다. JSON에 Android 항목이 없다는 사실만으로 Google Cloud 등록 여부를 확정할 수는 없다. 서명 등록 후 새 Firebase 설정 파일과 실제 APK 로그인으로 확인한다.
 - EAS에서 확인한 `com.diggin.app` SHA-1: `2F:11:D1:BA:75:4F:51:0C:F6:71:11:67:C0:94:4C:54:FA:B4:FD:A3`.
-- Firebase 프로젝트 설정 → 일반 → Android 앱 → 디지털 지문에 해당 SHA-1을 등록하고 `google-services.json`을 다시 내려받는다. 검증할 항목은 패키지·프로젝트, `oauth_client`의 `client_type: 1` 및 `android_info.certificate_hash`다. 최신 파일 반영과 콘솔 등록 확인은 아직 대기 중이다.
-- 로컬 debug와 Play 앱 서명 SHA-1은 EAS 지문과 다를 수 있다. 실제 debug APK·Play Console 앱 무결성에서 확인한 값만 추가한다. 현재는 두 지문을 확보하지 않았다. Google Play가 앱을 재서명하면 업로드 키 대신 앱 서명 키의 지문을 사용한다.
+- Firebase 지문 추가 후 Google Cloud에서 `Diggin Android EAS`·`Diggin Android Play` Android OAuth 클라이언트를 생성했다. 새 `google-services.json`의 Android 클라이언트 2개, 패키지·프로젝트, EAS 인증서 해시 일치 및 기존 웹 클라이언트 유지를 확인해 반영했다.
+- 사용자가 Play 앱 서명 키에서 복사해 등록한 지문은 `F5:50:7B:F2:84:4A:9B:FF:78:49:F5:B3:2C:D2:67:93:49:12:A4:72`이며 새 JSON의 Android 인증서 해시로 확인했다. Google Play가 앱을 재서명하므로 Play 설치 빌드는 이 지문으로 검증한다.
+- 로컬 debug SHA-1은 아직 확보하지 않았다. 실제 debug APK를 사용하는 경우 해당 서명을 확인해 추가한다. EAS 직접 설치·Play 설치의 실제 Google 로그인 검증도 빌드 후 진행한다.
 
 ## 발송 서버 활성화 (승인된 PR 배포 후)
 

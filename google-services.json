@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "664044106677-bcgq6ojh3tr859n62li624e7cigfjt36.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.diggin.app",
+            "certificate_hash": "f5507bf2844a9bff7849f5b32cd267934912a472"
+          }
+        },
+        {
+          "client_id": "664044106677-s8o95ga2gc4oes9068ftd349c0hri0al.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.diggin.app",
+            "certificate_hash": "2f11d1ba754f510cf6711167c0944c54fab4fda3"
+          }
+        },
+        {
           "client_id": "664044106677-vpmn6qka0co01hvg37e3ek1rahi3avts.apps.googleusercontent.com",
           "client_type": 3
         }
