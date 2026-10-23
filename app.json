@@ -58,6 +58,7 @@
           "resizeMode": "contain"
         }
       ],
+      ["expo-sharing", { "android": { "enabled": true, "singleShareMimeTypes": ["text/plain"] } }],
       ["expo-notifications", { "defaultChannel": "default" }],
       "expo-secure-store",
       "@react-native-google-signin/google-signin",
@@ -80,6 +81,7 @@
             "alpha": 0
           },
           "excludedPackages": [
+            "expo-sharing",
             "expo-dev-client",
             "expo-splash-screen",
             "expo-updates",
