@@ -81,6 +81,7 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+  const [availableHeight, setAvailableHeight] = useState<number>();
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -152,16 +153,20 @@ export function BottomSheet({
     }).panHandlers;
   }, [dragY, isGrabberVisible, isInline, isCloseConfirmed, onRequestClose]);
 
+  const sheetMaxHeight = isInline
+    ? undefined
+    : maxHeight
+      ? Math.min(maxHeight, Dimensions.get("window").height - insets.top)
+      : MAX_HEIGHT;
   const sheet = (
     <View
       className={`${isInline ? "flex-1" : "rounded-t-2xl"} bg-gray-0 ${className ?? ""}`}
       style={{
         height,
-        maxHeight: isInline
-          ? undefined
-          : maxHeight
-            ? Math.min(maxHeight, Dimensions.get("window").height - insets.top)
-            : MAX_HEIGHT,
+        maxHeight:
+          Platform.OS === "android" && availableHeight && sheetMaxHeight
+            ? Math.min(sheetMaxHeight, availableHeight)
+            : sheetMaxHeight,
         paddingBottom: isKeyboardVisible
           ? KEYBOARD_BOTTOM_PADDING
           : Math.max(insets.bottom, BOTTOM_PADDING),
@@ -217,9 +222,15 @@ export function BottomSheet({
     >
       <KeyboardAvoidingView
         enabled={isKeyboardAvoiding}
-        // 안드로이드는 adjustResize 로 OS 가 창을 줄여주므로 여기서 또 줄이면 입력란이 밀린다.
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1 justify-end"
+        // edge-to-edge에서는 OS resize만으로 모달이 올라오지 않을 수 있다.
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="justify-end"
+        style={{ flex: 1 }}
+        onLayout={
+          Platform.OS === "android"
+            ? (event) => setAvailableHeight(event.nativeEvent.layout.height)
+            : undefined
+        }
       >
         <Pressable
           accessible={isScrimClosable}

@@ -37,6 +37,7 @@ function loadModule(filename) {
           Pressable: "Pressable",
           Text: "Text",
           TextInput: "TextInput",
+          ScrollView: "ScrollView",
         };
       }
       if (name === "react")
@@ -97,6 +98,7 @@ test("입력 모달은 iOS와 Android 모두 키보드 유무에 따라 중앙�
             Modal: "NativeModal",
             View: "View",
             KeyboardAvoidingView: "KeyboardAvoidingView",
+            ScrollView: "ScrollView",
             Platform: { OS: os },
             Keyboard: {
               isVisible: () => false,
@@ -118,6 +120,9 @@ test("입력 모달은 iOS와 Android 모두 키보드 유무에 따라 중앙�
         children: null,
       });
     const content = (tree) => React.Children.toArray(tree.props.children)[0].props.children;
+    const avoiding = React.Children.toArray(render().props.children)[0];
+    assert.equal(avoiding.props.behavior, os === "ios" ? "padding" : "height");
+    assert.equal(avoiding.props.style.flex, 1);
     assert.ok(content(render()).props.className.includes("justify-center"));
     listeners[os === "ios" ? "keyboardWillShow" : "keyboardDidShow"]();
     assert.ok(content(render()).props.className.includes("justify-end"));
