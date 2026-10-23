@@ -117,7 +117,8 @@ function renderProfile(
           HelperText: "HelperText",
           TextField: "TextField",
         };
-      if (name === "./utils/validateNickname") return { NICKNAME_HELPER_MESSAGE, validateNickname };
+      if (name === "./utils/validateNickname")
+        return require("../src/screens/my/utils/validateNickname.ts");
       if (name === "@/api/avatar") return { AVATAR_UNREADABLE_ERROR: "avatar_unreadable" };
       if (name === "./utils/validateProfileImage") {
         const validator = { exports: {} };
@@ -137,6 +138,7 @@ function renderProfile(
         );
         return validator.exports;
       }
+      if (name === "@/utils/text") return require("../src/utils/text.ts");
       if (name === "./constants/profileMessages")
         return require("../src/screens/my/constants/profileMessages.ts");
       return require(name);
@@ -169,6 +171,11 @@ function renderProfile(
     calls,
     button,
     save: () => find(render(), (node) => node.type === "Button").props.onPress(),
+    saveButton: () => find(render(), (node) => node.type === "Button"),
+    counter: () => {
+      const text = find(render(), (node) => node.props.className?.includes("absolute right-4"));
+      return [].concat(text.props.children).join("");
+    },
     helper: () => find(render(), (node) => node.type === "HelperText"),
   };
 }
@@ -275,6 +282,28 @@ test("서버 닉네임 검사에 걸리면 문구를 입력칸 아래에 보여�
   assert.equal(photoSaves, 0);
   assert.deepEqual(calls.dismissed, []);
   assert.deepEqual(calls.toasts, []);
+});
+
+test("금칙어 오류가 보이는 동안 저장을 막고 입력칸을 오류로 표시하며, 고치면 다시 연다", async () => {
+  let saves = 0;
+  const { button, save, helper, saveButton } = renderProfile("android", true, {
+    onSaveNickname: async () => {
+      saves++;
+      return saves === 1 ? "사용할 수 없는 닉네임입니다." : undefined;
+    },
+  });
+  button("닉네임").props.onChangeText("시발놈");
+  await save();
+  assert.equal(helper().props.message, "사용할 수 없는 닉네임입니다.");
+  assert.equal(button("닉네임").props.isError, true);
+  assert.equal(saveButton().props.isDisabled, true);
+  await button("닉네임").props.onSubmitEditing();
+  assert.equal(saves, 1, "키보드 완료로도 다시 보내지 않는다");
+  button("닉네임").props.onChangeText("시발점");
+  assert.equal(button("닉네임").props.isError, false);
+  assert.equal(saveButton().props.isDisabled, false);
+  await save();
+  assert.equal(saves, 2);
 });
 
 test("저장 콜백이 없는 실제 화면은 저장 성공을 표시하지 않는다", async () => {
@@ -394,4 +423,13 @@ test("닉네임 검증 오류는 저장 콜백이나 성공 토스트를 실행�
   assert.equal(saveCount, 0);
   assert.deepEqual(calls.toasts, []);
   assert.deepEqual(calls.dismissed, []);
+});
+
+test("닉네임 입력칸 오른쪽에 글자 수를 보여 준다", () => {
+  const { button, counter } = renderProfile("ios", true, {});
+  assert.equal(counter(), "0/10");
+  button("닉네임").props.onChangeText("욕설닉네임");
+  assert.equal(counter(), "5/10");
+  button("닉네임").props.onChangeText("👍🏻디기");
+  assert.equal(counter(), "3/10", "이모지 조합은 서버처럼 1자로 센다");
 });
