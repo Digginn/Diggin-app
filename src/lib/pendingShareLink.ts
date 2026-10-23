@@ -7,11 +7,16 @@ import { isItemLink } from "@/utils/itemLink";
 // 오래 묵은 링크는 사용자가 잊은 공유라 로그인 뒤에 갑자기 저장 화면이 뜨지 않게 버린다.
 const PENDING_SHARE_TTL_MS = 10 * 60 * 1000;
 
-const folder = Platform.OS === "ios" ? Paths.appleSharedContainers[APP_GROUP] : undefined;
+const folder =
+  Platform.OS === "ios"
+    ? Paths.appleSharedContainers[APP_GROUP]
+    : Platform.OS === "android"
+      ? Paths.document
+      : undefined;
 const pending = folder ? new File(folder, "pending-share") : null;
 
 /**
- * SAVE-002 비회원이 공유한 링크를 앱과 공유 확장만 쓰는 App Group에 맡긴다.
+ * SAVE-002 비회원이 공유한 링크를 앱 전용 저장소(iOS는 App Group)에 맡긴다.
  * diggin:// 주소에 실으면 다른 앱도 링크를 넣어 로그인 직후 그 페이지를 열게 할 수 있다.
  */
 export function keepShareLink(url: string) {

@@ -55,7 +55,7 @@ function loadShareSave({
   const module = { exports: {} };
   runInNewContext(
     ts.transpileModule(
-      readFileSync(path.join(__dirname, "../src/share/ShareExtension.tsx"), "utf8"),
+      readFileSync(path.join(__dirname, "../src/screens/save/ShareSaveScreen.tsx"), "utf8"),
       {
         compilerOptions: {
           module: ts.ModuleKind.CommonJS,
@@ -146,14 +146,21 @@ function loadShareSave({
       },
     },
   );
-  const root = module.exports.default({ url: "coupang://x", text: `쿠팡 ${LINK}` });
-  calls.shared = root.props.children.props.children.props.children.props.shared;
-  const ShareSave = root.props.children.props.children.props.children.type;
+  calls.shared = ["coupang://x", `쿠팡 ${LINK}`].join(" ");
+  const ShareSave = module.exports.ShareSaveScreen;
   const render = (shared) => {
     cursor = 0;
     refCursor = 0;
     effects = [];
-    return ShareSave({ shared });
+    return ShareSave({
+      shared,
+      onClose: () => calls.closed++,
+      onLogin: (url) => {
+        calls.kept.push(url);
+        calls.opened.push("login");
+      },
+      onOpenItem: (id) => calls.opened.push(`items/${id}`),
+    });
   };
   const run = async (shared) => {
     render(shared);

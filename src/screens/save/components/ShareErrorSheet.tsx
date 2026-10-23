@@ -31,7 +31,7 @@ type ShareErrorSheetProps = {
   onClose: () => void;
 };
 
-/** 공유 확장(#91)이 iOS 카드 안에 그리는 오류 상태. */
+/** iOS 공유 카드와 Android 공유 수신 화면에서 사용하는 오류 상태. */
 export function ShareErrorSheet({ reason, onClose }: ShareErrorSheetProps) {
   const insets = useSafeAreaInsets();
 
