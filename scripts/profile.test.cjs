@@ -44,6 +44,7 @@ function renderProfile(
     Text: "Text",
     Pressable: "Pressable",
     ScrollView: "ScrollView",
+    KeyboardAvoidingView: "KeyboardAvoidingView",
     Keyboard: { dismiss() {} },
     Platform: { OS: platform },
     ActionSheetIOS: {
@@ -170,6 +171,7 @@ function renderProfile(
   return {
     calls,
     button,
+    render,
     save: () => find(render(), (node) => node.type === "Button").props.onPress(),
     saveButton: () => find(render(), (node) => node.type === "Button"),
     counter: () => {
@@ -179,6 +181,16 @@ function renderProfile(
     helper: () => find(render(), (node) => node.type === "HelperText"),
   };
 }
+
+test("프로필 수정은 Android만 키보드에 맞춰 줄이고 iOS 화면 껍데기는 유지한다", () => {
+  const android = renderProfile().render();
+  assert.equal(android.type, "KeyboardAvoidingView");
+  assert.equal(android.props.behavior, "height");
+  assert.equal(android.props.style.flex, 1);
+  const ios = renderProfile("ios").render();
+  assert.equal(ios.type, "View");
+  assert.equal(ios.props.behavior, undefined);
+});
 
 test("카메라 버튼은 먼저 선택 메뉴를 열고 선택한 경로만 실행한다", async () => {
   const { calls, button } = renderProfile();

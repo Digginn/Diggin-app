@@ -7,6 +7,7 @@ import {
   ActionSheetIOS,
   Alert,
   Keyboard,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -166,8 +167,13 @@ export function ProfileEditScreen({
     }
   };
 
+  const ScreenContainer = Platform.OS === "android" ? KeyboardAvoidingView : View;
   return (
-    <View className="flex-1 bg-gray-50">
+    <ScreenContainer
+      behavior={Platform.OS === "android" ? "height" : undefined}
+      style={{ flex: 1 }}
+      className="bg-gray-50"
+    >
       <AppBar title="프로필 수정" />
       <ScrollView
         className="flex-1"
@@ -245,6 +251,6 @@ export function ProfileEditScreen({
           저장하기
         </Button>
       </View>
-    </View>
+    </ScreenContainer>
   );
 }
