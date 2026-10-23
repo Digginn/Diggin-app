@@ -19,6 +19,7 @@ import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
+import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
 import { discardShareLink } from "@/lib/pendingShareLink";
 import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeModal";
 
@@ -56,10 +57,13 @@ export function LoginScreen({
     if (shouldRedirect) hasSignedIn.current = true;
   }, [shouldRedirect]);
 
-  // AUTH-001 공유하러 왔다가 로그인하지 않고 나가면 맡긴 링크를 버린다. 로그인 실패는 다시 시도할 수 있게 둔다.
+  // AUTH-001 로그인하지 않고 나가면 이어 할 동작과 맡긴 공유 링크를 버린다.
   useEffect(
     () => () => {
-      if (!hasSignedIn.current) discardShareLink();
+      if (!hasSignedIn.current) {
+        takeLoginIntent();
+        discardShareLink();
+      }
     },
     [],
   );
@@ -77,8 +81,19 @@ export function LoginScreen({
       }
       hasSignedIn.current = true;
       setDidSignIn(true);
-      // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다.
-      router.replace((result.isNewUser ? "/signup-complete" : "/(tabs)/all") as Href);
+      const resume = takeLoginIntent();
+      // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다. 이어 할 동작은 안내를 지난 뒤에 한다.
+      if (result.isNewUser) {
+        if (resume) keepLoginIntent(resume);
+        router.replace("/signup-complete" as Href);
+        return;
+      }
+      if (resume && router.canGoBack()) {
+        router.back();
+        resume();
+        return;
+      }
+      router.replace("/(tabs)/all" as Href);
     } catch {
       console.warn("소셜 로그인에 실패했습니다.");
       setHasError(true);

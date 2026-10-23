@@ -9,12 +9,12 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Fab } from "@/components/Fab";
 import { Spinner } from "@/components/Loading";
-import { LoginRequiredModal } from "@/components/modal";
 import { Post } from "@/components/Post";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { DIGGLE_EMPTY_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLoginGate } from "@/hooks/useLoginGate";
 import { useToast } from "@/hooks/useToast";
 
 import { useCommunityFeed } from "./queries/useCommunity";
@@ -31,7 +31,7 @@ export function DiggleScreen() {
   const tab = requestedTab === "vote" ? "vote" : "all";
   const { session, isRestoring } = useAuth();
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
-  const [isLoginRequired, setLoginRequired] = useState(false);
+  const { requireLogin, loginModal } = useLoginGate();
   const showToast = useToast();
   const feed = useCommunityFeed(tab);
   const posts = feed.data?.pages.flat() ?? [];
@@ -44,14 +44,7 @@ export function DiggleScreen() {
     <View className="flex-1 bg-gray-0">
       <AppBar
         left="logo"
-        right={
-          <NotificationButton
-            onPress={() => {
-              if (!session) setLoginRequired(true);
-              else router.push("/notifications");
-            }}
-          />
-        }
+        right={<NotificationButton onPress={() => router.push("/notifications")} />}
       />
       <TopTab items={TABS} activeKey={tab} onChange={(key) => router.setParams({ tab: key })} />
       {isRestoring || feed.isPending ? (
@@ -121,14 +114,14 @@ export function DiggleScreen() {
                   ? () => setReportTarget({ type: "post", id: item.id })
                   : undefined
               }
-              onPress={() => {
-                if (!session) setLoginRequired(true);
-                else
+              onPress={() =>
+                requireLogin(() =>
                   router.push({
                     pathname: item.type === "vote" ? "/votes/[id]" : "/posts/[id]",
                     params: { id: item.id },
-                  });
-              }}
+                  }),
+                )
+              }
             />
           )}
         />
@@ -137,29 +130,24 @@ export function DiggleScreen() {
         <Fab
           accessibilityLabel={tab === "vote" ? "투표글 작성" : "게시글 작성"}
           isDisabled={isRestoring}
-          onPress={() => {
-            if (!session) setLoginRequired(true);
-            else
-              void ensureCommunityWriteAllowed()
-                .then(() => router.push(tab === "vote" ? "/votes/write" : "/posts/write"))
-                .catch((error) =>
-                  showToast(
-                    restrictionMessage(error) ?? "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
-                    restrictionMessage(error) ? "notice" : "error",
+          onPress={() =>
+            requireLogin(
+              () =>
+                void ensureCommunityWriteAllowed()
+                  .then(() => router.push(tab === "vote" ? "/votes/write" : "/posts/write"))
+                  .catch((error) =>
+                    showToast(
+                      restrictionMessage(error) ??
+                        "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+                      restrictionMessage(error) ? "notice" : "error",
+                    ),
                   ),
-                );
-          }}
+            )
+          }
         />
       </View>
       <ReportFlow target={reportTarget} onClose={() => setReportTarget(null)} />
-      <LoginRequiredModal
-        visible={isLoginRequired && !session}
-        onClose={() => setLoginRequired(false)}
-        onLogin={() => {
-          setLoginRequired(false);
-          router.push("/login");
-        }}
-      />
+      {loginModal}
     </View>
   );
 }

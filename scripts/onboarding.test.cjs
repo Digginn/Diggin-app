@@ -7,6 +7,18 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+function loadLoginIntent() {
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(readFileSync(path.join(__dirname, "../src/lib/loginIntent.ts"), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText,
+    { module, exports: module.exports },
+  );
+  return module.exports;
+}
+const loginIntent = loadLoginIntent();
+
 test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에셋을 유지한다", () => {
   const file = "../src/screens/onboarding/components/OnboardingIllustration.tsx";
   const source = readFileSync(path.join(__dirname, file), "utf8");
@@ -71,6 +83,7 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
           assert.ok(readFileSync(path.join(__dirname, "..", name.slice(2))).length > 0);
           return name.endsWith(".svg") ? { default: () => React.createElement("Svg") } : name;
         }
+        if (name === "@/lib/loginIntent") return loginIntent;
         return require(name);
       },
     },
@@ -187,6 +200,7 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
       }
       if (name === "react-native-reanimated") return { useReducedMotion: () => false };
       if (name === "./BtnCarousel") return { BtnCarousel: "BtnCarousel" };
+      if (name === "@/lib/loginIntent") return loginIntent;
       return require(name);
     },
   });
@@ -284,6 +298,7 @@ test("자동 전환은 마지막에서 멈추고 스와이프·모션 줄이기 
       if (name === "react-native") return { View: "View", ScrollView: "ScrollView" };
       if (name === "react-native-reanimated") return { useReducedMotion: () => isReducedMotion };
       if (name === "./BtnCarousel") return { BtnCarousel: "BtnCarousel" };
+      if (name === "@/lib/loginIntent") return loginIntent;
       return require(name);
     },
   });
@@ -407,6 +422,7 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
       if (name === "@/theme") return { baseFrame: { height: 812 } };
       if (name === "./components/OnboardingIllustration")
         return { OnboardingIllustration: "OnboardingIllustration" };
+      if (name === "@/lib/loginIntent") return loginIntent;
       return require(name);
     },
   });
@@ -473,6 +489,7 @@ test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰�
           useWindowDimensions: () => ({ height: 812 }),
         };
       if (name === "@/components/Button") return { Button: "Button" };
+      if (name === "@/lib/loginIntent") return loginIntent;
       return require(name);
     },
   });

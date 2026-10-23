@@ -7,6 +7,11 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const LOGIN_SOURCES = {
+  "@/lib/loginIntent": "../src/lib/loginIntent.ts",
+  "@/hooks/useLoginGate": "../src/hooks/useLoginGate.tsx",
+};
+
 function load(filename, mocks) {
   const loaded = { exports: {} };
   const compiled = ts.transpileModule(readFileSync(path.join(__dirname, filename), "utf8"), {
@@ -19,7 +24,13 @@ function load(filename, mocks) {
     exports: loaded.exports,
     module: loaded,
     require: (name) =>
-      name in mocks ? mocks[name] : name.endsWith(".svg") ? { default: name } : require(name),
+      name in mocks
+        ? mocks[name]
+        : name.endsWith(".svg")
+          ? { default: name }
+          : LOGIN_SOURCES[name]
+            ? load(LOGIN_SOURCES[name], mocks)
+            : require(name),
   });
   return loaded.exports;
 }
@@ -64,11 +75,21 @@ test("폴더 관리 버튼은 1개 이하 배지를 숨기고 100개 이상을 9
   assert.equal(opened, true);
 });
 
-test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연다", () => {
-  let destination;
+function loadFolderDetailRoute({ params, folders = { data: undefined, isError: false } }) {
+  const calls = { destination: undefined, itemFolderIds: [], foldersEnabled: [] };
   const route = load("../src/app/folder-detail.tsx", {
     "react": { ...React, useState: (initial) => [initial, () => {}] },
+    "react-native": { View: "View" },
+    "@/components/app-bar": { AppBar: "AppBar" },
+    "@/components/ErrorState": { ErrorState: "ErrorState" },
+    "@/components/Loading": { Spinner: "Spinner" },
     "@/components/modal": { ActionModal: "ActionModal" },
+    "@/hooks/useFolders": {
+      useFolders: (isEnabled) => {
+        calls.foldersEnabled.push(isEnabled);
+        return { ...folders, refetch: () => {} };
+      },
+    },
     "@/hooks/useToast": { useToast: () => () => {} },
     "@/screens/folder/components/FolderNameModal": { FolderNameModal: "FolderNameModal" },
     "@/screens/folder/components/FolderToast": { FolderToast: "FolderToast" },
@@ -78,27 +99,68 @@ test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연
     },
     "@/screens/folder/mutations/useRenameFolder": { useRenameFolder: () => ({}) },
     "@/screens/folder/queries/useFolderItems": {
-      useFolderItems: () => ({ data: undefined, isError: false }),
+      useFolderItems: (folderId) => {
+        calls.itemFolderIds.push(folderId);
+        return { data: undefined, isError: false };
+      },
     },
     "@/screens/folder/queries/useFolderCounts": { useFolderCounts: () => ({ data: undefined }) },
     "expo-router": {
-      useLocalSearchParams: () => ({ id: "3", name: "내 폴더" }),
+      useLocalSearchParams: () => params,
       useRouter: () => ({
         push: (value) => {
-          destination = value;
+          calls.destination = value;
         },
       }),
     },
     "@/screens/folder/FolderDetailScreen": { FolderDetailScreen: "FolderDetailScreen" },
     "@/assets/images/folder/image-item-preview.png": 123,
+    "@/components/MemberOnly": { MemberOnly: "MemberOnly" },
   });
-  const screen = React.Children.toArray(route.default().props.children).find(
-    (node) => node.type === "FolderDetailScreen",
-  );
+  const entry = route.default().props.children;
+  const rendered = entry.type(entry.props);
+  const screen =
+    typeof rendered.type === "function"
+      ? React.Children.toArray(rendered.type(rendered.props).props.children).find(
+          (node) => node.type === "FolderDetailScreen",
+        )
+      : undefined;
+  return { calls, rendered, screen };
+}
+
+test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연다", () => {
+  const { calls, screen } = loadFolderDetailRoute({ params: { id: "3", name: "내 폴더" } });
+  assert.deepEqual(calls.foldersEnabled, [false]);
+  assert.deepEqual(calls.itemFolderIds, ["3"]);
   assert.equal(screen.props.folderName, "내 폴더");
   screen.props.onOpenItem({ id: "selected-item", name: "선택한 아이템", price: 0 });
-  assert.equal(destination.pathname, "/items/[id]");
-  assert.equal(destination.params.id, "selected-item");
+  assert.equal(calls.destination.pathname, "/items/[id]");
+  assert.equal(calls.destination.params.id, "selected-item");
+});
+
+test("비회원 때 연 나의 소장템은 로그인 후 실제 소장템 폴더 ID로 조회한다", () => {
+  const params = { id: "owned", name: "나의 소장템", owned: "1" };
+  const loading = loadFolderDetailRoute({ params });
+  assert.equal(loading.rendered.type, "Spinner");
+  assert.deepEqual(loading.calls.itemFolderIds, []);
+
+  const loaded = loadFolderDetailRoute({
+    params,
+    folders: {
+      data: [
+        { id: "7", name: "가방", isOwnedItems: false },
+        { id: "12", name: "나의 소장템", isOwnedItems: true },
+      ],
+      isError: false,
+    },
+  });
+  assert.deepEqual(loaded.calls.foldersEnabled, [true]);
+  assert.deepEqual(loaded.calls.itemFolderIds, ["12"]);
+  assert.equal(loaded.screen.props.isOwnedFolder, true);
+
+  const failed = loadFolderDetailRoute({ params, folders: { data: undefined, isError: true } });
+  assert.equal(failed.rendered.type, "View");
+  assert.deepEqual(failed.calls.itemFolderIds, []);
 });
 
 test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 폴더 선택 배경을 유지한다", async () => {

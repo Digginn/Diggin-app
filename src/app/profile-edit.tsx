@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 
 import { saveAvatar } from "@/api/avatar";
+import { MemberOnly } from "@/components/MemberOnly";
 import { fetchMyProfile, saveNickname, type MyProfile } from "@/screens/my/api/profile";
 import { ProfileEditScreen } from "@/screens/my/ProfileEditScreen";
 
-export default function ProfileEditRoute() {
+function ProfileEditContent() {
   const [profile, setProfile] = useState<MyProfile>();
 
   useEffect(() => {
@@ -21,5 +22,13 @@ export default function ProfileEditRoute() {
       onSaveNickname={saveNickname}
       onSavePhoto={saveAvatar}
     />
+  );
+}
+
+export default function ProfileEditRoute() {
+  return (
+    <MemberOnly title="프로필 수정">
+      <ProfileEditContent />
+    </MemberOnly>
   );
 }

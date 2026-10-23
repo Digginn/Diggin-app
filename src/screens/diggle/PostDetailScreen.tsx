@@ -30,6 +30,7 @@ import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
+import { startLogin } from "@/lib/loginIntent";
 import { normalizeText } from "@/utils/text";
 
 import { COMMUNITY_PAGE_SIZE, communityKeys } from "./api/community";
@@ -220,7 +221,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           onClose={goBack}
           onLogin={() => {
             setLoginPromptVisible(false);
-            router.push("/login");
+            startLogin(router);
           }}
         />
       </View>

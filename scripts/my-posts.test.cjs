@@ -7,6 +7,18 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+function loadLoginIntent() {
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(readFileSync(path.join(__dirname, "../src/lib/loginIntent.ts"), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText,
+    { module, exports: module.exports },
+  );
+  return module.exports;
+}
+const loginIntent = loadLoginIntent();
+
 function loadScreen(screenName = "MyPostsScreen", options = {}) {
   let activeKey = options.tab ?? "posts";
   function load(relativePath) {
@@ -102,6 +114,7 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
           if (name === "./components/MyMenuList") return { MyMenuList: "MyMenuList" };
           if (name === "./components/VoteListItem")
             return load("../src/screens/my/components/VoteListItem.tsx");
+          if (name === "@/lib/loginIntent") return loginIntent;
           return require(name);
         },
       },

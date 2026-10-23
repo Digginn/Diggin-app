@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
 import { useBrowsingMode } from "@/contexts/BrowsingModeContext";
+import { takeLoginIntent } from "@/lib/loginIntent";
 
 type OnboardingFinishScreenProps = {
   mode: "guest" | "signed-up";
@@ -89,6 +90,13 @@ export function OnboardingFinishScreen({ mode }: OnboardingFinishScreenProps) {
               className="rounded-field"
               onPress={() => {
                 setIsGuest(isGuest);
+                // 로그인 필요 모달에서 가입했으면 원래 화면으로 돌아가 이어 한다(AUTH-001).
+                const resume = isGuest ? null : takeLoginIntent();
+                if (resume && router.canGoBack()) {
+                  router.back();
+                  resume();
+                  return;
+                }
                 router.replace("/(tabs)/all");
               }}
             >

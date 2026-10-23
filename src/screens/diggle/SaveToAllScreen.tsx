@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFolders } from "@/hooks/useFolders";
 import { useToast } from "@/hooks/useToast";
+import { startLogin } from "@/lib/loginIntent";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
 import type { ItemSaveValues } from "@/types/wish-item";
 
@@ -36,11 +37,14 @@ const StyledImage = cssInterop(Image, { className: "style" });
 export function SaveToAllScreen() {
   const { postId, itemId } = useLocalSearchParams<{ postId?: string; itemId?: string }>();
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { session, isRestoring } = useAuth();
   const back = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/diggle"));
   if (isRestoring) return <Spinner />;
   if (!session)
-    return <LoginRequiredModal visible onClose={back} onLogin={() => router.replace("/login")} />;
+    return (
+      <LoginRequiredModal visible={isFocused} onClose={back} onLogin={() => startLogin(router)} />
+    );
   if (typeof postId !== "string" || typeof itemId !== "string")
     return <SaveUnavailable onBack={back} />;
   return (

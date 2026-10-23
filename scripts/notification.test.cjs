@@ -7,6 +7,11 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const LOGIN_SOURCES = {
+  "@/lib/loginIntent": "../src/lib/loginIntent.ts",
+  "@/hooks/useLoginGate": "../src/hooks/useLoginGate.tsx",
+};
+
 function load(filename, mocks, globals = {}) {
   const loaded = { exports: {} };
   const code = ts.transpileModule(readFileSync(path.join(__dirname, filename), "utf8"), {
@@ -16,7 +21,8 @@ function load(filename, mocks, globals = {}) {
     ...globals,
     exports: loaded.exports,
     module: loaded,
-    require: (name) => mocks[name] ?? require(name),
+    require: (name) =>
+      mocks[name] ?? (LOGIN_SOURCES[name] ? load(LOGIN_SOURCES[name], mocks) : require(name)),
   });
   return loaded.exports;
 }
@@ -29,6 +35,11 @@ function findAll(node, type) {
   ];
 }
 
+function member(Route) {
+  const content = Route().props.children;
+  return content.type(content.props);
+}
+
 test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   const events = [];
   const AppBar = Object.assign(() => null, {
@@ -37,6 +48,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   const mocks = {
     "react": {
       useState: (initial) => [initial, () => {}],
+      useCallback: (callback) => callback,
       useLayoutEffect: () => {},
       useEffect: () => {},
     },
@@ -45,14 +57,16 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
       useRouter: () => ({ push: (route) => events.push(route) }),
       useNavigation: () => ({}),
       useLocalSearchParams: () => ({}),
+      useFocusEffect: () => {},
     },
+    "@/contexts/AuthContext": { useAuth: () => ({ session: { user: { id: "u" } } }) },
     "@/assets/images/appbar": { IconNotification: "NotificationIcon", IconSearch: "SearchIcon" },
     "@/components/app-bar": { AppBar, SearchBar: "SearchBar" },
     "@/components/app-bar/NotificationButton": { NotificationButton: "NotificationButton" },
     "@/components/EmptyState": { EmptyState: "EmptyState" },
     "@/components/ErrorState": { ErrorState: "ErrorState" },
     "@/components/Loading": { LoadingDialog: "LoadingDialog" },
-    "@/components/modal": { ActionModal: "ActionModal" },
+    "@/components/modal": { ActionModal: "ActionModal", LoginRequiredModal: "LoginRequiredModal" },
     "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
     "@/constants/messages": { STATE_MESSAGES: {} },
@@ -102,8 +116,31 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   const { default: FolderRoute } = load("../src/app/(tabs)/folder.tsx", mocks, {
     __DEV__: false,
   });
-  FolderRoute().props.onNotifications();
+  findAll(FolderRoute(), "FolderScreen")[0].props.onNotifications();
   assert.deepEqual(events, ["/notifications", "/notifications", "/notifications"]);
+});
+
+test("비회원 FOLDER 탭은 남은 조회 오류가 있어도 오류 화면 대신 빈 나의 소장템을 보여 준다", () => {
+  const { default: FolderRoute } = load(
+    "../src/app/(tabs)/folder.tsx",
+    {
+      "react": { useState: (initial) => [initial, () => {}], useCallback: (callback) => callback },
+      "expo-router": { useRouter: () => ({ push: () => {} }), useFocusEffect: () => {} },
+      "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
+      "@/components/modal": { LoginRequiredModal: "LoginRequiredModal" },
+      "@/hooks/useFolders": { useFolders: () => ({ data: undefined, isError: true }) },
+      "@/hooks/useProductCounts": { useProductCounts: () => ({ data: undefined }) },
+      "@/hooks/useCreateFolder": { useCreateFolder: () => ({}) },
+      "@/screens/folder/FolderScreen": { FolderScreen: "FolderScreen" },
+      "@/screens/folder/mutations/useDeleteFolder": { useDeleteFolder: () => ({}) },
+      "@/screens/folder/mutations/useRenameFolder": { useRenameFolder: () => ({}) },
+    },
+    { __DEV__: false },
+  );
+  const screen = findAll(FolderRoute(), "FolderScreen")[0];
+  assert.equal(screen.props.isGuest, true);
+  assert.equal(screen.props.isError, false);
+  assert.equal(screen.props.folders, undefined);
 });
 
 test("알림 없음 화면은 공용 AppBar와 전체 화면 중앙 안내를 표시한다", () => {
@@ -231,6 +268,7 @@ test("뒤로 가기는 이전 화면으로, 직접 진입한 경우에는 탭 �
           }),
         },
         "@/screens/notification/NotificationScreen": { NotificationScreen: "NotificationScreen" },
+        "@/components/MemberOnly": { MemberOnly: "MemberOnly" },
         "@/screens/notification/hooks/useDevicePushOff": {
           useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
         },
@@ -251,7 +289,7 @@ test("뒤로 가기는 이전 화면으로, 직접 진입한 경우에는 탭 �
       },
       { __DEV__: false },
     );
-    Route().props.onBack();
+    member(Route).props.onBack();
     assert.deepEqual(events, [canGoBack ? "back" : "/(tabs)/all"]);
   }
 });
@@ -269,6 +307,7 @@ test("개발용 미리보기는 ?preview가 있을 때만 샘플을 보이고, �
       }),
     },
     "@/screens/notification/NotificationScreen": { NotificationScreen: "NotificationScreen" },
+    "@/components/MemberOnly": { MemberOnly: "MemberOnly" },
     "@/screens/notification/hooks/useDevicePushOff": {
       useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
     },
@@ -285,27 +324,27 @@ test("개발용 미리보기는 ?preview가 있을 때만 샘플을 보이고, �
     },
   };
   const { default: PreviewRoute } = load("../src/app/notifications.tsx", mocks, { __DEV__: true });
-  assert.equal(PreviewRoute().props.isError, true);
-  PreviewRoute().props.onRetry();
-  assert.equal(PreviewRoute().props.isError, false);
+  assert.equal(member(PreviewRoute).props.isError, true);
+  member(PreviewRoute).props.onRetry();
+  assert.equal(member(PreviewRoute).props.isError, false);
   assert.equal(
-    PreviewRoute().props.notifications.length,
+    member(PreviewRoute).props.notifications.length,
     0,
     "미리보기를 끄면 실제 알림을 보여 준다",
   );
   preview = "push-off";
-  assert.equal(PreviewRoute().props.notifications.length, 4);
+  assert.equal(member(PreviewRoute).props.notifications.length, 4);
   const { default: ProductionRoute } = load("../src/app/notifications.tsx", mocks, {
     __DEV__: false,
   });
   preview = "error";
-  assert.equal(ProductionRoute().props.isError, false);
+  assert.equal(member(ProductionRoute).props.isError, false);
   assert.equal(
-    typeof ProductionRoute().props.onRetry,
+    typeof member(ProductionRoute).props.onRetry,
     "function",
     "운영의 다시 시도는 실제 목록을 다시 불러온다",
   );
-  assert.equal(ProductionRoute().props.notifications.length, 0);
+  assert.equal(member(ProductionRoute).props.notifications.length, 0);
 });
 
 test("알림 행은 읽음 여부를 구분하며 긴 본문을 자르지 않고 선택 콜백을 호출한다", () => {
@@ -505,6 +544,7 @@ test("운영 알림 목록은 실제 알림과 지난 확인 뒤 새 알림을 �
         useRouter: () => ({ push: (route) => pushed.push(route) }),
       },
       "@/screens/notification/NotificationScreen": { NotificationScreen: "NotificationScreen" },
+      "@/components/MemberOnly": { MemberOnly: "MemberOnly" },
       "@/screens/notification/hooks/useDevicePushOff": {
         useDevicePushOff: () => ({ isPushOff: false, dismissedUntil: 0, dismiss: () => {} }),
       },
@@ -529,7 +569,7 @@ test("운영 알림 목록은 실제 알림과 지난 확인 뒤 새 알림을 �
     },
     { __DEV__: false },
   );
-  const props = Route().props;
+  const props = member(Route).props;
   assert.deepEqual(
     props.notifications.map((item) => [item.title, item.message, item.timeLabel, item.isRead]),
     [

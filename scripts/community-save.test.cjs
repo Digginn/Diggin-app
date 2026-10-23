@@ -7,6 +7,13 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const LOGIN_SOURCES = {
+  "@/lib/loginIntent": "src/lib/loginIntent.ts",
+  "@/hooks/useLoginGate": "src/hooks/useLoginGate.tsx",
+};
+
+let isScreenFocused = true;
+
 function load(file, mocks = {}) {
   const module = { exports: {} };
   runInNewContext(
@@ -16,7 +23,13 @@ function load(file, mocks = {}) {
     {
       module,
       exports: module.exports,
-      require: (name) => mocks[name] ?? (name.endsWith(".svg") ? name : require(name)),
+      require: (name) =>
+        mocks[name] ??
+        (name.endsWith(".svg")
+          ? name
+          : LOGIN_SOURCES[name]
+            ? load(LOGIN_SOURCES[name], mocks)
+            : require(name)),
     },
   );
   return module.exports;
@@ -131,6 +144,7 @@ function formHarness({ duplicate = false, fail = false, folderError = false } = 
         back() {},
       }),
       useLocalSearchParams: () => ({ postId: "10", itemId: "2" }),
+      useIsFocused: () => isScreenFocused,
     },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
     "@tanstack/react-query": {
@@ -298,7 +312,13 @@ test("방금 만든 폴더는 목록에 반영하고 조회 실패 시 폴더 �
 
 test("비회원의 저장 화면 직접 진입은 조회 전에 로그인 안내로 차단한다", () => {
   const h = formHarness();
-  assert.equal(h.SaveToAllScreen().type, "LoginRequiredModal");
+  const modal = h.SaveToAllScreen();
+  assert.equal(modal.type, "LoginRequiredModal");
+  assert.equal(modal.props.visible, true);
+  // 로그인 화면이 위에 쌓이면 안내 모달이 그 위에 남지 않아야 한다.
+  isScreenFocused = false;
+  assert.equal(h.SaveToAllScreen().props.visible, false);
+  isScreenFocused = true;
 });
 
 function folderHarness() {

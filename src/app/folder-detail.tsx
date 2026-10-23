@@ -1,7 +1,13 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
+import { View } from "react-native";
 
+import { AppBar } from "@/components/app-bar";
+import { ErrorState } from "@/components/ErrorState";
+import { Spinner } from "@/components/Loading";
+import { MemberOnly } from "@/components/MemberOnly";
 import { ActionModal } from "@/components/modal";
+import { useFolders } from "@/hooks/useFolders";
 import { useToast } from "@/hooks/useToast";
 import { FolderNameModal } from "@/screens/folder/components/FolderNameModal";
 import { FOLDER_MESSAGES } from "@/screens/folder/constants/folderMessages";
@@ -12,8 +18,8 @@ import { useFolderCounts } from "@/screens/folder/queries/useFolderCounts";
 import { useFolderItems } from "@/screens/folder/queries/useFolderItems";
 import type { WishLevelKey } from "@/types/wish-item";
 
-export default function FolderDetailRoute() {
-  const params = useLocalSearchParams<{ id: string; name?: string; owned?: string }>();
+function FolderDetailContent({ folderId }: { folderId: string }) {
+  const params = useLocalSearchParams<{ name?: string; owned?: string }>();
   const router = useRouter();
   const [name, setName] = useState(params.name ?? "");
   const [isOldestFirst, setIsOldestFirst] = useState(false);
@@ -22,8 +28,8 @@ export default function FolderDetailRoute() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const showToast = useToast();
-  const items = useFolderItems(params.id, isOldestFirst ? "oldest" : "latest", wishLevel, query);
-  const counts = useFolderCounts(params.id);
+  const items = useFolderItems(folderId, isOldestFirst ? "oldest" : "latest", wishLevel, query);
+  const counts = useFolderCounts(folderId);
   const renameFolder = useRenameFolder();
   const deleteFolder = useDeleteFolder();
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"));
@@ -59,7 +65,7 @@ export default function FolderDetailRoute() {
           onClose={() => setIsRenaming(false)}
           onSubmit={async (nextName) => {
             try {
-              await renameFolder.mutateAsync({ id: params.id, name: nextName });
+              await renameFolder.mutateAsync({ id: folderId, name: nextName });
               setName(nextName);
               showToast(FOLDER_MESSAGES.renameSuccess);
               return true;
@@ -81,7 +87,7 @@ export default function FolderDetailRoute() {
           label: "삭제하기",
           isDisabled: deleteFolder.isPending,
           onPress: () =>
-            deleteFolder.mutate(params.id, {
+            deleteFolder.mutate(folderId, {
               onSuccess: () => {
                 setIsDeleteConfirmOpen(false);
                 showToast(FOLDER_MESSAGES.deleteSuccess);
@@ -93,5 +99,36 @@ export default function FolderDetailRoute() {
         primaryAction={{ label: "취소", onPress: () => setIsDeleteConfirmOpen(false) }}
       />
     </>
+  );
+}
+
+// 비회원 FOLDER 탭의 나의 소장템은 임시 ID("owned")라 로그인 후 실제 폴더 ID로 바꿔 연다.
+function FolderDetailEntry() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const isPlaceholder = id === "owned";
+  const folders = useFolders(isPlaceholder);
+  if (!isPlaceholder) return <FolderDetailContent folderId={id} />;
+  const ownedId = folders.data?.find((folder) => folder.isOwnedItems)?.id;
+  if (ownedId) return <FolderDetailContent folderId={ownedId} />;
+  if (!folders.isError && !folders.data) return <Spinner />;
+  return (
+    <View className="flex-1 bg-gray-0">
+      <AppBar
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"))}
+      />
+      <ErrorState
+        message={"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요."}
+        onRetry={() => void folders.refetch()}
+      />
+    </View>
+  );
+}
+
+export default function FolderDetailRoute() {
+  return (
+    <MemberOnly>
+      <FolderDetailEntry />
+    </MemberOnly>
   );
 }

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Alert, AppState, Linking, Platform } from "react-native";
 
+import { MemberOnly } from "@/components/MemberOnly";
 import { NotificationSettingsScreen } from "@/screens/my/NotificationSettingsScreen";
 import { usePushSetting } from "@/screens/my/queries/usePushSetting";
 
-export default function NotificationSettingsRoute() {
+function NotificationSettingsContent() {
   const [isDevicePushEnabled, setIsDevicePushEnabled] = useState<boolean>();
   const pushSetting = usePushSetting();
 
@@ -51,5 +52,13 @@ export default function NotificationSettingsRoute() {
         );
       }}
     />
+  );
+}
+
+export default function NotificationSettingsRoute() {
+  return (
+    <MemberOnly title="알림 설정">
+      <NotificationSettingsContent />
+    </MemberOnly>
   );
 }

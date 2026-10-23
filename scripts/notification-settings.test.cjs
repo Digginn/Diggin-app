@@ -221,6 +221,7 @@ function setupRoute(
     },
     "@/screens/my/NotificationSettingsScreen": { NotificationSettingsScreen: "Settings" },
     "@/screens/my/queries/usePushSetting": { usePushSetting: () => pushSetting },
+    "@/components/MemberOnly": { MemberOnly: "MemberOnly" },
   };
   runInNewContext(
     ts.transpileModule(
@@ -236,7 +237,10 @@ function setupRoute(
       console,
     },
   );
-  const render = () => route.exports.default();
+  const render = () => {
+    const content = route.exports.default().props.children;
+    return content.type(content.props);
+  };
   render();
   const cleanup = effect();
   return {

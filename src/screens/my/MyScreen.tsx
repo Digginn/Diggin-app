@@ -5,6 +5,7 @@ import type { SvgProps } from "react-native-svg";
 
 import { IconMyProfile, IconMySettings, IconMySupport } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
+import { startLogin } from "@/lib/loginIntent";
 
 import { AccountWithdrawalModal } from "./components/AccountWithdrawalModal";
 import type { WithdrawalSurvey } from "./components/AccountWithdrawalSurvey";
@@ -134,7 +135,7 @@ export function MyScreen({
           Icon={IconMyProfile}
           rows={
             isGuest
-              ? [{ label: "로그인", onPress: () => router.push("/login") }]
+              ? [{ label: "로그인", onPress: () => startLogin(router) }]
               : [
                   { label: "프로필 수정", onPress: () => router.push("/profile-edit" as Href) },
                   { label: "내 활동", onPress: () => router.push("/my-activity" as Href) },

@@ -6,6 +6,11 @@ const { test } = require("node:test");
 const { runInNewContext } = require("node:vm");
 const ts = require("typescript");
 
+const LOGIN_SOURCES = {
+  "@/lib/loginIntent": "src/lib/loginIntent.ts",
+  "@/hooks/useLoginGate": "src/hooks/useLoginGate.tsx",
+};
+
 function load(file, mocks) {
   const module = { exports: {} };
   runInNewContext(
@@ -19,7 +24,9 @@ function load(file, mocks) {
         mocks[name] ??
         (name === "@/api/accountAccess"
           ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
-          : require(name)),
+          : LOGIN_SOURCES[name]
+            ? load(LOGIN_SOURCES[name], mocks)
+            : require(name)),
     },
   );
   return module.exports;

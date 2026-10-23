@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, Linking } from "react-native";
 
+import { MemberOnly } from "@/components/MemberOnly";
 import { TOAST_MESSAGES } from "@/constants/messages";
 import { useToast } from "@/hooks/useToast";
 import { formatCommunityTime } from "@/screens/diggle/utils/formatCommunityTime";
@@ -52,7 +53,7 @@ const PUSH_OFF_PREVIEW_MESSAGES = [
   "'겨울 패딩 이거 괜찮나요?' 투표가 종료됐어요. BUY 3 · NOT 9",
 ];
 
-export default function NotificationsRoute() {
+function NotificationsContent() {
   const router = useRouter();
   const { preview } = useLocalSearchParams<{ preview?: string }>();
   const isPreview = __DEV__ && preview !== undefined;
@@ -129,5 +130,13 @@ export default function NotificationsRoute() {
         else router.replace("/(tabs)/all");
       }}
     />
+  );
+}
+
+export default function NotificationsRoute() {
+  return (
+    <MemberOnly title="알림">
+      <NotificationsContent />
+    </MemberOnly>
   );
 }

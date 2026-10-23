@@ -39,6 +39,9 @@ type FolderScreenProps = {
   onCreateFolder?: (name: string) => void | Promise<void>;
   onSearch?: () => void;
   onNotifications?: () => void;
+  /** 비회원은 첫 방문 안내 대신 로그인 모달을 본다. */
+  isGuest?: boolean;
+  requireLogin?: (action: () => void) => void;
 };
 
 export function FolderScreen({
@@ -53,9 +56,11 @@ export function FolderScreen({
   onCreateFolder,
   onSearch,
   onNotifications,
+  isGuest = false,
+  requireLogin = (action) => action(),
 }: FolderScreenProps = {}) {
   const { height } = useWindowDimensions();
-  const guide = useFirstVisitGuide("folder", !isError);
+  const guide = useFirstVisitGuide("folder", !isError && !isGuest);
   const ownedGuideRef = useRef<View>(null);
   const fabGuideRef = useRef<View>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -278,10 +283,12 @@ export function FolderScreen({
             collapsable={false}
             accessibilityRole="button"
             accessibilityLabel="폴더 추가"
-            onPress={() => {
-              setToast(null);
-              setIsCreateModalOpen(true);
-            }}
+            onPress={() =>
+              requireLogin(() => {
+                setToast(null);
+                setIsCreateModalOpen(true);
+              })
+            }
             className="absolute left-[73px] top-[73px] size-[54px] items-center justify-center rounded-full bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.1)] active:opacity-75"
           >
             <PlusIcon />
