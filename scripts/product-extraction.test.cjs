@@ -273,6 +273,41 @@ test("광고 추적값만 떼고 상품을 가르는 쿼리 값은 남긴다", (
   );
 });
 
+test("AppsFlyer 공유 링크의 추적값을 떼어 같은 상품이 같은 링크로 저장되게 한다", () => {
+  // 29CM 공유 링크는 추적값과 순서가 매번 달라 같은 상품이 따로 저장됐다(#91).
+  for (const url of [
+    "https://www.29cm.co.kr/products/4310987?deep_link_value=app29cm%3A%2F%2Fweb&af_dp=app29cm%3A%2F%2Fweb&af_click_lookback=7d&pid=29cm_pdp_share&shortlink=7j3yhnmw&onelink_id=1080201211",
+    "https://www.29cm.co.kr/products/4310987?shortlink=7j3yhnmw&af_dp=app29cm%3A%2F%2Fweb&onelink_id=1080201211&pid=29cm_pdp_share&af_click_lookback=7d&deep_link_value=app29cm%3A%2F%2Fweb",
+    "https://www.29cm.co.kr/products/4310987?c=campaign&deep_link_sub1=x&af_sub1=y",
+  ]) {
+    assert.equal(stripTrackingParams(url, true), "https://www.29cm.co.kr/products/4310987");
+  }
+  assert.equal(
+    stripTrackingParams("https://shop.example.com/view?pid=123&c=blue", true),
+    "https://shop.example.com/view?pid=123&c=blue",
+    "AppsFlyer 링크가 아니면 pid·c는 상품 값일 수 있어 남긴다",
+  );
+});
+
+test("상품 페이지를 못 읽어 원래 공유 링크를 저장할 때는 상품을 가리키는 AppsFlyer 값을 남긴다", () => {
+  const shared =
+    "https://29cm.onelink.me/1080201211/7j3yhnmw?af_dp=app29cm%3A%2F%2Fproduct%2F4310987&deep_link_value=4310987&pid=29cm_pdp_share&utm_source=share";
+  const kept =
+    "https://29cm.onelink.me/1080201211/7j3yhnmw?af_dp=app29cm%3A%2F%2Fproduct%2F4310987&deep_link_value=4310987&pid=29cm_pdp_share";
+  assert.equal(stripTrackingParams(shared), kept, "일반 추적값(utm)만 뗀다");
+  const failed = normalizeProductPage({ finalUrl: shared, og: og({ title: "29CM" }) }, shared);
+  assert.equal(failed.hasFailed, true);
+  assert.equal(failed.values.sourceUrl, kept);
+  const landed = normalizeProductPage(
+    {
+      finalUrl: "https://www.29cm.co.kr/products/4310987?af_dp=x&shortlink=y&pid=z",
+      og: og({ title: "후드 집업", image: "https://img.29cm.co.kr/a.jpg" }),
+    },
+    shared,
+  );
+  assert.equal(landed.values.sourceUrl, "https://www.29cm.co.kr/products/4310987");
+});
+
 test("에이블리처럼 product:brand 메타만 있어도 브랜드를 채우고 공유 링크 추적값을 뗀다", () => {
   const { values } = normalizeProductPage(
     {
@@ -706,6 +741,61 @@ test("컬리는 페이지 데이터에서 상품명·판매가·브랜드를 읽
   assert.equal(values.name, "[Dole] 스위티오 바나나 2종 (택1)");
   assert.equal(values.price, "3990", "정가가 아니라 판매가를 쓴다");
   assert.equal(values.brand, "Dole", "판매자(컬리)가 아니라 브랜드를 쓴다");
+});
+
+test("무신사는 쿠폰 적용가와 페이지 데이터의 상품명·브랜드를 쓴다", () => {
+  const sent = [];
+  const metas = {
+    "og:title": "라운드랩(ROUNDLAB) 소나무 진정 시카 로션 250ml - 후기 | 무신사",
+    "og:image": "https://image.msscdn.net/a.jpg",
+    "product:price:amount": "20000",
+    "product:price:currency": "KRW",
+  };
+  const nextData = {
+    props: {
+      pageProps: {
+        meta: {
+          data: {
+            goodsPrice: {
+              salePrice: 20000,
+              normalPrice: 25000,
+              couponPrice: 16000,
+              finalPrice: 16000,
+            },
+            goodsNm: "소나무 진정 시카 로션 250ml",
+            brandInfo: { brandName: "라운드랩", brandEnglishName: "ROUNDLAB" },
+          },
+        },
+      },
+    },
+  };
+  runInNewContext(PRODUCT_PAGE_SCRIPT, {
+    window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+    document: {
+      readyState: "complete",
+      querySelector: (selector) => {
+        const key = /"([^"]+)"/.exec(selector)[1];
+        return metas[key] ? { getAttribute: () => metas[key] } : null;
+      },
+      querySelectorAll: () => [],
+      getElementById: (id) =>
+        id === "__NEXT_DATA__" ? { textContent: JSON.stringify(nextData) } : null,
+    },
+    location: {
+      href: "https://www.musinsa.com/products/2823000",
+      hostname: "www.musinsa.com",
+      search: "",
+    },
+    URLSearchParams,
+    Date,
+    JSON,
+    setInterval: () => 1,
+    clearInterval: () => {},
+  });
+  const { values } = normalizeProductPage(sent[0], "https://www.musinsa.com/products/2823000");
+  assert.equal(values.price, "16000");
+  assert.equal(values.name, "소나무 진정 시카 로션 250ml", "제목의 브랜드와 '- 후기'를 빼고 쓴다");
+  assert.equal(values.brand, "라운드랩");
 });
 
 test("전용 처리가 없는 쇼핑몰도 표준 형식(ProductGroup·priceSpecification·할인가 메타·마이크로데이터·eg: 메타)에서 가격과 브랜드를 읽는다", () => {

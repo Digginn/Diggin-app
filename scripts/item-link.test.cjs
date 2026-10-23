@@ -32,3 +32,22 @@ test("제목과 함께 복사해도 첫 링크를 뽑는다", () => {
   const text = "엄청 좋은 바지\nhttps://www.musinsa.com/products/123";
   assert.equal(ITEM_LINK.exec(text)[0], "https://www.musinsa.com/products/123");
 });
+
+test("링크 없는 긴 공유 텍스트도 앱 주소 검사가 오래 걸리지 않는다", () => {
+  const ts = require("typescript");
+  const { runInNewContext } = require("node:vm");
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText,
+    { module, exports: module.exports },
+  );
+  const { classifyItemLink } = module.exports;
+  // 공유 확장은 긴 글도 받는다. 예전 정규식은 이 입력에서 수 초씩 멈췄다.
+  const started = Date.now();
+  assert.equal(classifyItemLink("a.".repeat(60000)), "no_url");
+  assert.ok(Date.now() - started < 300, `${Date.now() - started}ms`);
+  assert.equal(classifyItemLink("이거 봐 musinsa://product/1"), "deeplink");
+  assert.equal(classifyItemLink("x.musinsa://y"), "deeplink");
+  assert.equal(classifyItemLink("https://ㅁㄴㅇㄹ"), "invalid_format");
+  assert.equal(classifyItemLink("링크 없는 글"), "no_url");
+});

@@ -66,7 +66,8 @@ export function useItemSave() {
         if (pending) setLoaded(pending);
         return null;
       });
-    if (AppState.currentState === "active") {
+    // 공유 확장(#91) 안에서는 앱 상태가 "extension"으로 와서, 화면 앞에 있는 것으로 본다.
+    if (AppState.currentState === "active" || AppState.currentState === "extension") {
       open();
       return;
     }

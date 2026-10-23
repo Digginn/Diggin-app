@@ -4,6 +4,7 @@ import { FlatList, Text, View } from "react-native";
 
 import { ensureCommunityWriteAllowed, restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
+import { NotificationButton } from "@/components/app-bar/NotificationButton";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Fab } from "@/components/Fab";
@@ -44,7 +45,7 @@ export function DiggleScreen() {
       <AppBar
         left="logo"
         right={
-          <AppBar.NotificationButton
+          <NotificationButton
             onPress={() => {
               if (!session) setLoginRequired(true);
               else router.push("/notifications");

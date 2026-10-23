@@ -156,6 +156,19 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
         }
       } catch (error) {}
     }
+    // 무신사 메타 가격은 쿠폰 전 할인가다. 화면에 보이는 값은 누구나 받는 쿠폰까지 뺀 finalPrice다.
+    if (location.hostname.endsWith("musinsa.com") && next) {
+      try {
+        const goods = JSON.parse(next.textContent).props.pageProps.meta.data;
+        const price = goods.goodsPrice || {};
+        return {
+          // 제목은 "브랜드(영문) 상품명 - 사이즈 & 후기"라 페이지 데이터의 상품명·브랜드를 쓴다.
+          name: goods.goodsNm || null,
+          brand: (goods.brandInfo && goods.brandInfo.brandName) || null,
+          price: price.finalPrice ?? price.salePrice ?? null,
+        };
+      } catch (error) {}
+    }
     if (location.hostname.endsWith("zigzag.kr") && next) {
       try {
         const queries = JSON.parse(next.textContent).props.pageProps.dehydratedState.queries;

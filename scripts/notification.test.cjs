@@ -33,7 +33,6 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   const events = [];
   const AppBar = Object.assign(() => null, {
     IconButton: "IconButton",
-    NotificationButton: "NotificationButton",
   });
   const mocks = {
     "react": {
@@ -49,6 +48,7 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     },
     "@/assets/images/appbar": { IconNotification: "NotificationIcon", IconSearch: "SearchIcon" },
     "@/components/app-bar": { AppBar, SearchBar: "SearchBar" },
+    "@/components/app-bar/NotificationButton": { NotificationButton: "NotificationButton" },
     "@/components/EmptyState": { EmptyState: "EmptyState" },
     "@/components/ErrorState": { ErrorState: "ErrorState" },
     "@/components/Loading": { LoadingDialog: "LoadingDialog" },
