@@ -15,7 +15,7 @@
 | 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다                 |
 | 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69)        |
 | 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)               |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 생성·목록 (#104). Push 발송은 후속 |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 생성·목록 (#104), Push 발송 (#131) |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -331,7 +331,13 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - 수신 설정·OS 권한과 관계없이 알림은 목록에 남긴다(NOTI-007). Push를 끈 사용자에게는 발송만 하지 않는다(발송 작업에서 반영).
 - 목록 문구는 시안(NOTI-07)대로 저장한다. 제목은 "투표 결과가 나왔어요.", "내 게시글에 댓글이 달렸어요.", "내 게시글에 좋아요가 달렸어요."이다.
 - Push 문구는 목록 문구와 다르다(시안 NOTI-03~05). 투표 마감은 "투표가 종료됐어요." / "내 투표 결과를 확인해 보세요.", 좋아요는 본문 자리에 게시글 본문을 쓴다. 댓글은 목록과 같다. 발송할 때 종류별로 만든다.
-- Push 발송은 다음 작업이다. 사용자의 토큰 전체에 보내고, DeviceNotRegistered면 토큰을 지우고, push_sent_at이 null이면 다음 실행 때 다시 보낸다.
+- Push 발송(#131)은 신규 알림 insert 트리거가 `private.notification_push_deliveries`에 기기별로 넣고, `notification-push` Edge Function이 Expo Push Service를 통해 FCM/APNs로 보낸다. 배포 전 알림과 토큰 등록 전 알림은 소급 발송하지 않는다. 목록·빨간 점은 기존 정책을 유지한다.
+- 발송 큐: `id bigint identity`, `notification_id FK notifications cascade`, `token_id FK push_tokens cascade`, 등록 시각 `token_updated_at`, `state(pending/receipt/delivered/failed/skipped)`, `ticket_id`, `attempts`, `available_at`, `lease_id`, `leased_until`, `last_error`. `(notification_id, token_id)` unique, due 부분 인덱스와 token FK 인덱스를 둔다. RLS를 켜고 직접 접근은 service_role에도 주지 않는다.
+- 서버 전용 RPC `claim_notification_pushes(receipts)`와 `finish_notification_push(delivery_id, claim_id, outcome, ticket, error_code)`만 service_role에 허용한다. public invoker/private definer 패턴이며 일반 사용자·anon은 호출할 수 없다. 한 번에 최대 100건, SKIP LOCKED와 5분 lease로 동시 실행을 막고 오래된 lease의 결과는 거절한다.
+- 발송 직전 토큰 소유자·수신 설정·정지·차단·신고·글 삭제/숨김을 다시 확인한다. HTTP 호출 이후 설정 변경과 OS에 이미 전달된 알림은 회수할 수 없다. 실패 기기만 2~60분 간격으로 재시도하고 24시간 지난 작업은 종료한다.
+- 접수 ticket과 전달 receipt를 구분한다. ticket 성공은 15분 뒤 receipt를 조회하고, 조회 실패/누락은 발송을 반복하지 않고 조회만 재시도한다. `DeviceNotRegistered`는 토큰의 소유자와 등록 시각이 그대로일 때만 삭제해 재등록/계정 전환된 토큰을 보호한다. 본문은 푸시 전체가 4KB 미만이 되도록 줄이며 목록 원문은 보존한다.
+- `push_sent_at`은 기기별 작업이 모두 Expo에 접수되거나 제외되었고 적어도 한 기기가 접수됐을 때 기록한다. 실제 기기 수신 보장값이 아니다. 작업 재시도 기준은 기기별 state/available_at이며, 성공 기기는 재발송하지 않는다. 외부 발송 성공 직후 DB 기록 전에 프로세스가 종료되면 중복이 생길 수 있는 at-least-once 방식이다.
+- pg_cron `notifications-push-dispatch`가 매분 Vault의 `push_dispatch_url`/`push_dispatch_secret`으로 함수를 호출한다. 함수는 별도 `PUSH_DISPATCH_SECRET`을 검증하고 앱 JWT를 받지 않는다. 최초 Vault·Edge secret 설정은 배포 후 운영자가 한다. 미설정 상태에는 외부 호출 없이 종료한다. 운영 절차와 Android 검증은 [ANDROID_NOTIFICATIONS.md](ANDROID_NOTIFICATIONS.md)를 따른다.
 
 ### 6-5. 운영 (#114, private)
 

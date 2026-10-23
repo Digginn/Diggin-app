@@ -440,6 +440,10 @@ verify_jwt = true
 [functions.account-withdrawal]
 verify_jwt = true
 
+# 전용 PUSH_DISPATCH_SECRET을 함수 내부에서 검증한다. 앱의 사용자 JWT는 허용하지 않는다.
+[functions.notification-push]
+verify_jwt = false
+
 # Supabase 세션 대신 함수 내부에서 제공자 ID token의 서명·issuer·audience를 검증한다.
 [functions.account-restriction]
 verify_jwt = false

@@ -58,7 +58,7 @@
           "resizeMode": "contain"
         }
       ],
-      "expo-notifications",
+      ["expo-notifications", { "defaultChannel": "default" }],
       "expo-secure-store",
       "@react-native-google-signin/google-signin",
       "./plugins/withShareExtensionBuild",
@@ -83,7 +83,7 @@
             "expo-dev-client",
             "expo-splash-screen",
             "expo-updates",
-            "expo-notifications",
+            ["expo-notifications", { "defaultChannel": "default" }],
             "expo-image-picker",
             "expo-apple-authentication",
             "@react-native-google-signin/google-signin",

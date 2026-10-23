@@ -401,6 +401,7 @@ export type Database = {
         Args: { target_id: number; target_type: string };
         Returns: undefined;
       };
+      claim_notification_pushes: { Args: { receipts?: boolean }; Returns: Json };
       create_comment: {
         Args: { comment_content: string; request_id: string; target_post_id: number };
         Returns: Json;
@@ -416,6 +417,16 @@ export type Database = {
       };
       delete_comment: { Args: { target_comment_id: number }; Returns: undefined };
       delete_community_post: { Args: { target_post_id: number }; Returns: undefined };
+      finish_notification_push: {
+        Args: {
+          claim_id: string;
+          delivery_id: number;
+          error_code?: string;
+          outcome: string;
+          ticket?: string;
+        };
+        Returns: boolean;
+      };
       get_account_access: { Args: Record<PropertyKey, never>; Returns: Json };
       get_community_comments: {
         Args: { after_created_at?: string; after_id?: number; target_post_id: number };

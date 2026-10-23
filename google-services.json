@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "664044106677",
+    "project_id": "diggin-511710",
+    "storage_bucket": "diggin-511710.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664044106677:android:4999c1690bbdb43cb81ffc",
+        "android_client_info": {
+          "package_name": "com.diggin.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "664044106677-vpmn6qka0co01hvg37e3ek1rahi3avts.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9Kh1MR9ZbcOp76X60ebw_lnXboiUkqRU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "664044106677-vpmn6qka0co01hvg37e3ek1rahi3avts.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "664044106677-jpkrlo5jh9i5ql5lm6f34gk1a3fd19fk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.diggin.app.preview"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
