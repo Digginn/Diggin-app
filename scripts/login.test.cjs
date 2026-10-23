@@ -343,18 +343,22 @@ test("로그인 화면은 주소로 온 공유 링크를 받지 않고, 로그�
   assert.equal(await external.pending.takeShareLink(), null, "주소의 shareUrl은 맡기지 않는다");
 });
 
-test("이미 로그인한 사람이 로그인 주소로 들어오면 ALL로 보내고, 로그인 중에 생긴 세션으로는 보내지 않는다", () => {
-  const render = (props, session, loading = false) => {
+test("이미 로그인한 사람의 자동 이동은 공유 링크를 보존하고, 로그인 중 세션은 원래 이동에 맡긴다", async () => {
+  const render = (props, session, loading = false, pending = { discardShareLink: () => {} }) => {
     let stateIndex = 0;
+    const cleanups = [];
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
       "react": {
         // 두 번째 상태가 로그인 진행 중(isLoading)이다.
         useState: (initial) => [stateIndex++ === 1 && loading ? true : initial, () => {}],
         useRef: (current) => ({ current }),
-        useEffect: () => {},
+        useEffect: (effect) => {
+          const cleanup = effect();
+          if (cleanup) cleanups.push(cleanup);
+        },
       },
       "./api/signIn": { signIn: async () => ({ status: "cancelled" }) },
-      "@/lib/pendingShareLink": { discardShareLink: () => {} },
+      "@/lib/pendingShareLink": pending,
       "expo-router": {
         Redirect: "Redirect",
         useRouter: () => ({ replace: () => {}, back: () => {}, canGoBack: () => false }),
@@ -376,16 +380,29 @@ test("이미 로그인한 사람이 로그인 주소로 들어오면 ALL로 보�
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
       "@/contexts/AuthContext": { useAuth: () => ({ session }) },
     });
-    return LoginScreen(props);
+    return { tree: LoginScreen(props), leave: () => cleanups.forEach((cleanup) => cleanup()) };
   };
   const member = { user: { id: "u" } };
-  const redirect = render({ isRedirectedWhenSignedIn: true }, member);
+  const LINK = "https://www.musinsa.com/products/1";
+  const shared = loadPendingShare();
+  shared.pending.keepShareLink(LINK);
+  const authenticated = render({ isRedirectedWhenSignedIn: true }, member, false, shared.pending);
+  const redirect = authenticated.tree;
   assert.equal(redirect.type, "Redirect");
   assert.equal(redirect.props.href, "/(tabs)/all");
-  assert.notEqual(render({ isRedirectedWhenSignedIn: true }, null).type, "Redirect");
-  assert.notEqual(render({}, member).type, "Redirect", "미리보기 화면은 그대로 보인다");
+  authenticated.leave();
+  assert.equal(await shared.pending.takeShareLink(), LINK, "자동 이동 후 ALL이 공유 링크를 받는다");
+  assert.equal(await shared.pending.takeShareLink(), null, "공유 링크는 한 번만 이어 저장한다");
+
+  const cancelled = loadPendingShare();
+  cancelled.pending.keepShareLink(LINK);
+  const guest = render({ isRedirectedWhenSignedIn: true }, null, false, cancelled.pending);
+  assert.notEqual(guest.tree.type, "Redirect");
+  guest.leave();
+  assert.equal(await cancelled.pending.takeShareLink(), null, "비회원이 나가면 공유 링크를 버린다");
+  assert.notEqual(render({}, member).tree.type, "Redirect", "미리보기 화면은 그대로 보인다");
   assert.notEqual(
-    render({ isRedirectedWhenSignedIn: true }, member, true).type,
+    render({ isRedirectedWhenSignedIn: true }, member, true).tree.type,
     "Redirect",
     "로그인 중에 생긴 세션은 가입 완료 안내 등 원래 이동에 맡긴다",
   );

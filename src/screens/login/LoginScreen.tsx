@@ -49,6 +49,12 @@ export function LoginScreen({
   const hasSignedIn = useRef(false);
   const [didSignIn, setDidSignIn] = useState(false);
   const { session } = useAuth();
+  const shouldRedirect = isRedirectedWhenSignedIn && !!session && !isLoading && !didSignIn;
+
+  // 복원된 세션으로 자동 이동할 때도 ALL이 공유 링크를 이어 받아야 한다.
+  useEffect(() => {
+    if (shouldRedirect) hasSignedIn.current = true;
+  }, [shouldRedirect]);
 
   // AUTH-001 공유하러 왔다가 로그인하지 않고 나가면 맡긴 링크를 버린다. 로그인 실패는 다시 시도할 수 있게 둔다.
   useEffect(
@@ -87,7 +93,7 @@ export function LoginScreen({
 
   // 이미 로그인한 사람이 diggin://login 으로 들어오면 로그인 화면이 필요 없다.
   // 로그인 중에도 세션이 먼저 생겨, 로그인 중이거나 막 끝났을 때는 아래 이동(가입 완료 안내 등)에 맡긴다.
-  if (isRedirectedWhenSignedIn && session && !isLoading && !didSignIn) {
+  if (shouldRedirect) {
     return <Redirect href={"/(tabs)/all" as Href} />;
   }
 
