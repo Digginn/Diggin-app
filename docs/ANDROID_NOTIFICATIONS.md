@@ -6,7 +6,16 @@
 - `google-services.json`은 공개 클라이언트 식별자 파일로 저장소 루트에 둔다. `app.config.ts`가 연결한다. EAS 파일 환경변수 `GOOGLE_SERVICES_JSON`이 있으면 우선 사용한다.
 - FCM V1 서비스 계정 키는 EAS `com.diggin.app`에 등록했다. 비공개 키 파일은 저장소에 넣지 않는다.
 - `expo-notifications` 기본 채널과 등록 코드의 채널 ID는 모두 `default`다. Android 13+ 권한 요청 전에 채널을 만든다.
+- 공유 확장의 `excludedPackages`는 문자열만 받는다. `expo-notifications`는 문자열로 제외하고 `defaultChannel` 옵션은 루트 plugins에만 둔다. 리뷰 수정 후 lockfile 기준 Linux iOS prebuild에서 생성된 Podfile의 제외 항목을 확인했다. macOS `pod install`과 iOS 컴파일은 별도 검증이 필요하다.
 - Android 운영 빌드는 Firebase 설정이 없으면 실패한다. Firebase SDK/Gradle 연결은 Expo prebuild가 처리한다. 이 설정만으로 Analytics SDK가 앱에 추가되지는 않는다.
+
+## Android Google 로그인 서명 확인
+
+- 앱은 기존 `GoogleSignin.configure({ webClientId, iosClientId })`와 Supabase 로그인 흐름을 사용한다. Firebase Authentication으로 전환하지 않는다. 현재 JSON의 웹 클라이언트 ID는 앱 설정과 일치한다.
+- Google 로그인은 Android 패키지와 실제 APK의 SHA-1에 맞는 Android OAuth 클라이언트가 필요하다. JSON에 Android 항목이 없다는 사실만으로 Google Cloud 등록 여부를 확정할 수는 없다. 서명 등록 후 새 Firebase 설정 파일과 실제 APK 로그인으로 확인한다.
+- EAS에서 확인한 `com.diggin.app` SHA-1: `2F:11:D1:BA:75:4F:51:0C:F6:71:11:67:C0:94:4C:54:FA:B4:FD:A3`.
+- Firebase 프로젝트 설정 → 일반 → Android 앱 → 디지털 지문에 해당 SHA-1을 등록하고 `google-services.json`을 다시 내려받는다. 검증할 항목은 패키지·프로젝트, `oauth_client`의 `client_type: 1` 및 `android_info.certificate_hash`다. 최신 파일 반영과 콘솔 등록 확인은 아직 대기 중이다.
+- 로컬 debug와 Play 앱 서명 SHA-1은 EAS 지문과 다를 수 있다. 실제 debug APK·Play Console 앱 무결성에서 확인한 값만 추가한다. 현재는 두 지문을 확보하지 않았다. Google Play가 앱을 재서명하면 업로드 키 대신 앱 서명 키의 지문을 사용한다.
 
 ## 발송 서버 활성화 (승인된 PR 배포 후)
 
@@ -39,6 +48,7 @@ Android 기기가 연결되지 않아 다음 항목은 빌드 후 확인한다. 
 - [ ] 알림 선택 시 게시글·투표 이동, 삭제/숨김 안내, 중복 이동 방지
 - [ ] 앱 알림 끄기/켜기, 차단/신고 후 미발송
 - [ ] 로그아웃·계정 전환 후 이전 계정 알림 차단
+- [ ] 실제 Android 설치 빌드에서 Google 로그인 확인 (설치 경로별 SHA-1 등록 포함)
 - [ ] 여러 기기 발송, receipt 확인 및 재등록 토큰 보호
 
 ## 참고
@@ -46,3 +56,5 @@ Android 기기가 연결되지 않아 다음 항목은 빌드 후 확인한다. 
 - [Expo FCM V1 설정](https://docs.expo.dev/push-notifications/fcm-credentials/)
 - [Expo 발송·ticket·receipt](https://docs.expo.dev/push-notifications/sending-notifications/)
 - [Supabase 예약 함수](https://supabase.com/docs/guides/functions/schedule-functions)
+- [Google Sign In 서명 설정](https://react-native-google-signin.github.io/docs/setting-up/get-config-file)
+- [Play 앱 서명 확인](https://support.google.com/googleplay/android-developer/answer/9842756?hl=ko)

@@ -23,6 +23,23 @@ function load(file, mocks, globals = {}) {
   return module.exports;
 }
 const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+test("공유 확장 제외 목록은 문자열만 사용하고 알림 채널 옵션은 루트 플러그인에 둔다", () => {
+  const { plugins } = JSON.parse(readFileSync(path.join(__dirname, "../app.json"), "utf8")).expo;
+  const extension = plugins.find(
+    (plugin) => Array.isArray(plugin) && plugin[0] === "expo-share-extension",
+  );
+  assert.equal(
+    extension[1].excludedPackages.every((name) => typeof name === "string"),
+    true,
+  );
+  assert.equal(extension[1].excludedPackages.includes("expo-notifications"), true);
+  const notifications = plugins.find(
+    (plugin) => Array.isArray(plugin) && plugin[0] === "expo-notifications",
+  );
+  assert.equal(notifications[1].defaultChannel, "default");
+});
+
 const response = (data, id = "push-1", actionIdentifier = "default") => ({
   actionIdentifier,
   notification: { request: { identifier: id, content: { data } } },

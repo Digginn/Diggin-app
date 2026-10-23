@@ -83,7 +83,7 @@
             "expo-dev-client",
             "expo-splash-screen",
             "expo-updates",
-            ["expo-notifications", { "defaultChannel": "default" }],
+            "expo-notifications",
             "expo-image-picker",
             "expo-apple-authentication",
             "@react-native-google-signin/google-signin",
