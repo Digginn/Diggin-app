@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import FolderLimitClose from "@/assets/images/my/csv/icon-csv-folder-limit-close.svg";
+import FolderLimitClose from "@/assets/images/icon-notification-banner-close.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { useToast } from "@/hooks/useToast";

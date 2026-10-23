@@ -66,7 +66,7 @@ function setup(pick, bottomInset = 34) {
         if (name === "@/components/Button") return { Button: "Button" };
         if (name === "@/hooks/useToast") return { useToast: () => showToast };
         if (name === "@/theme") return { colors: { gray: { 0: "#FFFFFF" } } };
-        if (name.endsWith("icon-csv-folder-limit-close.svg")) return "FolderLimitClose";
+        if (name.endsWith("icon-notification-banner-close.svg")) return "FolderLimitClose";
         if (name === "./components/CsvImportIllustration")
           return { CsvImportIllustration: "CsvImportIllustration" };
         if (name === "./components/CsvImportLoading")
