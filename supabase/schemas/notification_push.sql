@@ -154,6 +154,11 @@ declare
   function_url text;
   dispatch_secret text;
 begin
+  if not exists (
+    select 1 from private.notification_push_deliveries
+    where state in ('pending','receipt') and available_at <= now()
+      and (leased_until is null or leased_until <= now())
+  ) then return null; end if;
   select decrypted_secret into function_url from vault.decrypted_secrets where name = 'push_dispatch_url';
   select decrypted_secret into dispatch_secret from vault.decrypted_secrets where name = 'push_dispatch_secret';
   if function_url is null or dispatch_secret is null then return null; end if;
@@ -164,3 +169,5 @@ end;
 $$;
 revoke execute on function private.invoke_notification_push() from public, anon, authenticated, service_role;
 select cron.schedule('notifications-push-dispatch', '* * * * *', 'select private.invoke_notification_push()');
+-- 완료된 실행 기록만 정리한다. 최근 기록과 실행 중인 작업은 보존한다.
+select cron.schedule('cron-run-details-cleanup', '10 18 * * *', $$delete from cron.job_run_details where end_time < now() - interval '7 days'$$);

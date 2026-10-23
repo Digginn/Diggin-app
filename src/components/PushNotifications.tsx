@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { notificationKeys } from "@/screens/notification/api/notifications";
 
 /** 콜드 스타트와 실행 중 알림 선택을 같은 경로로 처리한다. 외부 URL은 이동 대상으로 받지 않는다. */
-export function AndroidPushNotifications() {
+export function PushNotifications() {
   const { session, isRestoring } = useAuth();
   const userId = session?.user.id;
   const router = useRouter();
@@ -16,7 +16,7 @@ export function AndroidPushNotifications() {
   const lastHandled = useRef<string | null>(null);
 
   useEffect(() => {
-    if (Platform.OS !== "android" || isRestoring) return;
+    if (Platform.OS === "web" || isRestoring) return;
     let isActive = true;
     Notifications.setNotificationHandler({
       handleNotification: async () => ({

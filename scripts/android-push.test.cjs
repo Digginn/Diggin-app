@@ -54,7 +54,7 @@ function setup({
 } = {}) {
   const calls = { routes: [], cleared: 0, invalidated: 0, removed: 0, handler: null };
   let cleanup, pressed, received;
-  const { AndroidPushNotifications } = load("src/components/AndroidPushNotifications.tsx", {
+  const { PushNotifications } = load("src/components/PushNotifications.tsx", {
     "react": {
       useRef: (current) => ({ current }),
       useEffect: (effect) => {
@@ -99,7 +99,7 @@ function setup({
       },
     },
   });
-  AndroidPushNotifications();
+  PushNotifications();
   return {
     calls,
     press: (value) => pressed?.(value),
@@ -174,8 +174,28 @@ test("실행 중 수신은 목록을 갱신하고 OS 배너·소리·목록 표�
   );
 });
 
-test("인증 복원 중에는 초기 알림을 소비하지 않고 iOS·웹 동작은 바꾸지 않는다", () => {
-  for (const options of [{ restoring: true }, { os: "ios" }, { os: "web" }]) {
+test("iOS도 초기 알림·탭 이동·실행 중 갱신을 처리하고 OS 표시는 끈다", async () => {
+  const cold = response(payload);
+  const h = setup({ os: "ios", last: cold });
+  await tick();
+  assert.equal(h.calls.routes[0].pathname, "/posts/[id]");
+  h.press(cold);
+  assert.equal(h.calls.routes.length, 1);
+  h.press(response({ ...payload, post_type: "vote" }, "vote-ios"));
+  assert.equal(h.calls.routes[1].pathname, "/votes/[id]");
+  h.receive();
+  assert.equal(h.calls.invalidated, 1);
+  const display = await h.calls.handler.handleNotification(cold.notification);
+  assert.equal(display.shouldShowBanner, false);
+  assert.equal(display.shouldShowList, false);
+  assert.equal(display.shouldPlaySound, false);
+  h.stop();
+  assert.equal(h.calls.removed, 2);
+  assert.equal(h.calls.handler, null);
+});
+
+test("인증 복원 중에는 초기 알림을 소비하지 않고 웹에는 리스너를 연결하지 않는다", () => {
+  for (const options of [{ restoring: true }, { os: "web" }]) {
     const h = setup(options);
     assert.equal(h.calls.handler, null);
     h.press(response(payload));

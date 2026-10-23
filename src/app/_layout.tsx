@@ -9,7 +9,7 @@ import { AppState } from "react-native";
 import { folderKeys } from "@/api/folders";
 import { productKeys } from "@/api/products";
 import { AccountAccessNotice } from "@/components/AccountAccessNotice";
-import { AndroidPushNotifications } from "@/components/AndroidPushNotifications";
+import { PushNotifications } from "@/components/PushNotifications";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { BlockedUsersProvider } from "@/contexts/BlockedUsersContext";
 import { BrowsingModeProvider } from "@/contexts/BrowsingModeContext";
@@ -124,7 +124,7 @@ export default function RootLayout() {
                     </Stack>
                     <SessionExpiredNotice />
                     <PushRegistration />
-                    <AndroidPushNotifications />
+                    <PushNotifications />
                     <SharedSaveSync />
                     <AccountAccessNotice />
                   </PostsProvider>

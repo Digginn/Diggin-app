@@ -1,4 +1,4 @@
-# Android 알림 (#131)
+# Android 알림 및 공통 Push 처리 (#131)
 
 ## 연결 정보
 
@@ -32,12 +32,14 @@ Expo 접수 성공은 기기 수신 성공과 다르다. 15분 뒤 receipt를 �
 
 ## 앱 동작
 
-- 인증 복원이 끝난 뒤 초기 알림 응답과 실행 중 선택 리스너를 연결한다. 같은 응답 ID는 한 번만 처리한다.
+- iOS·Android 공통 `PushNotifications`에서 인증 복원이 끝난 뒤 초기 알림 응답과 실행 중 선택 리스너를 연결한다. 같은 응답 ID는 한 번만 처리하며 웹에는 연결하지 않는다.
 - payload의 `recipient_id`가 현재 계정과 다르면 상세로 이동하지 않는다. 알 수 없는 payload나 비회원은 알림 목록의 기존 로그인 가드로 보낸다.
 - `post_id`는 큰 ID도 보존하도록 문자열로 전달한다. `post_type`은 post/vote만 허용하고 외부 URL은 실행하지 않는다.
-- 실행 중 수신하면 알림 목록·빨간 점 캐시만 갱신하고 OS 배너·알림 목록 표시·소리는 끈다(NOTI003~005). 백그라운드·종료 상태의 Push와 iOS 수신 코드는 유지한다.
+- iOS·Android 모두 실행 중 수신하면 알림 목록·빨간 점 캐시만 갱신하고 OS 배너·알림 목록 표시·소리는 끈다(NOTI003~005). 백그라운드·종료 상태의 OS Push 표시는 유지한다.
 - 댓글 알림은 대기열에 넣을 때와 발송 직전에 원문 댓글의 삭제 여부를 확인한다(NOTI004). 이미 삭제된 댓글은 발송하지 않는다.
 - 앱 알림 토글은 서버 발송 대기열과 발송 시점 모두에 적용된다. OS 권한 거부 시 토큰을 새로 등록하지 않으며, 로그아웃은 현재 기기 토큰을 제거한다.
+- 매분 DB 점검 시 처리 시각이 된 pending·receipt 작업이 있고 lease가 없거나 만료됐을 때만 Edge Function을 호출한다. 새 발송이 없어도 receipt 확인·실패 재시도는 이어 간다.
+- `cron-run-details-cleanup`은 매일 18:10 UTC(한국 시간 다음 날 03:10)에 완료된 지 7일 지난 크론 실행 기록을 정리한다. 최근 기록과 실행 중인 작업은 보존한다.
 
 ## 검증
 
@@ -58,5 +60,6 @@ Android 기기가 연결되지 않아 다음 항목은 빌드 후 확인한다. 
 - [Expo FCM V1 설정](https://docs.expo.dev/push-notifications/fcm-credentials/)
 - [Expo 발송·ticket·receipt](https://docs.expo.dev/push-notifications/sending-notifications/)
 - [Supabase 예약 함수](https://supabase.com/docs/guides/functions/schedule-functions)
+- [Supabase 크론 실행 기록 정리](https://supabase.com/docs/guides/cron/quickstart#clean-up-job-run-history)
 - [Google Sign In 서명 설정](https://react-native-google-signin.github.io/docs/setting-up/get-config-file)
 - [Play 앱 서명 확인](https://support.google.com/googleplay/android-developer/answer/9842756?hl=ko)

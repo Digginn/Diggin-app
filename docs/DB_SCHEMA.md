@@ -337,7 +337,8 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - 발송 직전 토큰 소유자·수신 설정·정지·차단·신고·글 삭제/숨김·원문 댓글 삭제를 다시 확인한다. HTTP 호출 이후 설정 변경과 OS에 이미 전달된 알림은 회수할 수 없다. 실패 기기만 2~60분 간격으로 재시도하고 24시간 지난 작업은 종료한다.
 - 접수 ticket과 전달 receipt를 구분한다. ticket 성공은 15분 뒤 receipt를 조회하고, 조회 실패/누락은 발송을 반복하지 않고 조회만 재시도한다. `DeviceNotRegistered`는 토큰의 소유자와 등록 시각이 그대로일 때만 삭제해 재등록/계정 전환된 토큰을 보호한다. 본문은 푸시 전체가 4KB 미만이 되도록 줄이며 목록 원문은 보존한다.
 - `push_sent_at`은 기기별 작업이 모두 Expo에 접수되거나 제외되었고 적어도 한 기기가 접수됐을 때 기록한다. 실제 기기 수신 보장값이 아니다. 작업 재시도 기준은 기기별 state/available_at이며, 성공 기기는 재발송하지 않는다. 외부 발송 성공 직후 DB 기록 전에 프로세스가 종료되면 중복이 생길 수 있는 at-least-once 방식이다.
-- pg_cron `notifications-push-dispatch`가 매분 Vault의 `push_dispatch_url`/`push_dispatch_secret`으로 함수를 호출한다. 함수는 별도 `PUSH_DISPATCH_SECRET`을 검증하고 앱 JWT를 받지 않는다. 최초 Vault·Edge secret 설정은 배포 후 운영자가 한다. 미설정 상태에는 외부 호출 없이 종료한다. 운영 절차와 Android 검증은 [ANDROID_NOTIFICATIONS.md](ANDROID_NOTIFICATIONS.md)를 따른다.
+- pg_cron `notifications-push-dispatch`가 매분 처리 시각이 된 pending·receipt 작업(lease 없음/만료)이 있을 때만 Vault의 `push_dispatch_url`/`push_dispatch_secret`으로 함수를 호출한다. 함수는 별도 `PUSH_DISPATCH_SECRET`을 검증하고 앱 JWT를 받지 않는다. 최초 Vault·Edge secret 설정은 배포 후 운영자가 한다. 미설정 상태에는 외부 호출 없이 종료한다. 운영 절차와 Android 검증은 [ANDROID_NOTIFICATIONS.md](ANDROID_NOTIFICATIONS.md)를 따른다. iOS·Android 수신·탭 이동과 실행 중 목록·빨간 점 갱신은 공통 `PushNotifications`에서 처리한다.
+- `cron-run-details-cleanup`은 매일 18:10 UTC에 `end_time` 기준 7일 지난 완료 기록만 삭제한다. 최근 기록과 실행 중인 작업은 보존한다.
 
 ### 6-5. 운영 (#114, private)
 
