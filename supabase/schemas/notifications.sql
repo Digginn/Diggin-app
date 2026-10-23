@@ -1,6 +1,7 @@
 -- #104 알림. 원본은 private에 두고 목록 RPC로만 읽는다. 알림을 누를 때 글이 지워졌는지(NOTI-006)를
 -- 앱이 private.posts를 보지 않고 알 수 있어야 해서 public 테이블 대신 RPC로 함께 내려준다.
 create extension if not exists pg_cron with schema pg_catalog;
+create extension if not exists pg_net with schema extensions;
 
 create table private.notifications (
   id bigint generated always as identity primary key,
@@ -14,7 +15,9 @@ create table private.notifications (
   -- 수신자·유형·원본 이벤트로 만든 키. 트리거 재실행·투표 마감 작업 반복에도 한 번만 남긴다.
   event_key text not null unique,
   created_at timestamptz not null default now(),
-  push_sent_at timestamptz
+  push_sent_at timestamptz,
+  -- 발송 함수가 가져간 시각. 응답 없이 끝나도 5분 뒤 다른 실행이 다시 가져가 보낸다.
+  push_claimed_at timestamptz
 );
 create index notifications_recipient_idx on private.notifications(recipient_id, created_at desc, id desc);
 create index notifications_push_pending_idx on private.notifications(created_at) where push_sent_at is null;
@@ -294,5 +297,97 @@ grant execute on function private.get_notifications(timestamptz, bigint), public
   private.set_push_enabled(boolean), public.set_push_enabled(boolean)
   to authenticated;
 
+-- Push 발송(#139). 받을 수 없는 알림은 목록에만 남기고 끝낸 것으로 보고, 나머지를 오래된 순으로 가져간다.
+-- 장애 뒤 오래된 Push가 한꺼번에 가지 않게 24시간 지난 알림은 보내지 않는다.
+create or replace function private.claim_push_notifications(batch_size integer default 100)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  claimed jsonb;
+begin
+  if batch_size is null or batch_size not between 1 and 500 then
+    raise exception 'invalid_batch_size' using errcode = '22023';
+  end if;
+  update private.notifications n set push_sent_at = now()
+  where n.push_sent_at is null and (
+    n.created_at <= now() - interval '24 hours'
+    or exists (select 1 from private.notification_settings s where s.user_id = n.recipient_id and not s.push_enabled)
+    or exists (select 1 from public.profiles p where p.id = n.recipient_id and p.status = 'suspended')
+    or not exists (select 1 from public.push_tokens t where t.user_id = n.recipient_id)
+    or (n.actor_id is not null and not private.notification_actor_visible(n.recipient_id, n.actor_id))
+  );
+  with picked as (
+    select n.id from private.notifications n
+    where n.push_sent_at is null
+      and (n.push_claimed_at is null or n.push_claimed_at < now() - interval '5 minutes')
+    order by n.created_at, n.id
+    limit batch_size
+    for update skip locked
+  ), claimed_rows as (
+    update private.notifications n set push_claimed_at = now()
+    from picked where n.id = picked.id
+    returning n.*
+  )
+  -- Push 문구는 시안 NOTI-03~05. 투표 마감만 목록과 다르고, 좋아요는 본문 자리에 게시글 본문을 쓴다.
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', r.id::text,
+    'title', case r.type when 'vote_ended' then '투표가 종료됐어요.' else r.title end,
+    'body', case r.type
+      when 'vote_ended' then '내 투표 결과를 확인해 보세요.'
+      when 'post_liked' then private.notification_text(p.content)
+      else r.body end,
+    'post_id', r.post_id::text,
+    'post_type', p.type,
+    'tokens', (select jsonb_agg(t.token order by t.id) from public.push_tokens t where t.user_id = r.recipient_id)
+  ) order by r.created_at, r.id), '[]'::jsonb) into claimed
+  from claimed_rows r join private.posts p on p.id = r.post_id;
+  return claimed;
+end;
+$$;
+
+-- 보낸 알림을 끝내고 Expo가 DeviceNotRegistered로 돌려준 토큰을 지운다. 일시 오류는 남겨 두면 5분 뒤 다시 보낸다.
+create or replace function private.complete_push_notifications(sent_ids bigint[], dead_tokens text[])
+returns void language sql security definer set search_path = '' as $$
+  update private.notifications set push_sent_at = now()
+  where id = any(coalesce(sent_ids, '{}')) and push_sent_at is null;
+  delete from public.push_tokens where token = any(coalesce(dead_tokens, '{}'));
+$$;
+
+create or replace function public.claim_push_notifications(batch_size integer default 100)
+returns jsonb language sql security invoker set search_path = '' as $$
+  select private.claim_push_notifications(batch_size);
+$$;
+
+create or replace function public.complete_push_notifications(sent_ids bigint[], dead_tokens text[])
+returns void language sql security invoker set search_path = '' as $$
+  select private.complete_push_notifications(sent_ids, dead_tokens);
+$$;
+
+-- pg_cron이 1분마다 발송 함수를 부른다. 주소·secret key는 Vault에 두고, 없으면(로컬·설정 전) 부르지 않는다.
+create or replace function private.invoke_push_send()
+returns bigint language plpgsql security definer set search_path = '' as $$
+declare
+  project_url text := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url');
+  secret_key text := (select decrypted_secret from vault.decrypted_secrets where name = 'secret_key');
+begin
+  if project_url is null or secret_key is null then
+    return null;
+  end if;
+  return net.http_post(
+    url := project_url || '/functions/v1/push-send',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'apikey', secret_key),
+    body := '{}'::jsonb
+  );
+end;
+$$;
+
+revoke execute on function private.claim_push_notifications(integer), public.claim_push_notifications(integer),
+  private.complete_push_notifications(bigint[], text[]), public.complete_push_notifications(bigint[], text[])
+  from public, anon, authenticated;
+grant execute on function private.claim_push_notifications(integer), public.claim_push_notifications(integer),
+  private.complete_push_notifications(bigint[], text[]), public.complete_push_notifications(bigint[], text[])
+  to service_role;
+revoke execute on function private.invoke_push_send() from public, anon, authenticated, service_role;
+
 select cron.schedule('notifications-vote-ended', '* * * * *', 'select private.create_vote_ended_notifications()');
 select cron.schedule('notifications-cleanup', '0 18 * * *', 'select private.delete_old_notifications()');
+select cron.schedule('notifications-push-send', '* * * * *', 'select private.invoke_push_send()');

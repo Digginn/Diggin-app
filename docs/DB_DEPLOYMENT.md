@@ -34,7 +34,19 @@ GitHub Actions의 IPv4 환경에서 IPv6 직접 DB 연결을 시도하면 `IPv6 
 
 등록 화면: https://github.com/Digginn/Diggin-app/settings/environments
 
-이 값이 비어 있으면 워크플로는 누락된 항목 이름을 표시하고 DB 적용 전에 중단한다. 실제 비밀값은 로그에 출력하지 않는다. DB 배포 성공 후 같은 커밋의 `admin-moderation`, `account-restriction`, `account-withdrawal` Edge Function을 배포한다. Deno 검사·테스트도 선행한다. OAuth 로그인 설정·프로젝트 설정·기기별 로컬 DB는 배포 대상이 아니다. 운영자 계정 등록과 OIDC audience 설정은 [MODERATION_API.md](MODERATION_API.md)를 따른다. 함수 배포 실패는 Actions 실패로 표시되며 DB 적용을 자동으로 되돌리지는 않는다.
+이 값이 비어 있으면 워크플로는 누락된 항목 이름을 표시하고 DB 적용 전에 중단한다. 실제 비밀값은 로그에 출력하지 않는다. DB 배포 성공 후 같은 커밋의 `admin-moderation`, `account-restriction`, `account-withdrawal`, `push-send` Edge Function을 배포한다. Deno 검사·테스트도 선행한다. OAuth 로그인 설정·프로젝트 설정·기기별 로컬 DB는 배포 대상이 아니다. 운영자 계정 등록과 OIDC audience 설정은 [MODERATION_API.md](MODERATION_API.md)를 따른다. 함수 배포 실패는 Actions 실패로 표시되며 DB 적용을 자동으로 되돌리지는 않는다.
+
+Push 발송(#139)은 공유 DB Vault에 아래 두 값이 있어야 동작한다. 워크플로는 Vault를 바꾸지 않으므로 백엔드 담당자가 한 번 직접 등록한다. 값이 없으면 1분마다 도는 작업이 아무것도 하지 않는다. secret key는 코드·이슈·PR·채팅에 붙여 넣지 않는다.
+
+| Vault 이름    | 값                                                             |
+| ------------- | -------------------------------------------------------------- |
+| `project_url` | `https://<Project Ref>.supabase.co`                            |
+| `secret_key`  | Dashboard → Project Settings → API Keys의 `default` secret key |
+
+```sql
+select vault.create_secret('https://<Project Ref>.supabase.co', 'project_url');
+select vault.create_secret('<default secret key>', 'secret_key');
+```
 
 ## 최초 배포 전 확인
 

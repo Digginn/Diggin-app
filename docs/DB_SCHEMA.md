@@ -15,7 +15,7 @@
 | 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다                 |
 | 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69)        |
 | 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)               |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 생성·목록 (#104). Push 발송은 후속 |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 생성·목록 (#104), Push 발송 (#139) |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -306,7 +306,8 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 ```
 private.notifications
   id, recipient_id FK profiles cascade, type notification_type, post_id FK posts cascade,
-  actor_id FK profiles set null, title, body, event_key text unique, created_at, push_sent_at null
+  actor_id FK profiles set null, title, body, event_key text unique, created_at, push_sent_at null,
+  push_claimed_at null
 
 private.like_notification_log  (post_id, actor_id) PK, created_at
 private.notification_checks    user_id PK FK profiles cascade, checked_at
@@ -331,7 +332,13 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - 수신 설정·OS 권한과 관계없이 알림은 목록에 남긴다(NOTI-007). Push를 끈 사용자에게는 발송만 하지 않는다(발송 작업에서 반영).
 - 목록 문구는 시안(NOTI-07)대로 저장한다. 제목은 "투표 결과가 나왔어요.", "내 게시글에 댓글이 달렸어요.", "내 게시글에 좋아요가 달렸어요."이다.
 - Push 문구는 목록 문구와 다르다(시안 NOTI-03~05). 투표 마감은 "투표가 종료됐어요." / "내 투표 결과를 확인해 보세요.", 좋아요는 본문 자리에 게시글 본문을 쓴다. 댓글은 목록과 같다. 발송할 때 종류별로 만든다.
-- Push 발송은 다음 작업이다. 사용자의 토큰 전체에 보내고, DeviceNotRegistered면 토큰을 지우고, push_sent_at이 null이면 다음 실행 때 다시 보낸다.
+- Push 발송(#139): pg_cron `notifications-push-send`가 1분마다 `private.invoke_push_send()`로 Edge Function `push-send`를 부른다. 주소와 secret key는 Vault `project_url`·`secret_key`에서 읽고, 없으면 부르지 않는다(로컬·설정 전). 함수는 `verify_jwt = false`이고 `@supabase/server`의 `auth: 'secret'`로 키를 검증한다.
+  - `claim_push_notifications(batch_size)`: 받을 수 없는 알림(24시간 지남, Push 끔, 정지, 토큰 없음, 받는 사람이 차단·신고한 행동)은 보내지 않고 push_sent_at을 채워 끝낸다. 나머지를 오래된 순으로 최대 batch_size개 가져가며 push_claimed_at을 남긴다. 응답 없이 끝나도 5분 뒤 다시 가져간다. Push 문구(위)와 글 ID·종류, 받는 사람의 모든 토큰을 준다.
+  - `complete_push_notifications(sent_ids, dead_tokens)`: 보낸 알림의 push_sent_at을 채우고 DeviceNotRegistered 토큰을 지운다.
+  - 둘 다 service_role 전용(public invoker → private definer)이고, `invoke_push_send`는 Vault를 읽어 service_role에도 주지 않는다.
+  - 토큰마다 한 건씩 100건 단위로 Expo에 보낸다. 한 기기라도 받았거나 남은 토큰이 모두 만료면 끝내고, 일시 오류만 받은 알림은 남겨 다시 보낸다. 마무리 RPC가 실패하면 이미 받은 기기에 한 번 더 갈 수 있다.
+  - 만료 토큰은 발송 응답(ticket)만 본다. 15분 뒤 receipt 확인은 후속이다.
+  - Push data는 `{ post_id, post_type }`이다. 앱은 누르면 해당 상세로 가고, 앱이 켜져 있을 때는 배너를 띄우지 않는다(expo-notifications 기본 동작).
 
 ### 6-5. 운영 (#114, private)
 

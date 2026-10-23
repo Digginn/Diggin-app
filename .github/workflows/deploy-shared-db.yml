@@ -159,6 +159,7 @@ jobs:
           supabase functions deploy admin-moderation --project-ref "$SUPABASE_PROJECT_ID"
           supabase functions deploy account-restriction --project-ref "$SUPABASE_PROJECT_ID"
           supabase functions deploy account-withdrawal --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy push-send --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Report the deployed commit
         env:
@@ -178,5 +179,5 @@ jobs:
         run: |
           npm exec --yes --package=deno@2.5.6 -- deno fmt --config supabase/functions/deno.json --check supabase/functions
           npm exec --yes --package=deno@2.5.6 -- deno lint --config supabase/functions/deno.json supabase/functions
-          npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/admin-moderation/index.ts supabase/functions/account-restriction/index.ts supabase/functions/account-withdrawal/index.ts
-          npm exec --yes --package=deno@2.5.6 -- deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts supabase/functions/account-withdrawal/handler_test.ts
+          npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/admin-moderation/index.ts supabase/functions/account-restriction/index.ts supabase/functions/account-withdrawal/index.ts supabase/functions/push-send/index.ts
+          npm exec --yes --package=deno@2.5.6 -- deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts supabase/functions/account-withdrawal/handler_test.ts supabase/functions/push-send/handler_test.ts

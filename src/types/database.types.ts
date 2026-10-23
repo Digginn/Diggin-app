@@ -401,6 +401,11 @@ export type Database = {
         Args: { target_id: number; target_type: string };
         Returns: undefined;
       };
+      claim_push_notifications: { Args: { batch_size?: number }; Returns: Json };
+      complete_push_notifications: {
+        Args: { dead_tokens: string[]; sent_ids: number[] };
+        Returns: undefined;
+      };
       create_comment: {
         Args: { comment_content: string; request_id: string; target_post_id: number };
         Returns: Json;

@@ -440,6 +440,10 @@ verify_jwt = true
 [functions.account-withdrawal]
 verify_jwt = true
 
+# pg_cron이 사용자 JWT 없이 secret key로 부른다. 함수 안에서 @supabase/server로 키를 검증한다.
+[functions.push-send]
+verify_jwt = false
+
 # Supabase 세션 대신 함수 내부에서 제공자 ID token의 서명·issuer·audience를 검증한다.
 [functions.account-restriction]
 verify_jwt = false
