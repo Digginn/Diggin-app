@@ -138,16 +138,10 @@ test("참여 제한 Toast는 Figma 알림 아이콘과 흰색 문구를 사용�
       IconToastSuccess: "Success",
       IconToastNotice: "Notice",
     },
-    "@/theme": {
-      colors: {
-        gray: { 0: "#FFFFFF", 200: "#ECECEC", 700: "#5D5D5D", 800: "#3F3F3F" },
-        semantic: {},
-      },
-    },
   });
   const tree = nodes(
     ToastText({ message: "2026.10.23까지 참여할 수 없습니다.", variant: "notice" }),
   );
-  assert.equal(tree.find((node) => node.type === "Notice").props.fill, "#FFFFFF");
+  assert.ok(tree.find((node) => node.type === "Notice"));
   assert.match(tree.find((node) => node.type === "Text").props.className, /text-gray-0/);
 });

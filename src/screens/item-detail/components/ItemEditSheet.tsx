@@ -28,6 +28,7 @@ type ItemEditSheetProps = {
   /** 시트가 네이티브 모달이라 저장 실패는 시트 위 토스트로 알린다. */
   errorMessage?: string;
   onErrorDismiss?: () => void;
+  isInline?: boolean;
 };
 
 export function ItemEditSheet({
@@ -40,6 +41,7 @@ export function ItemEditSheet({
   isSubmitting = false,
   errorMessage,
   onErrorDismiss,
+  isInline,
 }: ItemEditSheetProps) {
   const [values, setValues] = useState(initialValues);
   const [overlay, setOverlay] = useState<ItemInfoOverlay>(null);
@@ -82,6 +84,7 @@ export function ItemEditSheet({
   return (
     <BottomSheet
       visible={visible}
+      isInline={isInline}
       isScrimClosable={false}
       isCloseConfirmed={isDirty || isSubmitting}
       onRequestClose={requestClose}
@@ -119,7 +122,10 @@ export function ItemEditSheet({
     >
       <ScrollView
         className="px-margin"
-        contentContainerStyle={{ gap: 24 }}
+        // 카드는 높이를 줄일 수 없어, 버튼을 카드 아래로 내린다.
+        contentContainerStyle={
+          isInline ? { gap: 24, flexGrow: 1, justifyContent: "space-between" } : { gap: 24 }
+        }
         keyboardShouldPersistTaps="handled"
       >
         <View className="gap-8">

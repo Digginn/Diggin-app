@@ -120,6 +120,9 @@ test("루트는 폰트·세션 복원이 끝난 뒤 앱과 전역 제재 안내�
       SessionExpiredModal: "SessionExpiredModal",
     },
     "@/lib/pushNotifications": { registerDevicePush: async () => {} },
+    "@/lib/sharedSaves": { readSharedSaveTime: async () => 0 },
+    "@/api/folders": { folderKeys: { all: ["folders"] } },
+    "@/api/products": { productKeys: { all: ["products"] } },
   };
   for (const name of providers)
     mocks[`@/contexts/${name}Context`] = {
@@ -160,6 +163,7 @@ for (const os of ["ios", "android"]) {
         useRef: (current) => ({ current }),
         useEffect: () => {},
       },
+      "@/lib/pendingShareLink": { discardShareLink: () => {} },
       "./api/signIn": {
         signIn: (provider) => {
           signIns.push(provider);
@@ -167,6 +171,7 @@ for (const os of ["ios", "android"]) {
         },
       },
       "expo-router": {
+        useLocalSearchParams: () => ({}),
         useRouter: () => ({
           replace: (route) => routes.push(route),
           back: () => routes.push("back"),
@@ -188,6 +193,7 @@ for (const os of ["ios", "android"]) {
       "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+      "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
     });
     const tree = nodes(LoginScreen());
     const bar = tree.find((node) => node.type === "AppBar");
@@ -229,6 +235,237 @@ for (const os of ["ios", "android"]) {
   });
 }
 
+function loadPendingShare() {
+  const files = new Map();
+  class File {
+    constructor(folder, name) {
+      this.path = `${folder.path}/${name}`;
+    }
+    get exists() {
+      return files.has(this.path);
+    }
+    async text() {
+      return files.get(this.path);
+    }
+    write(value) {
+      files.set(this.path, value);
+    }
+    delete() {
+      files.delete(this.path);
+    }
+  }
+  const pending = load("lib/pendingShareLink.ts", {
+    "expo-file-system": {
+      File,
+      Paths: { appleSharedContainers: { "group.com.diggin.app.preview": { path: "/group" } } },
+    },
+    "react-native": { Platform: { OS: "ios" } },
+    "@/constants/appGroup": { APP_GROUP: "group.com.diggin.app.preview" },
+    "@/utils/itemLink": load("utils/itemLink.ts"),
+  });
+  return { pending, files };
+}
+
+test("비회원 공유 링크는 App Group에 맡겨 로그인 뒤 한 번만 꺼내고, 오래됐거나 웹 링크가 아니면 버린다", async () => {
+  const LINK = "https://www.musinsa.com/products/1";
+  const { pending, files } = loadPendingShare();
+  pending.keepShareLink(LINK);
+  assert.ok(files.has("/group/pending-share"), "앱과 확장만 쓰는 보관함에 둔다");
+  assert.equal(await pending.takeShareLink(), LINK);
+  assert.equal(await pending.takeShareLink(), null, "한 번만 꺼낸다");
+  assert.equal(files.size, 0, "꺼내면 지운다");
+
+  pending.keepShareLink("javascript:alert(1)");
+  assert.equal(await pending.takeShareLink(), null, "웹 링크가 아니면 버린다");
+  files.set("/group/pending-share", "{깨진");
+  assert.equal(await pending.takeShareLink(), null);
+  files.set(
+    "/group/pending-share",
+    JSON.stringify({ url: LINK, savedAt: Date.now() - 11 * 60 * 1000 }),
+  );
+  assert.equal(await pending.takeShareLink(), null, "10분 넘게 묵은 공유는 버린다");
+
+  pending.keepShareLink(LINK);
+  pending.discardShareLink();
+  assert.equal(await pending.takeShareLink(), null);
+});
+
+test("로그인 화면은 주소로 온 공유 링크를 받지 않고, 로그인하지 않고 나가면 맡긴 링크를 버린다", async () => {
+  const LINK = "https://www.musinsa.com/products/1";
+  const render = (signIn, pending) => {
+    let cleanup;
+    const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+      "react": {
+        useState: (initial) => [initial, () => {}],
+        useRef: (current) => ({ current }),
+        useEffect: (effect) => {
+          cleanup = effect();
+        },
+      },
+      "./api/signIn": { signIn },
+      "@/lib/pendingShareLink": pending,
+      "expo-router": {
+        // 다른 앱이 diggin://login?shareUrl=… 로 열어도 쓰지 않는다.
+        useLocalSearchParams: () => ({ shareUrl: "https://attacker.example/x" }),
+        useRouter: () => ({ replace: () => {}, back: () => {}, canGoBack: () => false }),
+      },
+      "expo-status-bar": { StatusBar: "StatusBar" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+      "react-native": {
+        Platform: { OS: "ios" },
+        View: "View",
+        Text: "Text",
+        Pressable: "Pressable",
+        ScrollView: "ScrollView",
+        useWindowDimensions: () => ({ height: 812 }),
+        Alert: { alert: () => {} },
+      },
+      "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/ToastText": { ToastText: "ToastText" },
+      "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+      "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
+    });
+    const press = () =>
+      nodes(LoginScreen())
+        .find((node) => node.type === "SocialLoginButton")
+        .props.onPress();
+    return { press, leave: () => cleanup?.() };
+  };
+
+  const success = loadPendingShare();
+  success.pending.keepShareLink(LINK);
+  const loggedIn = render(async () => ({ status: "success", isNewUser: false }), success.pending);
+  await loggedIn.press();
+  loggedIn.leave();
+  assert.equal(await success.pending.takeShareLink(), LINK, "로그인하면 ALL 탭이 꺼내도록 남긴다");
+
+  const failed = loadPendingShare();
+  failed.pending.keepShareLink(LINK);
+  const retry = render(async () => {
+    throw new Error("network");
+  }, failed.pending);
+  await retry.press();
+  assert.ok(failed.files.size > 0, "로그인 실패는 다시 시도할 수 있게 둔다");
+  retry.leave();
+  assert.equal(failed.files.size, 0, "로그인하지 않고 나가면 버린다");
+
+  const external = loadPendingShare();
+  const fromLink = render(async () => ({ status: "success", isNewUser: false }), external.pending);
+  await fromLink.press();
+  assert.equal(await external.pending.takeShareLink(), null, "주소의 shareUrl은 맡기지 않는다");
+});
+
+test("이미 로그인한 사람의 자동 이동은 공유 링크를 보존하고, 로그인 중 세션은 원래 이동에 맡긴다", async () => {
+  const render = (props, session, loading = false, pending = { discardShareLink: () => {} }) => {
+    let stateIndex = 0;
+    const cleanups = [];
+    const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+      "react": {
+        // 두 번째 상태가 로그인 진행 중(isLoading)이다.
+        useState: (initial) => [stateIndex++ === 1 && loading ? true : initial, () => {}],
+        useRef: (current) => ({ current }),
+        useEffect: (effect) => {
+          const cleanup = effect();
+          if (cleanup) cleanups.push(cleanup);
+        },
+      },
+      "./api/signIn": { signIn: async () => ({ status: "cancelled" }) },
+      "@/lib/pendingShareLink": pending,
+      "expo-router": {
+        Redirect: "Redirect",
+        useRouter: () => ({ replace: () => {}, back: () => {}, canGoBack: () => false }),
+      },
+      "expo-status-bar": { StatusBar: "StatusBar" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+      "react-native": {
+        Platform: { OS: "ios" },
+        View: "View",
+        Text: "Text",
+        Pressable: "Pressable",
+        ScrollView: "ScrollView",
+        useWindowDimensions: () => ({ height: 812 }),
+        Alert: { alert: () => {} },
+      },
+      "@/components/app-bar": { AppBar: "AppBar" },
+      "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/ToastText": { ToastText: "ToastText" },
+      "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+      "@/contexts/AuthContext": { useAuth: () => ({ session }) },
+    });
+    return { tree: LoginScreen(props), leave: () => cleanups.forEach((cleanup) => cleanup()) };
+  };
+  const member = { user: { id: "u" } };
+  const LINK = "https://www.musinsa.com/products/1";
+  const shared = loadPendingShare();
+  shared.pending.keepShareLink(LINK);
+  const authenticated = render({ isRedirectedWhenSignedIn: true }, member, false, shared.pending);
+  const redirect = authenticated.tree;
+  assert.equal(redirect.type, "Redirect");
+  assert.equal(redirect.props.href, "/(tabs)/all");
+  authenticated.leave();
+  assert.equal(await shared.pending.takeShareLink(), LINK, "자동 이동 후 ALL이 공유 링크를 받는다");
+  assert.equal(await shared.pending.takeShareLink(), null, "공유 링크는 한 번만 이어 저장한다");
+
+  const cancelled = loadPendingShare();
+  cancelled.pending.keepShareLink(LINK);
+  const guest = render({ isRedirectedWhenSignedIn: true }, null, false, cancelled.pending);
+  assert.notEqual(guest.tree.type, "Redirect");
+  guest.leave();
+  assert.equal(await cancelled.pending.takeShareLink(), null, "비회원이 나가면 공유 링크를 버린다");
+  assert.notEqual(render({}, member).tree.type, "Redirect", "미리보기 화면은 그대로 보인다");
+  assert.notEqual(
+    render({ isRedirectedWhenSignedIn: true }, member, true).tree.type,
+    "Redirect",
+    "로그인 중에 생긴 세션은 가입 완료 안내 등 원래 이동에 맡긴다",
+  );
+});
+
+test("ALL 탭은 로그인한 뒤에만 맡긴 공유 링크를 꺼내 저장을 이어 간다", async () => {
+  const run = async (session, pathname) => {
+    const started = [];
+    let taken = 0;
+    const effects = [];
+    const { default: TabLayout } = load("app/(tabs)/_layout.tsx", {
+      "react": { useEffect: (effect) => effects.push(effect) },
+      "expo-router": {
+        Tabs: Object.assign(() => null, { Screen: "Screen" }),
+        usePathname: () => pathname,
+      },
+      "@/contexts/AuthContext": { useAuth: () => ({ session }) },
+      "@/hooks/useItemSave": {
+        useItemSave: () => ({ start: (url) => started.push(url), isBusy: false }),
+      },
+      "@/hooks/useLoginGate": {
+        useLoginGate: () => ({ requireLogin: (action) => action(), loginModal: null }),
+      },
+      "@/lib/pendingShareLink": {
+        takeShareLink: async () => {
+          taken += 1;
+          return "https://www.musinsa.com/products/1";
+        },
+      },
+      "@/components/ItemSaveFlow": { ItemSaveFlow: "ItemSaveFlow" },
+      "@/components/LinkDetectModal": { LinkDetectModal: "LinkDetectModal" },
+      "@/components/NavigationBar": { NavigationBar: "NavigationBar" },
+    });
+    TabLayout();
+    for (const effect of effects) effect();
+    await new Promise((resolve) => setImmediate(resolve));
+    return { started, taken };
+  };
+  assert.deepEqual(
+    await run(null, "/all"),
+    { started: [], taken: 0 },
+    "둘러보기 비회원은 꺼내지 않는다",
+  );
+  assert.deepEqual(await run({ user: { id: "u" } }, "/folder"), { started: [], taken: 0 });
+  assert.deepEqual(await run({ user: { id: "u" } }, "/all"), {
+    started: ["https://www.musinsa.com/products/1"],
+    taken: 1,
+  });
+});
+
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
   const { ToastText } = load("components/ToastText.tsx", {
     "@/assets/images/toast": { IconToastError: "IconToastError" },
@@ -241,9 +478,10 @@ test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류�
     assert.ok(toast.props.className.includes(token));
   }
   const text = nodes(toast).find((node) => node.type === "Text");
-  assert.ok(text.props.className.includes("text-gray-200"));
+  assert.ok(text.props.className.includes("text-gray-0"));
   assert.ok(text.props.className.includes("font-label-14"));
-  assert.equal(text.props.children, "로그인 실패");
+  assert.equal(text.props.accessibilityLabel, "로그인 실패");
+  assert.equal(text.props.children.replaceAll("\u2060", ""), "로그인 실패");
 });
 
 test("AppBar는 로그인용 아이콘 옵션과 develop의 다크모드·제목 옵션을 함께 유지한다", () => {
@@ -253,7 +491,6 @@ test("AppBar는 로그인용 아이콘 옵션과 develop의 다크모드·제목
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 24 }) },
     "@/assets/images/appbar": { IconBack: "DefaultBack" },
     "./IconButton": { IconButton: "IconButton" },
-    "./NotificationButton": { NotificationButton: "NotificationButton" },
     "./TextButton": { TextButton: "TextButton" },
   });
   const dark = nodes(
@@ -577,6 +814,8 @@ test("로그인 필요 모달에서 온 로그인은 성공하면 원래 화면�
         },
       },
       "./api/signIn": { signIn: async () => result },
+      "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
+      "@/lib/pendingShareLink": { discardShareLink: () => {} },
       "expo-router": {
         useRouter: () => ({
           replace: (route) => routes.push(route),

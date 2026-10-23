@@ -1,9 +1,18 @@
 import * as DocumentPicker from "expo-document-picker";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { Alert, BackHandler, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import {
+  Alert,
+  BackHandler,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import FolderLimitClose from "@/assets/images/icon-notification-banner-close.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { useToast } from "@/hooks/useToast";
@@ -200,19 +209,27 @@ export function CsvImportScreen({
                 }
               </Text>
             </View>
+          </ScrollView>
+          <View
+            className="gap-[30px] px-margin pt-4"
+            style={{ paddingBottom: Math.max(MIN_BUTTON_BOTTOM_SPACING, insets.bottom + 10) }}
+          >
             {isFolderLimitNoticeVisible && (
-              <View accessibilityRole="alert" className="mt-6 rounded-xl bg-gray-900 p-4">
-                <Text className="text-gray-0 font-b3">
+              <View accessibilityRole="alert" className="rounded-lg bg-gray-100 py-4 pl-4 pr-10">
+                <Text className="text-gray-700 font-b4">
                   폴더는 최대 50개까지 만들 수 있습니다. 초과분은 ALL탭에 개별 아이템으로
                   저장됩니다.
                 </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="폴더 한도 안내 닫기"
+                  className="absolute -right-1 -top-1 size-12 items-center justify-center"
+                  onPress={() => answerFolderLimit(false)}
+                >
+                  <FolderLimitClose />
+                </Pressable>
               </View>
             )}
-          </ScrollView>
-          <View
-            className="gap-3 px-margin pt-4"
-            style={{ paddingBottom: Math.max(MIN_BUTTON_BOTTOM_SPACING, insets.bottom + 10) }}
-          >
             <Button
               variant="secondary"
               size="large"
@@ -220,13 +237,8 @@ export function CsvImportScreen({
               isDisabled={isSelecting && !isFolderLimitNoticeVisible}
               onPress={isFolderLimitNoticeVisible ? () => answerFolderLimit(true) : handleSelectCsv}
             >
-              {isFolderLimitNoticeVisible ? "계속 불러오기" : "CSV 파일로 데이터 불러오기"}
+              CSV 파일로 데이터 불러오기
             </Button>
-            {isFolderLimitNoticeVisible && (
-              <Button variant="secondary" onPress={() => answerFolderLimit(false)}>
-                취소
-              </Button>
-            )}
           </View>
         </>
       )}

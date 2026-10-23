@@ -8,6 +8,7 @@ import EmptyFolderIcon from "@/assets/images/folder/icon-empty-folder.svg";
 import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
 import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
+import { NotificationButton } from "@/components/app-bar/NotificationButton";
 import { Button } from "@/components/Button";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { ActionModal } from "@/components/modal";
@@ -148,7 +149,7 @@ export function FolderScreen({
                   onPress={onSearch}
                   disabled={!onSearch}
                 />
-                <AppBar.NotificationButton onPress={onNotifications} disabled={!onNotifications} />
+                <NotificationButton onPress={onNotifications} disabled={!onNotifications} />
               </>
             )
           }

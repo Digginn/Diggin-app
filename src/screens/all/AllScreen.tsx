@@ -6,6 +6,7 @@ import { IconSearch } from "@/assets/images/appbar";
 import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
 import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
+import { NotificationButton } from "@/components/app-bar/NotificationButton";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
@@ -137,7 +138,7 @@ export function AllScreen() {
                 accessibilityLabel="검색"
                 onPress={() => router.push("/all/search")}
               />
-              <AppBar.NotificationButton onPress={() => router.push("/notifications")} />
+              <NotificationButton onPress={() => router.push("/notifications")} />
             </>
           }
         />

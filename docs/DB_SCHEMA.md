@@ -98,12 +98,12 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 
 - 가입 트리거 `private.handle_new_user()`: auth.users insert 시 profiles(랜덤 닉네임)와 나의 소장템 폴더를 만든다.
 - 랜덤 닉네임 `private.generate_nickname()`: 형용사 + 디기 + 숫자(예: 느긋한디기12). 형용사 40개(2~4자), 숫자 1~9999라 2~10자 안에 들어간다. 직접 변경과 같은 검사를 통과한 후보만 쓴다(AUTH-005).
-- 닉네임 검사 `private.nickname_error()`: 글자 수 → 공백 → 특수문자·이모지 → 금칙어 → 사칭 → 중복(AUTH-008). 사칭 규칙은 명세 문구대로 함수에 있고, 금칙어는 `private.nickname_banned_words`(korcen 사전, 아직 비어 있음), 오탐 보정은 `nickname_allowed_words`.
+- 닉네임 검사 `private.nickname_error()`: 글자 수 → 공백 → 특수문자·이모지 → 금칙어 → 사칭 → 중복(AUTH-008). 사칭 규칙은 명세 문구대로 함수에 있고, 금칙어는 `private.nickname_banned_words`, 오탐 보정은 `nickname_allowed_words`다. 둘 다 korcen(MIT) 목록 중 닉네임에 쓸 수 있는 형태(한글 완성형·영문 소문자·숫자)만 마이그레이션으로 넣었다(#120).
 - profiles: 앱은 본인 행 select만. 닉네임은 `update_nickname`, 이미지는 `set_avatar`, 제재 상태는 운영 API만 바꾼다.
 - folders: 사용자별 이름 중복 금지, 일반 폴더 최대 50개(프로필 행을 잠근 뒤 센다), 나의 소장템은 만들기·고치기·지우기 불가. `last_added_at`은 상품을 담을 때 트리거로 갱신한다(#78).
 - legal_policies(public, 비회원도 조회) / user_policy_consents(private): `get_pending_policies()`, `accept_policy(policy_id)`.
 - push_tokens: 등록은 `register_push_token(token, platform)`만(같은 토큰은 마지막 로그인 계정으로 옮김), 앱은 본인 토큰 select·delete.
-- withdrawal_surveys(private, user_id 없음): 탈퇴 Edge Function이 service_role로만 쓴다.
+- withdrawal_surveys(private, user_id 없음): 탈퇴 Edge Function이 service_role 전용 `record_withdrawal_survey(reasons, custom_text)`로만 쓴다. 직접 작성은 앱 화면처럼 조합 이모지를 1자로 세(`private.char_count`, Edge는 grapheme) 100자까지 받는다.
 - Storage avatars 버킷: 비공개, WebP, 512KB 이하, 경로 `{user_id}/파일명`, 본인 폴더만 select·insert·update·delete.
 - 카카오 프로필 이미지(AUTH-006)는 URL로 두지 않고 신규 가입 때 앱이 받아 avatars에 512 WebP로 복사한다(`set_avatar`). 카카오에서 사진을 바꾸거나 지워도 앱 사진이 깨지지 않는다.
 
@@ -352,13 +352,14 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 ## 8. 탈퇴 (MY-007, Edge Function)
 
-1. 설문을 private.withdrawal_surveys에 저장한다(user_id 없음).
-2. 사용자 댓글 content를 null로 바꾼다.
-3. Storage avatars/{user_id}/ 파일을 지운다.
-4. 세션을 전부 로그아웃시킨다(사용자를 지워도 발급된 access token은 만료 전까지 살아 있다).
-5. auth.users를 지운다. FK가 처리한다.
+`account-withdrawal` Edge Function이 JWT의 사용자만 지운다(#120).
+
+1. Storage avatars/{user_id}/ 파일을 지운다. 실패하면 계정을 지우지 않는다.
+2. auth.users를 지운다. 세션·리프레시 토큰이 함께 지워지고, 나머지는 FK가 처리한다. 이미 발급된 access token은 만료 전까지 남지만 프로필이 없어 쓸 데이터가 없다.
    - cascade: profiles, products, folders, product_folders, import_*, posts(와 그 글의 하위 데이터), notifications, push_tokens, user_policy_consents, user_blocks, like_notification_log
    - set null: comments.author_id, vote_responses.user_id, post_likes.user_id, reports.reporter_id
+   - profiles 삭제 전 트리거(`profiles_clear_withdrawn_comments`)가 같은 트랜잭션에서 사용자 댓글 content를 null로 바꾼다.
+3. 계정이 지워진 뒤 설문을 private.withdrawal_surveys에 저장한다(user_id 없음). 재시도로 중복되지 않게 마지막에 두고, 실패해도 탈퇴는 성공으로 본다.
 
 ## 9. DB에 두지 않는 것
 

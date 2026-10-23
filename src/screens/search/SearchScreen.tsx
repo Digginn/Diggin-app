@@ -2,7 +2,8 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
-import { AppBar, SearchBar } from "@/components/app-bar";
+import { SearchBar } from "@/components/app-bar";
+import { NotificationButton } from "@/components/app-bar/NotificationButton";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { WishItemGrid } from "@/components/WishItemGrid";
@@ -83,7 +84,7 @@ export function SearchScreen() {
           setHistory([]);
         }}
         onSubmitEditing={(event) => handleSubmit(event.nativeEvent.text)}
-        right={<AppBar.NotificationButton onPress={() => router.push("/notifications")} />}
+        right={<NotificationButton onPress={() => router.push("/notifications")} />}
       />
 
       {!isSearching ? (

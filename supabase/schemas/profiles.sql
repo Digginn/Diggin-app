@@ -266,10 +266,54 @@ create table private.withdrawal_surveys (
   reasons public.withdrawal_reason[] not null default '{}',
   custom_text text,
   created_at timestamptz not null default now(),
-  constraint withdrawal_surveys_custom_text_length check (char_length(custom_text) <= 100),
-  constraint withdrawal_surveys_has_reason check (cardinality(reasons) > 0 or length(btrim(custom_text)) > 0)
+  constraint withdrawal_surveys_custom_text_length check (private.char_count(custom_text) <= 100),
+  constraint withdrawal_surveys_has_reason check (cardinality(reasons) > 0 or coalesce(length(btrim(custom_text)), 0) > 0)
 );
 
 -- 개인정보 파기 대상이 아니도록 user_id를 두지 않는다. 탈퇴 Edge Function(service_role)만 쓴다.
 alter table private.withdrawal_surveys enable row level security;
 revoke all on table private.withdrawal_surveys from anon, authenticated;
+
+-- MY-007 탈퇴 Edge Function이 계정 삭제에 성공한 뒤 부른다. 사용자와 잇지 않는다.
+create or replace function private.record_withdrawal_survey(reasons public.withdrawal_reason[], custom_text text)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into private.withdrawal_surveys (reasons, custom_text)
+  values (coalesce(reasons, '{}'), nullif(btrim(custom_text), ''));
+$$;
+
+create or replace function public.record_withdrawal_survey(reasons public.withdrawal_reason[], custom_text text)
+returns void
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.record_withdrawal_survey(reasons, custom_text);
+$$;
+
+revoke execute on function private.record_withdrawal_survey(public.withdrawal_reason[], text) from public, anon, authenticated;
+revoke execute on function public.record_withdrawal_survey(public.withdrawal_reason[], text) from public, anon, authenticated;
+grant execute on function private.record_withdrawal_survey(public.withdrawal_reason[], text) to service_role;
+grant execute on function public.record_withdrawal_survey(public.withdrawal_reason[], text) to service_role;
+
+-- MY-007 탈퇴하면 댓글은 남기고 내용만 지운다. 계정 삭제와 같은 트랜잭션에서 FK가 작성자를 비우기 전에 지운다.
+create or replace function private.clear_withdrawn_comments()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update private.comments set content = null where author_id = old.id;
+  return old;
+end;
+$$;
+
+revoke execute on function private.clear_withdrawn_comments() from public, anon, authenticated;
+
+create trigger profiles_clear_withdrawn_comments
+before delete on public.profiles
+for each row execute function private.clear_withdrawn_comments();

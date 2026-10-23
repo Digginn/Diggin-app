@@ -390,6 +390,7 @@ function screenMocks({
     "@/components/app-bar": {
       AppBar: Object.assign(() => null, { IconButton: "IconButton", TextButton: "TextButton" }),
     },
+    "@/components/app-bar/NotificationButton": { NotificationButton: "NotificationButton" },
     "@/components/Button": { Button: "Button" },
     "@/components/EmptyState": { EmptyState: "EmptyState" },
     "@/components/Fab": { Fab: "Fab" },

@@ -1,4 +1,4 @@
-import { useRouter, type Href } from "expo-router";
+import { Redirect, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -18,7 +18,9 @@ import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
+import { useAuth } from "@/contexts/AuthContext";
 import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
+import { discardShareLink } from "@/lib/pendingShareLink";
 import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeModal";
 
 import { signIn } from "./api/signIn";
@@ -30,11 +32,14 @@ const LOGIN_PROVIDERS: LoginProvider[] =
 type LoginScreenProps = {
   isLoginError?: boolean;
   isLoginLoading?: boolean;
+  /** 실제 로그인 경로에서만 켠다. 미리보기 화면은 로그인한 개발자에게도 보여야 한다. */
+  isRedirectedWhenSignedIn?: boolean;
 };
 
 export function LoginScreen({
   isLoginError = false,
   isLoginLoading = false,
+  isRedirectedWhenSignedIn = false,
 }: LoginScreenProps = {}) {
   const router = useRouter();
   const { height } = useWindowDimensions();
@@ -43,11 +48,22 @@ export function LoginScreen({
   const [isLoading, setIsLoading] = useState(isLoginLoading);
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
   const hasSignedIn = useRef(false);
+  const [didSignIn, setDidSignIn] = useState(false);
+  const { session } = useAuth();
+  const shouldRedirect = isRedirectedWhenSignedIn && !!session && !isLoading && !didSignIn;
 
-  // AUTH-001 로그인을 그만두고 나가면 이어 하려던 동작을 버린다.
+  // 복원된 세션으로 자동 이동할 때도 ALL이 공유 링크를 이어 받아야 한다.
+  useEffect(() => {
+    if (shouldRedirect) hasSignedIn.current = true;
+  }, [shouldRedirect]);
+
+  // AUTH-001 로그인하지 않고 나가면 이어 할 동작과 맡긴 공유 링크를 버린다.
   useEffect(
     () => () => {
-      if (!hasSignedIn.current) takeLoginIntent();
+      if (!hasSignedIn.current) {
+        takeLoginIntent();
+        discardShareLink();
+      }
     },
     [],
   );
@@ -64,6 +80,7 @@ export function LoginScreen({
         return;
       }
       hasSignedIn.current = true;
+      setDidSignIn(true);
       const resume = takeLoginIntent();
       // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다. 이어 할 동작은 안내를 지난 뒤에 한다.
       if (result.isNewUser) {
@@ -87,6 +104,12 @@ export function LoginScreen({
 
   function handlePolicy(title: string) {
     Alert.alert(title, "안내 페이지가 준비되면 연결할 예정입니다.");
+  }
+
+  // 이미 로그인한 사람이 diggin://login 으로 들어오면 로그인 화면이 필요 없다.
+  // 로그인 중에도 세션이 먼저 생겨, 로그인 중이거나 막 끝났을 때는 아래 이동(가입 완료 안내 등)에 맡긴다.
+  if (shouldRedirect) {
+    return <Redirect href={"/(tabs)/all" as Href} />;
   }
 
   return (

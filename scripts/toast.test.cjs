@@ -105,15 +105,23 @@ test("성공·에러 토스트는 아이콘을 앞에 두고 좌측 정렬, 기�
     ["notice", "IconToastNotice"],
   ]) {
     const toast = ToastText({ message: "안내", variant });
-    assert.match(toast.props.className, variant === "error" ? /items-start/ : /items-center/);
+    assert.match(toast.props.className, /items-center/);
     assert.match(toast.props.className, /bg-semantic-toast/);
     const children = React.Children.toArray(toast.props.children);
     assert.equal(children[0].props.children.type, icon);
     assert.match(children[1].props.className, /text-left/);
+    assert.match(children[1].props.className, /text-gray-0/);
     assert.equal(children[1].props.lineBreakStrategyIOS, "hangul-word");
   }
   const defaultToast = ToastText({ message: "완료 안내" });
   const children = React.Children.toArray(defaultToast.props.children);
   assert.equal(children.length, 1);
   assert.match(children[0].props.className, /text-center/);
+  assert.match(children[0].props.className, /text-gray-0/);
+  const message = "투표를 등록했습니다. 24시간 뒤 결과를 알려드립니다. 👟";
+  const text = React.Children.toArray(ToastText({ message, variant: "success" }).props.children)[1];
+  assert.equal(text.props.accessibilityLabel, message);
+  assert.equal(text.props.children.replaceAll("\u2060", ""), message);
+  assert.ok(text.props.children.includes("알\u2060려\u2060드\u2060립\u2060니\u2060다"));
+  assert.ok(text.props.children.endsWith(" 👟"));
 });

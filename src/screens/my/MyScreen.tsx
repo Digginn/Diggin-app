@@ -41,9 +41,15 @@ type MyScreenProps = {
   isGuest?: boolean;
   onLogout?: () => Promise<void>;
   onWithdraw?: (survey: WithdrawalSurvey) => Promise<void>;
+  onWithdrawComplete?: () => void;
 };
 
-export function MyScreen({ isGuest = false, onLogout, onWithdraw }: MyScreenProps = {}) {
+export function MyScreen({
+  isGuest = false,
+  onLogout,
+  onWithdraw,
+  onWithdrawComplete,
+}: MyScreenProps = {}) {
   const router = useRouter();
   const [modalToast, setModalToast] = useState<string>();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
@@ -152,6 +158,7 @@ export function MyScreen({ isGuest = false, onLogout, onWithdraw }: MyScreenProp
           isVisible
           onClose={() => setIsWithdrawalOpen(false)}
           onWithdraw={onWithdraw}
+          onComplete={onWithdrawComplete}
         />
       )}
     </View>

@@ -54,6 +54,8 @@ type BottomSheetProps = {
   toastMessage?: string;
   toastVariant?: ToastVariant;
   onToastDismiss?: () => void;
+  /** 공유 확장은 iOS가 띄운 카드 안에서 돌아 모달을 또 올리지 않고 카드 안에 위부터 그린다. */
+  isInline?: boolean;
 };
 
 export function BottomSheet({
@@ -75,6 +77,7 @@ export function BottomSheet({
   toastMessage,
   toastVariant = "default",
   onToastDismiss,
+  isInline = false,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
@@ -112,7 +115,8 @@ export function BottomSheet({
 
   const dragHandlers = useMemo(() => {
     // 그래버가 보이면 끌어서 닫힌다. 손잡이처럼 생긴 게 안 움직이면 고장으로 보인다.
-    if (!isGrabberVisible) return undefined;
+    // 카드 안에서는 끌어내리기를 iOS 카드가 맡는다.
+    if (!isGrabberVisible || isInline) return undefined;
 
     // setValue 와 애니메이션이 같은 JS 노드를 쓰도록 네이티브 드라이버는 켜지 않는다.
     return PanResponder.create({
@@ -146,7 +150,62 @@ export function BottomSheet({
       },
       onPanResponderTerminationRequest: () => false,
     }).panHandlers;
-  }, [dragY, isGrabberVisible, isCloseConfirmed, onRequestClose]);
+  }, [dragY, isGrabberVisible, isInline, isCloseConfirmed, onRequestClose]);
+
+  const sheet = (
+    <View
+      className={`${isInline ? "flex-1" : "rounded-t-2xl"} bg-gray-0 ${className ?? ""}`}
+      style={{
+        height,
+        maxHeight: isInline
+          ? undefined
+          : maxHeight
+            ? Math.min(maxHeight, Dimensions.get("window").height - insets.top)
+            : MAX_HEIGHT,
+        paddingBottom: isKeyboardVisible
+          ? KEYBOARD_BOTTOM_PADDING
+          : Math.max(insets.bottom, BOTTOM_PADDING),
+        boxShadow: isInline ? undefined : `0px -4px 4px ${colors.gray[1000]}1F`,
+      }}
+    >
+      {/* 그래버와 그 둘레 여백이 끌어내리는 손잡이가 된다. */}
+      <View {...dragHandlers} className="pt-3">
+        {isGrabberVisible ? (
+          <View
+            accessibilityElementsHidden
+            className={
+              handleClassName ?? "mb-5 h-1 w-8 self-center rounded-full bg-gray-500 opacity-40"
+            }
+            importantForAccessibility="no"
+          />
+        ) : null}
+        {header}
+      </View>
+      {children}
+    </View>
+  );
+  const toast = toastMessage ? (
+    <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px] items-center">
+      <View className="w-full max-w-[327px] items-center">
+        <ToastText message={toastMessage} variant={toastVariant} />
+      </View>
+    </View>
+  ) : null;
+
+  if (isInline) {
+    if (!visible) return null;
+    return (
+      <KeyboardAvoidingView
+        enabled={isKeyboardAvoiding}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className="flex-1"
+      >
+        {sheet}
+        {toast}
+        {overlay}
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <NativeModal
@@ -171,45 +230,9 @@ export function BottomSheet({
           // 닫지 않는 시트에서도 키보드는 내려줘야 가린 버튼을 누를 수 있다.
           onPress={isScrimClosable ? onRequestClose : Keyboard.dismiss}
         />
-        <Animated.View style={{ transform: [{ translateY: dragY }] }}>
-          <View
-            className={`rounded-t-2xl bg-gray-0 ${className ?? ""}`}
-            style={{
-              height,
-              maxHeight: maxHeight
-                ? Math.min(maxHeight, Dimensions.get("window").height - insets.top)
-                : MAX_HEIGHT,
-              paddingBottom: isKeyboardVisible
-                ? KEYBOARD_BOTTOM_PADDING
-                : Math.max(insets.bottom, BOTTOM_PADDING),
-              boxShadow: `0px -4px 4px ${colors.gray[1000]}1F`,
-            }}
-          >
-            {/* 그래버와 그 둘레 여백이 끌어내리는 손잡이가 된다. */}
-            <View {...dragHandlers} className="pt-3">
-              {isGrabberVisible ? (
-                <View
-                  accessibilityElementsHidden
-                  className={
-                    handleClassName ??
-                    "mb-5 h-1 w-8 self-center rounded-full bg-gray-500 opacity-40"
-                  }
-                  importantForAccessibility="no"
-                />
-              ) : null}
-              {header}
-            </View>
-            {children}
-          </View>
-        </Animated.View>
+        <Animated.View style={{ transform: [{ translateY: dragY }] }}>{sheet}</Animated.View>
       </KeyboardAvoidingView>
-      {toastMessage ? (
-        <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px] items-center">
-          <View className="w-full max-w-[327px] items-center">
-            <ToastText message={toastMessage} variant={toastVariant} />
-          </View>
-        </View>
-      ) : null}
+      {toast}
       {overlay}
     </NativeModal>
   );

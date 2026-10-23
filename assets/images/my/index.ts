@@ -10,4 +10,3 @@ export { default as IconProfileKakao } from "./icon-profile-kakao.png";
 export { default as ImageProfilePlaceholder } from "./image-profile-placeholder.png";
 export { default as ImageMyVotePlaceholder } from "./image-my-vote-placeholder.png";
 export { default as ImageSupportApp } from "./image-support-app.svg";
-export { default as IconWithdrawalClose } from "./icon-withdrawal-close.svg";

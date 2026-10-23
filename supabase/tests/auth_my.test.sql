@@ -37,15 +37,15 @@ select is(private.char_count('1️⃣2️⃣3️⃣4️⃣'), 4, '키캡 이모�
 select is(private.char_count('🏴󠁧󠁢󠁥󠁮󠁧󠁿'), 1, '태그 국기는 1자');
 
 -- AUTH-008 검사 순서
-insert into private.nickname_banned_words (word, kind) values ('바보', 'profanity');
-insert into private.nickname_allowed_words (word) values ('바보온달');
+insert into private.nickname_banned_words (word, kind) values ('꽥꽥', 'profanity');
+insert into private.nickname_allowed_words (word) values ('꽥꽥오리');
 select is(private.nickname_error('가', null), 'length', '1자는 글자 수 오류');
 select is(private.nickname_error('가 나다', null), 'whitespace', '공백 오류');
 select is(private.nickname_error('가나!', null), 'invalid_characters', '특수문자 오류');
-select is(private.nickname_error('너바보야', null), 'profanity', '금칙어 오류');
-select is(private.nickname_error('바보온달', null), null, 'allowlist 단어는 통과');
-select is(private.nickname_error('바보온달바보', null), 'profanity', 'allowlist 밖의 금칙어는 걸린다');
-select is(private.nickname_error('바보바보온달', null), 'profanity', 'allowlist 앞의 금칙어도 걸린다');
+select is(private.nickname_error('너꽥꽥야', null), 'profanity', '금칙어 오류');
+select is(private.nickname_error('꽥꽥오리', null), null, 'allowlist 단어는 통과');
+select is(private.nickname_error('꽥꽥오리꽥꽥', null), 'profanity', 'allowlist 밖의 금칙어는 걸린다');
+select is(private.nickname_error('꽥꽥꽥꽥오리', null), 'profanity', 'allowlist 앞의 금칙어도 걸린다');
 select is(private.nickname_error('DIGGIN', null), 'impersonation', '브랜드명과 정확히 같으면 사칭');
 select is(private.nickname_error('디긴공식', null), 'impersonation', '브랜드명+공식은 사칭');
 select is(private.nickname_error('디긴좋아요', null), null, '브랜드명+일반 단어는 허용');
