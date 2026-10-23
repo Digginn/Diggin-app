@@ -153,13 +153,15 @@ test("로그아웃·화면 정리 뒤 도착하는 초기 응답은 이동하지
   assert.equal(h.calls.handler, null);
 });
 
-test("실행 중 수신은 목록을 갱신하고 현재 계정만 배너·소리 표시를 허용한다", async () => {
+test("실행 중 수신은 목록을 갱신하고 OS 배너·소리·목록 표시는 끈다", async () => {
   const h = setup();
   h.receive();
   assert.equal(h.calls.invalidated, 1);
   const own = await h.calls.handler.handleNotification(response(payload).notification);
-  assert.equal(own.shouldShowBanner, true);
-  assert.equal(own.shouldPlaySound, true);
+  assert.equal(own.shouldShowBanner, false);
+  assert.equal(own.shouldShowList, false);
+  assert.equal(own.shouldPlaySound, false);
+  assert.equal(own.shouldSetBadge, false);
   const other = await h.calls.handler.handleNotification(
     response({ ...payload, recipient_id: "other" }).notification,
   );

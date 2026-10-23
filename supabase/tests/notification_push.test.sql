@@ -85,5 +85,30 @@ select ok(public.finish_notification_push((current_setting('test.remove')::jsonb
 reset role;
 select is((select count(*) from public.push_tokens where user_id='13100000-0000-0000-0000-00000000000a'),0::bigint,'유효하지 않은 기기 토큰을 지운다');
 select ok(private.invoke_notification_push() is null,'Vault 미설정이면 외부 호출 없이 종료');
+-- 댓글 알림은 원문 삭제 전에는 허용하고, 삭제 후에는 큐에 있어도 발송하지 않는다.
+insert into public.push_tokens(user_id,token,platform)
+values ('13100000-0000-0000-0000-00000000000a','ExponentPushToken[comment-a]','android');
+insert into private.comments(post_id,author_id,content)
+values (current_setting('test.push_post')::bigint,'13100000-0000-0000-0000-00000000000b','발송 대기 중 삭제할 댓글')
+returning id as comment_id \gset
+select ok(private.push_notification_allowed(
+ (select id from private.notifications where event_key='comment:' || :comment_id),
+ (select id from public.push_tokens where token='ExponentPushToken[comment-a]')),'살아 있는 댓글은 발송 허용');
+update private.comments set deleted_at=now() where id=:comment_id;
+select ok(not private.push_notification_allowed(
+ (select id from private.notifications where event_key='comment:' || :comment_id),
+ (select id from public.push_tokens where token='ExponentPushToken[comment-a]')),'삭제된 댓글은 발송 직전 제외');
+set local role service_role;
+select set_config('test.deleted_comment_jobs',public.claim_notification_pushes(false)::text,true);
+select is((current_setting('test.deleted_comment_jobs')::jsonb->0->>'allowed')::boolean,false,'이미 큐에 있던 댓글도 claim 시 발송 불가');
+reset role;
+-- 삭제된 원문의 알림을 뒤늦게 생성하더라도 새 큐에 넣지 않는다.
+delete from private.notifications where event_key='comment:' || :comment_id;
+insert into private.notifications(recipient_id,type,post_id,actor_id,title,body,event_key)
+values ('13100000-0000-0000-0000-00000000000a','post_commented',current_setting('test.push_post')::bigint,
+ '13100000-0000-0000-0000-00000000000b','댓글','삭제된 댓글','comment:' || :comment_id);
+select is((select count(*) from private.notification_push_deliveries d
+ join private.notifications n on n.id=d.notification_id where n.event_key='comment:' || :comment_id),
+ 0::bigint,'삭제된 댓글은 enqueue에서도 제외');
 select * from finish();
 rollback;

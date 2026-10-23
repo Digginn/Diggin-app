@@ -31,6 +31,11 @@ returns boolean language sql stable security definer set search_path = '' as $$
     where n.id = notification_id and n.created_at > now() - interval '24 hours'
       and u.status <> 'suspended' and coalesce(s.push_enabled, true)
       and p.deleted_at is null and p.hidden_at is null
+      and (n.type <> 'post_commented' or exists (
+        select 1 from private.comments c
+        where c.post_id = n.post_id and n.event_key = 'comment:' || c.id
+          and c.deleted_at is null
+      ))
       and (n.actor_id is null or private.notification_actor_visible(n.recipient_id, n.actor_id))
   );
 $$;

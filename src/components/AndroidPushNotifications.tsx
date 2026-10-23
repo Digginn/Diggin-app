@@ -19,16 +19,12 @@ export function AndroidPushNotifications() {
     if (Platform.OS !== "android" || isRestoring) return;
     let isActive = true;
     Notifications.setNotificationHandler({
-      handleNotification: async (notification) => {
-        const recipient = notification.request.content.data?.recipient_id;
-        const canShow = !!userId && (typeof recipient !== "string" || recipient === userId);
-        return {
-          shouldShowBanner: canShow,
-          shouldShowList: canShow,
-          shouldPlaySound: canShow,
-          shouldSetBadge: false,
-        };
-      },
+      handleNotification: async () => ({
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
     });
     const handle = (response: Notifications.NotificationResponse) => {
       if (!isActive || response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER)
