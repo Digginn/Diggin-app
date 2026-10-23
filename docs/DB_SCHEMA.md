@@ -328,11 +328,12 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
   - `has_unread_notifications()`: 확인 시각 뒤에 온 최근 30일 알림이 있으면 true. 종 아이콘 점.
   - `mark_notifications_checked()`: 알림함을 열 때 부른다. 확인 시각을 지금으로 바꾸고 이전 시각을 돌려준다(처음이면 null). 앱은 이전 시각보다 뒤에 온 알림을 Gray50으로 보여 주고, 다음에 열면 흰색이 된다.
 - pg_cron `notifications-cleanup`이 매일 03:00(KST)에 30일 지난 알림을 지운다.
+- pg_cron `cron-run-details-cleanup`이 매일 03:10(KST)에 7일 지난 크론 실행 기록(`cron.job_run_details`)을 지운다. 1분 주기 작업이 둘이라 지우지 않으면 1년에 100MB 넘게 쌓인다.
 - 수신 설정(MY-011)은 시안대로 Push 토글 하나다. `get_push_enabled()`·`set_push_enabled(enabled)`로 읽고 쓰며, 행이 없으면 켜진 것으로 본다. 종류별 설정은 없다.
 - 수신 설정·OS 권한과 관계없이 알림은 목록에 남긴다(NOTI-007). Push를 끈 사용자에게는 발송만 하지 않는다(발송 작업에서 반영).
 - 목록 문구는 시안(NOTI-07)대로 저장한다. 제목은 "투표 결과가 나왔어요.", "내 게시글에 댓글이 달렸어요.", "내 게시글에 좋아요가 달렸어요."이다.
 - Push 문구는 목록 문구와 다르다(시안 NOTI-03~05). 투표 마감은 "투표가 종료됐어요." / "내 투표 결과를 확인해 보세요.", 좋아요는 본문 자리에 게시글 본문을 쓴다. 댓글은 목록과 같다. 발송할 때 종류별로 만든다.
-- Push 발송(#139): pg_cron `notifications-push-send`가 1분마다 `private.invoke_push_send()`로 Edge Function `push-send`를 부른다. 주소와 secret key는 Vault `project_url`·`secret_key`에서 읽고, 없으면 부르지 않는다(로컬·설정 전). 함수는 `verify_jwt = false`이고 `@supabase/server`의 `auth: 'secret'`로 키를 검증한다.
+- Push 발송(#139): pg_cron `notifications-push-send`가 1분마다 `private.invoke_push_send()`로 Edge Function `push-send`를 부른다. 주소와 secret key는 Vault `project_url`·`secret_key`에서 읽고, 없으면(로컬·설정 전) 또는 가져갈 알림이 없으면 부르지 않는다. 함수는 `verify_jwt = false`이고 `@supabase/server`의 `auth: 'secret'`로 키를 검증한다.
   - `claim_push_notifications(batch_size)`: 받을 수 없는 알림(24시간 지남, Push 끔, 정지, 토큰 없음, 받는 사람이 차단·신고한 행동)은 보내지 않고 push_sent_at을 채워 끝낸다. 나머지를 오래된 순으로 최대 batch_size개 가져가며 push_claimed_at을 남긴다. 응답 없이 끝나도 5분 뒤 다시 가져간다. Push 문구(위)와 글 ID·종류, 받는 사람의 모든 토큰을 준다.
   - `complete_push_notifications(sent_ids, dead_tokens)`: 보낸 알림의 push_sent_at을 채우고 DeviceNotRegistered 토큰을 지운다.
   - 둘 다 service_role 전용(public invoker → private definer)이고, `invoke_push_send`는 Vault를 읽어 service_role에도 주지 않는다.

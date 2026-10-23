@@ -101,7 +101,15 @@ reset role;
 select ok(pg_temp.sent('t:blocked') and pg_temp.sent('t:like'), '차단한 사람의 알림은 보내지 않고 끝낸다');
 
 select is(private.invoke_push_send(), null, 'Vault에 주소·키가 없으면(로컬·설정 전) 발송 함수를 부르지 않는다');
-select is((select command from cron.job where jobname = 'notifications-push-send'), 'select private.invoke_push_send()', '1분마다 발송 함수를 부른다');
+select vault.create_secret('http://push-send.test', 'project_url');
+select vault.create_secret('sb_secret_test', 'secret_key');
+select is(private.invoke_push_send(), null, '가져갈 알림이 없으면 발송 함수를 부르지 않는다');
+select pg_temp.notify('13900000-0000-0000-0000-00000000000a','post_commented','test.post','13900000-0000-0000-0000-00000000000c','t:pending');
+select isnt(private.invoke_push_send(), null, '가져갈 알림이 있으면 발송 함수를 부른다');
+select is((select headers->>'apikey' from net.http_request_queue order by id desc limit 1), 'sb_secret_test', 'Vault의 secret key를 apikey로 보낸다');
+select is((select schedule || ' ' || command from cron.job where jobname = 'notifications-push-send'),
+  '* * * * * select private.invoke_push_send()', '1분마다 발송 함수를 부른다');
+select is((select schedule from cron.job where jobname = 'cron-run-details-cleanup'), '10 18 * * *', '크론 실행 기록을 매일 정리한다');
 
 select * from finish();
 rollback;

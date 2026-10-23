@@ -80,7 +80,11 @@ declare
   project_url text := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url');
   secret_key text := (select decrypted_secret from vault.decrypted_secrets where name = 'secret_key');
 begin
-  if project_url is null or secret_key is null then
+  if project_url is null or secret_key is null or not exists (
+    select 1 from private.notifications n
+    where n.push_sent_at is null
+      and (n.push_claimed_at is null or n.push_claimed_at < now() - interval '5 minutes')
+  ) then
     return null;
   end if;
   return net.http_post(
@@ -139,5 +143,7 @@ REVOKE ALL ON FUNCTION "public"."complete_push_notifications"(bigint[], text[]) 
 GRANT EXECUTE ON FUNCTION "public"."complete_push_notifications"(bigint[], text[]) TO "postgres";
 
 GRANT EXECUTE ON FUNCTION "public"."complete_push_notifications"(bigint[], text[]) TO "service_role";
+
+SELECT cron.schedule_in_database('cron-run-details-cleanup', '10 18 * * *', 'delete from cron.job_run_details where end_time < now() - interval ''7 days''', 'postgres', NULL, true);
 
 SELECT cron.schedule_in_database('notifications-push-send', '* * * * *', 'select private.invoke_push_send()', 'postgres', NULL, true);

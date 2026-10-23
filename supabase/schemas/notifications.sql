@@ -363,13 +363,18 @@ returns void language sql security invoker set search_path = '' as $$
 $$;
 
 -- pg_cron이 1분마다 발송 함수를 부른다. 주소·secret key는 Vault에 두고, 없으면(로컬·설정 전) 부르지 않는다.
+-- 가져갈 알림이 없으면 함수를 부르지 않아 빈 호출을 만들지 않는다.
 create or replace function private.invoke_push_send()
 returns bigint language plpgsql security definer set search_path = '' as $$
 declare
   project_url text := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url');
   secret_key text := (select decrypted_secret from vault.decrypted_secrets where name = 'secret_key');
 begin
-  if project_url is null or secret_key is null then
+  if project_url is null or secret_key is null or not exists (
+    select 1 from private.notifications n
+    where n.push_sent_at is null
+      and (n.push_claimed_at is null or n.push_claimed_at < now() - interval '5 minutes')
+  ) then
     return null;
   end if;
   return net.http_post(
@@ -391,3 +396,5 @@ revoke execute on function private.invoke_push_send() from public, anon, authent
 select cron.schedule('notifications-vote-ended', '* * * * *', 'select private.create_vote_ended_notifications()');
 select cron.schedule('notifications-cleanup', '0 18 * * *', 'select private.delete_old_notifications()');
 select cron.schedule('notifications-push-send', '* * * * *', 'select private.invoke_push_send()');
+-- 1분 주기 작업이 실행마다 남기는 기록이 DB 용량을 계속 차지하지 않게 7일 지난 기록을 지운다.
+select cron.schedule('cron-run-details-cleanup', '10 18 * * *', $$delete from cron.job_run_details where end_time < now() - interval '7 days'$$);
