@@ -33,6 +33,7 @@ function loadPush({
         };
       if (name === "expo-notifications")
         return {
+          DEFAULT_ACTION_IDENTIFIER: "expo.modules.notifications.actions.DEFAULT",
           AndroidImportance: { DEFAULT: 3 },
           setNotificationChannelAsync: async () => {
             calls.channels += 1;
@@ -216,4 +217,29 @@ test("로그아웃이 겹치면 모두 끝난 뒤에야 등록을 다시 허용�
   push.finishDeviceSignOut();
   await push.registerDevicePush("user-a", false);
   assert.equal(calls.rpc.length, 1);
+});
+
+test("Push를 누르면 data의 글 종류에 맞는 상세로 가고, 다른 동작이나 잘못된 data는 무시한다", () => {
+  const { push } = loadPush();
+  const route = (data, actionIdentifier = "expo.modules.notifications.actions.DEFAULT") =>
+    // vm 안에서 만든 객체라 프로토타입이 달라 값만 비교한다.
+    JSON.parse(
+      JSON.stringify(
+        push.pushResponseRoute({
+          actionIdentifier,
+          notification: { request: { content: { data } } },
+        }),
+      ),
+    );
+  assert.deepEqual(route({ post_id: "12", post_type: "vote" }), {
+    pathname: "/votes/[id]",
+    params: { id: "12" },
+  });
+  assert.deepEqual(route({ post_id: "7", post_type: "post" }), {
+    pathname: "/posts/[id]",
+    params: { id: "7" },
+  });
+  assert.equal(route({ post_id: "7" }, "dismiss"), null);
+  assert.equal(route({ post_id: "../login" }), null);
+  assert.equal(route(null), null);
 });

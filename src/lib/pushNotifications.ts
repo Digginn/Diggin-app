@@ -69,6 +69,17 @@ export async function unregisterDevicePush() {
   if (error) console.warn("Push 토큰을 지우지 못했습니다.", error);
 }
 
+/**
+ * NOTI-003~005 Push를 눌렀을 때 열 상세 화면. 서버(push-send)가 data에 글 ID·종류를 담는다.
+ * 지워진 글이면 상세 화면이 찾을 수 없다는 안내를 띄운다.
+ */
+export function pushResponseRoute(response: Notifications.NotificationResponse) {
+  if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return null;
+  const { post_id: id, post_type: type } = response.notification.request.content.data ?? {};
+  if (typeof id !== "string" || !/^\d+$/.test(id)) return null;
+  return { pathname: type === "vote" ? "/votes/[id]" : "/posts/[id]", params: { id } } as const;
+}
+
 /** 로그아웃이 끝나면 부른다. 세션 종료에 실패해 로그인 상태가 남으면 다시 등록할 수 있게 한다. */
 export function finishDeviceSignOut() {
   signingOut = Math.max(0, signingOut - 1);

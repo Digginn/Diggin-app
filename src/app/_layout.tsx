@@ -1,5 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -15,7 +16,7 @@ import { BrowsingModeProvider } from "@/contexts/BrowsingModeContext";
 import { PostDraftProvider } from "@/contexts/PostDraftContext";
 import { PostsProvider } from "@/contexts/PostsContext";
 import { ToastProvider } from "@/contexts/ToastContext";
-import { registerDevicePush } from "@/lib/pushNotifications";
+import { pushResponseRoute, registerDevicePush } from "@/lib/pushNotifications";
 import { queryClient } from "@/lib/queryClient";
 import { readSharedSaveTime } from "@/lib/sharedSaves";
 import { SessionExpiredModal } from "@/screens/login/components/SessionExpiredModal";
@@ -73,6 +74,21 @@ function PushRegistration() {
   return null;
 }
 
+// 앱이 꺼져 있을 때 누른 Push도 받도록 마지막 응답을 보고, 한 번 이동하면 지워 다시 이동하지 않는다.
+function PushResponseRouting() {
+  const router = useRouter();
+  const response = Notifications.useLastNotificationResponse();
+
+  useEffect(() => {
+    if (!response) return;
+    Notifications.clearLastNotificationResponse();
+    const route = pushResponseRoute(response);
+    if (route) router.push(route);
+  }, [response, router]);
+
+  return null;
+}
+
 // 공유 확장(#91)에서 저장하면 앱으로 돌아올 때 상품·폴더 목록을 다시 불러온다. 저장이 없었으면 그대로 둔다.
 function SharedSaveSync() {
   const lastSeen = useRef<number | null>(null);
@@ -123,6 +139,7 @@ export default function RootLayout() {
                     </Stack>
                     <SessionExpiredNotice />
                     <PushRegistration />
+                    <PushResponseRouting />
                     <SharedSaveSync />
                     <AccountAccessNotice />
                   </PostsProvider>
