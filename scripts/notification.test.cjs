@@ -120,6 +120,29 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
   assert.deepEqual(events, ["/notifications", "/notifications", "/notifications"]);
 });
 
+test("비회원 FOLDER 탭은 남은 조회 오류가 있어도 오류 화면 대신 빈 나의 소장템을 보여 준다", () => {
+  const { default: FolderRoute } = load(
+    "../src/app/(tabs)/folder.tsx",
+    {
+      "react": { useState: (initial) => [initial, () => {}], useCallback: (callback) => callback },
+      "expo-router": { useRouter: () => ({ push: () => {} }), useFocusEffect: () => {} },
+      "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
+      "@/components/modal": { LoginRequiredModal: "LoginRequiredModal" },
+      "@/hooks/useFolders": { useFolders: () => ({ data: undefined, isError: true }) },
+      "@/hooks/useProductCounts": { useProductCounts: () => ({ data: undefined }) },
+      "@/hooks/useCreateFolder": { useCreateFolder: () => ({}) },
+      "@/screens/folder/FolderScreen": { FolderScreen: "FolderScreen" },
+      "@/screens/folder/mutations/useDeleteFolder": { useDeleteFolder: () => ({}) },
+      "@/screens/folder/mutations/useRenameFolder": { useRenameFolder: () => ({}) },
+    },
+    { __DEV__: false },
+  );
+  const screen = findAll(FolderRoute(), "FolderScreen")[0];
+  assert.equal(screen.props.isGuest, true);
+  assert.equal(screen.props.isError, false);
+  assert.equal(screen.props.folders, undefined);
+});
+
 test("알림 없음 화면은 공용 AppBar와 전체 화면 중앙 안내를 표시한다", () => {
   const { NotificationScreen } = load("../src/screens/notification/NotificationScreen.tsx", {
     "react": {
