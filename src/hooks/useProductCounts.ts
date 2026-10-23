@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { fetchProductCounts, productKeys } from "@/api/products";
 
@@ -7,7 +7,8 @@ export function useProductCounts(query = "", isEnabled = true) {
     queryKey: productKeys.counts(query),
     queryFn: () => fetchProductCounts(query),
     enabled: isEnabled,
-    // 검색어를 칠 때마다 빈 화면이 깜빡이지 않게 결과가 올 때까지 이전 결과를 둔다.
-    placeholderData: query ? keepPreviousData : undefined,
+    // 이전 검색 결과만 두고, 검색어 없는 ALL 개수는 두지 않는다(첫 검색 때 ALL 전체가 깜빡임).
+    placeholderData: (previous, previousQuery) =>
+      query && previousQuery?.queryKey.at(-1) ? previous : undefined,
   });
 }
