@@ -60,7 +60,7 @@ export function FolderModal({
               <Text className="text-center text-gray-600 font-name-s">{productName}</Text>
             </View>
           ) : null}
-          <Text className="max-w-[235px] text-center text-gray-600 font-b3" numberOfLines={1}>
+          <Text className="max-w-[295px] text-center text-gray-600 font-b3" numberOfLines={1}>
             {description}
           </Text>
         </View>
