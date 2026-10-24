@@ -445,3 +445,28 @@ test("닉네임 입력칸 오른쪽에 글자 수를 보여 준다", () => {
   button("닉네임").props.onChangeText("👍🏻디기");
   assert.equal(counter(), "3/10", "이모지 조합은 서버처럼 1자로 센다");
 });
+
+test("닉네임은 타이핑·붙여넣기 모두 10글자로 제한하고 카운터와 저장 값도 일치한다", async () => {
+  for (const platform of ["ios", "android"]) {
+    const saved = [];
+    const { button, counter, save } = renderProfile(platform, true, {
+      onSaveNickname: async (nickname) => {
+        saved.push(nickname);
+      },
+    });
+    assert.equal(button("닉네임").props.maxLength, 10);
+    button("닉네임").props.onChangeText("가나다라마바사아자차");
+    button("닉네임").props.onChangeText("가나다라마바사아자차카");
+    assert.equal(button("닉네임").props.value, "가나다라마바사아자차");
+    assert.equal(counter(), "10/10");
+    button("닉네임").props.onChangeText("12345678901234567890");
+    assert.equal(button("닉네임").props.value, "1234567890");
+    assert.equal(counter(), "10/10");
+    await save();
+    assert.equal(saved[0], "1234567890");
+    button("닉네임").props.onChangeText("123456789");
+    assert.equal(counter(), "9/10");
+    button("닉네임").props.onChangeText("123456789가");
+    assert.equal(counter(), "10/10");
+  }
+});

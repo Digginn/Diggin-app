@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import { AVATAR_UNREADABLE_ERROR } from "@/api/avatar";
 import { IconProfileCamera, ImageProfilePlaceholder } from "@/assets/images/my";
@@ -217,8 +218,11 @@ export function ProfileEditScreen({
               accessibilityLabel="닉네임"
               inputClassName="pr-12"
               isError={isNicknameError}
+              maxLength={MAX_NICKNAME_LENGTH}
               onChangeText={(value) => {
-                setNickname(value);
+                setNickname(
+                  Array.from(splitGraphemes(value)).slice(0, MAX_NICKNAME_LENGTH).join(""),
+                );
                 setHelperStatus("default");
                 setHelperMessage(NICKNAME_HELPER_MESSAGE);
               }}
