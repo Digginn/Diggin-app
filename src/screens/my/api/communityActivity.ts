@@ -27,12 +27,7 @@ export async function fetchCommunityActivity(
       throw new Error("invalid_activity_response");
     databaseId(id);
     const post = parsePost(value.post);
-    if (
-      post.isPreview ||
-      (kind === "liked"
-        ? post.type !== "post" || !post.isLiked
-        : !post.isMine || post.type !== kind)
-    )
+    if (post.isPreview || (kind === "liked" ? !post.isLiked : !post.isMine || post.type !== kind))
       throw new Error("invalid_activity_response");
     return { post, cursor: { createdAt, id } };
   });

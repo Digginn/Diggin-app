@@ -322,7 +322,7 @@ test("좋아요 등록·취소 실패 시 아이콘과 개수를 원상 복구�
   }
 });
 
-test("좋아요 성공은 동시 갱신된 댓글 수를 보존하고 투표글·비회원은 요청하지 않는다", async () => {
+test("좋아요 성공은 동시 갱신된 댓글 수를 보존하고 비회원은 요청하지 않는다", async () => {
   const work = deferred(),
     ui = harness({ like: () => work.promise });
   const request = ui.render("likes").toggle();
@@ -333,9 +333,21 @@ test("좋아요 성공은 동시 갱신된 댓글 수를 보존하고 투표글�
   assert.equal(ui.post().likeCount, 5);
   assert.equal(ui.post().commentCount, 9);
   const blocked = harness();
-  blocked.setPost({ type: "vote" });
-  await blocked.render("likes").toggle();
-  blocked.setPost({ type: "post" });
   await blocked.render("likes", null).toggle();
   assert.equal(blocked.calls.length, 0);
+});
+
+test("투표글도 좋아요 0개에서 등록·취소하고 결과를 캐시에 반영한다", async () => {
+  const ui = harness({
+    like: async (_id, liked) => ({ isLiked: liked, likeCount: liked ? 1 : 0 }),
+  });
+  ui.setPost({ type: "vote", isLiked: false, likeCount: 0 });
+  await ui.render("likes").toggle();
+  assert.equal(ui.calls.length, 1);
+  assert.equal(ui.post().isLiked, true);
+  assert.equal(ui.post().likeCount, 1);
+  await ui.render("likes").toggle();
+  assert.equal(ui.calls.length, 2);
+  assert.equal(ui.post().isLiked, false);
+  assert.equal(ui.post().likeCount, 0);
 });

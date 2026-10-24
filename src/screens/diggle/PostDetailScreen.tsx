@@ -339,10 +339,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                 likeCount={like.likeCount}
                 commentCount={post.commentCount ?? 0}
                 isLiked={like.isLiked}
-                hasLike={post.type === "post"}
-                onPressLike={
-                  post.type === "post" && !like.isPending ? () => void like.toggle() : undefined
-                }
+                onPressLike={!like.isPending ? () => void like.toggle() : undefined}
               />
               <View className="h-3 bg-gray-100" />
             </>

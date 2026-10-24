@@ -142,6 +142,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
               renderItem={({ item: { post } }) =>
                 isLiked ? (
                   <Post
+                    type={post.type === "vote" ? "vote" : "all"}
                     body={post.body}
                     items={post.items}
                     timeLabel={formatCommunityTime(post.createdAt)}

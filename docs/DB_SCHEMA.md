@@ -228,7 +228,7 @@ import_failures
 - 모든 댓글·좋아요 쓰기는 `private.lock_community_post_for_write()`로 인증·제재를 확인하고 부모 글 행을 잠근 뒤 변경한다. 글 삭제도 같은 행을 먼저 잠그므로 삭제 후 댓글이나 좋아요가 추가되는 경합을 막는다. 삭제·숨김·차단/신고로 접근할 수 없는 글은 쓰기도 허용하지 않는다. 댓글 수정·삭제는 글쓴이에게도 타인 댓글 권한을 주지 않는다.
 - `post_anon_numbers`는 최초 댓글 때만 할당하고 같은 글에서 유지한다. 부모 글 잠금 안에서 `next_anon_number`를 올리므로 동시 참여에도 중복 번호가 없다. 글쓴이는 번호를 소비하지 않는다. 본인·글쓴이·탈퇴 라벨과 본문 비공개는 조회 계약을 따른다.
 - `comments.creation_request_id`와 `(author_id, creation_request_id)` unique로 응답 유실·동시 재시도에 같은 댓글을 반환한다. 다른 게시글로 키를 재사용하면 거부한다. 앱은 성공한 댓글을 서버 페이지와 중복 없이 합치며 서버 커서를 바꾸지 않는다. 등록 후 새 댓글까지 남은 페이지를 읽고 이동하고, 실패한 조회는 댓글 영역에서 재시도한다.
-- `set_community_like(target_post_id, is_liked)`는 일반글에만 적용하고 `{is_liked, like_count}`를 반환한다. 계정당 한 행이며 원하는 상태를 지정하므로 재시도해도 토글되지 않는다. 댓글 작성과 독립적으로 실행하며 앱의 낙관적 아이콘·개수는 실패 시 원상 복구한다.
+- `set_community_like(target_post_id, is_liked)`는 일반글·투표글에 적용하고 `{is_liked, like_count}`를 반환한다. 목록은 0개도 하트와 함께 표시하고 투표 상세에도 버튼을 연결한다. 좋아요 알림은 #148 사용자 확인에 따라 일반글·투표글 모두 작성자에게 생성하며 기존 Push 큐·FCM/APNs 발송과 상세 경로를 재사용한다. 계정당 한 행이며 원하는 상태를 지정하므로 재시도해도 토글되지 않는다. 댓글 작성과 독립적으로 실행하며 앱의 낙관적 아이콘·개수는 실패 시 원상 복구한다.
 - 등록·수정·삭제·좋아요 성공은 `community` 캐시를 갱신한다. 후속 내 활동도 같은 키 아래에 두어 함께 갱신한다. 계정이 바뀌거나 화면을 떠난 후 도착한 응답으로 새 계정의 초안·캐시를 변경하지 않는다.
 - 알림 연동 계약: 댓글 등록 성공 트랜잭션에서 `comment:{comment_id}`를 이벤트 키로 사용하고 본인 댓글은 알리지 않는다. 수정·삭제·재시도는 새 등록 이벤트가 아니다. 좋아요 알림은 `(post_id, actor_id)`를 `like_notification_log`에 최초 한 번 기록하는 계약이며 취소·재등록으로 다시 발송하지 않는다. 수신자는 서버가 글에서 결정하고 UUID를 앱에 반환하지 않는다. 알림 테이블·실제 이벤트 저장·Push 발송은 알림 작업에서 이 RPC에 연결한다.
 - 로컬 검증: 전체 pgTAP, DB lint·Advisors와 `scripts/check_community_concurrency.py --container supabase_db_diggin-97`로 실제 동시 요청을 확인한다. 테스트 데이터만 사용하는 임시 DB에서 실행한다.
@@ -236,10 +236,10 @@ import_failures
 #### #99 내 활동·내가 쓴 글·좋아요한 글
 
 - `get_my_community_activity(activity_type, after_activity_at?, after_id?)`는 `post`/`vote`/`liked` 목록을 20개씩 반환한다. 계정 ID를 인자로 받지 않고 JWT의 본인만 조회한다. 비회원·정지 계정은 차단하고 커뮤니티 작성 제한 중 조회는 허용한다.
-- 본인 글은 `(posts.created_at, posts.id)` 최신순으로 일반글·투표를 분리한다. 좋아요한 글은 현재 유효한 본인의 일반글 좋아요만 `(post_likes.created_at, post_likes.id)` 최신순으로 반환한다. 취소·재등록은 새로운 활동으로 정렬한다.
+- 본인 글은 `(posts.created_at, posts.id)` 최신순으로 일반글·투표를 분리한다. 좋아요한 글은 현재 유효한 본인의 일반글·투표글 좋아요를 `(post_likes.created_at, post_likes.id)` 최신순으로 반환한다. 취소·재등록은 새로운 활동으로 정렬한다.
 - 각 행은 `{post, activity_at, activity_id}`다. `post`는 기존 공개 JSON 계약을 재사용하고 작성자 UUID는 반환하지 않는다. 앱은 좋아요 목록의 다음 페이지에 글 작성일·글 ID를 쓰지 않고 활동 커서를 그대로 보존한다.
 - 삭제·숨김·차단한 작성자의 콘텐츠와 본인이 신고한 해당 게시글은 모든 활동 목록에서 제외한다. 본인 글에는 신고 Action을 제공하지 않고 기존 공통 상세의 삭제 흐름을 재사용한다.
-- 앱의 두 메뉴와 실제 목록을 연결했다. 작성한 일반글은 기존 한 줄 목록, 투표는 두 줄·상품 이미지 목록, 좋아요한 일반글은 공통 게시글 카드로 표시한다. 목록에서 종류에 맞는 공통 상세로 이동한다. 투표 참여 목록은 추가하지 않는다.
+- 앱의 두 메뉴와 실제 목록을 연결했다. 작성한 일반글은 기존 한 줄 목록, 투표는 두 줄·상품 이미지 목록, 좋아요한 글은 일반글·투표글의 유형에 맞는 공통 게시글 카드로 표시한다. 목록에서 종류에 맞는 공통 상세로 이동한다. 투표 참여 목록은 추가하지 않는다.
 - 활동 캐시는 `community/viewer/activity/kind`로 계정·종류별 분리한다. 기존 작성·삭제·댓글·좋아요 성공의 community 무효화에 포함되며 화면 복귀 때 재조회한다. 최초 오류·빈 목록·추가 페이지 재시도를 구분하고 재조회 실패 시 기존 목록과 Toast를 유지한다. 이동 예외는 현재 화면에서 안내한다.
 - 검증은 `supabase/tests/community_activity.test.sql`, `scripts/community-activity.test.cjs`, `scripts/my-posts.test.cjs`에 권한·정렬·커서·취소·삭제 제외와 UI 복귀·오류·로그인 차단을 포함한다.
 
@@ -268,7 +268,7 @@ post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)
 - 수정 RPC는 없다(DGL-008). 삭제는 deleted_at, 댓글도 같이 soft delete. 투표글 삭제 시 vote_responses는 실제로 지운다.
 - `set_community_vote`는 upsert. 공통 쓰기 권한·부모 글 잠금 후 투표글·유효 선택·본인 글 제외·서버 `clock_timestamp() < ends_at`을 검사한다. 잠금 대기 중 마감된 요청도 차단한다.
 - 투표 결과는 진행 중 참여자·작성자, 마감 후 미참여 회원에게도 공개한다. 진행 중 미참여자는 buy_count·not_count가 null이고 비회원 미리보기에는 필드 자체가 없다. 퍼센트는 앱이 계산한다.
-- 좋아요는 일반글만(LIKE-001).
+- 좋아요는 일반글·투표글 모두 허용한다(#148 PM QA / VOTE-05 시안 반영, 기존 LIKE-001 일반글 전용 제한 수정).
 - 익명 번호는 그 사용자의 첫 댓글일 때 posts.next_anon_number를 올리며 받는다. 글쓴이는 번호를 받지 않는다. 댓글 조회는 author_id 대신 `is_post_author, anon_number, is_mine, is_withdrawn`을 돌려준다.
 - 모든 커뮤니티 조회는 삭제·숨김 콘텐츠와 차단한 작성자의 전체 콘텐츠, 본인이 신고한 해당 콘텐츠만 뺀다.
 
@@ -316,7 +316,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 처음엔 notifications를 public에 두고 select만 열 생각이었는데, 알림을 눌렀을 때 글이 지워졌는지(NOTI-006)를 앱이 알아야 해서 private.posts를 같이 봐야 했다. 그래서 커뮤니티처럼 원본은 private에 두고 `get_notifications(after_created_at, after_id)`로만 읽는다.
 
 - 알림은 쓰기 RPC를 고치지 않고 트리거로 만든다. 댓글은 `comments` insert, 좋아요는 `post_likes` insert 때 돈다. 댓글 재시도는 기존 댓글을 돌려줘 insert가 없고, 좋아요는 on conflict do nothing이라 이미 누른 상태면 트리거가 돌지 않는다.
-- 일반 게시글만 알린다(NOTI-004·005). 본인 댓글·본인 좋아요, 받는 사람이 차단·신고한 사용자의 행동, 지워지거나 숨겨진 글은 알리지 않는다.
+- 댓글은 일반 게시글만 알린다(NOTI-004). 좋아요는 일반글·투표글 모두 알린다(NOTI-005의 일반글 제한을 #148 사용자 확인으로 확장). 본인 댓글·본인 좋아요, 받는 사람이 차단·신고한 사용자의 행동, 지워지거나 숨겨진 글은 알리지 않는다.
 - 알림을 받은 뒤 그 사람을 차단·신고하면 목록과 새 알림 점에서 뺀다. 커뮤니티 조회는 신고한 콘텐츠만 빼지만(#112), 알림은 신고한 사람의 알림을 모두 뺀다. 그래서 댓글·좋아요 알림에 행동한 사람(actor_id)을 남긴다. 투표 마감은 행동한 사람이 없어 항상 보인다. 명세(RPT-004)는 Feed·상세만 정하고 있어 알림함도 같은 기준으로 맞췄다.
 - 좋아요는 같은 사람·같은 글에 최초 1회. like_notification_log에 on conflict do nothing으로 넣고 들어갔을 때만 알림을 만든다. 취소하거나 알림이 30일 지나 지워져도 기록은 남겨 다시 보내지 않는다.
 - 투표 마감은 pg_cron `notifications-vote-ended`가 1분마다 `ends_at`이 지난 투표를 찾아 작성자에게 만든다(NOTI-003). 알림을 만들 때 지워졌거나 숨겨진 투표는 건너뛴다(NOTI-003). 삭제 시 투표 응답도 지워져(VOTE-012) 보여 줄 결과가 없다. 알림을 받은 뒤 지워지면 누를 때 NOTI-006 안내를 띄운다. 작업이 밀려도 놓치지 않게 시각 범위가 아니라 event_key로 중복을 막는다.
