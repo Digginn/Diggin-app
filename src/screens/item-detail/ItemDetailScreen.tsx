@@ -229,11 +229,13 @@ export function ItemDetailScreen() {
 
         <View className="gap-6 pt-4">
           <View className="gap-[13px] px-4">
-            <View className="w-full flex-row items-center justify-between gap-2">
-              <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
-                {item.brand}
-              </Text>
-            </View>
+            {item.brand.trim() ? (
+              <View className="w-full flex-row items-center justify-between gap-2">
+                <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
+                  {item.brand}
+                </Text>
+              </View>
+            ) : null}
             <ItemInfo
               name={item.name}
               price={item.price === "" ? null : Number(item.price)}
