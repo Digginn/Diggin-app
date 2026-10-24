@@ -48,6 +48,7 @@ export function LoginScreen({
   const [isLoading, setIsLoading] = useState(isLoginLoading);
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
   const hasSignedIn = useRef(false);
+  const isSigningIn = useRef(false);
   const [didSignIn, setDidSignIn] = useState(false);
   const { session } = useAuth();
   const shouldRedirect = isRedirectedWhenSignedIn && !!session && !isLoading && !didSignIn;
@@ -69,11 +70,12 @@ export function LoginScreen({
   );
 
   async function handleLogin(provider: LoginProvider) {
-    if (isLoading) return;
+    if (isSigningIn.current) return;
+    isSigningIn.current = true;
     setHasError(false);
-    setIsLoading(true);
     try {
-      const result = await signIn(provider);
+      // iOS는 화면이 떠오르는 중에 다른 화면을 띄우지 않는다. 로딩 창을 먼저 띄우면 로그인 창이 안 열린다.
+      const result = await signIn(provider, () => setIsLoading(true));
       if (result.status === "cancelled") return;
       if (result.status === "suspended") {
         setSuspension(result.access);
@@ -98,6 +100,7 @@ export function LoginScreen({
       console.warn("소셜 로그인에 실패했습니다.");
       setHasError(true);
     } finally {
+      isSigningIn.current = false;
       setIsLoading(false);
     }
   }

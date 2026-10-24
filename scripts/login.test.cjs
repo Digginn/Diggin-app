@@ -151,7 +151,7 @@ test("루트는 폰트·세션 복원이 끝난 뒤 앱과 전역 제재 안내�
 });
 
 for (const os of ["ios", "android"]) {
-  test(`${os}: 로그인 화면의 둘러보기·뒤로 가기와 OS별 소셜 로그인이 정상 동작한다`, () => {
+  test(`${os}: 로그인 화면의 둘러보기·뒤로 가기와 OS별 소셜 로그인이 정상 동작한다`, async () => {
     const expectedProviders = os === "ios" ? "google,kakao,apple" : "google,kakao";
     const routes = [];
     const alerts = [];
@@ -210,7 +210,7 @@ for (const os of ["ios", "android"]) {
     assert.equal(scroll.props.contentContainerStyle.paddingBottom, 36);
     const providers = tree.filter((node) => node.type === "SocialLoginButton");
     assert.equal(providers.map((node) => node.props.provider).join(","), expectedProviders);
-    for (const button of providers) button.props.onPress();
+    for (const button of providers) await button.props.onPress();
     assert.equal(signIns.join(","), expectedProviders);
     assert.equal(alerts.length, 0);
     const buttons = tree.filter((node) => node.type === "Pressable");
@@ -771,6 +771,24 @@ test("카카오 신규 가입만 카카오 프로필 사진을 복사하고, 실
   } finally {
     console.warn = warn;
   }
+});
+
+test("로딩 창은 소셜 로그인 창이 닫히고 토큰을 받은 뒤에만 띄운다", async () => {
+  const order = [];
+  const user = { id: "a", created_at: "2026-10-16T00:00:00Z", last_sign_in_at: "2026-10-16T00:05:00Z" };
+  const { signIn } = loadSignIn({
+    getUser: () => (order.push("server"), user),
+    kakao: {
+      login: async () => {
+        throw Object.assign(new Error("cancel"), { code: "Cancelled" });
+      },
+    },
+  });
+  assert.equal((await signIn("google", () => order.push("loading"))).status, "success");
+  assert.deepEqual(order, ["loading", "server"]);
+  order.length = 0;
+  assert.equal((await signIn("kakao", () => order.push("loading"))).status, "cancelled");
+  assert.deepEqual(order, [], "취소하면 로딩 창을 띄우지 않는다");
 });
 
 test("Auth ban 로그인은 가입 처리 없이 검증된 본인 제재 안내로 전환한다", async () => {
