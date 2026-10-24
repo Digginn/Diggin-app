@@ -48,7 +48,7 @@ export function NotificationSettingsScreen({
   }, []);
 
   const handleChange = async (key: keyof NotificationSettings, isEnabled: boolean) => {
-    if (isSavingRef.current) return;
+    if (!isDevicePushEnabled || isSavingRef.current) return;
     const previous = settings;
     const next = { ...settings, [key]: isEnabled };
     setSettings(next);
@@ -91,8 +91,8 @@ export function NotificationSettingsScreen({
             </View>
             <Toggle
               accessibilityLabel="푸시 알림"
-              isOn={settings.isAllEnabled}
-              isDisabled={isSaving}
+              isOn={isDevicePushEnabled && settings.isAllEnabled}
+              isDisabled={!isDevicePushEnabled || isSaving}
               onChange={(value) => handleChange("isAllEnabled", value)}
             />
           </View>

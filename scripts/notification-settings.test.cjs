@@ -149,6 +149,37 @@ test("저장 중 중복 요청을 막고 언마운트 후 실패 토스트를 �
   assert.equal(toasts.length, 0);
 });
 
+test("기기에서 차단하면 토글은 OFF·비활성이고 다시 허용하면 저장된 설정을 복원한다", async () => {
+  for (const isAllEnabled of [true, false]) {
+    const saved = [];
+    const props = {
+      isDevicePushEnabled: false,
+      initialSettings: {
+        isAllEnabled,
+        isVoteEndEnabled: isAllEnabled,
+        isCommentEnabled: isAllEnabled,
+        isLikeEnabled: isAllEnabled,
+      },
+      onSaveSettings: async (settings) => saved.push(settings),
+    };
+    const context = setup(props);
+    assert.equal(context.toggles()[0].isOn, false);
+    assert.equal(context.toggles()[0].isDisabled, true);
+    await context.toggles()[0].onChange(true);
+    assert.equal(saved.length, 0);
+    assert.equal(context.toggles()[0].isOn, false);
+    props.isDevicePushEnabled = true;
+    assert.equal(context.toggles()[0].isOn, isAllEnabled);
+    assert.equal(context.toggles()[0].isDisabled, false);
+    await context.toggles()[0].onChange(!isAllEnabled);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].isAllEnabled, !isAllEnabled);
+    props.isDevicePushEnabled = false;
+    assert.equal(context.toggles()[0].isOn, false);
+    assert.equal(context.toggles()[0].isDisabled, true);
+  }
+});
+
 test("기기 알림이 꺼졌을 때만 닫기 없는 배너와 설정 이동을 제공한다", () => {
   let opened = 0;
   const context = setup({ isDevicePushEnabled: false, onOpenNotificationSettings: () => opened++ });
