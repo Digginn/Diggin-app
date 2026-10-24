@@ -121,6 +121,21 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   await saveButton().props.onPress();
   assert.equal(saved.at(-1).price, "0");
 
+  const brandField = () =>
+    render().find((node) => node.type === "TextField" && node.props.placeholder === "선택 입력");
+  assert.equal(nameField().props.maxLength, 100);
+  assert.equal(brandField().props.maxLength, 30);
+  nameField().props.onChangeText("새".repeat(100));
+  nameField().props.onChangeText(`${nameField().props.value}상품`);
+  assert.equal(nameField().props.value, "새".repeat(100));
+  brandField().props.onChangeText("브".repeat(31));
+  assert.equal(brandField().props.value, "브".repeat(30));
+  await saveButton().props.onPress();
+  assert.equal(saved.at(-1).name, "새".repeat(100), "초과 입력 시 원래 상품명으로 돌아가지 않는다");
+  assert.equal(saved.at(-1).brand, "브".repeat(30));
+  nameField().props.onChangeText("수정한 상품");
+  assert.equal(nameField().props.value, "수정한 상품", "삭제 후 다시 입력할 수 있다");
+
   // 저장 응답 전 연타와 취소·끌어내리기는 막고, 끝나면 풀린다. 실패해도 풀린다.
   let submitCount = 0;
   let closeCount = 0;

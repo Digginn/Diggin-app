@@ -5,6 +5,7 @@ import { cssInterop } from "nativewind";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import { FolderError, folderKeys } from "@/api/folders";
 import { productKeys, saveProduct } from "@/api/products";
@@ -177,8 +178,11 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
             <TextField
               accessibilityLabel="아이템명"
               growsTo={88}
+              maxLength={100}
               value={values.name}
-              onChangeText={update("name")}
+              onChangeText={(text) =>
+                update("name")(Array.from(splitGraphemes(text)).slice(0, 100).join(""))
+              }
               isError={!!errors.name}
             />
             {errors.name && <HelperText status="error" message={errors.name} />}
@@ -187,8 +191,11 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
             <Text className="text-gray-900 font-b3">브랜드</Text>
             <TextField
               accessibilityLabel="브랜드"
+              maxLength={30}
               value={values.brand}
-              onChangeText={update("brand")}
+              onChangeText={(text) =>
+                update("brand")(Array.from(splitGraphemes(text)).slice(0, 30).join(""))
+              }
               isError={!!errors.brand}
             />
             {errors.brand && <HelperText status="error" message={errors.brand} />}
