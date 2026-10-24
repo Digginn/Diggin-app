@@ -433,3 +433,16 @@ test("닉네임 입력칸 오른쪽에 글자 수를 보여 준다", () => {
   button("닉네임").props.onChangeText("👍🏻디기");
   assert.equal(counter(), "3/10", "이모지 조합은 서버처럼 1자로 센다");
 });
+
+test("닉네임 0자·1자는 저장을 막고, 1자는 문구 없이 테두리·카운터만 빨갛게 한다", () => {
+  const { button, saveButton, helper } = renderProfile("ios", true, {});
+  assert.equal(button("닉네임").props.maxLength, 10, "10자를 넘게 입력할 수 없다");
+  assert.equal(saveButton().props.isDisabled, true, "0자는 저장 버튼이 비활성이다");
+  button("닉네임").props.onChangeText("디");
+  assert.equal(saveButton().props.isDisabled, true);
+  assert.equal(button("닉네임").props.isError, true);
+  assert.equal(helper().props.message, "", "길이 오류 문구는 보여 주지 않는다");
+  button("닉네임").props.onChangeText("디기");
+  assert.equal(saveButton().props.isDisabled, false);
+  assert.equal(button("닉네임").props.isError, false);
+});
