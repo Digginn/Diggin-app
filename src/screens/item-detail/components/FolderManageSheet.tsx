@@ -36,6 +36,7 @@ type FolderManageSheetProps = {
   isNewItem?: boolean;
   overlay?: ReactNode;
   getCreateErrorMessage?: (error: unknown) => string;
+  isInline?: boolean;
 };
 
 export function FolderManageSheet({
@@ -54,6 +55,7 @@ export function FolderManageSheet({
   isNewItem = false,
   overlay,
   getCreateErrorMessage,
+  isInline,
 }: FolderManageSheetProps) {
   const [selectedIds, setSelectedIds] = useState(selectedFolderIds);
   const [isCreating, setIsCreating] = useState(false);
@@ -89,6 +91,7 @@ export function FolderManageSheet({
       toastVariant="error"
       onToastDismiss={onErrorDismiss}
       visible
+      isInline={isInline}
       onRequestClose={close}
       isCloseConfirmed={isCompleting}
       maxHeight={702}

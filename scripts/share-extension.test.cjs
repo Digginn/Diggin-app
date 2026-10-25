@@ -20,6 +20,7 @@ function loadTs(file) {
 const itemLink = loadTs("../src/utils/itemLink.ts");
 
 const LINK = "https://www.musinsa.com/products/1";
+const FOLDERS = [{ id: "f1", name: "선물" }];
 const VALUES = {
   name: "니트",
   brand: "",
@@ -120,6 +121,11 @@ function loadShareSave({
             }),
           },
           "@/hooks/useToast": { useToast: () => (message) => calls.toasts.push(message) },
+          "@/hooks/useFolders": { useFolders: () => ({ data: FOLDERS }) },
+          "@/hooks/useCreateFolder": { useCreateFolder: () => ({ mutateAsync: async () => {} }) },
+          "@/screens/item-detail/components/FolderManageSheet": {
+            FolderManageSheet: "FolderManageSheet",
+          },
           "@/lib/queryClient": { queryClient: {} },
           "@/lib/sharedSaves": { markSharedSave: () => calls.marked++ },
           "@/lib/pendingShareLink": { keepShareLink: (url) => calls.kept.push(url) },
@@ -188,16 +194,23 @@ test("로그인돼 있으면 카드 안의 아이템 정보 수정에서 저장�
   const sheet = find(view, "ItemEditSheet");
   assert.equal(sheet.props.isInline, true, "모달을 또 올리지 않고 카드 안에 그린다");
   assert.equal(sheet.props.visible, true);
+  assert.equal(sheet.props.submitLabel, "폴더 선택하기");
   await sheet.props.onSubmit(VALUES);
+  assert.deepEqual(calls.saves, [], "폴더를 고르기 전에는 저장하지 않는다");
+  assert.equal(find(render(LINK), "ItemEditSheet").props.visible, false);
+  const folderSheet = find(render(LINK), "FolderManageSheet");
+  assert.equal(folderSheet.props.isInline, true);
+  assert.equal(folderSheet.props.title, "저장할 폴더 선택");
+  await folderSheet.props.onComplete(["f1"]);
   assert.deepEqual(
     JSON.parse(JSON.stringify(calls.saves)),
-    [{ values: VALUES, folderIds: [] }],
-    "폴더 없이 저장한다",
+    [{ values: VALUES, folderIds: ["f1"] }],
+    "고른 폴더에 저장한다",
   );
   assert.equal(calls.marked, 1, "앱이 돌아올 때 목록을 다시 불러오도록 남긴다");
   assert.deepEqual(calls.toasts, ["아이템을 저장했습니다."]);
   assert.equal(
-    find(render(LINK), "ItemEditSheet").props.isSubmitting,
+    find(render(LINK), "FolderManageSheet").props.isCompleting,
     true,
     "닫힐 때까지 다시 저장하지 못한다",
   );

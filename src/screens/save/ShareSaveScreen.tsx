@@ -5,10 +5,13 @@ import { Text, View } from "react-native";
 import { findProductIdByUrl } from "@/api/products";
 import { Spinner } from "@/components/Loading";
 import { TOAST_MESSAGES } from "@/constants/messages";
+import { useCreateFolder } from "@/hooks/useCreateFolder";
+import { useFolders } from "@/hooks/useFolders";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
 import { markSharedSave } from "@/lib/sharedSaves";
 import { supabase } from "@/lib/supabase";
+import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
 import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ProductPageReader } from "@/screens/save/components/ProductPageReader";
 import { ShareErrorSheet, type ShareErrorReason } from "@/screens/save/components/ShareErrorSheet";
@@ -41,6 +44,9 @@ export function ShareSaveScreen({
   const hasStarted = useRef(false);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [isSaved, setSaved] = useState(false);
+  const [folderValues, setFolderValues] = useState<ItemSaveValues | null>(null);
+  const folders = useFolders();
+  const createFolder = useCreateFolder();
   const showToast = useToast();
   const isMounted = useRef(true);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,12 +82,21 @@ export function ShareSaveScreen({
     if (!isLoading) openAfterLoading();
   }, [isLoading, openAfterLoading]);
 
-  async function submit(values: ItemSaveValues) {
-    // 같은 링크는 저장하지 않고 기존 아이템을 안내한다(SAVE-012). 확인에 실패하면 저장 때 서버가 막는다.
-    const existingId = await findProductIdByUrl(values.sourceUrl).catch(() => null);
+  // 폴더를 다 고른 뒤에 중복을 알리지 않도록 폴더 선택 전에 확인한다(SAVE-012). 확인에 실패하면 저장 때 서버가 막는다.
+  async function openFolderSelect(values: ItemSaveValues) {
+    const [existingId, folderResult] = await Promise.all([
+      findProductIdByUrl(values.sourceUrl).catch(() => null),
+      folders.data ? folders : folders.refetch(),
+    ]);
     if (!isMounted.current) return;
     if (existingId) return setDuplicateId(existingId);
-    const { productId, isDuplicate } = await save.mutateAsync({ values, folderIds: [] });
+    // 폴더 목록 없이 열면 빈 목록이라 폴더 없이 저장하게 된다.
+    if (!folderResult.data) return showToast(TOAST_MESSAGES.SYS_001, "error");
+    setFolderValues(values);
+  }
+
+  async function submit(values: ItemSaveValues, folderIds: string[]) {
+    const { productId, isDuplicate } = await save.mutateAsync({ values, folderIds });
     if (!isMounted.current) return;
     if (isDuplicate) return setDuplicateId(productId);
     markSharedSave();
@@ -118,18 +133,34 @@ export function ShareSaveScreen({
       <ItemEditSheet
         key={itemSave.values?.sourceUrl ?? ""}
         isInline={isInline}
-        visible={itemSave.values !== null}
+        visible={itemSave.values !== null && folderValues === null}
         initialValues={itemSave.values ?? EMPTY_ITEM_SAVE_VALUES}
         hasExtractionFailed={itemSave.hasFailed}
         duplicate={
           duplicateId ? { onConfirm: () => onOpenItem(duplicateId), onDismiss: onClose } : undefined
         }
         onRequestClose={onClose}
-        onSubmit={submit}
-        isSubmitting={save.isPending || isSaved}
-        errorMessage={save.isError ? TOAST_MESSAGES.SAVE_012 : undefined}
-        onErrorDismiss={save.reset}
+        onSubmit={openFolderSelect}
+        submitLabel="폴더 선택하기"
       />
+      {/* 클립보드로 불러온 저장과 같이 폴더를 고른 뒤 저장한다(SAVE-10 → PDT-08). */}
+      {folderValues && folders.data ? (
+        <FolderManageSheet
+          isInline={isInline}
+          title="저장할 폴더 선택"
+          completeLabel="저장하기"
+          backLabel="취소"
+          folders={folders.data}
+          selectedFolderIds={[]}
+          onBack={() => setFolderValues(null)}
+          onClose={() => setFolderValues(null)}
+          onCreateFolder={(name) => createFolder.mutateAsync(name)}
+          onComplete={(ids) => submit(folderValues, ids)}
+          isCompleting={save.isPending || isSaved}
+          errorMessage={save.isError ? TOAST_MESSAGES.SAVE_012 : undefined}
+          onErrorDismiss={save.reset}
+        />
+      ) : null}
     </View>
   );
 }
