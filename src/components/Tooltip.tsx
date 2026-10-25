@@ -42,7 +42,7 @@ export function Tooltip({ message, onClose, arrowPosition = "top", className }: 
         <Arrow width={ARROW_WIDTH} height={ARROW_HEIGHT} />
       </View>
       <Text
-        className={`text-gray-0 font-b4 ${isAndroid ? "min-h-6 leading-5" : ""}`}
+        className={`text-gray-0 font-b3 ${isAndroid ? "min-h-6" : ""}`}
         style={isAndroid ? { textAlignVertical: "center" } : undefined}
       >
         {message}
