@@ -213,7 +213,7 @@ test("FolderModal 문구와 폴더 이름은 사용처 props를 표시하고 콜
     nodes
       .find((node) => node.props.accessibilityLabel === `폴더 선택: ${selectedFolderName}`)
       .props.onPress();
-    for (const label of ["돌아가기", "불러오기", "저장하기"]) {
+    for (const label of ["취소", "불러오기", "저장하기"]) {
       const button = nodes.find(
         (node) =>
           node.type === "Pressable" &&

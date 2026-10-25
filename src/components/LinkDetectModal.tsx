@@ -33,9 +33,8 @@ export function LinkDetectModal({ onLoad, isBusy = false }: LinkDetectModalProps
     <>
       <FolderModal
         visible={link !== null}
-        // TODO: 크롤링이 붙으면 productName 으로 아이템명을 넘긴다. 링크 아이콘과 배지가 같이 나온다.
-        title="위시 아이템을 찾았어요."
-        description="복사한 URL을 불러와 아이템을 저장할까요?"
+        title="위시 아이템을 찾았습니다."
+        description="복사한 링크를 불러와 저장하시겠습니까?"
         onBack={() => link && handle(link)}
         onLoad={() => {
           if (!link) return;

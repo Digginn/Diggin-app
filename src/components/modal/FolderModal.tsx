@@ -47,7 +47,7 @@ export function FolderModal({
     >
       <View className="w-full items-center gap-1">
         <View className="flex-row items-start justify-center gap-1">
-          {productName ? (
+          {productName || onLoad ? (
             <View className="size-6 items-center justify-center overflow-hidden">
               <LinkIcon className="size-6" />
             </View>
@@ -60,7 +60,7 @@ export function FolderModal({
               <Text className="text-center text-gray-600 font-name-s">{productName}</Text>
             </View>
           ) : null}
-          <Text className="max-w-[295px] text-center text-gray-600 font-b3" numberOfLines={1}>
+          <Text className="max-w-[295px] shrink text-center text-gray-600 font-b3">
             {description}
           </Text>
         </View>
@@ -89,7 +89,7 @@ export function FolderModal({
       {onBack && onLoad ? (
         <View className="w-[295px] flex-row gap-[15px]">
           <View className="flex-1">
-            <ModalButton action={{ label: "돌아가기", onPress: onBack }} variant="secondary" />
+            <ModalButton action={{ label: "취소", onPress: onBack }} variant="secondary" />
           </View>
           <View className="w-[140px]">
             <ModalButton action={{ label: "불러오기", onPress: onLoad }} />
