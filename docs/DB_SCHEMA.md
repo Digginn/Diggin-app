@@ -121,6 +121,7 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 ## 5-2. 구현된 영역 요약 (#69 CSV 저장)
 
 - `import_csv(request_id uuid, import_plan jsonb)`는 본인 상품·폴더·관계를 저장하고 실제 성공 수·제외 상품·폴더 연결 경고를 반환한다. CSV 파싱은 앱에서 하고 상품 입력·URL 중복·계정·폴더 한도는 서버에서 다시 검사한다.
+- `csv-import` Edge Function은 검증한 JWT의 사용자·세션 ID를 유지한 authenticated 역할로 기존 RPC를 단일 트랜잭션에서 실행한다. `diggin.csv_progress=on`인 전용 연결에만 내부 `private.report_csv_import_progress`가 실제 처리 건수를 NOTICE로 보낸다(약 1% 간격, 완료 미포함). 함수는 앱 역할에 직접 실행 권한을 주지 않는다. Edge는 NOTICE를 NDJSON 진행 이벤트로 전달하고 COMMIT 후에만 결과를 전송한다. 서버 저장·기록·재시도 원자성은 유지하며 진행률용 테이블이나 쓰기 권한은 추가하지 않는다.
 - CSV로 생성한 폴더는 `folders.csv_source_name`에 원본 버킷명을 보존하고 다음 Import에서 우선 재사용한다. 표시 이름을 바꿔도 원본 매핑은 유지하고 삭제하면 함께 사라진다. 보존된 원본이 없으면 기존 일반 폴더명과 정확히 일치할 때 재사용한다. 다른 원본의 잘린 이름 충돌은 앱이 7자 내 번호로 구분하고, 조회 이후의 충돌은 서버가 `40001`로 취소해 최신 목록으로 다시 계산하게 한다. 프로필·기존 상품·폴더를 잠가 동시 생성과 소장 처리를 보호한다.
 - 상품은 저장하면서 `saved_at`에 CSV 등록일을 넣는다. 서버는 미래 날짜·유한하지 않은 날짜를 `INVALID_PRODUCT_DATA`로 제외한다. 중복 URL은 기존 정보를 유지하고 폴더·소장 관계만 추가한다. 선택 가격이 DB 정수 범위를 넘으면 가격만 null로 저장한다. 원화 판별 규칙은 미완료라 실사용 경로의 가격은 모두 null이다.
 - 새 일반 폴더가 50개 한도를 넘으면 관계 실패로 기록하고 상품은 ALL에 남긴다. 이미 있는 폴더에는 한도와 관계없이 연결한다. 소장 Y는 `private.set_owned`를 재사용한다.
