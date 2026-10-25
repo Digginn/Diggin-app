@@ -10,6 +10,7 @@ const ts = require("typescript");
 const LOGIN_SOURCES = {
   "@/lib/loginIntent": "src/lib/loginIntent.ts",
   "@/hooks/useLoginGate": "src/hooks/useLoginGate.tsx",
+  "@/screens/save/domain/itemSaveError": "src/screens/save/domain/itemSaveError.ts",
 };
 
 let isScreenFocused = true;
@@ -80,7 +81,12 @@ test("상품명·브랜드는 NFC 정규화한 코드포인트로 검증하고 �
     assert.ok(domain.communitySaveErrors({ ...draft, price }).price);
 });
 
-function formHarness({ duplicate = false, fail = false, folderError = false } = {}) {
+function formHarness({
+  duplicate = false,
+  fail = false,
+  folderError = false,
+  saveError = new Error("offline"),
+} = {}) {
   const state = [],
     calls = [],
     invalidated = [],
@@ -104,7 +110,7 @@ function formHarness({ duplicate = false, fail = false, folderError = false } = 
         rpc: async (name, args) => {
           calls.push({ name, args });
           return fail
-            ? { error: new Error("offline") }
+            ? { error: saveError }
             : { data: [{ product_id: 50, is_duplicate: duplicate }] };
         },
       },
@@ -165,6 +171,7 @@ function formHarness({ duplicate = false, fail = false, folderError = false } = 
             return result;
           } catch (error) {
             mutation.isError = true;
+            mutation.error = error;
             throw error;
           } finally {
             mutation.isPending = false;
@@ -184,7 +191,13 @@ function formHarness({ duplicate = false, fail = false, folderError = false } = 
     "@/components/Loading": { Spinner: "Spinner" },
     "@/components/modal": { ActionModal: "ActionModal", LoginRequiredModal: "LoginRequiredModal" },
     "@/components/WishLevelSelect": { WishLevelSelect: "WishLevelSelect" },
-    "@/constants/messages": { TOAST_MESSAGES: { SAVE_011: "saved", SAVE_012: "failed" } },
+    "@/constants/messages": {
+      TOAST_MESSAGES: {
+        SAVE_011: "saved",
+        SAVE_012: "failed",
+        SYS_001: "연결 상태를 확인한 후 다시 시도해 주세요.",
+      },
+    },
     "@/contexts/AuthContext": { useAuth: () => ({ session: null, isRestoring: false }) },
     "@/hooks/useCreateFolder": {
       useCreateFolder: () => ({ mutateAsync: async (name) => ({ id: "3", name }) }),
@@ -298,6 +311,27 @@ test("저장 실패 시 초안과 폴더 시트를 유지하고 성공 처리를
   assert.equal(h.returned, 0);
   assert.deepEqual(h.invalidated, []);
   assert.deepEqual(h.toasts, []);
+});
+
+test("DIGGLE 저장도 통신 오류는 연결 확인 문구로, 일반 오류는 저장 실패로 구분한다", async () => {
+  for (const [error, expected] of [
+    [new TypeError("Network request failed"), "연결 상태를 확인한 후 다시 시도해 주세요."],
+    [
+      { message: "TypeError: Failed to fetch", code: "", details: "", hint: "" },
+      "연결 상태를 확인한 후 다시 시도해 주세요.",
+    ],
+    [{ message: "permission denied", code: "42501" }, "failed"],
+  ]) {
+    const h = formHarness({ fail: true, saveError: error });
+    h.field("아이템명").onChangeText("오프라인 초안");
+    h.open();
+    assert.equal(h.sheet().errorMessage, undefined);
+    await assert.rejects(h.sheet().onComplete(["2"]));
+    assert.equal(h.sheet().errorMessage, expected);
+    assert.equal(h.field("아이템명").value, "오프라인 초안");
+    assert.equal(h.returned, 0);
+    assert.deepEqual(h.invalidated, []);
+  }
 });
 
 test("중복은 새 저장 성공으로 알리지 않고 기존 상품 확인 동작만 제공한다", async () => {

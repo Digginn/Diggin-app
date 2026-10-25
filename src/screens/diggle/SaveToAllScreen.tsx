@@ -22,6 +22,7 @@ import { useFolders } from "@/hooks/useFolders";
 import { useToast } from "@/hooks/useToast";
 import { startLogin } from "@/lib/loginIntent";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
+import { itemSaveErrorMessage } from "@/screens/save/domain/itemSaveError";
 import type { ItemSaveValues } from "@/types/wish-item";
 
 import {
@@ -256,7 +257,7 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
           folders={folders.data ?? []}
           selectedFolderIds={[]}
           isCompleting={save.isPending}
-          errorMessage={save.isError ? TOAST_MESSAGES.SAVE_012 : undefined}
+          errorMessage={save.isError ? itemSaveErrorMessage(save.error) : undefined}
           onErrorDismiss={save.reset}
           onBack={() => setFolderOpen(false)}
           onClose={() => setFolderOpen(false)}
