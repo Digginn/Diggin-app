@@ -170,6 +170,8 @@ for (const os of ["android", "ios"]) {
           measure = callback;
         },
         clearTimeout() {},
+        requestAnimationFrame: (callback) => callback(),
+        cancelAnimationFrame() {},
       },
     );
     const props = {
