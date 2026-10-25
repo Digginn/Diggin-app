@@ -125,7 +125,8 @@ export function Post({
         )}
 
         {!isPreview && (
-          <View className="w-full flex-row items-center justify-between">
+          // 신고 버튼이 없는 본인 글도 같은 간격이 되도록 버튼 높이(48)로 고정한다.
+          <View className="h-12 w-full flex-row items-center justify-between">
             <View className="flex-row items-center gap-1.5">
               <Meta>{timeLabel}</Meta>
               <Text className="text-gray-500 font-b1">·</Text>
