@@ -96,7 +96,7 @@ export function Modal({
           {/* 카드 바깥을 누르면 키보드만 닫는다. 모달은 닫지 않는다. */}
           <Pressable accessible={false} className="absolute inset-0" onPress={Keyboard.dismiss} />
           <View
-            className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-lg ${className ?? "px-2.5 py-4"}`}
+            className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-[0px_4px_20px_rgba(0,0,0,0.1)] ${className ?? "px-2.5 py-4"}`}
           >
             <View className={contentClassName ?? "w-full max-w-[295px] items-center gap-[25px]"}>
               {children}
