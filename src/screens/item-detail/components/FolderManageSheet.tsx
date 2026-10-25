@@ -95,7 +95,7 @@ export function FolderManageSheet({
       onRequestClose={close}
       isCloseConfirmed={isCompleting}
       maxHeight={702}
-      height={isNewItem && folders.length >= 9 ? 702 : undefined}
+      height={!isInline && isNewItem && folders.length >= 9 ? 702 : undefined}
       className="rounded-t-[20px]"
       handleClassName="mb-4 h-1 w-9 self-center rounded-sm bg-gray-300"
       scrimOpacity={0.36}
@@ -166,8 +166,9 @@ export function FolderManageSheet({
         ))
       }
     >
-      {/* 높이를 정하지 않아 폴더 수만큼 자라고, maxHeight 에 닿으면 목록이 줄며 스크롤된다. */}
-      <View className="shrink gap-gutter px-margin">
+      {/* 높이를 정하지 않아 폴더 수만큼 자라고, maxHeight 에 닿으면 목록이 줄며 스크롤된다.
+          공유 카드는 높이가 고정이라 목록이 남은 높이를 채우고 버튼은 맨 아래에 둔다. */}
+      <View className={clsx("gap-gutter px-margin", isInline ? "flex-1" : "shrink")}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="새 폴더 만들기"
@@ -180,7 +181,7 @@ export function FolderManageSheet({
         </Pressable>
         <ScrollView
           ref={listRef}
-          className="grow-0"
+          className={isInline ? "flex-1" : "grow-0"}
           contentContainerClassName="gap-2"
           showsVerticalScrollIndicator={false}
         >
