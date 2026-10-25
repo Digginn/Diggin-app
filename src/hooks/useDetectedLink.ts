@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 
 import { isLinkDetectionPaused } from "@/hooks/useLinkDetectionPause";
+import { isNativeModalBusy } from "@/hooks/useNativeModalVisible";
 import { findItemLink } from "@/utils/itemLink";
 
 // 불러오기를 시작했거나 감지 모달에서 답한 링크. 같은 앱 실행 동안 다시 묻지 않는다.
@@ -21,21 +22,25 @@ export function useDetectedLink() {
 
   const check = useCallback(async () => {
     if (deniedRef.current || checkingRef.current) return;
+    // 시트·모달 위에는 감지 모달이 뜨지 못해 붙여넣기 팝업만 남고 화면이 막힌다. 읽지 않고 다음 복귀 때 다시 본다.
+    if (isLinkDetectionPaused() || isNativeModalBusy()) return;
     checkingRef.current = true;
     try {
       if (!(await Clipboard.hasStringAsync())) return;
 
       const text = await Clipboard.getStringAsync();
-      setHasReadClipboard(true);
       if (!text) {
         // 내용이 있다는데 빈 값이면 붙여넣기를 거부한 것임
         deniedRef.current = true;
+        setHasReadClipboard(true);
         return;
       }
 
       const url = findItemLink(text);
-      // 시트·모달이 떠 있으면 묻지 않고 넘긴다. 기록하지 않아서 다음에 앱으로 돌아오면 다시 묻는다.
-      if (!url || handledLinks.has(url) || isLinkDetectionPaused()) return;
+      // https 링크가 없으면 불러올 것도 없으니 붙여넣기 안내도 띄우지 않는다.
+      if (!url) return;
+      setHasReadClipboard(true);
+      if (handledLinks.has(url) || isLinkDetectionPaused() || isNativeModalBusy()) return;
 
       setLink(url);
     } catch {
