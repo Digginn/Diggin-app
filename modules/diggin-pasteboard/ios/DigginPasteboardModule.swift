@@ -12,6 +12,11 @@ public class DigginPasteboardModule: Module {
     }
 
     AsyncFunction("hasWebUrlAsync") { (promise: Promise) in
+      // Safari 주소 복사처럼 URL 타입으로 들어온 링크는 글자 감지에 잡히지 않는다.
+      if UIPasteboard.general.hasURLs {
+        promise.resolve(true)
+        return
+      }
       UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { result in
         if case .success(let patterns) = result {
           promise.resolve(patterns.contains(.probableWebURL))
