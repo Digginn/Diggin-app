@@ -92,12 +92,20 @@ Deno.test("직접 작성은 앱 화면처럼 조합 이모지를 1자로 센다"
 });
 
 Deno.test("사진이나 계정 삭제에 실패하면 실패로 알리고 설문은 남기지 않는다", async () => {
-  for (const fail of [{ avatars: true }, { user: true }]) {
-    const { handler, calls } = setup(fail);
-    const response = await handler(request({ reasons: ["rarely_used"] }));
-    assert(response.status === 503);
-    assert(!calls.some((call) => call.startsWith("survey:")));
-    if (fail.avatars) assert(!calls.some((call) => call.startsWith("user:")));
+  const logged: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => logged.push(args);
+  try {
+    for (const fail of [{ avatars: true }, { user: true }]) {
+      const { handler, calls } = setup(fail);
+      const response = await handler(request({ reasons: ["rarely_used"] }));
+      assert(response.status === 503);
+      assert(logged.at(-1)?.[0] === "withdrawal_failed");
+      assert(!calls.some((call) => call.startsWith("survey:")));
+      if (fail.avatars) assert(!calls.some((call) => call.startsWith("user:")));
+    }
+  } finally {
+    console.error = original;
   }
 });
 

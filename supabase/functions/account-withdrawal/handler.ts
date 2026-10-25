@@ -83,7 +83,9 @@ export function createWithdrawalHandler(services: Services) {
     try {
       await services.removeAvatars(userId);
       await services.deleteUser(userId);
-    } catch {
+    } catch (error) {
+      // 어느 단계에서 왜 실패했는지 남긴다. 사용자 ID는 남기지 않는다.
+      console.error("withdrawal_failed", error instanceof Error ? error.message : error);
       return json({ error: "withdrawal_failed" }, 503);
     }
     try {

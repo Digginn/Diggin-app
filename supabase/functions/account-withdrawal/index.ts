@@ -21,19 +21,21 @@ Deno.serve(createWithdrawalHandler({
     const bucket = client.storage.from(AVATAR_BUCKET);
     while (true) {
       const { data, error } = await bucket.list(userId, { limit: AVATAR_PAGE });
-      if (error) throw new Error("avatar_list_failed");
+      if (error) throw new Error(`avatar_list_failed: ${error.message}`);
       if (!data.length) return;
       const { error: removeError } = await bucket.remove(
         data.map((file) => `${userId}/${file.name}`),
       );
-      if (removeError) throw new Error("avatar_remove_failed");
+      if (removeError) throw new Error(`avatar_remove_failed: ${removeError.message}`);
       if (data.length < AVATAR_PAGE) return;
     }
   },
   // auth.users를 지우면 세션·리프레시 토큰과 FK로 묶인 데이터가 함께 지워진다(DB_SCHEMA 8).
   async deleteUser(userId) {
     const { error } = await client.auth.admin.deleteUser(userId);
-    if (error) throw new Error("delete_user_failed");
+    if (error) {
+      throw new Error(`delete_user_failed: ${error.code ?? error.status}: ${error.message}`);
+    }
   },
   async recordSurvey({ reasons, customText }) {
     const { error } = await client.rpc("record_withdrawal_survey", {
