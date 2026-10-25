@@ -212,6 +212,12 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
   const isAppLinkLanding = ${APP_LINK_HOST}.test(location.hostname);
   // 중간 페이지가 웹으로 넘겨 주지 않는 경우(오늘의집)가 있어, 주소에 담긴 웹 대체 주소로 직접 옮긴다.
   if (isAppLinkLanding) {
+    // 에이블리 모바일 공유는 앱 실행만 시도하므로 같은 상품 번호의 웹 페이지로 옮긴다.
+    const ablyProduct = /^\\/goods\\/(\\d+)\\/?$/.exec(location.pathname);
+    if (location.hostname === "ably.airbridge.io" && ablyProduct) {
+      location.replace("https://m.a-bly.com/goods/" + ablyProduct[1]);
+      return;
+    }
     // 컬리 공유 링크는 앱을 열거나 App Store로 보내고, 웹 대체 주소를 쿼리에 담지 않는다. 같은 상품 번호의 웹 주소로 옮긴다.
     const kurlyProduct = /^\\/products\\/(\\d+)/.exec(location.pathname);
     if (location.hostname === "kurlink.kurly.com" && kurlyProduct) {
