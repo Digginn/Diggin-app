@@ -120,6 +120,9 @@ test("루트는 폰트·세션 복원이 끝난 뒤 앱과 전역 제재 안내�
       SessionExpiredModal: "SessionExpiredModal",
     },
     "@/lib/pushNotifications": { registerDevicePush: async () => {} },
+    "@/components/PushNotifications": {
+      PushNotifications: "PushNotifications",
+    },
     "@/lib/sharedSaves": { readSharedSaveTime: async () => 0 },
     "@/api/folders": { folderKeys: { all: ["folders"] } },
     "@/api/products": { productKeys: { all: ["products"] } },

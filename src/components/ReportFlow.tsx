@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Modal } from "@/components/modal/Modal";
 import { ModalButton } from "@/components/modal/ModalButton";
@@ -88,6 +88,7 @@ export function ReportDialog({ target, onClose }: { target: ReportTarget; onClos
 
   return (
     <Modal
+      isKeyboardAvoiding={Platform.OS === "android" && phase === "report"}
       visible={!!viewer && viewer === owner}
       onRequestClose={close}
       toastMessage={error || undefined}

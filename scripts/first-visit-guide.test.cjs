@@ -123,85 +123,87 @@ test("세 안내는 별도로 저장하며 닫은 안내·비활성 화면·늦�
   assert.equal(state, false);
 });
 
-test("강조 영역은 측정 위치·Android 상태바를 반영하고 VotePrompt 전체 너비를 유지한다", () => {
-  const states = [];
-  let cursor = 0;
-  let measure;
-  let closeCount = 0;
-  const { FirstVisitGuide } = load(
-    "../src/components/FirstVisitGuide.tsx",
-    {
-      "react": {
-        useEffect: (callback) => callback(),
-        useState: (initial) => {
-          const index = cursor++;
-          states[index] ??= initial;
-          return [
-            states[index],
-            (value) => {
-              states[index] = typeof value === "function" ? value(states[index]) : value;
-            },
-          ];
+for (const os of ["android", "ios"]) {
+  test(`${os} 강조 영역은 측정 좌표에 상태바 높이를 중복 가산하지 않는다`, () => {
+    const states = [];
+    let cursor = 0;
+    let measure;
+    let closeCount = 0;
+    const { FirstVisitGuide } = load(
+      "../src/components/FirstVisitGuide.tsx",
+      {
+        "react": {
+          useEffect: (callback) => callback(),
+          useState: (initial) => {
+            const index = cursor++;
+            states[index] ??= initial;
+            return [
+              states[index],
+              (value) => {
+                states[index] = typeof value === "function" ? value(states[index]) : value;
+              },
+            ];
+          },
         },
+        "react-native": {
+          Modal: "Modal",
+          View: "View",
+          Text: "Text",
+          Pressable: "Pressable",
+          Platform: { OS: os },
+          useWindowDimensions: () => ({ width: 375, height: 762 }),
+        },
+        "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 0 }) },
+        "@/hooks/useNativeModalVisible": { useNativeModalVisible: (visible) => visible },
+        "expo-image": { Image: "Image" },
+        "react-native-svg": {
+          __esModule: true,
+          default: "Svg",
+          Defs: "Defs",
+          Mask: "Mask",
+          Rect: "Rect",
+        },
+        "@/theme": { colors: { gray: { 1000: "#000" } } },
       },
-      "react-native": {
-        Modal: "Modal",
-        View: "View",
-        Text: "Text",
-        Pressable: "Pressable",
-        Platform: { OS: "android" },
-        useWindowDimensions: () => ({ width: 375, height: 762 }),
+      {
+        setTimeout: (callback) => {
+          measure = callback;
+        },
+        clearTimeout() {},
       },
-      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 0 }) },
-      "@/hooks/useNativeModalVisible": { useNativeModalVisible: (visible) => visible },
-      "expo-image": { Image: "Image" },
-      "react-native-svg": {
-        __esModule: true,
-        default: "Svg",
-        Defs: "Defs",
-        Mask: "Mask",
-        Rect: "Rect",
+    );
+    const props = {
+      kind: "item-detail",
+      onClose: () => closeCount++,
+      targets: {
+        wish: { current: { measureInWindow: (callback) => callback(17, 410, 84, 48) } },
+        vote: { current: { measureInWindow: (callback) => callback(0, 620, 375, 42) } },
       },
-      "@/theme": { colors: { gray: { 1000: "#000" } } },
-    },
-    {
-      setTimeout: (callback) => {
-        measure = callback;
-      },
-      clearTimeout() {},
-    },
-  );
-  const props = {
-    kind: "item-detail",
-    onClose: () => closeCount++,
-    targets: {
-      wish: { current: { measureInWindow: (callback) => callback(17, 410, 84, 48) } },
-      vote: { current: { measureInWindow: (callback) => callback(0, 620, 375, 42) } },
-    },
-  };
-  const render = () => {
-    cursor = 0;
-    return FirstVisitGuide(props);
-  };
-  render();
-  measure();
-  const tree = render();
-  const find = (node, type) =>
-    !React.isValidElement(node)
-      ? []
-      : [
-          ...(node.type === type ? [node] : []),
-          ...React.Children.toArray(node.props.children).flatMap((child) => find(child, type)),
-        ];
-  const holes = find(tree, "Rect").filter((node) => node.props.fill === "black");
-  assert.equal(holes[0].props.y, 466);
-  assert.equal(holes[0].props.height, 36);
-  assert.equal(holes[1].props.y, 670);
-  assert.equal(holes[1].props.width, 375);
-  assert.equal(holes[1].props.height, 42);
-  assert.equal(find(tree, "Svg")[0].props.height, 812);
-  assert.equal(find(tree, "Mask")[0].props.maskUnits, "userSpaceOnUse");
-  find(tree, "Pressable")[0].props.onPress();
-  tree.props.onRequestClose();
-  assert.equal(closeCount, 2);
-});
+    };
+    const render = () => {
+      cursor = 0;
+      return FirstVisitGuide(props);
+    };
+    render();
+    measure();
+    const tree = render();
+    const find = (node, type) =>
+      !React.isValidElement(node)
+        ? []
+        : [
+            ...(node.type === type ? [node] : []),
+            ...React.Children.toArray(node.props.children).flatMap((child) => find(child, type)),
+          ];
+    const holes = find(tree, "Rect").filter((node) => node.props.fill === "black");
+    assert.equal(holes[0].props.y, 416);
+    assert.equal(holes[0].props.height, 36);
+    assert.equal(holes[1].props.y, 620);
+    assert.equal(holes[1].props.width, 375);
+    assert.equal(holes[1].props.height, 42);
+    assert.equal(find(tree, "Svg")[0].props.height, 812);
+    assert.equal(find(tree, "Mask")[0].props.maskUnits, "userSpaceOnUse");
+    find(tree, "Pressable")[0].props.onPress();
+    tree.props.onRequestClose();
+    assert.equal(closeCount, 2);
+  });
+}

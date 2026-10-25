@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
-import { Modal, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, Mask, Rect } from "react-native-svg";
 
@@ -121,7 +121,8 @@ export function FirstVisitGuide({
               ...previous,
               [target]: {
                 x,
-                y: y + (Platform.OS === "android" ? insets.top : 0),
+                // edge-to-edge 화면의 측정 좌표에는 상태바 영역이 이미 포함된다.
+                y,
                 width: targetWidth,
                 height: targetHeight,
               },

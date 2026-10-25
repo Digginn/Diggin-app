@@ -6,6 +6,7 @@ import {
   Modal as NativeModal,
   Platform,
   Pressable,
+  ScrollView,
   View,
 } from "react-native";
 
@@ -85,11 +86,10 @@ export function Modal({
       statusBarTranslucent={isFullScreen}
       navigationBarTranslucent={isFullScreen}
     >
-      {/* 안드로이드는 adjustResize 로 OS 가 창을 줄여주므로 여기서 또 줄이면 입력란이 밀린다. */}
       <KeyboardAvoidingView
         enabled={isKeyboardAvoiding}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
         <View
           className={`flex-1 items-center px-margin ${isAboveKeyboard ? "justify-end" : "justify-center"} ${backdropClassName ?? ""}`}
@@ -100,10 +100,26 @@ export function Modal({
           <Pressable accessible={false} className="absolute inset-0" onPress={Keyboard.dismiss} />
           <View
             className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-[0px_4px_20px_rgba(0,0,0,0.1)] ${className ?? "px-2.5 py-4"}`}
+            style={
+              Platform.OS === "android" && isKeyboardAvoiding ? { maxHeight: "100%" } : undefined
+            }
           >
-            <View className={contentClassName ?? "w-full max-w-[295px] items-center gap-[25px]"}>
-              {children}
-            </View>
+            {Platform.OS === "android" && isKeyboardAvoiding ? (
+              <ScrollView
+                className="w-full max-w-[295px]"
+                style={{ flexShrink: 1 }}
+                keyboardShouldPersistTaps="handled"
+                contentContainerClassName={
+                  contentClassName ?? "w-full max-w-[295px] items-center gap-[25px]"
+                }
+              >
+                {children}
+              </ScrollView>
+            ) : (
+              <View className={contentClassName ?? "w-full max-w-[295px] items-center gap-[25px]"}>
+                {children}
+              </View>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>

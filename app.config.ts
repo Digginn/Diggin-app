@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
 type Plugins = NonNullable<ExpoConfig["plugins"]>;
@@ -37,10 +39,25 @@ function withKakao(plugins: Plugins): Plugins {
 // app.json에 값이 들어오면 그 값을 쓴다.
 const IOS_BUNDLE_ID = "com.diggin.app.preview";
 
-// app.json을 그대로 쓰고, 키가 필요한 플러그인만 .env 값으로 채운다.
-export default ({ config }: ConfigContext): ExpoConfig =>
-  ({
+// app.json을 그대로 쓰고, 키가 필요한 플러그인과 Firebase 파일 경로만 환경에서 채운다.
+export default ({ config }: ConfigContext): ExpoConfig => {
+  const googleServicesFile =
+    process.env.GOOGLE_SERVICES_JSON ??
+    config.android?.googleServicesFile ??
+    (existsSync("./google-services.json") ? "./google-services.json" : undefined);
+  if (
+    process.env.EAS_BUILD_PLATFORM === "android" &&
+    process.env.EAS_BUILD_PROFILE === "production" &&
+    !googleServicesFile
+  ) {
+    throw new Error(
+      "Android 운영 빌드에는 GOOGLE_SERVICES_JSON 또는 google-services.json 설정이 필요합니다.",
+    );
+  }
+  return {
     ...config,
     ios: { ...config.ios, bundleIdentifier: config.ios?.bundleIdentifier ?? IOS_BUNDLE_ID },
+    android: { ...config.android, googleServicesFile },
     plugins: withKakao(withGoogleSignIn(config.plugins ?? [])),
-  }) as ExpoConfig;
+  } as ExpoConfig;
+};
