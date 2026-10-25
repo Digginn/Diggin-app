@@ -205,7 +205,11 @@ export function FolderManageSheet({
                         ? previous.filter((id) => id !== folder.id)
                         : [...previous, folder.id],
                     );
-                    if (!isNewItem && folder.isOwnedItems && !isSelected)
+                    // 담겨 있는 일반 폴더가 있을 때만 그 폴더에서 뺄지 묻는다.
+                    const hasCustomFolder = selectedIds.some((id) =>
+                      folders.some((other) => other.id === id && !other.isOwnedItems),
+                    );
+                    if (!isNewItem && folder.isOwnedItems && !isSelected && hasCustomFolder)
                       setPendingOwnedFolderId(folder.id);
                   }}
                 >

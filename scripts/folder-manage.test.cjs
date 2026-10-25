@@ -60,6 +60,7 @@ test("소장템 선택 시 유지·제외·취소를 구분하고 완료 시에�
       require: (name) => mocks[name] ?? (name.startsWith("@/assets/") ? name : require(name)),
     },
   );
+  let initialSelected = ["pants"];
   const render = () => {
     cursor = 0;
     return component.exports.FolderManageSheet({
@@ -67,7 +68,7 @@ test("소장템 선택 시 유지·제외·취소를 구분하고 완료 시에�
         { id: "owned", name: "나의 소장템", isOwnedItems: true },
         { id: "pants", name: "바지" },
       ],
-      selectedFolderIds: ["pants"],
+      selectedFolderIds: initialSelected,
       onComplete: (ids) => completed.push(Array.from(ids)),
       onClose() {},
     });
@@ -94,6 +95,14 @@ test("소장템 선택 시 유지·제외·취소를 구분하고 완료 시에�
   row("나의 소장템").props.onPress();
   modal().primaryAction.onPress();
   assert.equal(row("바지").props.accessibilityState.checked, false);
+  finish();
+  assert.deepEqual(completed.pop(), ["owned"]);
+
+  // 담긴 일반 폴더가 없으면 뺄 폴더가 없으니 묻지 않는다.
+  state.length = 0;
+  initialSelected = [];
+  row("나의 소장템").props.onPress();
+  assert.equal(modal().visible, false);
   finish();
   assert.deepEqual(completed.pop(), ["owned"]);
 });
