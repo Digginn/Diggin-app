@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { ItemEditSheet } from "@/screens/item-detail/components/ItemEditSheet";
 import { ProductPageReader } from "@/screens/save/components/ProductPageReader";
 import { ShareErrorSheet, type ShareErrorReason } from "@/screens/save/components/ShareErrorSheet";
+import { itemSaveErrorMessage } from "@/screens/save/domain/itemSaveError";
 import type { ItemSaveValues } from "@/types/wish-item";
 import { classifyItemLink, findItemLink } from "@/utils/itemLink";
 
@@ -127,7 +128,7 @@ export function ShareSaveScreen({
         onRequestClose={onClose}
         onSubmit={submit}
         isSubmitting={save.isPending || isSaved}
-        errorMessage={save.isError ? TOAST_MESSAGES.SAVE_012 : undefined}
+        errorMessage={save.isError ? itemSaveErrorMessage(save.error) : undefined}
         onErrorDismiss={save.reset}
       />
     </View>

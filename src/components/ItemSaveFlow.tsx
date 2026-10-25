@@ -6,6 +6,7 @@ import { EMPTY_ITEM_SAVE_VALUES, type useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
 import { ItemSavePage } from "@/screens/save/components/ItemSavePage";
 import { ProductPageReader } from "@/screens/save/components/ProductPageReader";
+import { itemSaveErrorMessage } from "@/screens/save/domain/itemSaveError";
 
 type ItemSaveFlowProps = { itemSave: ReturnType<typeof useItemSave> };
 
@@ -41,7 +42,7 @@ export function ItemSaveFlow({ itemSave }: ItemSaveFlowProps) {
         initialValues={itemSave.values ?? EMPTY_ITEM_SAVE_VALUES}
         onRequestClose={itemSave.close}
         isSubmitting={save.isPending}
-        errorMessage={save.isError ? TOAST_MESSAGES.SAVE_012 : undefined}
+        errorMessage={save.isError ? itemSaveErrorMessage(save.error) : undefined}
         onErrorDismiss={save.reset}
         onOpenDuplicate={openProduct}
         onSubmit={(values, folderIds) =>

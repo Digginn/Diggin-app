@@ -17,7 +17,42 @@ function nodes(node) {
 const LOGIN_SOURCES = {
   "@/lib/loginIntent": "../src/lib/loginIntent.ts",
   "@/hooks/useLoginGate": "../src/hooks/useLoginGate.tsx",
+  "@/screens/save/domain/itemSaveError": "../src/screens/save/domain/itemSaveError.ts",
 };
+
+test("아이템 저장은 통신 오류만 연결 확인 토스트로 구분한다", () => {
+  const { TOAST_MESSAGES } = load("../src/constants/messages.ts", {});
+  const mocks = {
+    "expo-router": { useRouter: () => ({}) },
+    "@/components/Loading": { LoadingDialog: "LoadingDialog" },
+    "@/constants/messages": { TOAST_MESSAGES },
+    "@/hooks/useItemSave": { EMPTY_ITEM_SAVE_VALUES: {} },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/screens/save/components/ItemSavePage": { ItemSavePage: "ItemSavePage" },
+    "@/screens/save/components/ProductPageReader": { ProductPageReader: "ProductPageReader" },
+  };
+  const { ItemSaveFlow } = load("../src/components/ItemSaveFlow.tsx", mocks);
+  for (const [error, expected] of [
+    [new TypeError("Network request failed"), TOAST_MESSAGES.SYS_001],
+    [
+      { message: "TypeError: Network request failed", code: "", details: "", hint: "" },
+      TOAST_MESSAGES.SYS_001,
+    ],
+    [{ message: "Failed to fetch" }, TOAST_MESSAGES.SYS_001],
+    [{ message: "permission denied", code: "42501" }, TOAST_MESSAGES.SAVE_012],
+    [new Error("invalid_name"), TOAST_MESSAGES.SAVE_012],
+    [null, TOAST_MESSAGES.SAVE_012],
+  ]) {
+    const page = nodes(ItemSaveFlow({ itemSave: { save: { isError: true, error } } })).find(
+      (node) => node.type === "ItemSavePage",
+    );
+    assert.equal(page.props.errorMessage, expected);
+  }
+  const page = nodes(ItemSaveFlow({ itemSave: { save: { isError: false } } })).find(
+    (node) => node.type === "ItemSavePage",
+  );
+  assert.equal(page.props.errorMessage, undefined);
+});
 
 function load(file, mocks) {
   const module = { exports: {} };
