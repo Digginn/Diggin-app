@@ -316,6 +316,7 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   let cursor = 0;
   let lastEffect;
   const { FolderDetailScreen } = load("../src/screens/folder/FolderDetailScreen.tsx", {
+    "@/assets/images/appbar": { IconKebab: "IconKebab" },
     "react": {
       useEffect: (effect) => {
         lastEffect = effect;
@@ -422,7 +423,7 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
     findAll(tree, "FlatList")[0].props.renderItem({ item: items[0] }).props.hasOwnedDim,
     false,
   );
-  assert.equal(headerButtons[1].props.iconSize, 16);
+  assert.equal(headerButtons[1].props.iconSize, 24, "시안의 24px 케밥");
   let menuOpened = false;
   const menuAppBar = React.Children.toArray(
     render({

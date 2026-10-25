@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FlatList, Keyboard, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import MoreIcon from "@/assets/images/folder/icon-detail-more.svg";
+import { IconKebab } from "@/assets/images/appbar";
 import SearchIcon from "@/assets/images/folder/icon-detail-search.svg";
 import SortIcon from "@/assets/images/folder/icon-sort.svg";
 import { AppBar, SearchBar } from "@/components/app-bar";
@@ -150,8 +150,8 @@ export function FolderDetailScreen({
               />
               {isOwnedFolder ? null : (
                 <AppBar.IconButton
-                  icon={MoreIcon}
-                  iconSize={16}
+                  icon={IconKebab}
+                  iconSize={24}
                   accessibilityLabel="폴더 상세 더보기"
                   onPress={() => {
                     setIsMenuOpen(true);
