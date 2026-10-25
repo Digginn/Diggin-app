@@ -48,7 +48,7 @@ type ProfileEditScreenProps = {
 const AUTH_PROVIDER_LABELS = { kakao: "카카오", google: "Google", apple: "Apple" } as const;
 
 export function ProfileEditScreen({
-  authProvider = "kakao",
+  authProvider,
   currentNickname,
   avatarUrl,
   onSaveNickname,
@@ -228,7 +228,7 @@ export function ProfileEditScreen({
                 setHelperMessage(NICKNAME_HELPER_MESSAGE);
               }}
               onSubmitEditing={handleSave}
-              placeholder={currentNickname ?? "현재 닉네임"}
+              placeholder={currentNickname ?? ""}
               returnKeyType="done"
               value={nickname}
             />
@@ -242,12 +242,14 @@ export function ProfileEditScreen({
 
         <View className="mt-5 h-12 flex-row items-center justify-between border-b border-gray-300">
           <Text className="text-gray-800 font-label-14">가입 수단</Text>
-          <View className="flex-row items-center gap-1">
-            <AuthProviderIcon provider={authProvider} />
-            <Text className="text-gray-600 font-b3">
-              {AUTH_PROVIDER_LABELS[authProvider]} 간편 인증
-            </Text>
-          </View>
+          {authProvider && (
+            <View className="flex-row items-center gap-1">
+              <AuthProviderIcon provider={authProvider} />
+              <Text className="text-gray-600 font-b3">
+                {AUTH_PROVIDER_LABELS[authProvider]} 간편 인증
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 

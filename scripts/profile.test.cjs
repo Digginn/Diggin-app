@@ -117,6 +117,7 @@ function renderProfile(
           Button: "Button",
           HelperText: "HelperText",
           TextField: "TextField",
+          AuthProviderIcon: "AuthProviderIcon",
         };
       if (name === "./utils/validateNickname")
         return require("../src/screens/my/utils/validateNickname.ts");
@@ -181,6 +182,28 @@ function renderProfile(
     helper: () => find(render(), (node) => node.type === "HelperText"),
   };
 }
+
+test("프로필 정보가 없으면 가짜 현재 닉네임이나 카카오 가입수단을 표시하지 않는다", () => {
+  const h = renderProfile();
+  assert.equal(h.button("닉네임").props.placeholder, "");
+  const walk = (node) =>
+    React.isValidElement(node)
+      ? [node, ...React.Children.toArray(node.props.children).flatMap(walk)]
+      : [];
+  assert.equal(
+    walk(h.render()).some((node) => node.type === "AuthProviderIcon"),
+    false,
+  );
+  const google = renderProfile("android", true, {
+    currentNickname: "현재계정",
+    authProvider: "google",
+  });
+  assert.equal(google.button("닉네임").props.placeholder, "현재계정");
+  assert.equal(
+    walk(google.render()).find((node) => node.type === "AuthProviderIcon").props.provider,
+    "google",
+  );
+});
 
 test("닉네임을 모두 지우면 저장 버튼을 비활성화하고 다시 입력하면 활성화한다", async () => {
   for (const platform of ["android", "ios"]) {
