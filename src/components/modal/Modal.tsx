@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
 import {
+  AppState,
   Keyboard,
   KeyboardAvoidingView,
   Modal as NativeModal,
@@ -34,7 +35,7 @@ export function Modal({
   children,
   visible,
   onRequestClose,
-  isKeyboardAvoiding = false,
+  isKeyboardAvoiding: isKeyboardAvoidingProp = false,
   keyboardGap = 40,
   onShow,
   onDismiss,
@@ -48,6 +49,8 @@ export function Modal({
   onToastDismiss,
 }: ModalProps) {
   const isNativeVisible = useNativeModalVisible(visible);
+  // 공유 확장은 키보드 위치·높이를 0으로 받아, 키보드를 피하면 카드가 화면 밖으로 밀린다.
+  const isKeyboardAvoiding = isKeyboardAvoidingProp && AppState.currentState !== "extension";
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(() => Keyboard.isVisible());
   useEffect(() => {
     if (!isKeyboardAvoiding) return;

@@ -98,6 +98,7 @@ test("입력 모달은 iOS와 Android 모두 키보드 유무에 따라 중앙�
             View: "View",
             KeyboardAvoidingView: "KeyboardAvoidingView",
             Platform: { OS: os },
+            AppState: { currentState: "active" },
             Keyboard: {
               isVisible: () => false,
               addListener: (event, callback) => {
