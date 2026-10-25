@@ -1,3 +1,4 @@
+/* global __dirname, Buffer */
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
@@ -70,6 +71,15 @@ test("cover로 잘린 이미지에서 화살표 뒤 원본 영역을 구한다",
   assert.equal(rect.originY, 113);
   assert.equal(rect.width, 93);
   assert.equal(rect.height, 93);
+  const right = coverCropRect(
+    { width: 1000, height: 1000 },
+    { width: 375, height: 520 },
+    { x: 327, y: 59, width: 48, height: 48 },
+  );
+  assert.equal(right.originX, 768, "케밥은 뒤로가기와 다른 오른쪽 영역을 측정한다");
+  assert.equal(right.originY, 113);
+  assert.equal(right.width, 93);
+  assert.equal(right.height, 93);
   const edge = coverCropRect(
     { width: 10, height: 10 },
     { width: 375, height: 520 },
