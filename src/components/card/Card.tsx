@@ -95,7 +95,7 @@ export function Card({
           </Text>
           <View className="flex-row">
             <Text
-              className="min-w-0 max-w-[94px] shrink text-gray-900 font-price-s"
+              className="min-w-0 max-w-[94px] shrink text-gray-1000 font-price-s"
               numberOfLines={1}
               ellipsizeMode="tail"
             >
