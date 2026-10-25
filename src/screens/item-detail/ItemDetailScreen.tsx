@@ -6,8 +6,8 @@ import { useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { IconBack } from "@/assets/images/appbar";
-import MoreIcon from "@/assets/images/folder/icon-detail-more.svg";
+import { IconBack, type SvgIcon } from "@/assets/images/appbar";
+import MoreSvg from "@/assets/images/folder/icon-detail-more.svg";
 import ShareSvg from "@/assets/images/icon-share.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
@@ -41,6 +41,9 @@ import { useProduct } from "./queries/useProduct";
 import { useProductFolderIds } from "./queries/useProductFolderIds";
 
 const StyledImage = cssInterop(Image, { className: "style" });
+const MoreIcon = cssInterop(MoreSvg, {
+  className: { target: false, nativeStyleToProp: { color: true } },
+}) as SvgIcon;
 const ShareIcon = cssInterop(ShareSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
@@ -88,15 +91,11 @@ export function ItemDetailScreen() {
   const saveFolders = useSaveProductFolders(id);
   const thumbnail = item?.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
   const { width: windowWidth } = useWindowDimensions();
-  const isBackAreaDark = useIsImageDark(
+  // 두 버튼 색을 맞추려고 양 끝을 따로 재지 않고 앱바 줄 전체 밝기 하나로 정한다.
+  const isHeaderAreaDark = useIsImageDark(
     thumbnail,
     { width: windowWidth, height: HERO_HEIGHT },
-    { x: 0, y: insets.top, width: 48, height: 48 },
-  );
-  const isMoreAreaDark = useIsImageDark(
-    thumbnail,
-    { width: windowWidth, height: HERO_HEIGHT },
-    { x: windowWidth - 48, y: insets.top, width: 48, height: 48 },
+    { x: 0, y: insets.top, width: windowWidth, height: 48 },
   );
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
@@ -106,8 +105,11 @@ export function ItemDetailScreen() {
   // 시트·모달 위에 클립보드 감지 모달이 겹치면 iOS가 무시하고 투명한 창만 남아 화면이 멈춘다.
   useLinkDetectionPause(isEditOpen || isFolderOpen || isMenuOpen || isDeleteOpen);
   const isHeaderDisabled = isEditOpen || isFolderOpen;
-  const headerIconColor = (isDark: boolean) =>
-    isHeaderDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900";
+  const headerIconColor = isHeaderDisabled
+    ? "text-gray-400"
+    : isHeaderAreaDark
+      ? "text-gray-0"
+      : "text-gray-900";
 
   async function openFolderSheet() {
     const [folderResult, folderIdsResult] = await Promise.all([
@@ -178,7 +180,7 @@ export function ItemDetailScreen() {
               accessibilityLabel="뒤로 가기"
               onPress={() => router.back()}
               disabled={isHeaderDisabled}
-              className={headerIconColor(isBackAreaDark)}
+              className={headerIconColor}
             />
           </View>
           <View className="absolute right-0 top-0" style={{ paddingTop: insets.top }}>
@@ -188,7 +190,7 @@ export function ItemDetailScreen() {
               accessibilityLabel="아이템 더보기"
               onPress={() => setMenuOpen(true)}
               disabled={isHeaderDisabled}
-              className={headerIconColor(isMoreAreaDark)}
+              className={headerIconColor}
             />
           </View>
 
