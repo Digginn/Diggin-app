@@ -64,6 +64,7 @@ export function ProfileEditScreen({
   const isNicknameError = helperStatus === "error";
   const [helperMessage, setHelperMessage] = useState(NICKNAME_HELPER_MESSAGE);
   const [isSaving, setIsSaving] = useState(false);
+  const isSaveDisabled = isSaving || isNicknameError || (!nickname && !profileImageUri);
 
   const handlePickImage = async (source: "camera" | "library") => {
     try {
@@ -126,7 +127,7 @@ export function ProfileEditScreen({
 
   const handleSave = async () => {
     Keyboard.dismiss();
-    if (isSaving || isNicknameError || (!nickname && !profileImageUri)) return;
+    if (isSaveDisabled) return;
 
     const errorMessage = validateNickname(nickname);
     if (errorMessage) {
@@ -251,7 +252,7 @@ export function ProfileEditScreen({
       </ScrollView>
 
       <View className="absolute left-6 right-6" style={{ bottom: insets.bottom + 10 }}>
-        <Button size="large" isDisabled={isSaving || isNicknameError} onPress={handleSave}>
+        <Button size="large" isDisabled={isSaveDisabled} onPress={handleSave}>
           저장하기
         </Button>
       </View>

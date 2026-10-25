@@ -182,6 +182,29 @@ function renderProfile(
   };
 }
 
+test("닉네임을 모두 지우면 저장 버튼을 비활성화하고 다시 입력하면 활성화한다", async () => {
+  for (const platform of ["android", "ios"]) {
+    let saves = 0;
+    const h = renderProfile(platform, true, {
+      onSaveNickname: async () => {
+        saves += 1;
+      },
+    });
+    assert.equal(h.saveButton().props.isDisabled, true);
+    h.button("닉네임").props.onChangeText("변경닉네임");
+    assert.equal(h.saveButton().props.isDisabled, false);
+    h.button("닉네임").props.onChangeText("");
+    assert.equal(h.counter(), "0/10");
+    assert.equal(h.saveButton().props.isDisabled, true);
+    await h.save();
+    assert.equal(saves, 0);
+    assert.deepEqual(h.calls.dismissed, []);
+    assert.deepEqual(h.calls.toasts, []);
+    h.button("닉네임").props.onChangeText("새닉네임");
+    assert.equal(h.saveButton().props.isDisabled, false);
+  }
+});
+
 test("프로필 수정은 Android만 키보드에 맞춰 줄이고 iOS 화면 껍데기는 유지한다", () => {
   const android = renderProfile().render();
   assert.equal(android.type, "KeyboardAvoidingView");
@@ -335,6 +358,7 @@ test("사진만 저장한 경우 성공을 안내하고, 일부 저장 콜백이
   });
   saved.button("프로필 사진 변경").props.onPress();
   await saved.button("앨범에서 선택").props.onPress();
+  assert.equal(saved.saveButton().props.isDisabled, false, "사진만 바꾼 경우도 저장할 수 있다");
   await saved.save();
   assert.equal(photoSaves, 1);
   assert.deepEqual(saved.calls.toasts, ["프로필 사진이 변경되었습니다."]);
