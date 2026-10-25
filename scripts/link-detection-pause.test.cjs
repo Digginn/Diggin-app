@@ -22,7 +22,7 @@ function load(file, mocks) {
 function loadDetectedLink(
   pause,
   clipboardText,
-  { isModalBusy = () => false, reads = [], pasteboard = null } = {},
+  { isModalBusy = () => false, reads = [], pasteboard = null, clipboardUrl = null } = {},
 ) {
   const state = [];
   let cursor = 0;
@@ -47,6 +47,7 @@ function loadDetectedLink(
         reads.push(clipboardText);
         return clipboardText;
       },
+      getUrlAsync: async () => clipboardUrl,
     },
     "@/hooks/useLinkDetectionPause": pause,
     "@/hooks/useNativeModalVisible": { isNativeModalBusy: () => isModalBusy() },
@@ -151,6 +152,17 @@ test("iOS는 클립보드를 읽지 않고 링크 유무만 보고 묻고, 불�
   pasteboard.changeCount = 2;
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), true, "새로 복사하면 다시 묻는다");
+});
+
+test("iOS에서 URL 형식으로만 복사된 링크도 불러오기를 누르면 읽는다", async () => {
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
+  const url = "https://zigzag.kr/catalog/products/7";
+  const pasteboard = fakePasteboard({ preview: url });
+  pasteboard.changeCount = 20;
+  const linkDetection = loadDetectedLink(pause, "", { pasteboard, clipboardUrl: url });
+
+  await linkDetection.check();
+  assert.equal(await linkDetection.render().readLink(), url);
 });
 
 test("iOS에서 https가 아닌 링크는 묻지 않는다", async () => {

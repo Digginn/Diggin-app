@@ -76,7 +76,8 @@ export function useDetectedLink() {
     if (!detected) return null;
     if (detected.url) return detected.url;
     try {
-      const text = await Clipboard.getStringAsync();
+      // URL 형식으로만 복사되면 문자열이 비어 있어 URL로 한 번 더 읽는다.
+      const text = (await Clipboard.getStringAsync()) || (await Clipboard.getUrlAsync());
       // 빈 값이면 붙여넣기를 거부한 것이다. 안내(다음부터 바로 불러오기)를 띄울 수 있게 남긴다.
       setHasReadClipboard(true);
       return text ? findItemLink(text) : null;
