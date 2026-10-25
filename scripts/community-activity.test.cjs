@@ -79,24 +79,6 @@ test("좋아요 목록은 글 작성 시각 대신 좋아요 원본 시각·ID�
   assert.deepEqual(Object.keys(args).sort(), ["activity_type", "after_activity_at", "after_id"]);
 });
 
-test("좋아요 목록은 일반글·투표글 혼합 응답을 받아 각 글 종류와 활동 커서를 보존한다", async () => {
-  const post = row();
-  const vote = row();
-  vote.activity_id = "92";
-  vote.post.id = "13";
-  vote.post.type = "vote";
-  const items = await api([vote, post]).fetchCommunityActivity("liked", null);
-  assert.equal(items.length, 2);
-  assert.equal(items[0].post.type, "vote");
-  assert.equal(items[0].cursor.id, "92");
-  assert.equal(items[1].post.type, "post");
-  vote.post.is_liked = false;
-  await assert.rejects(
-    api([vote]).fetchCommunityActivity("liked", null),
-    /invalid_activity_response/,
-  );
-});
-
 test("활동 응답에서 작성자 UUID를 보존하지 않고 타인 글·취소된 좋아요·유형 불일치를 거부한다", async () => {
   const data = row();
   data.post.author_id = "hidden";

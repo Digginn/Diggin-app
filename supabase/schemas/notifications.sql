@@ -92,14 +92,14 @@ begin
 end;
 $$;
 
--- NOTI-005 / #148: 일반글·투표글에 다른 사람이 좋아요를 처음 눌렀을 때. 중복 요청에는 insert가 없다.
+-- NOTI-005 내 일반 게시글에 다른 사람이 좋아요를 처음 눌렀을 때. 이미 누른 상태면 insert가 없어 트리거도 돌지 않는다.
 create or replace function private.notify_post_liked()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
   target private.posts%rowtype;
 begin
   select * into target from private.posts where id = new.post_id;
-  if target.deleted_at is not null or target.hidden_at is not null or
+  if target.type <> 'post' or target.deleted_at is not null or target.hidden_at is not null or
      new.user_id is null or new.user_id = target.author_id or
      not private.notification_actor_visible(target.author_id, new.user_id) then
     return new;

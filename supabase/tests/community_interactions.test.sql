@@ -18,7 +18,6 @@ select throws_ok($$select public.create_comment(current_setting('test.post')::bi
 select throws_ok($$select public.update_comment(1,'댓글')$$,'42501',null,'비회원 수정 불가');
 select throws_ok($$select public.delete_comment(1)$$,'42501',null,'비회원 삭제 불가');
 select throws_ok($$select public.set_community_like(current_setting('test.post')::bigint,true)$$,'42501',null,'비회원 좋아요 불가');
-select throws_ok($$select public.set_community_like(current_setting('test.vote')::bigint,true)$$,'42501',null,'비회원 투표글 좋아요 불가');
 set local role authenticated;
 select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,'댓글',gen_random_uuid())$$,'42501','not_authenticated','JWT 없는 쓰기 거부');
 set local request.jwt.claims = '{"sub":"97000000-0000-0000-0000-000000000002","role":"authenticated"}';
@@ -47,14 +46,7 @@ select throws_ok($$select public.update_comment(current_setting('test.comment'):
 select is(public.set_community_like(current_setting('test.post')::bigint,true)->>'like_count','1','좋아요 등록');
 select is(public.set_community_like(current_setting('test.post')::bigint,true)->>'like_count','1','등록 재시도는 1개 유지');
 select is(public.get_community_post(current_setting('test.post')::bigint)->>'is_liked','true','상세 본인 좋아요 상태 반영');
-select is(public.set_community_like(current_setting('test.vote')::bigint,true)->>'like_count','1','투표글 좋아요 등록');
-select is(public.set_community_like(current_setting('test.vote')::bigint,true)->>'like_count','1','투표글 좋아요 재시도 중복 없음');
-select is(public.get_community_post(current_setting('test.vote')::bigint)->>'is_liked','true','투표글 상세 좋아요 상태');
-select is((select item->>'like_count' from jsonb_array_elements(public.get_community_feed('all')) item where item->>'id'=current_setting('test.vote')),'1','전체 목록에 투표글 좋아요 집계');
-select ok(exists(select 1 from jsonb_array_elements(public.get_my_community_activity('liked')) item where item->'post'->>'id'=current_setting('test.vote')),'좋아요 활동에 투표글 포함');
-select is(public.set_community_like(current_setting('test.vote')::bigint,false)->>'like_count','0','투표글 좋아요 취소');
-select is(public.get_community_post(current_setting('test.vote')::bigint)->>'is_liked','false','투표글 취소 후 상태');
-select ok(not exists(select 1 from jsonb_array_elements(public.get_my_community_activity('liked')) item where item->'post'->>'id'=current_setting('test.vote')),'취소한 투표글은 좋아요 활동에서 제외');
+select throws_ok($$select public.set_community_like(current_setting('test.vote')::bigint,true)$$,'22023','invalid_post_type','투표글 좋아요 차단');
 select throws_ok($$select public.set_community_like(current_setting('test.post')::bigint,null)$$,'22023','invalid_like_state','null 상태 거부');
 select lives_ok($$select public.create_comment(current_setting('test.vote')::bigint,'투표와 독립인 댓글',gen_random_uuid())$$,'투표 참여 없이 댓글 등록 허용');
 reset role;
@@ -91,7 +83,6 @@ select throws_ok($$select public.create_comment(current_setting('test.post')::bi
 select throws_ok($$select public.update_comment(current_setting('test.comment')::bigint,'제한 계정 수정')$$,'42501','community_restricted','제재 수정 차단');
 select throws_ok($$select public.delete_comment(current_setting('test.comment')::bigint)$$,'42501','community_restricted','제재 댓글 삭제 차단');
 select throws_ok($$select public.set_community_like(current_setting('test.post')::bigint,true)$$,'42501','community_restricted','제재 좋아요 차단');
-select throws_ok($$select public.set_community_like(current_setting('test.vote')::bigint,true)$$,'42501','community_restricted','제재 투표글 좋아요 차단');
 reset role;
 update public.profiles set restricted_until=now()-interval '1 second' where id=auth.uid();
 set local role authenticated;
@@ -101,13 +92,11 @@ insert into private.user_blocks(blocker_id,blocked_id) values (auth.uid(),'97000
 set local role authenticated;
 select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,'차단 댓글',gen_random_uuid())$$,'42501','post_not_found','차단 작성자의 글에 등록 불가');
 select throws_ok($$select public.set_community_like(current_setting('test.post')::bigint,true)$$,'42501','post_not_found','차단 작성자의 글에 좋아요 불가');
-select throws_ok($$select public.set_community_like(current_setting('test.vote')::bigint,true)$$,'42501','post_not_found','차단 작성자의 투표글 좋아요 불가');
 reset role;
 delete from private.user_blocks where blocker_id=auth.uid();
 update private.posts set hidden_at=now() where id=current_setting('test.vote')::bigint;
 set local role authenticated;
 select throws_ok($$select public.create_comment(current_setting('test.vote')::bigint,'숨긴 글 댓글',gen_random_uuid())$$,'42501','post_not_found','숨긴 글 등록 불가');
-select throws_ok($$select public.set_community_like(current_setting('test.vote')::bigint,true)$$,'42501','post_not_found','숨긴 투표글 좋아요 불가');
 reset role;
 set local request.jwt.claims = '{"sub":"97000000-0000-0000-0000-000000000001","role":"authenticated"}';
 set local role authenticated;

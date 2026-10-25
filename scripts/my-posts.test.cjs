@@ -194,17 +194,6 @@ test("좋아요한 글은 탭 없이 실제 카드를 표시하고 상세로 이
   assert.equal(selected[0].params.returnTo, "liked");
 });
 
-test("좋아요한 투표글은 투표 카드로 표시하고 투표 상세로 이동한다", () => {
-  const selected = [];
-  const item = activity("5", "vote");
-  const Screen = loadScreen("MyPostsScreen", { rows: { liked: [item] }, selected });
-  const row = find(Screen({ isLiked: true }), "FlatList").props.renderItem({ item });
-  assert.equal(row.type, "Post");
-  assert.equal(row.props.type, "vote");
-  row.props.onPress();
-  assert.equal(selected[0].pathname, "/votes/[id]");
-});
-
 test("빈 상태·최초 오류·추가 페이지 오류를 구분하고 기존 목록을 유지한다", () => {
   let retries = 0,
     next = 0;

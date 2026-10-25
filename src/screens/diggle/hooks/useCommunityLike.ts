@@ -33,7 +33,7 @@ export function useCommunityLike(post: CommunityPost | null | undefined, viewer:
       : { isLiked: post?.isLiked ?? false, likeCount: post?.likeCount ?? 0 };
 
   async function toggle() {
-    if (!post || !viewer || busy.current) return;
+    if (!post || post.type !== "post" || !viewer || busy.current) return;
     const current = lifetime.current;
     const isLiked = !state.isLiked;
     busy.current = true;

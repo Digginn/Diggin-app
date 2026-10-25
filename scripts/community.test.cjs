@@ -438,26 +438,6 @@ function screenMocks({
   return { mocks, toasts, destination: () => destination };
 }
 
-test("투표글 목록은 좋아요 0개도 표시하고 상세에는 좋아요 버튼을 연결한다", () => {
-  const post = {
-    id: "12",
-    type: "vote",
-    body: "투표 본문",
-    items: [],
-    likeCount: 0,
-    commentCount: 0,
-  };
-  const state = screenMocks({ post, feed: { data: { pages: [[post]] } } });
-  state.mocks["@/components/Post"] = { Post: "Post" };
-  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
-  assert.equal(nodes(DiggleScreen(), "Post")[0].props.likeCount, 0);
-  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
-  const row = nodes(PostDetailScreen({ type: "vote" }), "LikeCommentRow")[0];
-  assert.notEqual(row.props.hasLike, false);
-  assert.equal(row.props.likeCount, 0);
-  assert.equal(typeof row.props.onPressLike, "function");
-});
-
 test("비회원 상세 직접 진입은 로그인 안내로 차단하고 없는 글에 목업을 보여주지 않는다", () => {
   let state = screenMocks({ session: null });
   let { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
