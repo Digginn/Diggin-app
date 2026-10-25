@@ -42,6 +42,7 @@ export function VoteListItem({ item, onPress, onReport }: VoteListItemProps) {
           <Image
             source={item.imageSource}
             contentFit="cover"
+            autoplay={false}
             className="h-20 w-20 rounded"
             accessibilityLabel="투표 아이템 이미지"
           />

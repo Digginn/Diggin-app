@@ -168,6 +168,7 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
             <StyledImage
               className="size-[92px] rounded-field bg-gray-100"
               contentFit="cover"
+              autoplay={false}
               source={values.thumbnailUrl ?? undefined}
               accessibilityLabel="게시글에 저장된 아이템 이미지"
             />

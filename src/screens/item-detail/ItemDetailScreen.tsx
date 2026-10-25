@@ -154,6 +154,7 @@ export function ItemDetailScreen() {
             <StyledImage
               className={HERO_FRAME}
               contentFit="cover"
+              autoplay={false}
               onError={() => setFailed(true)}
               source={thumbnail}
             />

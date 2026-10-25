@@ -94,6 +94,7 @@ export function Post({
             <StyledImage
               className="size-20 rounded bg-gray-100"
               contentFit="cover"
+              autoplay={false}
               source={items[0]?.imageUrl ?? undefined}
             />
           </View>
