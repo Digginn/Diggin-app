@@ -109,13 +109,12 @@ export function FolderScreen({
       setToast({ message: folder ? FOLDER_MESSAGES.renameSuccess : FOLDER_MESSAGES.createSuccess });
       return true;
     } catch (error) {
+      const reason =
+        typeof error === "object" && error !== null && "reason" in error ? error.reason : null;
+      // 같은 이름은 입력칸 아래에 알리고 입력값을 유지한다(FLD-002).
+      if (reason === "duplicate") return FOLDER_MESSAGES.duplicateName;
       Keyboard.dismiss();
-      const isLimitError =
-        !folder &&
-        typeof error === "object" &&
-        error !== null &&
-        "reason" in error &&
-        error.reason === "limit";
+      const isLimitError = !folder && reason === "limit";
       setToast({
         message: folder
           ? FOLDER_MESSAGES.renameError
