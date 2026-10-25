@@ -92,6 +92,7 @@ export function ShareSaveScreen({
     if (existingId) return setDuplicateId(existingId);
     // 폴더 목록 없이 열면 빈 목록이라 폴더 없이 저장하게 된다.
     if (!folderResult.data) return showToast(TOAST_MESSAGES.SYS_001, "error");
+    save.reset();
     setFolderValues(values);
   }
 
@@ -152,6 +153,7 @@ export function ShareSaveScreen({
           backLabel="취소"
           folders={folders.data}
           selectedFolderIds={[]}
+          isNewItem
           onBack={() => setFolderValues(null)}
           onClose={() => setFolderValues(null)}
           onCreateFolder={(name) => createFolder.mutateAsync(name)}
