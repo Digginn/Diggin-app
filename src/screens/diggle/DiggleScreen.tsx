@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { FlatList, Text, View } from "react-native";
+import { FlatList, View } from "react-native";
 
 import { ensureCommunityWriteAllowed, restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
 import { NotificationButton } from "@/components/app-bar/NotificationButton";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { Fab } from "@/components/Fab";
 import { Spinner } from "@/components/Loading";
 import { Post } from "@/components/Post";
@@ -60,6 +61,11 @@ export function DiggleScreen() {
             </View>
           ))}
         </View>
+      ) : feed.isError && posts.length === 0 ? (
+        <ErrorState
+          message={communityErrorMessage(feed.error)}
+          onRetry={() => void feed.refetch()}
+        />
       ) : (
         <FlatList
           data={posts}
@@ -72,23 +78,12 @@ export function DiggleScreen() {
           }}
           onEndReachedThreshold={0.4}
           ListEmptyComponent={
-            feed.isError ? (
-              <View className="items-center gap-4 px-margin py-12">
-                <Text className="text-center text-gray-500 font-b1">
-                  {communityErrorMessage(feed.error)}
-                </Text>
-                <View className="w-[156px]">
-                  <Button onPress={() => void feed.refetch()}>다시 시도</Button>
-                </View>
-              </View>
-            ) : (
-              <View className="h-96">
-                <EmptyState
-                  variant={tab === "all" ? "post" : "vote"}
-                  message={DIGGLE_EMPTY_MESSAGES[tab]}
-                />
-              </View>
-            )
+            <View className="h-96">
+              <EmptyState
+                variant={tab === "all" ? "post" : "vote"}
+                message={DIGGLE_EMPTY_MESSAGES[tab]}
+              />
+            </View>
           }
           ListFooterComponent={
             feed.isFetchingNextPage ? (
