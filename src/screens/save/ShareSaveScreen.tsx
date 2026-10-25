@@ -99,7 +99,11 @@ export function ShareSaveScreen({
   async function submit(values: ItemSaveValues, folderIds: string[]) {
     const { productId, isDuplicate } = await save.mutateAsync({ values, folderIds });
     if (!isMounted.current) return;
-    if (isDuplicate) return setDuplicateId(productId);
+    if (isDuplicate) {
+      // 중복 안내는 정보수정 시트에 붙어 있어, 폴더 선택을 닫아 시트를 다시 보여 준다.
+      setFolderValues(null);
+      return setDuplicateId(productId);
+    }
     markSharedSave();
     setSaved(true);
     showToast(TOAST_MESSAGES.SAVE_011);

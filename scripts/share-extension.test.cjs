@@ -239,6 +239,19 @@ test("이미 저장한 링크는 저장하지 않고 안내하며, 확인하면 
   assert.equal(calls.closed, 1, "괜찮아요는 공유를 닫는다");
 });
 
+test("폴더를 고르는 사이 같은 링크가 저장됐으면 폴더 선택을 닫고 중복 안내를 띄운다", async () => {
+  const { run, render, find } = loadShareSave({
+    session: { user: { id: "u" } },
+    saved: { productId: "43", isDuplicate: true },
+  });
+  await find(await run(LINK), "ItemEditSheet").props.onSubmit(VALUES);
+  await find(render(LINK), "FolderManageSheet").props.onComplete(["f1"]);
+  const view = render(LINK);
+  assert.equal(find(view, "FolderManageSheet"), undefined);
+  assert.equal(find(view, "ItemEditSheet").props.visible, true);
+  assert.ok(find(view, "ItemEditSheet").props.duplicate);
+});
+
 test("로그인이 풀렸으면 링크는 앱과 확장만 쓰는 보관함에 맡기고, 주소에 싣지 않고 앱의 로그인으로 보낸다", async () => {
   const { run, calls } = loadShareSave({ error: { message: "invalid refresh token" } });
   await run(LINK);
