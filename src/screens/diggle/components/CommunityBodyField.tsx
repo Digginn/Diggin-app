@@ -19,7 +19,7 @@ export function CommunityBodyField({
   const hasError = (value.length > 0 && count < 5) || hasOverflowed;
   return (
     <View
-      className={`w-full rounded-field border-field bg-gray-0 p-4 ${isVote ? "h-[100px]" : "h-[200px]"} ${hasError ? "border-semantic-error" : "border-gray-300"}`}
+      className={`h-[120px] w-full rounded-field border-field bg-gray-0 p-4 ${hasError ? "border-semantic-error" : "border-gray-300"}`}
     >
       <TextInput
         accessibilityLabel={isVote ? "투표글 본문" : "게시글 본문"}
@@ -28,8 +28,8 @@ export function CommunityBodyField({
         textAlignVertical="top"
         placeholder={
           isVote
-            ? "구매가 고민되는 아이템에 대해 써 주세요. (최소 5글자)"
-            : "저장한 아이템에 대해 의견을 나누어 보세요. (최소 5글자)"
+            ? "구매가 고민되는 아이템은 투표를 올려 의견을 받아보세요. (5~50자)"
+            : "저장한 아이템에 대해 다른 사람들과 의견을 나누어 보세요. (5~50자)"
         }
         placeholderTextColor={colors.gray[400]}
         value={value}
@@ -43,8 +43,8 @@ export function CommunityBodyField({
           onChangeText(limitPostBody(next));
         }}
       />
-      <Text className={`self-end font-note ${hasError ? "text-semantic-error" : "text-gray-500"}`}>
-        {count}/50자
+      <Text className={`self-end font-note ${hasError ? "text-semantic-error" : "text-gray-600"}`}>
+        {count}/{count > 0 && count < 5 ? 5 : 50}자
       </Text>
     </View>
   );
