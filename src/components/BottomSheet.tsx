@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ToastText, type ToastVariant } from "@/components/ToastText";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 import { colors } from "@/theme";
 
 const BOTTOM_PADDING = 40;
@@ -80,6 +81,7 @@ export function BottomSheet({
   isInline = false,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
+  const isNativeVisible = useNativeModalVisible(visible && !isInline);
   const [isKeyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
 
   useEffect(() => {
@@ -213,7 +215,7 @@ export function BottomSheet({
       onRequestClose={onRequestClose}
       onDismiss={onDismiss}
       transparent
-      visible={visible}
+      visible={isNativeVisible}
     >
       <KeyboardAvoidingView
         enabled={isKeyboardAvoiding}
