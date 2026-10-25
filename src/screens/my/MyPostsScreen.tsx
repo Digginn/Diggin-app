@@ -145,7 +145,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                     body={post.body}
                     items={post.items}
                     timeLabel={formatCommunityTime(post.createdAt)}
-                    authorLabel={post.isMine ? "글쓴이 (나)" : "글쓴이"}
+                    authorLabel={post.isMine ? "익명(나)" : "익명"}
                     likeCount={post.likeCount ?? 0}
                     commentCount={post.commentCount ?? 0}
                     onPressReport={
