@@ -175,14 +175,14 @@ export function LoginScreen({
         >
           <Text className="text-gray-500 underline font-b3">회원가입 없이 둘러보기</Text>
         </Pressable>
-        <View className="mt-6 w-full flex-1 flex-row flex-wrap items-end justify-center gap-x-1">
+        <View className="mt-6 w-full flex-1 flex-row flex-wrap items-end justify-center gap-x-[3px]">
           <View className="h-12 justify-center">
             <Text className="text-gray-500 font-meta">로그인 시</Text>
           </View>
           <Pressable
             onPress={() => handlePolicy("이용약관")}
             accessibilityRole="button"
-            className="h-12 min-w-12 items-center justify-center"
+            className="h-12 items-center justify-center"
           >
             <Text className="text-gray-700 underline font-meta">이용약관</Text>
           </Pressable>
@@ -193,7 +193,7 @@ export function LoginScreen({
             <Pressable
               onPress={() => handlePolicy("개인정보 처리방침")}
               accessibilityRole="button"
-              className="h-12 min-w-12 items-center justify-center"
+              className="h-12 items-center justify-center"
             >
               <Text className="text-gray-700 underline font-meta">개인정보 처리방침</Text>
             </Pressable>
