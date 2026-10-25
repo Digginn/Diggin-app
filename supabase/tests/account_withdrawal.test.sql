@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(16);
+select plan(17);
 
 -- AUTH-008 korcen 사전
 select is(private.nickname_error('시발놈', null), 'profanity', 'korcen 비속어는 걸린다');
@@ -23,6 +23,14 @@ insert into private.posts(author_id, type, content) values
 insert into private.comments(post_id, author_id, content) values
   (current_setting('test.host')::bigint, '12000000-0000-0000-0000-000000000001', '탈퇴할 사용자 댓글'),
   (current_setting('test.host')::bigint, '12000000-0000-0000-0000-000000000002', '남는 사용자 댓글');
+-- 본인 글에 본인이 단 댓글이 있으면 글과 함께 지워져야 하고, 탈퇴가 막히면 안 된다.
+insert into private.comments(post_id, author_id, content)
+select id, author, '본인 글의 댓글'
+from private.posts, unnest(array[
+  '12000000-0000-0000-0000-000000000001'::uuid,
+  '12000000-0000-0000-0000-000000000002'::uuid
+]) as author
+where content = '탈퇴할 사용자의 게시글';
 
 -- MY-007 계정 삭제
 delete from auth.users where id = '12000000-0000-0000-0000-000000000001';
@@ -45,6 +53,11 @@ select is(
   (select count(*) from private.posts where content = '탈퇴할 사용자의 게시글'),
   0::bigint,
   '탈퇴한 사용자 게시글은 지운다'
+);
+select is(
+  (select count(*) from private.comments where content = '본인 글의 댓글'),
+  0::bigint,
+  '본인 글에 단 댓글이 있어도 탈퇴되고 그 글의 댓글은 함께 지운다'
 );
 
 -- 탈퇴 설문은 Edge Function(service_role)만 남긴다
