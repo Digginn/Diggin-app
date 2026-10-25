@@ -23,7 +23,6 @@ import KurlyIcon from "@/assets/images/icon-onboarding-kurly.svg";
 import NaverIcon from "@/assets/images/icon-onboarding-naver.svg";
 import PhotoIcon from "@/assets/images/icon-onboarding-photo.svg";
 import { IconMySupport, IconMyChevron } from "@/assets/images/my";
-import CsvGlow from "@/assets/images/onboarding-csv-glow.svg";
 import CsvTap from "@/assets/images/onboarding-csv-tap.svg";
 import FolderFront from "@/assets/images/onboarding-folder-front.svg";
 
@@ -407,15 +406,6 @@ function CsvIllustration({ time }: { time: SharedValue<number> }) {
       },
     ],
   }));
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: csvTrack(time.value, [
-      [0, 0],
-      [900, 0, EASE_OUT],
-      [1450, 0.7],
-      [2150, 0.7, CSV_EASE_IN],
-      [2450, 0],
-    ]),
-  }));
   const tapStyle = useAnimatedStyle(() => ({
     opacity: csvTrack(time.value, [
       [0, 0],
@@ -435,9 +425,6 @@ function CsvIllustration({ time }: { time: SharedValue<number> }) {
   }));
   return (
     <>
-      <AnimatedView className="absolute left-[165px] top-[210px]" style={glowStyle}>
-        <CsvGlow />
-      </AnimatedView>
       <AnimatedView
         className="absolute left-20 top-[143px] h-[171.478px] w-[136px] rounded-[17.739px] bg-gray-0"
         style={[{ boxShadow: "0px 5.913px 11.826px rgba(0,0,0,0.06)" }, fileStyle]}
