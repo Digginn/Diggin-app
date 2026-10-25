@@ -422,12 +422,22 @@ test("이미 로그인한 사람의 자동 이동은 공유 링크를 보존하�
 });
 
 test("ALL 탭은 로그인한 뒤에만 맡긴 공유 링크를 꺼내 저장을 이어 간다", async () => {
-  const run = async (session, pathname) => {
+  const run = async (session, pathname, appState = "active") => {
     const started = [];
     let taken = 0;
     const effects = [];
+    const listeners = [];
     const { default: TabLayout } = load("app/(tabs)/_layout.tsx", {
       "react": { useEffect: (effect) => effects.push(effect) },
+      "react-native": {
+        AppState: {
+          currentState: appState,
+          addEventListener: (_type, listener) => {
+            listeners.push(listener);
+            return { remove() {} };
+          },
+        },
+      },
       "expo-router": {
         Tabs: Object.assign(() => null, { Screen: "Screen" }),
         usePathname: () => pathname,
@@ -452,18 +462,23 @@ test("ALL 탭은 로그인한 뒤에만 맡긴 공유 링크를 꺼내 저장을
     TabLayout();
     for (const effect of effects) effect();
     await new Promise((resolve) => setImmediate(resolve));
-    return { started, taken };
+    const becomeActive = async () => {
+      listeners.forEach((listener) => listener("active"));
+      await new Promise((resolve) => setImmediate(resolve));
+    };
+    return { started, taken, becomeActive };
   };
-  assert.deepEqual(
-    await run(null, "/all"),
-    { started: [], taken: 0 },
-    "둘러보기 비회원은 꺼내지 않는다",
-  );
-  assert.deepEqual(await run({ user: { id: "u" } }, "/folder"), { started: [], taken: 0 });
-  assert.deepEqual(await run({ user: { id: "u" } }, "/all"), {
-    started: ["https://www.musinsa.com/products/1"],
-    taken: 1,
-  });
+  const guest = await run(null, "/all");
+  assert.deepEqual([guest.started, guest.taken], [[], 0], "둘러보기 비회원은 꺼내지 않는다");
+  const folder = await run({ user: { id: "u" } }, "/folder");
+  assert.deepEqual([folder.started, folder.taken], [[], 0]);
+  const member = await run({ user: { id: "u" } }, "/all");
+  assert.deepEqual([member.started, member.taken], [["https://www.musinsa.com/products/1"], 1]);
+
+  const afterLogin = await run({ user: { id: "u" } }, "/all", "inactive");
+  assert.equal(afterLogin.taken, 0, "로그인 창이 닫히는 중에는 꺼내지 않는다");
+  await afterLogin.becomeActive();
+  assert.deepEqual(afterLogin.started, ["https://www.musinsa.com/products/1"]);
 });
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
@@ -775,7 +790,11 @@ test("카카오 신규 가입만 카카오 프로필 사진을 복사하고, 실
 
 test("로딩 창은 소셜 로그인 창이 닫히고 토큰을 받은 뒤에만 띄운다", async () => {
   const order = [];
-  const user = { id: "a", created_at: "2026-10-16T00:00:00Z", last_sign_in_at: "2026-10-16T00:05:00Z" };
+  const user = {
+    id: "a",
+    created_at: "2026-10-16T00:00:00Z",
+    last_sign_in_at: "2026-10-16T00:05:00Z",
+  };
   const { signIn } = loadSignIn({
     getUser: () => (order.push("server"), user),
     kakao: {
