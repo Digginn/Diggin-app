@@ -196,16 +196,13 @@ export function BottomSheet({
 
   if (isInline) {
     if (!visible) return null;
+    // 공유 확장은 키보드 위치·높이를 0으로 받아, 키보드를 피하면 시트 높이가 0이 되어 흰 화면만 남는다.
     return (
-      <KeyboardAvoidingView
-        enabled={isKeyboardAvoiding}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1"
-      >
+      <View className="flex-1">
         {sheet}
         {toast}
         {overlay}
-      </KeyboardAvoidingView>
+      </View>
     );
   }
 
