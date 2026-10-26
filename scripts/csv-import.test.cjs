@@ -388,7 +388,7 @@ test("폴더 한도 배너에서 불러오기·닫기·뒤로가기·화면 이�
     const notice = ui.render(props);
     assert.ok(
       textContent(notice).includes(
-        "폴더는 최대 50개까지 만들 수 있습니다. 초과분은 ALL탭에 개별 아이템으로 저장됩니다.",
+        "폴더는 최대 50개까지 만들 수 있습니다.\n초과분은 ALL탭에 개별 아이템으로 저장됩니다.",
       ),
     );
     assert.equal(ui.find(notice, "CsvImportLoading"), undefined);

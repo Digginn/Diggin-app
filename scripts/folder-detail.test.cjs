@@ -75,10 +75,19 @@ test("폴더 관리 버튼은 1개 이하 배지를 숨기고 100개 이상을 9
   assert.equal(opened, true);
 });
 
-function loadFolderDetailRoute({ params, folders = { data: undefined, isError: false } }) {
-  const calls = { destination: undefined, itemFolderIds: [], foldersEnabled: [] };
+function loadFolderDetailRoute({
+  params,
+  folders = { data: undefined, isError: false },
+  items,
+  counts,
+}) {
+  const calls = { destination: undefined, itemFolderIds: [], foldersEnabled: [], toasts: [] };
   const route = load("../src/app/folder-detail.tsx", {
-    "react": { ...React, useState: (initial) => [initial, () => {}] },
+    "react": {
+      ...React,
+      useState: (initial) => [initial, () => {}],
+      useEffect: (effect) => effect(),
+    },
     "react-native": { View: "View" },
     "@/components/app-bar": { AppBar: "AppBar" },
     "@/components/ErrorState": { ErrorState: "ErrorState" },
@@ -90,7 +99,10 @@ function loadFolderDetailRoute({ params, folders = { data: undefined, isError: f
         return { ...folders, refetch: () => {} };
       },
     },
-    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/hooks/useToast": { useToast: () => (message) => calls.toasts.push(message) },
+    "@/constants/messages": {
+      TOAST_MESSAGES: { SYS_001: "연결 상태를 확인한 후 다시 시도해 주세요." },
+    },
     "@/screens/folder/components/FolderNameModal": { FolderNameModal: "FolderNameModal" },
     "@/screens/folder/components/FolderToast": { FolderToast: "FolderToast" },
     "@/screens/folder/constants/folderMessages": { FOLDER_MESSAGES: {} },
@@ -101,10 +113,12 @@ function loadFolderDetailRoute({ params, folders = { data: undefined, isError: f
     "@/screens/folder/queries/useFolderItems": {
       useFolderItems: (folderId) => {
         calls.itemFolderIds.push(folderId);
-        return { data: undefined, isError: false };
+        return items ?? { data: undefined, isError: false };
       },
     },
-    "@/screens/folder/queries/useFolderCounts": { useFolderCounts: () => ({ data: undefined }) },
+    "@/screens/folder/queries/useFolderCounts": {
+      useFolderCounts: () => counts ?? { data: undefined },
+    },
     "expo-router": {
       useLocalSearchParams: () => params,
       useRouter: () => ({
@@ -138,6 +152,44 @@ test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연
   assert.equal(calls.destination.params.id, "selected-item");
 });
 
+test("폴더 상세 조회 실패는 기존 데이터를 유지하고 연결 확인 토스트만 표시한다", () => {
+  for (const [cached, errorTarget] of [
+    [true, "items"],
+    [false, "items"],
+    [true, "counts"],
+  ]) {
+    const previous = [{ id: "1", name: "저장한 상품", price: 10000 }];
+    let itemRefreshes = 0;
+    let countRefreshes = 0;
+    const h = loadFolderDetailRoute({
+      params: { id: "12", name: "내 폴더" },
+      items: {
+        isError: errorTarget === "items",
+        errorUpdatedAt: 1,
+        data: cached ? { pages: [previous] } : undefined,
+        refetch: () => {
+          itemRefreshes += 1;
+        },
+      },
+      counts: {
+        data: { total: 5 },
+        isError: errorTarget === "counts",
+        refetch: () => {
+          countRefreshes += 1;
+        },
+      },
+    });
+    assert.equal(h.screen.props.folderName, "내 폴더");
+    assert.equal(h.screen.props.items.length, cached ? 1 : 0);
+    assert.equal(h.screen.props.savedItemCount, 5);
+    assert.deepEqual(h.calls.toasts, ["연결 상태를 확인한 후 다시 시도해 주세요."]);
+    assert.equal(h.screen.props.onRetry, undefined);
+    h.screen.props.onRefresh();
+    assert.equal(itemRefreshes, 1);
+    assert.equal(countRefreshes, 1);
+  }
+});
+
 test("비회원 때 연 나의 소장템은 로그인 후 실제 소장템 폴더 ID로 조회한다", () => {
   const params = { id: "owned", name: "나의 소장템", owned: "1" };
   const loading = loadFolderDetailRoute({ params });
@@ -159,7 +211,9 @@ test("비회원 때 연 나의 소장템은 로그인 후 실제 소장템 폴�
   assert.equal(loaded.screen.props.isOwnedFolder, true);
 
   const failed = loadFolderDetailRoute({ params, folders: { data: undefined, isError: true } });
-  assert.equal(failed.rendered.type, "View");
+  assert.equal(failed.rendered.type, "FolderDetailScreen");
+  assert.equal(failed.rendered.props.folderName, "나의 소장템");
+  assert.deepEqual(failed.calls.toasts, ["연결 상태를 확인한 후 다시 시도해 주세요."]);
   assert.deepEqual(failed.calls.itemFolderIds, []);
 });
 
@@ -311,7 +365,7 @@ test("폴더 관리는 소장템을 상단에 구분하고 다중 선택·새 �
   assert.ok(findAll(tree, "Button").every((button) => button.props.isDisabled));
 });
 
-test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실패 재시도를 처리한다", async () => {
+test("폴더 상세는 3열·정렬·카드 동작을 유지하고 오류 화면으로 목록을 가리지 않는다", async () => {
   const state = [];
   let cursor = 0;
   let lastEffect;
@@ -390,18 +444,11 @@ test("폴더 상세는 3열·빈 칸 유지·정렬 전환·카드 콜백과 실
   assert.equal(sortToggled, true, "정렬은 서버에서 다시 불러오도록 라우트에 알린다");
   tree = render({ isOldestFirst: true });
   assert.ok(findAll(tree, "Text").some((node) => node.props.children === "오래된 순"));
-  let retried = false;
-  tree = render({
-    isError: true,
-    onRetry: () => {
-      retried = true;
-    },
-  });
-  assert.equal(findAll(tree, "FlatList").length, 0);
-  assert.equal(findAll(tree, "WishLevel").length, 0);
-  findAll(tree, "Button")[0].props.onPress();
-  assert.equal(retried, true);
-  assert.equal(findAll(render({ isError: true }), "Button")[0].props.isDisabled, true);
+  tree = render({ isError: true });
+  assert.equal(findAll(tree, "FlatList").length, 1);
+  assert.equal(findAll(tree, "FlatList")[0].props.data[0].id, "0");
+  assert.equal(findAll(tree, "WishLevel").length, 1);
+  assert.equal(findAll(tree, "Button").length, 0);
   tree = render();
   const appBar = React.Children.toArray(tree.props.children).find(
     (node) => node.props.isTitleLeftAligned,

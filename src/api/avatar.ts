@@ -16,7 +16,17 @@ export async function saveAvatar(uri: string) {
   try {
     // 카카오 프로필처럼 원격 이미지는 먼저 불러온다. 변환 모듈은 로컬 파일만 읽는다.
     const source = /^https?:\/\//.test(uri) ? await Image.loadAsync(uri) : uri;
-    const image = await ImageManipulator.manipulate(source)
+    const context = ImageManipulator.manipulate(source);
+    const original = await context.renderAsync();
+    const side = Math.min(original.width, original.height);
+    // 직사각형을 바로 512×512로 줄이면 찌그러지므로 중앙을 정사각형으로 자른 뒤 축소한다.
+    const image = await context
+      .crop({
+        originX: Math.floor((original.width - side) / 2),
+        originY: Math.floor((original.height - side) / 2),
+        width: side,
+        height: side,
+      })
       .resize({ width: AVATAR_SIZE, height: AVATAR_SIZE })
       .renderAsync();
     const webp = await image.saveAsync({ format: SaveFormat.WEBP, compress: 0.8 });

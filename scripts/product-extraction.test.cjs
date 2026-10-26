@@ -1,3 +1,4 @@
+/* global __dirname */
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
@@ -694,6 +695,44 @@ test("컬리 공유 링크는 앱·App Store로 가기 전에 같은 상품 번�
     "https://kurlink.kurly.com/products/1001464950",
   );
   assert.equal(hasFailed, true, "못 옮기고 중간 페이지에서 끝나면 그 정보를 쓰지 않는다");
+});
+
+test("에이블리 모바일 공유 중간 페이지는 앱 실행 대신 같은 상품의 웹 페이지를 연다", () => {
+  for (const pathname of ["/goods/57476763", "/goods/57476763/"]) {
+    let replaced;
+    const sent = [];
+    let tick;
+    let now = 0;
+    runInNewContext(PRODUCT_PAGE_SCRIPT, {
+      window: { ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) } },
+      document: {
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        getElementById: () => null,
+      },
+      location: {
+        href: `https://ably.airbridge.io${pathname}?https_deeplink=true&short_id=6crmvz8`,
+        hostname: "ably.airbridge.io",
+        pathname,
+        search: "?https_deeplink=true&short_id=6crmvz8",
+        replace: (url) => {
+          replaced = url;
+        },
+      },
+      URLSearchParams,
+      JSON,
+      Date: { now: () => now },
+      setInterval: (callback) => {
+        tick = callback;
+        return 1;
+      },
+      clearInterval() {},
+    });
+    now = 8000;
+    tick?.();
+    assert.equal(replaced, "https://m.a-bly.com/goods/57476763");
+    assert.equal(sent.length, 0, "앱 연결 페이지의 불완전한 정보를 저장 화면에 보내지 않는다");
+  }
 });
 
 test("컬리는 페이지 데이터에서 상품명·판매가·브랜드를 읽는다", () => {

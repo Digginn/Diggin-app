@@ -1,6 +1,7 @@
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { TextField } from "@/components/Field";
@@ -84,10 +85,11 @@ export function ItemInfoFields({
           <TextField
             growsTo={88}
             isError={isNameMissing}
-            maxLength={NAME_MAX_LENGTH}
             placeholder="아이템명을 입력해 주세요."
             value={values.name}
-            onChangeText={update("name")}
+            onChangeText={(text) =>
+              update("name")(Array.from(splitGraphemes(text)).slice(0, NAME_MAX_LENGTH).join(""))
+            }
           />
         </View>
 
@@ -95,10 +97,11 @@ export function ItemInfoFields({
           <View className="flex-1 gap-2">
             <Text className="text-gray-900 font-b3">브랜드명</Text>
             <TextField
-              maxLength={BRAND_MAX_LENGTH}
               placeholder="선택 입력"
               value={values.brand}
-              onChangeText={update("brand")}
+              onChangeText={(text) =>
+                update("brand")(Array.from(splitGraphemes(text)).slice(0, BRAND_MAX_LENGTH).join(""))
+              }
             />
           </View>
           <View className="flex-1 gap-2">

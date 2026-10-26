@@ -3,11 +3,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Linking, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconBack, IconKebab } from "@/assets/images/appbar";
-import ShareSvg from "@/assets/images/icon-share.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
@@ -40,9 +39,6 @@ import { useProduct } from "./queries/useProduct";
 import { useProductFolderIds } from "./queries/useProductFolderIds";
 
 const StyledImage = cssInterop(Image, { className: "style" });
-const ShareIcon = cssInterop(ShareSvg, {
-  className: { target: "style", nativeStyleToProp: { width: true, height: true } },
-});
 
 // HERO_FRAME의 높이와 같아야 한다. 뒤로가기 뒤 밝기를 잴 때 쓴다.
 const HERO_HEIGHT = 520;
@@ -87,11 +83,15 @@ export function ItemDetailScreen() {
   const saveFolders = useSaveProductFolders(id);
   const thumbnail = item?.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
   const { width: windowWidth } = useWindowDimensions();
-  // 두 버튼 색을 맞추려고 양 끝을 따로 재지 않고 앱바 줄 전체 밝기 하나로 정한다.
-  const isHeaderAreaDark = useIsImageDark(
+  const isBackAreaDark = useIsImageDark(
     thumbnail,
     { width: windowWidth, height: HERO_HEIGHT },
-    { x: 0, y: insets.top, width: windowWidth, height: 48 },
+    { x: 0, y: insets.top, width: 48, height: 48 },
+  );
+  const isMoreAreaDark = useIsImageDark(
+    thumbnail,
+    { width: windowWidth, height: HERO_HEIGHT },
+    { x: windowWidth - 48, y: insets.top, width: 48, height: 48 },
   );
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
@@ -101,11 +101,8 @@ export function ItemDetailScreen() {
   // 시트·모달 위에 클립보드 감지 모달이 겹치면 iOS가 무시하고 투명한 창만 남아 화면이 멈춘다.
   useLinkDetectionPause(isEditOpen || isFolderOpen || isMenuOpen || isDeleteOpen);
   const isHeaderDisabled = isEditOpen || isFolderOpen;
-  const headerIconColor = isHeaderDisabled
-    ? "text-gray-400"
-    : isHeaderAreaDark
-      ? "text-gray-0"
-      : "text-gray-900";
+  const headerIconColor = (isDark: boolean) =>
+    isHeaderDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900";
 
   async function openFolderSheet() {
     const [folderResult, folderIdsResult] = await Promise.all([
@@ -177,7 +174,7 @@ export function ItemDetailScreen() {
               accessibilityLabel="뒤로 가기"
               onPress={() => router.back()}
               disabled={isHeaderDisabled}
-              className={headerIconColor}
+              className={headerIconColor(isBackAreaDark)}
             />
           </View>
           <View className="absolute right-0 top-0" style={{ paddingTop: insets.top }}>
@@ -187,7 +184,7 @@ export function ItemDetailScreen() {
               accessibilityLabel="아이템 더보기"
               onPress={() => setMenuOpen(true)}
               disabled={isHeaderDisabled}
-              className={headerIconColor}
+              className={headerIconColor(isMoreAreaDark)}
             />
           </View>
 
@@ -214,16 +211,6 @@ export function ItemDetailScreen() {
               />
             )}
           </View>
-
-          <Pressable
-            accessibilityLabel="공유하기"
-            accessibilityRole="button"
-            className="absolute bottom-5 right-4 size-8 items-center justify-center rounded-full border border-gray-300 bg-gray-0 active:opacity-75"
-            hitSlop={8}
-            onPress={() => {}}
-          >
-            <ShareIcon className="size-7" />
-          </Pressable>
         </View>
 
         <View className="gap-6 pt-4">

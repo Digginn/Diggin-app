@@ -150,13 +150,13 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   );
   const csv = () =>
     React.Children.toArray(componentModule.exports.CsvIllustration({ time }).props.children);
-  assert.equal(csv()[1].props.style[1].opacity, 1);
-  assert.equal(csv()[3].props.style[1].opacity, 1);
+  assert.equal(csv()[0].props.style[1].opacity, 1);
+  assert.equal(csv()[2].props.style[1].opacity, 1);
   time.value = 2680;
-  assert.equal(csv()[1].props.style[1].opacity, 0);
-  assert.equal(csv()[1].props.style[1].transform[2].scale, 0.12);
+  assert.equal(csv()[0].props.style[1].opacity, 0);
+  assert.equal(csv()[0].props.style[1].transform[2].scale, 0.12);
   time.value = 4750;
-  assert.equal(csv()[2].props.style.opacity, 1);
+  assert.equal(csv()[1].props.style.opacity, 1);
   isReducedMotion = false;
   OnboardingIllustration({ page: 3 });
   effect();

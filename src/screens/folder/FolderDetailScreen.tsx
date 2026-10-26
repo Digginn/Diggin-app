@@ -8,7 +8,6 @@ import { IconKebab } from "@/assets/images/appbar";
 import SearchIcon from "@/assets/images/folder/icon-detail-search.svg";
 import SortIcon from "@/assets/images/folder/icon-sort.svg";
 import { AppBar, SearchBar } from "@/components/app-bar";
-import { Button } from "@/components/Button";
 import { Card } from "@/components/card";
 import { WishLevel } from "@/components/WishLevel";
 import type { WishLevelKey } from "@/types/wish-item";
@@ -39,8 +38,8 @@ type FolderDetailScreenProps = {
   wishLevel?: WishLevelKey | null;
   onSelectWishLevel?: (level: WishLevelKey) => void;
   onEndReached?: () => void;
-  isError?: boolean;
-  onRetry?: () => void;
+  isRefreshing?: boolean;
+  onRefresh?: () => void;
   onBack?: () => void;
   onSearch?: () => void;
   onPressMenu?: () => void;
@@ -71,8 +70,8 @@ export function FolderDetailScreen({
   wishLevel = null,
   onSelectWishLevel,
   onEndReached,
-  isError = false,
-  onRetry,
+  isRefreshing = false,
+  onRefresh,
   onBack,
   onSearch,
   onPressMenu,
@@ -163,79 +162,60 @@ export function FolderDetailScreen({
           }
         />
       )}
-      {isError ? (
-        <View
-          pointerEvents="box-none"
-          className="absolute inset-0 items-center justify-center px-margin"
-        >
-          <View className="items-center gap-margin">
-            <Text
-              className="text-center text-gray-500 font-b1"
-              style={{ includeFontPadding: false }}
-            >
-              {"아이템을 불러오지 못했습니다.\n잠시 후 다시 시도해주세요."}
-            </Text>
-            <View className="w-[156px]">
-              <Button onPress={() => onRetry?.()} isDisabled={!onRetry}>
-                다시 시도
-              </Button>
+      <>
+        <View className="gap-2 px-4 pt-4">
+          <Text className="text-gray-1000 font-label-12-semibold">
+            {hasSearchResults ? "검색된 아이템" : "저장한 아이템"}{" "}
+            {(hasSearchResults ? items.length : savedItemCount).toLocaleString("ko-KR")}개
+          </Text>
+          <View className="h-12 flex-row items-center justify-between">
+            <View className="h-12 justify-center">
+              {isOwnedFolder ? null : (
+                <WishLevel
+                  levels={levels}
+                  label="위시레벨"
+                  selected={wishLevel}
+                  onSelect={onSelectWishLevel}
+                />
+              )}
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${isOldestFirst ? "오래된 순" : "최신 순"}, 정렬 변경`}
+              className="h-12 flex-row items-center gap-1 active:opacity-75"
+              onPress={onToggleSort}
+            >
+              <Text className="text-gray-600 font-label-12-semibold">
+                {isOldestFirst ? "오래된 순" : "최신 순"}
+              </Text>
+              <SortIcon />
+            </Pressable>
           </View>
         </View>
-      ) : (
-        <>
-          <View className="gap-2 px-4 pt-4">
-            <Text className="text-gray-1000 font-label-12-semibold">
-              {hasSearchResults ? "검색된 아이템" : "저장한 아이템"}{" "}
-              {(hasSearchResults ? items.length : savedItemCount).toLocaleString("ko-KR")}개
-            </Text>
-            <View className="h-12 flex-row items-center justify-between">
-              <View className="h-12 justify-center">
-                {isOwnedFolder ? null : (
-                  <WishLevel
-                    levels={levels}
-                    label="위시레벨"
-                    selected={wishLevel}
-                    onSelect={onSelectWishLevel}
-                  />
-                )}
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${isOldestFirst ? "오래된 순" : "최신 순"}, 정렬 변경`}
-                className="h-12 flex-row items-center gap-1 active:opacity-75"
-                onPress={onToggleSort}
-              >
-                <Text className="text-gray-600 font-label-12-semibold">
-                  {isOldestFirst ? "오래된 순" : "최신 순"}
-                </Text>
-                <SortIcon />
-              </Pressable>
-            </View>
-          </View>
-          <FlatList
-            className="flex-1"
-            numColumns={3}
-            data={rows}
-            keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
-            columnWrapperClassName="gap-3"
-            contentContainerClassName="gap-5 px-4 pb-6"
-            onEndReached={onEndReached}
-            renderItem={({ item }) =>
-              item ? (
-                <Card
-                  {...item}
-                  hasOwnedDim={!isOwnedFolder}
-                  className="h-40 flex-1"
-                  onPress={onOpenItem ? () => onOpenItem(item) : undefined}
-                />
-              ) : (
-                <View className="flex-1" />
-              )
-            }
-          />
-        </>
-      )}
+        <FlatList
+          className="flex-1"
+          numColumns={3}
+          data={rows}
+          keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
+          columnWrapperClassName="gap-3"
+          contentContainerClassName="gap-5 px-4 pb-6"
+          onEndReached={onEndReached}
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          renderItem={({ item }) =>
+            item ? (
+              <Card
+                {...item}
+                hasOwnedDim={!isOwnedFolder}
+                className="h-40 flex-1"
+                onPress={onOpenItem ? () => onOpenItem(item) : undefined}
+              />
+            ) : (
+              <View className="flex-1" />
+            )
+          }
+        />
+      </>
       {isMenuOpen && (
         <FolderMenu
           placement="header"

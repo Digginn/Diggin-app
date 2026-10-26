@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { WebView } from "react-native-webview";
 
+import { isNaverShortLink, resolveProductPageUrl } from "../api/resolveProductPageUrl";
 import { PRODUCT_PAGE_SCRIPT, type ProductPageRaw } from "../domain/productPageScript";
 
 // 페이지 스크립트는 페이지마다 최대 8초를 기다린다. 앱 공유 링크는 짧은 링크→중간 페이지→상품 페이지를 거친다.
@@ -21,6 +22,8 @@ type ProductPageReaderProps = {
 export function ProductPageReader({ url, onDone }: ProductPageReaderProps) {
   const { width, height } = useWindowDimensions();
   const isDoneRef = useRef(false);
+  const [resolved, setResolved] = useState<{ source: string; target: string } | null>(null);
+  const pageUrl = isNaverShortLink(url) ? (resolved?.source === url ? resolved.target : null) : url;
   const finish = useCallback(
     (raw: ProductPageRaw | null) => {
       if (isDoneRef.current) return;
@@ -35,6 +38,21 @@ export function ProductPageReader({ url, onDone }: ProductPageReaderProps) {
     return () => clearTimeout(timer);
   }, [finish]);
 
+  useEffect(() => {
+    if (!isNaverShortLink(url)) return;
+    let isActive = true;
+    const abort = new AbortController();
+    void resolveProductPageUrl(url, abort.signal).then((target) => {
+      if (isActive) setResolved({ source: url, target });
+    });
+    return () => {
+      isActive = false;
+      abort.abort();
+    };
+  }, [url]);
+
+  if (!pageUrl) return null;
+
   return (
     // iOS 웹뷰는 투명해도 터치를 가져갈 수 있어 크기 0인 틀 안에 넣는다. 안의 웹뷰는 휴대폰 화면 크기로 그려야 쇼핑몰이 모바일 페이지를 준다.
     <View
@@ -42,7 +60,7 @@ export function ProductPageReader({ url, onDone }: ProductPageReaderProps) {
       style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
     >
       <WebView
-        source={{ uri: url }}
+        source={{ uri: pageUrl }}
         injectedJavaScriptBeforeContentLoaded={PRODUCT_PAGE_SCRIPT}
         onMessage={(event) => {
           try {

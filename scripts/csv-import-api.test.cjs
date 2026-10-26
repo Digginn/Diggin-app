@@ -86,6 +86,17 @@ function setup({
     },
     "../domain/prepareCsvImport": domain,
     "../domain/isKrwCsvSource": currency,
+    "./streamCsvImport": {
+      streamCsvImport: async (payload) => {
+        const copy = JSON.parse(JSON.stringify(payload));
+        calls.push(copy);
+        const response = rpc
+          ? await rpc(copy, calls.length)
+          : { data: { importedCount: 1, excludedProducts: [], folderFailures: [] }, error: null };
+        if (response.error) throw response.error;
+        return response.data;
+      },
+    },
     "@/lib/supabase": {
       supabase: {
         auth: { getUser: async () => ({ data: { user }, error: null }) },
@@ -114,14 +125,6 @@ function setup({
             },
           };
           return query;
-        },
-        rpc: async (name, payload) => {
-          assert.equal(name, "import_csv");
-          const copy = JSON.parse(JSON.stringify(payload));
-          calls.push(copy);
-          return rpc
-            ? rpc(copy, calls.length)
-            : { data: { importedCount: 1, excludedProducts: [], folderFailures: [] }, error: null };
         },
       },
     },

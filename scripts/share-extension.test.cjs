@@ -13,7 +13,12 @@ function loadTs(file) {
     ts.transpileModule(readFileSync(path.join(__dirname, file), "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS },
     }).outputText,
-    { module, exports: module.exports, require },
+    {
+      module,
+      exports: module.exports,
+      require: (name) =>
+        name === "@/constants/messages" ? loadTs("../src/constants/messages.ts") : require(name),
+    },
   );
   return module.exports;
 }
@@ -100,6 +105,9 @@ function loadShareSave({
           "@/constants/messages": {
             TOAST_MESSAGES: { SAVE_011: "아이템을 저장했습니다.", SAVE_012: "저장 실패" },
           },
+          "@/screens/save/domain/itemSaveError": loadTs(
+            "../src/screens/save/domain/itemSaveError.ts",
+          ),
           "@/contexts/ToastContext": { ToastProvider: "ToastProvider" },
           "@/hooks/useItemSave": {
             EMPTY_ITEM_SAVE_VALUES: {},

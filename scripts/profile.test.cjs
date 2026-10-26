@@ -117,6 +117,7 @@ function renderProfile(
           Button: "Button",
           HelperText: "HelperText",
           TextField: "TextField",
+          AuthProviderIcon: "AuthProviderIcon",
         };
       if (name === "./utils/validateNickname")
         return require("../src/screens/my/utils/validateNickname.ts");
@@ -181,6 +182,51 @@ function renderProfile(
     helper: () => find(render(), (node) => node.type === "HelperText"),
   };
 }
+
+test("프로필 정보가 없으면 가짜 현재 닉네임이나 카카오 가입수단을 표시하지 않는다", () => {
+  const h = renderProfile();
+  assert.equal(h.button("닉네임").props.placeholder, "");
+  const walk = (node) =>
+    React.isValidElement(node)
+      ? [node, ...React.Children.toArray(node.props.children).flatMap(walk)]
+      : [];
+  assert.equal(
+    walk(h.render()).some((node) => node.type === "AuthProviderIcon"),
+    false,
+  );
+  const google = renderProfile("android", true, {
+    currentNickname: "현재계정",
+    authProvider: "google",
+  });
+  assert.equal(google.button("닉네임").props.placeholder, "현재계정");
+  assert.equal(
+    walk(google.render()).find((node) => node.type === "AuthProviderIcon").props.provider,
+    "google",
+  );
+});
+
+test("닉네임을 모두 지우면 저장 버튼을 비활성화하고 다시 입력하면 활성화한다", async () => {
+  for (const platform of ["android", "ios"]) {
+    let saves = 0;
+    const h = renderProfile(platform, true, {
+      onSaveNickname: async () => {
+        saves += 1;
+      },
+    });
+    assert.equal(h.saveButton().props.isDisabled, true);
+    h.button("닉네임").props.onChangeText("변경닉네임");
+    assert.equal(h.saveButton().props.isDisabled, false);
+    h.button("닉네임").props.onChangeText("");
+    assert.equal(h.counter(), "0/10");
+    assert.equal(h.saveButton().props.isDisabled, true);
+    await h.save();
+    assert.equal(saves, 0);
+    assert.deepEqual(h.calls.dismissed, []);
+    assert.deepEqual(h.calls.toasts, []);
+    h.button("닉네임").props.onChangeText("새닉네임");
+    assert.equal(h.saveButton().props.isDisabled, false);
+  }
+});
 
 test("프로필 수정은 Android만 키보드에 맞춰 줄이고 iOS 화면 껍데기는 유지한다", () => {
   const android = renderProfile().render();
@@ -335,6 +381,7 @@ test("사진만 저장한 경우 성공을 안내하고, 일부 저장 콜백이
   });
   saved.button("프로필 사진 변경").props.onPress();
   await saved.button("앨범에서 선택").props.onPress();
+  assert.equal(saved.saveButton().props.isDisabled, false, "사진만 바꾼 경우도 저장할 수 있다");
   await saved.save();
   assert.equal(photoSaves, 1);
   assert.deepEqual(saved.calls.toasts, ["프로필 사진이 변경되었습니다."]);
@@ -448,8 +495,7 @@ test("닉네임 입력칸 오른쪽에 글자 수를 보여 준다", () => {
 
 test("닉네임 0자·1자는 저장을 막고, 1자는 문구 없이 테두리·카운터만 빨갛게 한다", () => {
   const { button, saveButton, helper } = renderProfile("ios", true, {});
-  assert.equal(button("닉네임").props.maxLength, 10, "10자를 넘게 입력할 수 없다");
-  assert.equal(saveButton().props.isDisabled, true, "0자는 저장 버튼이 비활성이다");
+    assert.equal(saveButton().props.isDisabled, true, "0자는 저장 버튼이 비활성이다");
   button("닉네임").props.onChangeText("디");
   assert.equal(saveButton().props.isDisabled, true);
   assert.equal(button("닉네임").props.isError, true);
@@ -457,4 +503,33 @@ test("닉네임 0자·1자는 저장을 막고, 1자는 문구 없이 테두리�
   button("닉네임").props.onChangeText("디기");
   assert.equal(saveButton().props.isDisabled, false);
   assert.equal(button("닉네임").props.isError, false);
+});
+
+test("닉네임은 타이핑·붙여넣기 모두 10글자로 제한하고 카운터와 저장 값도 일치한다", async () => {
+  for (const platform of ["ios", "android"]) {
+    const saved = [];
+    const { button, counter, save } = renderProfile(platform, true, {
+      onSaveNickname: async (nickname) => {
+        saved.push(nickname);
+      },
+    });
+    assert.equal(button("닉네임").props.maxLength, undefined);
+    const mixed = `${"가".repeat(9)}👍🏻`;
+    button("닉네임").props.onChangeText(`${mixed}나`);
+    assert.equal(button("닉네임").props.value, mixed);
+    assert.equal(counter(), "10/10");
+    button("닉네임").props.onChangeText("가나다라마바사아자차");
+    button("닉네임").props.onChangeText("가나다라마바사아자차카");
+    assert.equal(button("닉네임").props.value, "가나다라마바사아자차");
+    assert.equal(counter(), "10/10");
+    button("닉네임").props.onChangeText("12345678901234567890");
+    assert.equal(button("닉네임").props.value, "1234567890");
+    assert.equal(counter(), "10/10");
+    await save();
+    assert.equal(saved[0], "1234567890");
+    button("닉네임").props.onChangeText("123456789");
+    assert.equal(counter(), "9/10");
+    button("닉네임").props.onChangeText("123456789가");
+    assert.equal(counter(), "10/10");
+  }
 });
