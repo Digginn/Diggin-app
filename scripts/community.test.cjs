@@ -304,6 +304,56 @@ function nodes(node, type) {
   ];
 }
 
+test("작성 권한 확인 중 연타해도 작성 화면을 한 번만 열고 목록 복귀 후에는 다시 열 수 있다", async () => {
+  const state = screenMocks();
+  let complete, reject, focus;
+  let checks = 0;
+  const routes = [];
+  state.mocks["@/api/accountAccess"] = {
+    ensureCommunityWriteAllowed: () => {
+      checks++;
+      return new Promise((resolve, fail) => {
+        complete = resolve;
+        reject = fail;
+      });
+    },
+    restrictionMessage: () => null,
+  };
+  state.mocks["expo-router"].useRouter = () => ({
+    push: (route) => routes.push(route),
+    navigate: (route) => routes.push(route),
+  });
+  state.mocks["expo-router"].useFocusEffect = (callback) => {
+    focus = callback;
+  };
+  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const fab = nodes(DiggleScreen(), "Fab")[0];
+  focus?.();
+  fab.props.onPress();
+  fab.props.onPress();
+  assert.equal(checks, 1);
+  complete();
+  await new Promise((resolve) => setImmediate(resolve));
+  fab.props.onPress();
+  assert.equal(checks, 1, "화면 전환 중에도 중복 진입을 차단한다");
+  assert.deepEqual(routes, ["/posts/write"]);
+  focus();
+  fab.props.onPress();
+  assert.equal(checks, 2);
+  complete();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(routes.length, 2);
+  focus();
+  fab.props.onPress();
+  reject(new Error("offline"));
+  await new Promise((resolve) => setImmediate(resolve));
+  fab.props.onPress();
+  assert.equal(checks, 4, "권한 확인 실패 후에는 재시도할 수 있다");
+  complete();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(routes.length, 3);
+});
+
 function screenMocks({
   session = { user: { id: "viewer" } },
   post = null,
