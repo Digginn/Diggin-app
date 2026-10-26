@@ -13,6 +13,8 @@ import { DigginPasteboard } from "../../modules/diggin-pasteboard";
 const handledLinks = new Set<string>();
 // iOS는 내용을 읽지 않고 복사 횟수로 같은 복사를 가린다. 답한 복사는 다시 묻지 않는다.
 // 복사 횟수는 앱을 다시 켜도 유지돼 기기에 저장한다. 재부팅하면 처음부터 다시 센다.
+// '허용'이면 수십 ms 안에 읽힌다. 사람이 팝업에 답하려면 이보다 오래 걸린다.
+const PASTE_PROMPT_MIN_MS = 300;
 const HANDLED_CHANGE_COUNT_KEY = "link-detection-handled-change-count";
 let handledChangeCount: number | null = null;
 let handledChangeCountLoad: Promise<void> | null = null;
@@ -41,8 +43,8 @@ type DetectedLink = { url: string | null; changeCount: number | null };
 
 export function useDetectedLink() {
   const [detected, setDetected] = useState<DetectedLink | null>(null);
-  // 붙여넣기가 막혀 링크를 못 읽은 경우만 켠다. '허용' 설정이면 항상 읽혀 안내가 뜨지 않는다.
-  const [isPasteBlocked, setPasteBlocked] = useState(false);
+  // '허용' 설정이 아니어서 팝업을 거쳤거나 막힌 경우에 켠다. '허용'이면 바로 읽혀 안내가 뜨지 않는다.
+  const [needsPasteGuide, setNeedsPasteGuide] = useState(false);
   const deniedRef = useRef(false);
   const checkingRef = useRef(false);
 
@@ -69,7 +71,7 @@ export function useDetectedLink() {
       if (!text) {
         // 내용이 있다는데 빈 값이면 붙여넣기를 거부한 것임
         deniedRef.current = true;
-        setPasteBlocked(true);
+        setNeedsPasteGuide(true);
         return;
       }
       const url = findItemLink(text);
@@ -91,14 +93,16 @@ export function useDetectedLink() {
     try {
       // 붙여넣기 설정이 '묻기'면 메인 스레드에서 읽어야 사용자의 답을 기다린다(BUG-058). 모듈이 없는 빌드는 expo-clipboard로 읽는다.
       // URL 형식으로만 복사되면 문자열이 비어 있어 URL로 한 번 더 읽는다.
+      const startedAt = Date.now();
       const text = DigginPasteboard?.readLinkTextAsync
         ? await DigginPasteboard.readLinkTextAsync()
         : (await Clipboard.getStringAsync()) || (await Clipboard.getUrlAsync());
-      // 빈 값이면 붙여넣기가 막힌 것이다. 안내(다음부터 바로 불러오기)를 띄울 수 있게 남긴다.
-      if (!text) setPasteBlocked(true);
+      // 빈 값이면 막힌 것이고, 오래 걸렸으면 '묻기' 팝업에 사용자가 답한 것이다. 둘 다 안내(다음부터 바로 불러오기)를 띄운다.
+      // shortcut: 설정값을 읽는 API가 없어 읽기 시간으로 팝업 여부를 가린다. iOS가 설정 조회 API를 주면 그걸로 바꾼다.
+      if (!text || Date.now() - startedAt >= PASTE_PROMPT_MIN_MS) setNeedsPasteGuide(true);
       return text ? findItemLink(text) : null;
     } catch {
-      setPasteBlocked(true);
+      setNeedsPasteGuide(true);
       return null;
     }
   }, [detected]);
@@ -135,5 +139,5 @@ export function useDetectedLink() {
   // 링크를 못 읽어 닫을 때는 처리 기록을 남기지 않는다. 설정에서 허용하고 돌아오면 같은 링크를 다시 묻는다.
   const close = useCallback(() => setDetected(null), []);
 
-  return { isDetected: detected !== null, readLink, handle, close, isPasteBlocked };
+  return { isDetected: detected !== null, readLink, handle, close, needsPasteGuide };
 }
