@@ -1,15 +1,7 @@
 import { Redirect, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SANCTION_REASON_LABELS, type AccountAccess } from "@/api/accountAccess";
@@ -105,10 +97,6 @@ export function LoginScreen({
     }
   }
 
-  function handlePolicy(title: string) {
-    Alert.alert(title, "안내 페이지가 준비되면 연결할 예정입니다.");
-  }
-
   // 이미 로그인한 사람이 diggin://login 으로 들어오면 로그인 화면이 필요 없다.
   // 로그인 중에도 세션이 먼저 생겨, 로그인 중이거나 막 끝났을 때는 아래 이동(가입 완료 안내 등)에 맡긴다.
   if (shouldRedirect) {
@@ -180,7 +168,7 @@ export function LoginScreen({
             <Text className="text-gray-500 font-meta">로그인 시</Text>
           </View>
           <Pressable
-            onPress={() => handlePolicy("이용약관")}
+            onPress={() => router.push("/policies/terms")}
             accessibilityRole="button"
             className="h-12 items-center justify-center"
           >
@@ -191,7 +179,7 @@ export function LoginScreen({
           </View>
           <View className="h-12 flex-row items-center">
             <Pressable
-              onPress={() => handlePolicy("개인정보 처리방침")}
+              onPress={() => router.push("/policies/privacy")}
               accessibilityRole="button"
               className="h-12 items-center justify-center"
             >
