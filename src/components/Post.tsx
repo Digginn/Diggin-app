@@ -12,9 +12,8 @@ import { colors } from "@/theme";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 
-// 아이콘 에셋이 24 프레임 기준이라 쓰는 크기에 맞춰 같은 비율로 줄임
+// 댓글 아이콘은 24 프레임 기준이라 쓰는 크기에 맞춰 같은 비율로 줄임
 const SCALE = 16 / 24;
-const HEART = { width: 18 * SCALE, height: 16.35 * SCALE };
 const COMMENT = { width: 19.5 * SCALE, height: 16.93 * SCALE };
 
 const COLUMN_COUNT = 2;
@@ -135,7 +134,7 @@ export function Post({
               <View className="flex-row items-center justify-end gap-2">
                 {likeCount !== undefined ? (
                   <View className="flex-row items-center justify-center gap-1">
-                    <HeartSvg {...HEART} color={colors.gray[500]} />
+                    <HeartSvg />
                     <Meta>{likeCount}</Meta>
                   </View>
                 ) : null}
