@@ -17,7 +17,6 @@ type SwipeCarouselProps = {
   accessibilityLabel?: string;
   onPageChange?: (index: number) => void;
   autoAdvanceDelays?: readonly number[];
-  media?: ReactNode;
 };
 
 const CARD_WIDTH = 296;
@@ -27,7 +26,6 @@ export function SwipeCarousel({
   accessibilityLabel = "캐러셀",
   onPageChange,
   autoAdvanceDelays,
-  media,
 }: SwipeCarouselProps) {
   const pages = Children.toArray(children).filter(isValidElement);
   const scrollRef = useRef<ScrollView>(null);
@@ -47,10 +45,14 @@ export function SwipeCarousel({
     (index: number) => {
       const nextIndex = Math.max(0, Math.min(pages.length - 1, index));
       scrollRef.current?.scrollTo({ x: nextIndex * CARD_WIDTH, animated: !isReducedMotion });
-      updatePage(nextIndex);
     },
-    [pages.length, isReducedMotion, updatePage],
+    [pages.length, isReducedMotion],
   );
+
+  function updateFromOffset(offset: number) {
+    const index = Math.max(0, Math.min(pages.length - 1, Math.round(offset / CARD_WIDTH)));
+    if (index !== activeIndex) updatePage(index);
+  }
 
   useEffect(() => {
     const delay = autoAdvanceDelays?.[activeIndex];
@@ -75,6 +77,8 @@ export function SwipeCarousel({
         disableIntervalMomentum
         bounces={false}
         showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={({ nativeEvent }) => updateFromOffset(nativeEvent.contentOffset.x)}
         onLayout={() =>
           scrollRef.current?.scrollTo({ x: activeIndex * CARD_WIDTH, animated: false })
         }
@@ -83,12 +87,7 @@ export function SwipeCarousel({
         onMomentumScrollBegin={() => setIsScrolling(true)}
         onMomentumScrollEnd={({ nativeEvent }) => {
           setIsScrolling(false);
-          updatePage(
-            Math.max(
-              0,
-              Math.min(pages.length - 1, Math.round(nativeEvent.contentOffset.x / CARD_WIDTH)),
-            ),
-          );
+          updateFromOffset(nativeEvent.contentOffset.x);
         }}
         accessibilityRole="adjustable"
         accessibilityLabel={accessibilityLabel}
@@ -115,11 +114,6 @@ export function SwipeCarousel({
           />
         ))}
       </View>
-      {media && (
-        <View pointerEvents="none" className="absolute left-0 top-0 h-[396px] w-[295px]">
-          {media}
-        </View>
-      )}
     </View>
   );
 }
