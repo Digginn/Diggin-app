@@ -153,14 +153,14 @@ test("로그아웃·화면 정리 뒤 도착하는 초기 응답은 이동하지
   assert.equal(h.calls.handler, null);
 });
 
-test("실행 중 수신은 목록을 갱신하고 내 알림은 OS 배너·소리·목록으로도 띄운다", async () => {
+test("실행 중 수신은 목록을 갱신하고 OS 배너·소리·목록 표시는 끈다", async () => {
   const h = setup();
   h.receive();
   assert.equal(h.calls.invalidated, 1);
   const own = await h.calls.handler.handleNotification(response(payload).notification);
-  assert.equal(own.shouldShowBanner, true);
-  assert.equal(own.shouldShowList, true);
-  assert.equal(own.shouldPlaySound, true);
+  assert.equal(own.shouldShowBanner, false);
+  assert.equal(own.shouldShowList, false);
+  assert.equal(own.shouldPlaySound, false);
   assert.equal(own.shouldSetBadge, false);
   const other = await h.calls.handler.handleNotification(
     response({ ...payload, recipient_id: "other" }).notification,
@@ -174,7 +174,7 @@ test("실행 중 수신은 목록을 갱신하고 내 알림은 OS 배너·소�
   );
 });
 
-test("iOS도 초기 알림·탭 이동·실행 중 갱신을 처리하고 내 알림은 앱 사용 중에도 띄운다", async () => {
+test("iOS도 초기 알림·탭 이동·실행 중 갱신을 처리하고 OS 표시는 끈다", async () => {
   const cold = response(payload);
   const h = setup({ os: "ios", last: cold });
   await tick();
@@ -186,9 +186,9 @@ test("iOS도 초기 알림·탭 이동·실행 중 갱신을 처리하고 내 �
   h.receive();
   assert.equal(h.calls.invalidated, 1);
   const display = await h.calls.handler.handleNotification(cold.notification);
-  assert.equal(display.shouldShowBanner, true);
-  assert.equal(display.shouldShowList, true);
-  assert.equal(display.shouldPlaySound, true);
+  assert.equal(display.shouldShowBanner, false);
+  assert.equal(display.shouldShowList, false);
+  assert.equal(display.shouldPlaySound, false);
   h.stop();
   assert.equal(h.calls.removed, 2);
   assert.equal(h.calls.handler, null);
