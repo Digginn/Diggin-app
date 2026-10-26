@@ -41,8 +41,8 @@ type DetectedLink = { url: string | null; changeCount: number | null };
 
 export function useDetectedLink() {
   const [detected, setDetected] = useState<DetectedLink | null>(null);
-  // 클립보드를 읽는 순간이 iOS 시스템 팝업이 뜨는 순간이다.
-  const [hasReadClipboard, setHasReadClipboard] = useState(false);
+  // 붙여넣기가 막혀 링크를 못 읽은 경우만 켠다. '허용' 설정이면 항상 읽혀 안내가 뜨지 않는다.
+  const [isPasteBlocked, setPasteBlocked] = useState(false);
   const deniedRef = useRef(false);
   const checkingRef = useRef(false);
 
@@ -69,13 +69,12 @@ export function useDetectedLink() {
       if (!text) {
         // 내용이 있다는데 빈 값이면 붙여넣기를 거부한 것임
         deniedRef.current = true;
-        setHasReadClipboard(true);
+        setPasteBlocked(true);
         return;
       }
       const url = findItemLink(text);
       // https 링크가 없으면 불러올 것도 없으니 붙여넣기 안내도 띄우지 않는다.
       if (!url) return;
-      setHasReadClipboard(true);
       if (handledLinks.has(url) || isLinkDetectionPaused() || isNativeModalBusy()) return;
       setDetected({ url, changeCount: null });
     } catch {
@@ -95,11 +94,11 @@ export function useDetectedLink() {
       const text = DigginPasteboard?.readLinkTextAsync
         ? await DigginPasteboard.readLinkTextAsync()
         : (await Clipboard.getStringAsync()) || (await Clipboard.getUrlAsync());
-      // 빈 값이면 붙여넣기를 거부한 것이다. 안내(다음부터 바로 불러오기)를 띄울 수 있게 남긴다.
-      setHasReadClipboard(true);
+      // 빈 값이면 붙여넣기가 막힌 것이다. 안내(다음부터 바로 불러오기)를 띄울 수 있게 남긴다.
+      if (!text) setPasteBlocked(true);
       return text ? findItemLink(text) : null;
     } catch {
-      setHasReadClipboard(true);
+      setPasteBlocked(true);
       return null;
     }
   }, [detected]);
@@ -136,5 +135,5 @@ export function useDetectedLink() {
   // 링크를 못 읽어 닫을 때는 처리 기록을 남기지 않는다. 설정에서 허용하고 돌아오면 같은 링크를 다시 묻는다.
   const close = useCallback(() => setDetected(null), []);
 
-  return { isDetected: detected !== null, readLink, handle, close, hasReadClipboard };
+  return { isDetected: detected !== null, readLink, handle, close, isPasteBlocked };
 }

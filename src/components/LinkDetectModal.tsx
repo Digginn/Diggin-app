@@ -16,12 +16,12 @@ type LinkDetectModalProps = {
 
 // 탭 화면 어디서든 떠야 해서 탭 레이아웃에서 한 번만 렌더함
 export function LinkDetectModal({ onLoad, isBusy = false }: LinkDetectModalProps) {
-  const { isDetected, readLink, handle, close, hasReadClipboard } = useDetectedLink();
+  const { isDetected, readLink, handle, close, isPasteBlocked } = useDetectedLink();
   // 닫히는 애니메이션이 끝나면 넘길 링크. iOS 는 닫히는 중에 다른 모달을 띄우면 무시한다.
   const [pendingLink, setPendingLink] = useState<string | null>(null);
   const isReadingRef = useRef(false);
   const pasteGuide = usePasteGuide(
-    hasReadClipboard && !isDetected && pendingLink === null && !isBusy,
+    isPasteBlocked && !isDetected && pendingLink === null && !isBusy,
   );
 
   async function load() {

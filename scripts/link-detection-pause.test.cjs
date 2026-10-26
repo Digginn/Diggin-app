@@ -84,7 +84,7 @@ function loadDetectedLink(
     render,
     isDetected: () => state[0] !== null,
     markLinkHandled: detected.markLinkHandled,
-    hasReadClipboard: () => state[1],
+    isPasteBlocked: () => state[1],
   };
 }
 
@@ -128,11 +128,11 @@ test("https 링크가 없으면 붙여넣기 안내 조건을 켜지 않는다",
   const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
   const http = loadDetectedLink(pause, "http://zigzag.kr/catalog/products/4");
   assert.equal(await http.check(), null);
-  assert.equal(http.hasReadClipboard(), false);
+  assert.equal(http.isPasteBlocked(), false);
 
   const https = loadDetectedLink(pause, "https://zigzag.kr/catalog/products/4");
   assert.equal(await https.check(), "https://zigzag.kr/catalog/products/4");
-  assert.equal(https.hasReadClipboard(), true);
+  assert.equal(https.isPasteBlocked(), false, "읽기에 성공하면(허용 설정) 안내를 띄우지 않는다");
 });
 
 function fakePasteboard() {
@@ -165,6 +165,7 @@ test("iOS는 클립보드를 읽지 않고 링크 유무만 보고 묻고, 불�
 
   assert.equal(await linkDetection.render().readLink(), url);
   assert.equal(reads.length, 1, "불러오기를 누를 때 읽는다");
+  assert.equal(linkDetection.isPasteBlocked(), false, "읽기에 성공하면 안내를 띄우지 않는다");
   linkDetection.render().handle(url);
   assert.equal(linkDetection.isDetected(), false);
 
@@ -242,6 +243,7 @@ test("불러오기에서 링크를 못 읽으면 처리 기록을 남기지 않�
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), true);
   assert.equal(await linkDetection.render().readLink(), null, "묻기 설정에서 못 읽음");
+  assert.equal(linkDetection.isPasteBlocked(), true, "못 읽었을 때만 안내를 띄운다");
   linkDetection.render().close();
   assert.equal(linkDetection.isDetected(), false);
   await new Promise((resolve) => setTimeout(resolve, 0));
