@@ -8,6 +8,7 @@
 - `expo-notifications` 기본 채널과 등록 코드의 채널 ID는 모두 `default`다. Android 13+ 권한 요청 전에 채널을 만든다.
 - Android 아이콘은 Figma 알림 시안 `2836:55329`의 AppIcons 원본 SVG(`icon-app-figma.svg`)를 사용한다. `icon-app-android.png`는 구형 Android 일반 아이콘이다. Adaptive icon은 `icon-app-adaptive-foreground.png`(흰 로고·투명 배경)와 `icon-app-adaptive-background.png`(전체 그라데이션)로 분리한다. 흰 전경은 테마용 단색 아이콘에도 재사용한다. iOS의 기존 `icon-app.png`는 유지한다.
 - Adaptive 이미지 두 장은 각각 1024×1024다. Android 108dp 레이어의 중앙 72dp가 원본 38×38 디자인과 일치하도록 로고에 `translate(18 18) scale(72/38)`를 적용하고, 배경 그라데이션 좌표에도 같은 변환을 적용한다. 중앙 영역을 잘라 표시해도 iOS와 로고 비율이 같고, 기기별 마스크에 따라 바깥 모양만 달라진다. 완성된 정사각형 아이콘을 전경으로 그대로 넣으면 로고가 약 1.5배 커 보인다. 앱 아이콘 변경도 새 Android 빌드 설치 후 반영된다.
+- 스플래시는 Figma `352:2426`의 워드마크 원본 `splash-logo-source.svg`에서 4배 해상도로 내보낸 `splash-logo.png`(640×208, 투명 배경)를 사용한다. 표시 너비는 기존 160dp를 유지한다. xxxhdpi(4배 밀도)까지 작은 PNG를 확대하지 않도록 하며, 스플래시 변경도 새 네이티브 빌드가 필요하다.
 - 알림 작은 아이콘은 같은 시안의 흰색 `D,` 벡터를 내보낸 `icon-notification.png`(96×96, 흰색·투명 배경)다. 원본 SVG도 `assets/images/`에 보관한다. 아이콘 변경은 새 Android 빌드 설치 후 반영된다.
 - 공유 확장의 `excludedPackages`는 문자열만 받는다. `expo-notifications`는 문자열로 제외하고 `defaultChannel` 옵션은 루트 plugins에만 둔다. 리뷰 수정 후 lockfile 기준 Linux iOS prebuild에서 생성된 Podfile의 제외 항목을 확인했다. macOS `pod install`과 iOS 컴파일은 별도 검증이 필요하다.
 - Android 운영 빌드는 Firebase 설정이 없으면 실패한다. Firebase SDK/Gradle 연결은 Expo prebuild가 처리한다. 이 설정만으로 Analytics SDK가 앱에 추가되지는 않는다.
