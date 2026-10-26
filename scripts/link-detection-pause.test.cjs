@@ -218,3 +218,15 @@ test("iOS에서 https가 아닌 링크는 감지 모달은 뜨지만 불러오�
   assert.equal(pasteboard.valueReads, 0);
   assert.equal(await linkDetection.render().readLink(), null);
 });
+
+test("iOS 불러오기는 네이티브 모듈의 메인 스레드 읽기를 쓰고, 없으면 expo-clipboard로 읽는다", async () => {
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
+  const url = "https://zigzag.kr/catalog/products/9";
+  const reads = [];
+  const pasteboard = { ...fakePasteboard(), readLinkTextAsync: async () => url };
+  pasteboard.changeCount = 40;
+  const linkDetection = loadDetectedLink(pause, "", { reads, pasteboard });
+  await linkDetection.check();
+  assert.equal(await linkDetection.render().readLink(), url);
+  assert.deepEqual(reads, [], "expo-clipboard는 답을 기다리지 않아 쓰지 않는다");
+});
