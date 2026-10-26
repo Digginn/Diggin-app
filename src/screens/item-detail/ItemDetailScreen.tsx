@@ -40,9 +40,9 @@ import { useProductFolderIds } from "./queries/useProductFolderIds";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 
-// HERO_FRAME의 높이와 같아야 한다. 뒤로가기 뒤 밝기를 잴 때 쓴다.
-const HERO_HEIGHT = 520;
-const HERO_FRAME = "h-[520px] w-full bg-gray-10 ";
+// PDT-01 시안(375×812)의 이미지 높이 520 비율을 모든 기기에서 유지한다(BUG-009).
+const HERO_HEIGHT_RATIO = 520 / 812;
+const HERO_FRAME = "h-full w-full bg-gray-10 ";
 
 // MVP 에서 추천 아이템을 빼기로 하면서 그만큼 이미지가 커졌다.
 // 다시 넣을 때 true 로 바꾸면 된다.
@@ -82,15 +82,16 @@ export function ItemDetailScreen() {
   const createFolder = useCreateFolder();
   const saveFolders = useSaveProductFolders(id);
   const thumbnail = item?.thumbnailUrl && !failed ? item.thumbnailUrl : undefined;
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const heroHeight = Math.round(windowHeight * HERO_HEIGHT_RATIO);
   const isBackAreaDark = useIsImageDark(
     thumbnail,
-    { width: windowWidth, height: HERO_HEIGHT },
+    { width: windowWidth, height: heroHeight },
     { x: 0, y: insets.top, width: 48, height: 48 },
   );
   const isMoreAreaDark = useIsImageDark(
     thumbnail,
-    { width: windowWidth, height: HERO_HEIGHT },
+    { width: windowWidth, height: heroHeight },
     { x: windowWidth - 48, y: insets.top, width: 48, height: 48 },
   );
   const [isMenuOpen, setMenuOpen] = useState(false);
@@ -142,7 +143,7 @@ export function ItemDetailScreen() {
   return (
     <View className="flex-1 bg-gray-0">
       <ScrollView contentContainerStyle={{ paddingBottom: bottomHeight }}>
-        <View className="relative">
+        <View className="relative" style={{ height: heroHeight }}>
           {thumbnail ? (
             <StyledImage
               className={HERO_FRAME}
