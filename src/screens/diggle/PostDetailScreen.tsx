@@ -23,6 +23,7 @@ import { Comment, type MenuAnchor } from "@/components/Comment";
 import { CommentEditBanner } from "@/components/CommentEditBanner";
 import { CommentInput } from "@/components/CommentInput";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { FloatingToolbar } from "@/components/FloatingToolbar";
 import { Spinner } from "@/components/Loading";
 import { ActionModal, LoginRequiredModal } from "@/components/modal";
@@ -266,19 +267,17 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           <Spinner />
         </View>
       ) : !post ? (
-        <View className="flex-1 gap-4">
+        result.isError ? (
+          <ErrorState
+            message={communityErrorMessage(result.error)}
+            onRetry={() => void result.refetch()}
+          />
+        ) : (
           <EmptyState
             variant={type === "vote" ? "vote" : "post"}
-            message={
-              result.isError ? communityErrorMessage(result.error) : "게시글을 찾을 수 없습니다."
-            }
+            message="게시글을 찾을 수 없습니다."
           />
-          {result.isError && (
-            <View className="self-center pb-6">
-              <Button onPress={() => void result.refetch()}>다시 시도</Button>
-            </View>
-          )}
-        </View>
+        )
       ) : (
         <FlatList
           ref={listRef}

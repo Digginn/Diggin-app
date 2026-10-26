@@ -100,6 +100,7 @@ test("입력 모달은 iOS와 Android 모두 키보드 유무에 따라 중앙�
             KeyboardAvoidingView: "KeyboardAvoidingView",
             ScrollView: "ScrollView",
             Platform: { OS: os },
+            AppState: { currentState: "active" },
             Keyboard: {
               isVisible: () => false,
               addListener: (event, callback) => {
@@ -218,7 +219,7 @@ test("FolderModal 문구와 폴더 이름은 사용처 props를 표시하고 콜
     nodes
       .find((node) => node.props.accessibilityLabel === `폴더 선택: ${selectedFolderName}`)
       .props.onPress();
-    for (const label of ["돌아가기", "불러오기", "저장하기"]) {
+    for (const label of ["취소", "불러오기", "저장하기"]) {
       const button = nodes.find(
         (node) =>
           node.type === "Pressable" &&

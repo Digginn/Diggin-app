@@ -104,7 +104,14 @@ export function FirstVisitGuide({
   targets?: GuideTargets;
   onClose: () => void;
 }) {
-  const isNativeVisible = useNativeModalVisible(true);
+  // 로딩 창이 사라지는 렌더에서 바로 띄우면 그 창이 아직 닫히는 중으로 잡히지 않아 iOS가 무시한다.
+  // 한 프레임 뒤에 띄워 닫힘을 먼저 기다리게 한다.
+  const [isReady, setReady] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const isNativeVisible = useNativeModalVisible(isReady);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [viewport, setViewport] = useState({ width, height: height + insets.top + insets.bottom });

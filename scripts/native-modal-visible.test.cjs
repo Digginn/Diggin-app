@@ -63,7 +63,7 @@ function loadHook(os) {
     require: (name) => (name === "react" ? react : { Platform: { OS: os } }),
   });
 
-  return function mount(visible) {
+  function mount(visible) {
     const instance = { state: [], effects: [], subscriptions: [], props: { visible } };
     instance.rerender = () => {
       depth += 1;
@@ -104,7 +104,9 @@ function loadHook(os) {
     };
     instance.rerender();
     return instance;
-  };
+  }
+  mount.isBusy = () => hookModule.exports.isNativeModalBusy();
+  return mount;
 }
 
 test("iOS는 다른 모달이 닫히는 동안 새 모달을 미뤘다가 닫힘이 끝나면 띄운다", () => {
@@ -124,6 +126,8 @@ test("iOS는 다른 모달이 닫히는 동안 새 모달을 미뤘다가 닫힘
     assert.equal(guide.value, false);
     mock.timers.tick(1);
     assert.equal(guide.value, true, "닫힘이 끝나면 띄운다");
+
+    assert.equal(mount.isBusy(), true, "떠 있는 모달이 있으면 바쁘다");
 
     const expired = mount(true);
     guide.setVisible(false);

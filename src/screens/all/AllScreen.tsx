@@ -74,7 +74,6 @@ export function AllScreen() {
   useLinkDetectionPause(isLinkSheetOpen || itemSave.isBusy);
 
   const selectedCount = selectedIds.size;
-  const isAllSelected = items.length > 0 && selectedCount === items.length;
 
   // 선택 모드에서는 DeleteBar 가 탭바 자리를 대신한다.
   useLayoutEffect(() => {
@@ -120,14 +119,7 @@ export function AllScreen() {
   return (
     <View className="flex-1 bg-gray-0">
       {isSelectMode ? (
-        <SelectModeBar
-          selectedCount={selectedCount}
-          isAllSelected={isAllSelected}
-          onCancel={handleCancel}
-          onToggleAll={() =>
-            setSelectedIds(isAllSelected ? new Set() : new Set(items.map((item) => item.id)))
-          }
-        />
+        <SelectModeBar selectedCount={selectedCount} onCancel={handleCancel} />
       ) : (
         <AppBar
           left="logo"
@@ -178,7 +170,7 @@ export function AllScreen() {
                 <Text className="text-gray-1000 font-label-12-semibold">
                   저장한 아이템 {shownCount}개
                 </Text>
-                {/* 선택 모드에서는 상단 바가 취소 · 전체 선택을 맡으므로 숨긴다. */}
+                {/* 선택 모드에서는 상단 바가 취소를 맡으므로 숨긴다. */}
                 {!isSelectMode && items.length > 0 ? (
                   <Pressable
                     accessibilityRole="button"

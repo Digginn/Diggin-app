@@ -24,6 +24,7 @@ function Thumbnail({ source }: { source?: FolderThumbnailSource }) {
     <StyledImage
       source={source}
       contentFit="cover"
+      autoplay={false}
       className="h-full w-full"
       onError={() => setFailedSource(source)}
     />

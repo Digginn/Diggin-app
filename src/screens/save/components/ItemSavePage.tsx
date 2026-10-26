@@ -103,6 +103,8 @@ export function ItemSavePage({
     isCheckingRef.current = true;
     setOverlay(null);
     Keyboard.dismiss();
+    // 앞서 실패한 저장의 안내가 다시 연 시트에 같이 뜨지 않게 지운다.
+    onErrorDismiss();
     setChecking(true);
     // 폴더 목록을 못 불러온 채 열면 빈 목록이라 폴더 없이 저장하게 된다. 다시 불러오고, 그래도 없으면 열지 않는다.
     const [productId, folderResult] = await Promise.all([
@@ -169,6 +171,7 @@ export function ItemSavePage({
           folders={folders.data}
           // 선택된 폴더 없이 시작하고, 미선택 저장도 허용한다(PDT-004).
           selectedFolderIds={[]}
+          isNewItem
           onBack={() => setFolderOpen(false)}
           onClose={() => setFolderOpen(false)}
           onCreateFolder={(name) => createFolder.mutateAsync(name)}

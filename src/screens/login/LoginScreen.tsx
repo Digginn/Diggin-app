@@ -48,6 +48,7 @@ export function LoginScreen({
   const [isLoading, setIsLoading] = useState(isLoginLoading);
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
   const hasSignedIn = useRef(false);
+  const isSigningIn = useRef(false);
   const [didSignIn, setDidSignIn] = useState(false);
   const { session } = useAuth();
   const shouldRedirect = isRedirectedWhenSignedIn && !!session && !isLoading && !didSignIn;
@@ -69,11 +70,12 @@ export function LoginScreen({
   );
 
   async function handleLogin(provider: LoginProvider) {
-    if (isLoading) return;
+    if (isSigningIn.current) return;
+    isSigningIn.current = true;
     setHasError(false);
-    setIsLoading(true);
     try {
-      const result = await signIn(provider);
+      // iOS는 화면이 떠오르는 중에 다른 화면을 띄우지 않는다. 로딩 창을 먼저 띄우면 로그인 창이 안 열린다.
+      const result = await signIn(provider, () => setIsLoading(true));
       if (result.status === "cancelled") return;
       if (result.status === "suspended") {
         setSuspension(result.access);
@@ -98,6 +100,7 @@ export function LoginScreen({
       console.warn("소셜 로그인에 실패했습니다.");
       setHasError(true);
     } finally {
+      isSigningIn.current = false;
       setIsLoading(false);
     }
   }
@@ -172,14 +175,14 @@ export function LoginScreen({
         >
           <Text className="text-gray-500 underline font-b3">회원가입 없이 둘러보기</Text>
         </Pressable>
-        <View className="mt-6 w-full flex-1 flex-row flex-wrap items-end justify-center gap-x-1">
+        <View className="mt-6 w-full flex-1 flex-row flex-wrap items-end justify-center gap-x-[3px]">
           <View className="h-12 justify-center">
             <Text className="text-gray-500 font-meta">로그인 시</Text>
           </View>
           <Pressable
             onPress={() => handlePolicy("이용약관")}
             accessibilityRole="button"
-            className="h-12 min-w-12 items-center justify-center"
+            className="h-12 items-center justify-center"
           >
             <Text className="text-gray-700 underline font-meta">이용약관</Text>
           </Pressable>
@@ -190,7 +193,7 @@ export function LoginScreen({
             <Pressable
               onPress={() => handlePolicy("개인정보 처리방침")}
               accessibilityRole="button"
-              className="h-12 min-w-12 items-center justify-center"
+              className="h-12 items-center justify-center"
             >
               <Text className="text-gray-700 underline font-meta">개인정보 처리방침</Text>
             </Pressable>

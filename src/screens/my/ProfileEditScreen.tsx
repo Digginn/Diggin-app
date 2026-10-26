@@ -27,11 +27,7 @@ import { useToast } from "@/hooks/useToast";
 import { textLength } from "@/utils/text";
 
 import { PROFILE_MESSAGES } from "./constants/profileMessages";
-import {
-  MAX_NICKNAME_LENGTH,
-  NICKNAME_HELPER_MESSAGE,
-  validateNickname,
-} from "./utils/validateNickname";
+import { MAX_NICKNAME_LENGTH, validateNickname } from "./utils/validateNickname";
 import { validateProfileImage } from "./utils/validateProfileImage";
 
 const Image = cssInterop(ExpoImage, { className: "style" });
@@ -62,9 +58,12 @@ export function ProfileEditScreen({
   const [helperStatus, setHelperStatus] = useState<"default" | "error">("default");
   // MY-002 오류 문구가 보이는 동안 저장을 막고, 닉네임을 고치면 다시 연다.
   const isNicknameError = helperStatus === "error";
-  const [helperMessage, setHelperMessage] = useState(NICKNAME_HELPER_MESSAGE);
+  const [helperMessage, setHelperMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const isSaveDisabled = isSaving || isNicknameError || (!nickname && !profileImageUri);
+  // MY-02 1자는 문구 없이 테두리·카운터만 빨갛게 하고 저장을 막는다.
+  const isNicknameTooShort = textLength(nickname) === 1;
+  const isSaveDisabled =
+    isSaving || isNicknameError || isNicknameTooShort || (!nickname && !profileImageUri);
 
   const handlePickImage = async (source: "camera" | "library") => {
     try {
@@ -218,13 +217,13 @@ export function ProfileEditScreen({
             <TextField
               accessibilityLabel="닉네임"
               inputClassName="pr-12"
-              isError={isNicknameError}
+              isError={isNicknameError || isNicknameTooShort}
               onChangeText={(value) => {
                 setNickname(
                   Array.from(splitGraphemes(value)).slice(0, MAX_NICKNAME_LENGTH).join(""),
                 );
                 setHelperStatus("default");
-                setHelperMessage(NICKNAME_HELPER_MESSAGE);
+                setHelperMessage("");
               }}
               onSubmitEditing={handleSave}
               placeholder={currentNickname ?? ""}
@@ -232,7 +231,10 @@ export function ProfileEditScreen({
               value={nickname}
             />
             {/* AUTH-08 입력칸 오른쪽 글자 수 */}
-            <Text pointerEvents="none" className="absolute right-4 text-gray-600 font-note">
+            <Text
+              pointerEvents="none"
+              className={`absolute right-4 font-note ${isNicknameTooShort ? "text-semantic-error" : "text-gray-600"}`}
+            >
               {textLength(nickname)}/{MAX_NICKNAME_LENGTH}
             </Text>
           </View>

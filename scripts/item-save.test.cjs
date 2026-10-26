@@ -156,6 +156,10 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   await saveButton().props.onPress();
   assert.equal(saved.at(-1).price, "0");
 
+  // DB가 거절하는 길이·범위는 입력 단계에서 막는다.
+  priceField().props.onChangeText("12345678901");
+  await saveButton().props.onPress();
+  assert.equal(saved.at(-1).price, "123456789", "정수 범위를 넘지 않게 9자리까지만 받는다");
   const brandField = () =>
     render().find((node) => node.type === "TextField" && node.props.placeholder === "선택 입력");
   assert.equal(nameField().props.maxLength, undefined);

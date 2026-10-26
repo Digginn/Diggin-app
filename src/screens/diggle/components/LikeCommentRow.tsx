@@ -37,7 +37,7 @@ export function LikeCommentRow({
             className="-mr-1.5 size-12 items-center justify-center active:opacity-75"
             onPress={onPressLike}
           >
-            <Heart {...HEART} color={isLiked ? colors.gray[900] : colors.gray[500]} />
+            <Heart {...HEART} color={isLiked ? colors.semantic.error : colors.gray[500]} />
           </Pressable>
           <Text className="text-gray-500 font-label-14">{likeCount}</Text>
         </View>

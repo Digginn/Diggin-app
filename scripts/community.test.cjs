@@ -393,6 +393,7 @@ function screenMocks({
     "@/components/app-bar/NotificationButton": { NotificationButton: "NotificationButton" },
     "@/components/Button": { Button: "Button" },
     "@/components/EmptyState": { EmptyState: "EmptyState" },
+    "@/components/ErrorState": { ErrorState: "ErrorState" },
     "@/components/Fab": { Fab: "Fab" },
     "@/components/Loading": { Spinner: "Spinner" },
     "@/components/modal": { LoginRequiredModal: "LoginRequiredModal", ActionModal: "ActionModal" },
@@ -676,18 +677,21 @@ test("피드·상세 첫 조회 실패는 화면 안내만 표시하고 기존 �
     const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", detail.mocks);
     const tree = PostDetailScreen({});
     assert.equal(detail.toasts.length, hasData ? 1 : 0);
-    assert.equal(nodes(tree, "EmptyState").length, hasData ? 0 : 1);
+    assert.equal(nodes(tree, "ErrorState").length, hasData ? 0 : 1);
     const feed = screenMocks({
       feed: { data: { pages: [hasData ? [post] : []] }, isError: true, error },
     });
     feed.mocks.react.useEffect = (effect) => effect();
     const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", feed.mocks);
-    const list = nodes(DiggleScreen(), "FlatList")[0];
+    const screen = DiggleScreen();
     assert.equal(feed.toasts.length, hasData ? 1 : 0);
-    assert.equal(
-      nodes(list.props.ListEmptyComponent, "Text")[0].props.children,
-      "게시글을 불러오지 못했습니다. 다시 시도해 주세요.",
-    );
+    const errorStates = nodes(screen, "ErrorState");
+    assert.equal(errorStates.length, hasData ? 0 : 1, "기존 게시글이 있으면 목록을 유지한다");
+    if (!hasData)
+      assert.equal(
+        errorStates[0].props.message,
+        "게시글을 불러오지 못했습니다. 다시 시도해 주세요.",
+      );
   }
 });
 

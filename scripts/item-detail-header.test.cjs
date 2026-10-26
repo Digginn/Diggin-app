@@ -58,8 +58,11 @@ test("상품 상세의 양쪽 48px 터치 영역 밝기를 각각 적용하고 �
           Icon({ ...props, color: className === "text-gray-0" ? "#FFFFFF" : "#1E1E1E" });
       },
     },
-    "@/assets/images/appbar": { IconBack: "BackSvg" },
-    "@/assets/images/folder/icon-detail-more.svg": { __esModule: true, default: moreSvg },
+    "@/assets/images/appbar": {
+      IconBack: "BackSvg",
+      IconKebab: ({ className, ...props }) =>
+        moreSvg({ ...props, color: className === "text-gray-0" ? "#FFFFFF" : "#1E1E1E" }),
+    },
     "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: false }) },
     "@/hooks/useToast": { useToast: () => () => {} },
     "@/hooks/useFolders": { useFolders: () => ({ data: [] }) },
@@ -67,7 +70,7 @@ test("상품 상세의 양쪽 48px 터치 영역 밝기를 각각 적용하고 �
     "@/hooks/useProductCounts": { useProductCounts: () => ({}) },
     "@/hooks/useLinkDetectionPause": { useLinkDetectionPause: () => {} },
     "@/screens/all/mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
-    "./queries/useProduct": { useProduct: () => ({ data: { values: { thumbnailUrl } } }) },
+    "./queries/useProduct": { useProduct: () => ({ data: { values: { thumbnailUrl, brand: "" } } }) },
     "./queries/useProductFolderIds": { useProductFolderIds: () => ({ data: [] }) },
     "./mutations/useUpdateProduct": { useUpdateProduct: () => ({}) },
     "./mutations/useSaveProductFolders": { useSaveProductFolders: () => ({}) },

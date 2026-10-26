@@ -6,8 +6,7 @@ import { useRef, useState } from "react";
 import { Linking, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { IconBack, type SvgIcon } from "@/assets/images/appbar";
-import MoreSvg from "@/assets/images/folder/icon-detail-more.svg";
+import { IconBack, IconKebab } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
@@ -40,9 +39,6 @@ import { useProduct } from "./queries/useProduct";
 import { useProductFolderIds } from "./queries/useProductFolderIds";
 
 const StyledImage = cssInterop(Image, { className: "style" });
-const MoreIcon = cssInterop(MoreSvg, {
-  className: { target: false, nativeStyleToProp: { color: true } },
-}) as SvgIcon;
 
 // HERO_FRAME의 높이와 같아야 한다. 뒤로가기 뒤 밝기를 잴 때 쓴다.
 const HERO_HEIGHT = 520;
@@ -151,6 +147,7 @@ export function ItemDetailScreen() {
             <StyledImage
               className={HERO_FRAME}
               contentFit="cover"
+              autoplay={false}
               onError={() => setFailed(true)}
               source={thumbnail}
             />
@@ -182,8 +179,8 @@ export function ItemDetailScreen() {
           </View>
           <View className="absolute right-0 top-0" style={{ paddingTop: insets.top }}>
             <AppBar.IconButton
-              icon={MoreIcon}
-              iconSize={16}
+              icon={IconKebab}
+              iconSize={24}
               accessibilityLabel="아이템 더보기"
               onPress={() => setMenuOpen(true)}
               disabled={isHeaderDisabled}
@@ -218,11 +215,13 @@ export function ItemDetailScreen() {
 
         <View className="gap-6 pt-4">
           <View className="gap-[13px] px-4">
-            <View className="w-full flex-row items-center justify-between gap-2">
-              <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
-                {item.brand}
-              </Text>
-            </View>
+            {item.brand.trim() ? (
+              <View className="w-full flex-row items-center justify-between gap-2">
+                <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
+                  {item.brand}
+                </Text>
+              </View>
+            ) : null}
             <ItemInfo
               name={item.name}
               price={item.price === "" ? null : Number(item.price)}

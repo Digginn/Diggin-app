@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clsx } from "clsx";
 import { LinearGradient } from "expo-linear-gradient";
 import { cssInterop } from "nativewind";
@@ -107,6 +108,22 @@ function LevelList({
   );
 }
 
+// ALL-009·PDT-002 처음 펼칠 때 툴팁을 한 번 띄운다. 화면마다 문구가 달라 문구별로 기록한다.
+const HINT_SEEN_KEY = "wish-level-tooltip-seen:";
+const seenHints = new Set<string>();
+
+function showHintOnce(hint: string, show: () => void) {
+  if (seenHints.has(hint)) return;
+  seenHints.add(hint);
+  AsyncStorage.getItem(HINT_SEEN_KEY + hint)
+    .then((value) => {
+      if (value) return;
+      show();
+      return AsyncStorage.setItem(HINT_SEEN_KEY + hint, "1");
+    })
+    .catch(() => {});
+}
+
 export function WishLevel({
   levels,
   label = "위시 레벨",
@@ -142,6 +159,7 @@ export function WishLevel({
       setChipLayout({ x, y, width, height });
       setIsUp(openDirection === "auto" ? spaceBelow < listHeight : openDirection === "up");
       setIsOpen(true);
+      if (hint) showHintOnce(hint, () => setHintOpen(true));
     });
   }
 

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
-import { HelperText, SearchField } from "@/components/Field";
+import { SearchField } from "@/components/Field";
 import { Spinner } from "@/components/Loading";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePostDraft } from "@/contexts/PostDraftContext";
@@ -100,23 +100,11 @@ export function ItemSelectScreen() {
         />
       </View>
 
-      <View className="w-full flex-row items-center justify-between px-margin py-3">
-        {keyword ? (
+      {keyword ? (
+        <View className="w-full px-margin pt-3">
           <Text className="text-gray-700 font-b3">{`'${keyword}' 검색 결과${counts.data && !counts.isPlaceholderData ? ` ${counts.data.total}개` : " 조회 중"}`}</Text>
-        ) : (
-          <HelperText
-            className="flex-1"
-            message={
-              maxAttachCount === 1
-                ? "1개만 선택할 수 있습니다."
-                : `최대 ${maxAttachCount}개까지 선택할 수 있습니다.`
-            }
-          />
-        )}
-        <Text className="text-gray-900 font-meta">
-          {selectedIds.length}/{maxAttachCount}
-        </Text>
-      </View>
+        </View>
+      ) : null}
 
       <FlatList
         data={products.isPlaceholderData ? [] : gridItems}
@@ -183,7 +171,7 @@ export function ItemSelectScreen() {
             router.back();
           }}
         >
-          {`첨부하기(${selected.length}/${maxAttachCount}개)`}
+          {`첨부하기 (${selected.length}/${maxAttachCount})`}
         </Button>
       </View>
     </KeyboardAvoidingView>

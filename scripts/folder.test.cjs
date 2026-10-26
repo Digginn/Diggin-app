@@ -228,6 +228,30 @@ test("최신 서버 응답의 폴더 제한과 일반 저장 실패를 구분한
   }
 });
 
+test("같은 이름 폴더는 토스트 대신 입력칸 아래 오류로 알리고 모달을 유지한다", async () => {
+  screenState = [];
+  const render = () => {
+    screenCursor = 0;
+    return screenModule.exports.FolderScreen({
+      onCreateFolder: async () => {
+        throw { reason: "duplicate" };
+      },
+    });
+  };
+  try {
+    findAll(render(), "Pressable")
+      .find((node) => node.props.accessibilityLabel === "폴더 추가")
+      .props.onPress();
+    assert.equal(
+      await findAll(render(), "FolderNameModal")[0].props.onSubmit("가"),
+      "이미 사용 중인 폴더 이름입니다.",
+    );
+    assert.equal(findAll(render(), "FolderNameModal")[0].props.overlay, undefined);
+  } finally {
+    screenState = undefined;
+  }
+});
+
 test("삭제 메뉴는 확인 모달을 열고 취소는 삭제하지 않으며 확인한 폴더만 콜백으로 전달한다", async () => {
   screenState = [];
   const calls = [];

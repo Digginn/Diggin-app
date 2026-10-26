@@ -4,6 +4,8 @@ export const FOLDER_MESSAGES = {
   deleteSuccess: "폴더가 삭제되었습니다.",
   createError: "폴더를 생성하지 못했습니다. 다시 시도해 주세요.",
   createLimit: "폴더는 최대 50개까지 만들 수 있습니다.",
+  // MSG-FOLDER-009
+  duplicateName: "이미 사용 중인 폴더 이름입니다.",
   renameError: "폴더 이름을 변경하지 못했습니다. 다시 시도해 주세요.",
   deleteError: "폴더를 삭제하지 못했습니다. 다시 시도해 주세요.",
 } as const;

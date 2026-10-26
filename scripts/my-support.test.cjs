@@ -84,6 +84,7 @@ function setup(
               },
             },
           };
+        if (name === "expo-linear-gradient") return { LinearGradient: "LinearGradient" };
         if (name === "expo-clipboard")
           return {
             setStringAsync: async (text) => {
@@ -618,12 +619,14 @@ test("MY 정책과 작성 동의·보기는 동일한 커뮤니티 전문을 표
     });
     assert.deepEqual(texts(tree), expected);
     const buttons = expand(tree).filter((node) => node.type === "Button");
-    assert.equal(buttons[0].props.children, isRequired ? "동의하고 작성하기" : "확인");
-    buttons[0].props.onPress();
+    assert.deepEqual(
+      buttons.map((button) => button.props.children),
+      isRequired ? ["취소", "동의하고 작성하기"] : ["확인"],
+    );
+    buttons.at(-1).props.onPress();
     assert.equal(confirmed, 1);
-    assert.equal(buttons.length, isRequired ? 2 : 1);
     if (isRequired) {
-      buttons[1].props.onPress();
+      buttons[0].props.onPress();
       assert.equal(closed, 1);
     }
   }

@@ -366,7 +366,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 2. auth.users를 지운다. 세션·리프레시 토큰이 함께 지워지고, 나머지는 FK가 처리한다. 이미 발급된 access token은 만료 전까지 남지만 프로필이 없어 쓸 데이터가 없다.
    - cascade: profiles, products, folders, product_folders, import_*, posts(와 그 글의 하위 데이터), notifications, push_tokens, user_policy_consents, user_blocks, like_notification_log
    - set null: comments.author_id, vote_responses.user_id, post_likes.user_id, reports.reporter_id
-   - profiles 삭제 전 트리거(`profiles_clear_withdrawn_comments`)가 같은 트랜잭션에서 사용자 댓글 content를 null로 바꾼다.
+   - profiles 삭제 전 트리거(`profiles_clear_withdrawn_comments`)가 같은 트랜잭션에서 사용자 글을 먼저 지우고(그 글의 댓글도 함께 지워짐), 남은 사용자 댓글 content를 null로 바꾼다. 글을 FK 연쇄에 맡기면 본인 글에 단 본인 댓글이 먼저 수정된 뒤 글이 지워져 comments_post_id_fkey 위반으로 탈퇴가 실패했다.
 3. 계정이 지워진 뒤 설문을 private.withdrawal_surveys에 저장한다(user_id 없음). 재시도로 중복되지 않게 마지막에 두고, 실패해도 탈퇴는 성공으로 본다.
 
 ## 9. DB에 두지 않는 것

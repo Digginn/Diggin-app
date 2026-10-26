@@ -8,6 +8,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   View,
@@ -209,12 +210,6 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
               <HelperText message="BUY / NOT 투표는 등록 후 24시간 뒤 자동으로 종료됩니다." />
             )}
           </View>
-          <View className="gap-2 rounded bg-gray-100 p-4">
-            <Text className="text-gray-600 font-note">
-              게시글을 등록하면 DIGGIN 커뮤니티 이용정책에 동의한 것으로 간주됩니다.
-            </Text>
-            <AppBar.TextButton onPress={() => setPolicyOpen(true)}>보기</AppBar.TextButton>
-          </View>
         </ScrollView>
       ) : (
         <View className="flex-1 items-center justify-center gap-4 px-margin">
@@ -230,6 +225,23 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
           ) : null}
         </View>
       )}
+      {canEdit ? (
+        <View className="px-margin pb-10">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="커뮤니티 이용정책 보기"
+            className="flex-row items-center gap-3 rounded-lg bg-gray-900 px-4 py-1.5"
+            onPress={() => setPolicyOpen(true)}
+          >
+            <Text className="flex-1 text-gray-0 font-b4">
+              게시글을 등록하면 커뮤니티 이용정책에 동의한 것으로 간주됩니다.
+            </Text>
+            <View className="h-12 min-w-12 items-center justify-center">
+              <Text className="text-gray-200 underline font-b3">보기</Text>
+            </View>
+          </Pressable>
+        </View>
+      ) : null}
       <CommunityPolicySheet
         visible={(isPolicyRequired && policy.data === false) || isPolicyOpen}
         isRequired={isPolicyRequired}

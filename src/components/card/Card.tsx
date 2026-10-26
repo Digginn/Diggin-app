@@ -63,6 +63,7 @@ export function Card({
         <StyledImage
           className={CARD_IMAGE_FRAME}
           contentFit="cover"
+          autoplay={false}
           onError={() => setFailedSource(thumbnail)}
           source={thumbnail}
         />

@@ -7,17 +7,10 @@ const TOUCH_HEIGHT = 44;
 
 type SelectModeBarProps = {
   selectedCount: number;
-  isAllSelected: boolean;
   onCancel: () => void;
-  onToggleAll: () => void;
 };
 
-export function SelectModeBar({
-  selectedCount,
-  isAllSelected,
-  onCancel,
-  onToggleAll,
-}: SelectModeBarProps) {
+export function SelectModeBar({ selectedCount, onCancel }: SelectModeBarProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -37,16 +30,8 @@ export function SelectModeBar({
           {selectedCount}개 선택
         </Text>
 
-        <Pressable
-          accessibilityRole="button"
-          className="items-end justify-center active:opacity-75"
-          style={{ width: SIDE_SLOT, height: TOUCH_HEIGHT }}
-          onPress={onToggleAll}
-        >
-          <Text className="text-gray-900 font-label-16-medium">
-            {isAllSelected ? "전체 해제" : "전체 선택"}
-          </Text>
-        </Pressable>
+        {/* MVP는 전체 선택을 제공하지 않는다(대량 삭제 부하). 개수가 가운데 오도록 자리만 둔다. */}
+        <View style={{ width: SIDE_SLOT }} />
       </View>
     </View>
   );

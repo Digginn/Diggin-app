@@ -109,13 +109,12 @@ export function FolderScreen({
       setToast({ message: folder ? FOLDER_MESSAGES.renameSuccess : FOLDER_MESSAGES.createSuccess });
       return true;
     } catch (error) {
+      const reason =
+        typeof error === "object" && error !== null && "reason" in error ? error.reason : null;
+      // 같은 이름은 입력칸 아래에 알리고 입력값을 유지한다(FLD-002).
+      if (reason === "duplicate") return FOLDER_MESSAGES.duplicateName;
       Keyboard.dismiss();
-      const isLimitError =
-        !folder &&
-        typeof error === "object" &&
-        error !== null &&
-        "reason" in error &&
-        error.reason === "limit";
+      const isLimitError = !folder && reason === "limit";
       setToast({
         message: folder
           ? FOLDER_MESSAGES.renameError
@@ -335,8 +334,11 @@ export function FolderScreen({
           overlay={modalToast}
           type="2Btn"
           hasTallHeader
+          isPrimaryLeft
           title="폴더 삭제하기"
-          description={"해당 폴더를 삭제하시겠습니까?\n삭제된 폴더는 복구할 수 없습니다."}
+          description={
+            "해당 폴더를 삭제하시겠습니까?\n폴더를 삭제해도 폴더에 담긴 아이템은\n삭제되지 않으며, ALL에서 계속 확인할 수 있습니다."
+          }
           onRequestClose={() => {
             if (!isDeletingRef.current) setDeletingFolder(null);
           }}

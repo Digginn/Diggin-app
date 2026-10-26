@@ -128,7 +128,7 @@ export function AccountWithdrawalSurvey({
               editable={!isSubmitting}
               textAlignVertical="top"
               placeholder="이유를 입력해 주세요. (최대 30자)"
-              placeholderTextColor={colors.gray[900]}
+              placeholderTextColor={colors.gray[400]}
               value={detail}
               onChangeText={(value) =>
                 setDetail(Array.from(splitGraphemes(value)).slice(0, DETAIL_MAX_LENGTH).join(""))
