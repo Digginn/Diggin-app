@@ -401,17 +401,19 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                   <Text className="text-center text-gray-500 font-b3">
                     댓글을 불러올 수 없습니다. 다시 시도해 주세요.
                   </Text>
-                  <Button
-                    accessibilityLabel="댓글 다시 불러오기"
-                    isDisabled={comments.isFetching}
-                    onPress={() => {
-                      if (comments.isFetchNextPageError)
-                        void comments.fetchNextPage({ cancelRefetch: false });
-                      else void comments.refetch();
-                    }}
-                  >
-                    다시 시도
-                  </Button>
+                  <View className="w-[156px]">
+                    <Button
+                      accessibilityLabel="댓글 다시 불러오기"
+                      isDisabled={comments.isFetching}
+                      onPress={() => {
+                        if (comments.isFetchNextPageError)
+                          void comments.fetchNextPage({ cancelRefetch: false });
+                        else void comments.refetch();
+                      }}
+                    >
+                      다시 시도
+                    </Button>
+                  </View>
                 </View>
               )}
             </>
