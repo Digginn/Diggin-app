@@ -200,9 +200,14 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }
 
+  // 댓글 조회가 끝난 뒤 실패마다 한 번만 정한다. 댓글 영역이 다시 시도로 알리면 토스트는 띄우지 않는다(CMT-006).
+  const toastedPostError = useRef<number | null>(null);
   useEffect(() => {
-    if (result.error && post) showToast(communityErrorMessage(result.error));
-  }, [result.error, post, showToast]);
+    if (!result.error || !post || comments.isFetching) return;
+    if (toastedPostError.current === result.errorUpdatedAt) return;
+    toastedPostError.current = result.errorUpdatedAt;
+    if (!comments.isError) showToast(communityErrorMessage(result.error));
+  }, [result.error, result.errorUpdatedAt, post, comments.isFetching, comments.isError, showToast]);
 
   useEffect(() => {
     if (!isRestoring && session && post && isWrongRoute) {

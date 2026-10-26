@@ -695,6 +695,26 @@ test("피드·상세 첫 조회 실패는 화면 안내만 표시하고 기존 �
   }
 });
 
+test("댓글 영역이 다시 시도로 알리는 실패는 게시글 재조회 실패 토스트로 또 알리지 않는다", async () => {
+  const error = { message: "Network request failed" };
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  for (const [commentsResult, toastCount] of [
+    [{ isError: true, error }, 0],
+    [{ isFetching: true }, 0],
+    [{}, 1],
+  ]) {
+    const detail = screenMocks({
+      post,
+      postResult: { isError: true, error, errorUpdatedAt: 1 },
+      commentsResult,
+    });
+    detail.mocks.react.useEffect = (effect) => effect();
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", detail.mocks);
+    PostDetailScreen({});
+    assert.equal(detail.toasts.length, toastCount);
+  }
+});
+
 test("투표 블록은 본문 컨테이너의 좌우 여백을 그대로 사용한다", () => {
   const { VoteBlock } = load("src/screens/diggle/components/VoteBlock.tsx", {
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
