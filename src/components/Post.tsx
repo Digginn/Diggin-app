@@ -95,13 +95,14 @@ export function Post({
       accessibilityRole={onPress ? "button" : undefined}
       className={clsx(
         "w-full border-b border-gray-200 bg-gray-0 px-margin pt-4",
-        isVote ? "items-start pb-1" : "items-center justify-center pb-1.5",
+        // 하단 정보와 구분선 사이를 일반글 기준으로 맞춘다(BUG-028·091).
+        isVote ? "items-start pb-1.5" : "items-center justify-center pb-1.5",
         onPress && "active:opacity-75",
       )}
       disabled={!onPress}
       onPress={onPress}
     >
-      <View className={clsx("w-full items-start", isVote && "h-[120px]")}>
+      <View className="w-full items-start">
         {isVote ? (
           <View className="w-full flex-row items-start gap-3">
             <View className="min-w-0 flex-1 self-stretch">

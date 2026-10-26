@@ -817,3 +817,30 @@ test("투표글 미리보기 이미지가 없거나 불러오지 못하면 상�
   nodes(loaded, "Image")[0].props.onError();
   assert.deepEqual(placeholder(thumb("https://shop.test/a.jpg")), ["vote"], "불러오기 실패");
 });
+
+test("투표글 피드는 일반글과 같은 하단 여백을 쓰고 높이를 고정하지 않아 구분선 간격이 같다(BUG-028·091)", () => {
+  const { Post } = load("src/components/Post.tsx", {
+    "react": { ...React, useState: (initial) => [initial, () => {}] },
+    "react-native": { Pressable: "Pressable", Text: "Text", View: "View" },
+    "expo-image": { Image: "Image" },
+    "nativewind": { cssInterop: (component) => component },
+    "@/components/FallbackImg": { FallbackImg: "FallbackImg" },
+    "@/components/ProductImg": { ProductImg: "ProductImg" },
+    "@/theme": { colors: { gray: {}, semantic: {} } },
+  });
+  const props = {
+    body: "본문",
+    timeLabel: "방금 전",
+    authorLabel: "익명",
+    commentCount: 0,
+    items: [],
+  };
+  const vote = Post({ ...props, type: "vote" });
+  const all = Post({ ...props, type: "all" });
+  const bottom = (tree) => tree.props.className.match(/\bpb-\S+/)[0];
+  assert.equal(bottom(vote), bottom(all));
+  assert.doesNotMatch(
+    React.Children.toArray(vote.props.children)[0].props.className,
+    /h-\[120px\]/,
+  );
+});
