@@ -8,10 +8,10 @@ export function CsvImportLoading({ progress }: { progress?: CsvImportProgress })
   const ratio = hasMeasuredProgress
     ? Math.min(1, Math.max(0, progress.completed / progress.total))
     : 0;
-  const [width] = useState(() => new Animated.Value(hasMeasuredProgress ? ratio * 200 : 1));
+  const [width] = useState(() => new Animated.Value(ratio * 200));
   const progressLabel = hasMeasuredProgress
     ? `${progress.completed} / ${progress.total}`
-    : "불러오는 중";
+    : "파일 확인 중";
   useEffect(() => {
     let isActive = true;
     let animation: Animated.CompositeAnimation | undefined;
@@ -33,21 +33,8 @@ export function CsvImportLoading({ progress }: { progress?: CsvImportProgress })
         animation.start();
         return;
       }
-      // 파일 준비 중 전체 건수를 알기 전에는 Figma의 반복 로딩을 사용한다.
-      width.setValue(1);
-      if (isReducedMotion) return;
-      animation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(width, {
-            toValue: 187.606,
-            duration: 2500,
-            easing: Easing.bezier(0, 0, 0.58, 1),
-            useNativeDriver: false,
-          }),
-          Animated.delay(1000),
-        ]),
-      );
-      animation.start();
+      // 확인 단계에서 미리 채우면 실제 저장 0건으로 전환할 때 바가 뒤로 되감긴다.
+      width.setValue(0);
     };
     void AccessibilityInfo.isReduceMotionEnabled().then(start, () => start(true));
     const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", start);

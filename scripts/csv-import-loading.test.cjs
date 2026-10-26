@@ -174,12 +174,21 @@ test("모션 줄이기 설정에서는 중간 진행률도 애니메이션 없�
   updated.cleanup();
 });
 
-test("총 건수를 모르는 동안도 로딩을 표시하고 모션 줄이기 설정은 존중한다", async () => {
-  const unknown = await render(undefined);
-  assert.equal(unknown.starts(), 1);
-  assert.equal(unknown.label, "불러오는 중");
-  unknown.cleanup();
-  const reduced = await render({ completed: 0, total: 100 }, true);
-  assert.equal(reduced.starts(), 0);
-  assert.equal(reduced.label, "0 / 100");
+test("파일 확인 단계는 바를 미리 채우지 않고 실제 저장 진행률로 이어진다", async () => {
+  for (const isReducedMotion of [false, true]) {
+    const unknown = await render(undefined, isReducedMotion);
+    assert.equal(unknown.starts(), 0);
+    assert.equal(unknown.timings.length, 0);
+    assert.equal(unknown.label, "파일 확인 중");
+    assert.equal(unknown.bar.props.accessibilityValue.text, "파일 확인 중");
+    assert.equal(unknown.fill.props.style.width.value, 0);
+    const initial = await unknown.update({ completed: 0, total: 4110 });
+    assert.equal(initial.fill.props.style.width, unknown.fill.props.style.width);
+    assert.equal(initial.fill.props.style.width.value, 0);
+    assert.equal(initial.label, "0 / 4110");
+    const done = await initial.update({ completed: 4110, total: 4110 });
+    assert.equal(done.fill.props.style.width.value, 200);
+    assert.equal(done.bar.props.accessibilityState.busy, false);
+    done.cleanup();
+  }
 });
