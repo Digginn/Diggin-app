@@ -88,7 +88,7 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
         type="2Btn"
         hasTallHeader
         title="폴더 삭제하기"
-        description={"해당 폴더를 삭제하시겠습니까?\n삭제된 폴더는 복구할 수 없습니다."}
+        description={"삭제된 폴더는 복구할 수 없으며,\n폴더 내 아이템은 삭제되지 않습니다."}
         onRequestClose={() => setIsDeleteConfirmOpen(false)}
         secondaryAction={{
           label: "삭제하기",

@@ -17,8 +17,6 @@ type ActionModalProps = Omit<ModalProps, "children"> & {
   secondaryAction?: ModalAction;
   isPrimaryDisabled?: boolean;
   hasTallHeader?: boolean;
-  /** 검정(주) 버튼을 왼쪽에 둔다. 폴더 삭제(FLD-06)처럼 취소를 강조하는 시안에서 쓴다. */
-  isPrimaryLeft?: boolean;
 };
 
 const CloseIcon = cssInterop(CloseSvg, {
@@ -38,7 +36,6 @@ export function ActionModal({
   secondaryAction,
   isPrimaryDisabled = true,
   hasTallHeader = false,
-  isPrimaryLeft = false,
   isKeyboardAvoiding,
   keyboardGap,
   onShow,
@@ -88,9 +85,7 @@ export function ActionModal({
         {children}
       </View>
       {isTwoButton ? (
-        <View
-          className={`w-[295px] gap-modal-action ${isPrimaryLeft ? "flex-row-reverse" : "flex-row"}`}
-        >
+        <View className="w-[295px] flex-row gap-modal-action">
           <View className="w-[140px]">
             <ModalButton action={secondaryAction} variant="secondary" />
           </View>
