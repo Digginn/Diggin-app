@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 import { Image } from "expo-image";
 import { cssInterop } from "nativewind";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import CommentSvg from "@/assets/images/icon-comment.svg";
@@ -43,6 +43,26 @@ type PostProps = {
 
 function Meta({ children }: { children: ReactNode }) {
   return <Text className="text-right text-gray-500 font-b4">{children}</Text>;
+}
+
+function VoteThumbnail({ url }: { url?: string | null }) {
+  const [isFailed, setIsFailed] = useState(false);
+  if (!url || isFailed) {
+    return (
+      <View className="size-20 overflow-hidden rounded">
+        <FallbackImg size="vote" className="h-full" />
+      </View>
+    );
+  }
+  return (
+    <StyledImage
+      className="size-20 rounded bg-gray-100"
+      contentFit="cover"
+      autoplay={false}
+      onError={() => setIsFailed(true)}
+      source={url}
+    />
+  );
 }
 
 function toRows(items: PostItem[]): (PostItem | null)[][] {
@@ -92,18 +112,7 @@ export function Post({
                 {body}
               </Text>
             </View>
-            {items[0]?.imageUrl ? (
-              <StyledImage
-                className="size-20 rounded bg-gray-100"
-                contentFit="cover"
-                autoplay={false}
-                source={items[0].imageUrl}
-              />
-            ) : (
-              <View className="size-20 overflow-hidden rounded">
-                <FallbackImg size="vote" className="h-full" />
-              </View>
-            )}
+            <VoteThumbnail url={items[0]?.imageUrl} />
           </View>
         ) : (
           <View className="w-full gap-4">

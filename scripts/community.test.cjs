@@ -772,8 +772,18 @@ test("삭제 실패는 원래 상세에 남고 잘못된 글 종류를 교정해
   assert.equal(state.destination().params.returnTo, "my-posts");
 });
 
-test("이미지 없는 투표글 미리보기는 상품 카드와 같은 비율의 로고 Placeholder를 보여 준다", () => {
+test("투표글 미리보기 이미지가 없거나 불러오지 못하면 상품 카드와 같은 비율의 로고 Placeholder를 보여 준다", () => {
+  const state = [];
+  let cursor = 0;
   const { Post } = load("src/components/Post.tsx", {
+    "react": {
+      ...React,
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [state[index], (value) => (state[index] = value)];
+      },
+    },
     "react-native": { Pressable: "Pressable", Text: "Text", View: "View" },
     "expo-image": { Image: "Image" },
     "nativewind": { cssInterop: (component) => component },
@@ -788,13 +798,22 @@ test("이미지 없는 투표글 미리보기는 상품 카드와 같은 비율�
     authorLabel: "익명",
     commentCount: 0,
   };
-  const empty = Post({ ...props, items: [{ id: "1", imageUrl: null }] });
-  assert.deepEqual(
-    nodes(empty, "FallbackImg").map((node) => node.props.size),
-    ["vote"],
-  );
-  assert.equal(nodes(empty, "Image").length, 0);
-  const filled = Post({ ...props, items: [{ id: "1", imageUrl: "https://shop.test/a.jpg" }] });
-  assert.equal(nodes(filled, "FallbackImg").length, 0);
-  assert.equal(nodes(filled, "Image").length, 1);
+  const thumb = (imageUrl) => {
+    const element = Post({ ...props, items: [{ id: "1", imageUrl }] });
+    const found = [];
+    const walk = (node) => {
+      if (!React.isValidElement(node)) return;
+      if (typeof node.type === "function") found.push(node);
+      React.Children.toArray(node.props.children).forEach(walk);
+    };
+    walk(element);
+    cursor = 0;
+    return found[0].type(found[0].props);
+  };
+  const placeholder = (tree) => nodes(tree, "FallbackImg").map((node) => node.props.size);
+  assert.deepEqual(placeholder(thumb(null)), ["vote"]);
+  const loaded = thumb("https://shop.test/a.jpg");
+  assert.deepEqual(placeholder(loaded), []);
+  nodes(loaded, "Image")[0].props.onError();
+  assert.deepEqual(placeholder(thumb("https://shop.test/a.jpg")), ["vote"], "불러오기 실패");
 });
