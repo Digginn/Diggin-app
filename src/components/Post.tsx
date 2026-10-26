@@ -7,6 +7,7 @@ import { Pressable, Text, View } from "react-native";
 import CommentSvg from "@/assets/images/icon-comment.svg";
 import HeartSvg from "@/assets/images/icon-heart.svg";
 import ReportSvg from "@/assets/images/icon-report.svg";
+import { FallbackImg } from "@/components/FallbackImg";
 import { ProductImg } from "@/components/ProductImg";
 import { colors } from "@/theme";
 
@@ -91,12 +92,18 @@ export function Post({
                 {body}
               </Text>
             </View>
-            <StyledImage
-              className="size-20 rounded bg-gray-100"
-              contentFit="cover"
-              autoplay={false}
-              source={items[0]?.imageUrl ?? undefined}
-            />
+            {items[0]?.imageUrl ? (
+              <StyledImage
+                className="size-20 rounded bg-gray-100"
+                contentFit="cover"
+                autoplay={false}
+                source={items[0].imageUrl}
+              />
+            ) : (
+              <View className="size-20 overflow-hidden rounded">
+                <FallbackImg size="vote" className="h-full" />
+              </View>
+            )}
           </View>
         ) : (
           <View className="w-full gap-4">

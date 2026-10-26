@@ -771,3 +771,30 @@ test("삭제 실패는 원래 상세에 남고 잘못된 글 종류를 교정해
   corrected({ type: "all" });
   assert.equal(state.destination().params.returnTo, "my-posts");
 });
+
+test("이미지 없는 투표글 미리보기는 상품 카드와 같은 비율의 로고 Placeholder를 보여 준다", () => {
+  const { Post } = load("src/components/Post.tsx", {
+    "react-native": { Pressable: "Pressable", Text: "Text", View: "View" },
+    "expo-image": { Image: "Image" },
+    "nativewind": { cssInterop: (component) => component },
+    "@/components/FallbackImg": { FallbackImg: "FallbackImg" },
+    "@/components/ProductImg": { ProductImg: "ProductImg" },
+    "@/theme": { colors: { gray: {}, semantic: {} } },
+  });
+  const props = {
+    type: "vote",
+    body: "본문",
+    timeLabel: "방금 전",
+    authorLabel: "익명",
+    commentCount: 0,
+  };
+  const empty = Post({ ...props, items: [{ id: "1", imageUrl: null }] });
+  assert.deepEqual(
+    nodes(empty, "FallbackImg").map((node) => node.props.size),
+    ["vote"],
+  );
+  assert.equal(nodes(empty, "Image").length, 0);
+  const filled = Post({ ...props, items: [{ id: "1", imageUrl: "https://shop.test/a.jpg" }] });
+  assert.equal(nodes(filled, "FallbackImg").length, 0);
+  assert.equal(nodes(filled, "Image").length, 1);
+});
