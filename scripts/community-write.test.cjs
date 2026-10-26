@@ -100,6 +100,14 @@ test("입력창은 50자 초과를 반영하지 않고 테두리·카운터를 �
   assert.doesNotMatch(render().props.className, /border-semantic-error/);
   nodes(render(), "TextInput")[0].props.onChangeText("👍🏽".repeat(70));
   assert.equal(value, "👍🏽".repeat(50));
+  // BUG-094 5자 미만은 아래 안내만 띄우고, 카운터는 n/50자·기본 색을 유지한다.
+  overflow = false;
+  value = "가나";
+  const short = render();
+  assert.doesNotMatch(short.props.className, /border-semantic-error/);
+  const counter = nodes(short, "Text")[0];
+  assert.doesNotMatch(counter.props.className, /text-semantic-error/);
+  assert.equal(counter.props.children.join(""), "2/50자");
 });
 
 test("등록 API는 본문·상품 ID·재시도 키만 전달하고 상품 정보는 클라이언트에서 보내지 않는다", async () => {
