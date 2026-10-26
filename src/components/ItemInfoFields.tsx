@@ -1,6 +1,7 @@
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import TooltipSvg from "@/assets/images/icon-tooltip.svg";
 import { TextField } from "@/components/Field";
@@ -15,6 +16,11 @@ const TooltipIcon = cssInterop(TooltipSvg, {
 });
 
 const HINT = "얼마나 사고 싶은지를\n3단계로 기록해두어\nALL 탭에서 빠르게\n분류할 수 있습니다.";
+
+// DB가 거절하는 길이·범위를 입력 단계에서 막는다. 가격은 정수 범위(약 21억) 안의 9자리까지.
+const NAME_MAX_LENGTH = 100;
+const BRAND_MAX_LENGTH = 30;
+const PRICE_MAX_DIGITS = 9;
 
 const HINT_GAP = 10;
 const HINT_TOP_OFFSET = 4;
@@ -81,7 +87,9 @@ export function ItemInfoFields({
             isError={isNameMissing}
             placeholder="아이템명을 입력해 주세요."
             value={values.name}
-            onChangeText={update("name")}
+            onChangeText={(text) =>
+              update("name")(Array.from(splitGraphemes(text)).slice(0, NAME_MAX_LENGTH).join(""))
+            }
           />
         </View>
 
@@ -91,7 +99,9 @@ export function ItemInfoFields({
             <TextField
               placeholder="선택 입력"
               value={values.brand}
-              onChangeText={update("brand")}
+              onChangeText={(text) =>
+                update("brand")(Array.from(splitGraphemes(text)).slice(0, BRAND_MAX_LENGTH).join(""))
+              }
             />
           </View>
           <View className="flex-1 gap-2">
@@ -101,7 +111,9 @@ export function ItemInfoFields({
               keyboardType="number-pad"
               placeholder="가격 입력"
               value={formatPriceInput(values.price)}
-              onChangeText={(text) => update("price")(text.replace(/\D/g, ""))}
+              onChangeText={(text) =>
+                update("price")(text.replace(/\D/g, "").slice(0, PRICE_MAX_DIGITS))
+              }
             />
           </View>
         </View>

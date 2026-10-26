@@ -36,6 +36,7 @@ export function ProductImg({ url, onPressInfo, onRemove, className }: ProductImg
         <StyledImage
           className={FRAME}
           contentFit="cover"
+          autoplay={false}
           onError={() => setIsFailed(true)}
           source={source}
         />

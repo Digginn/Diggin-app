@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
 import {
+  AppState,
   Keyboard,
   KeyboardAvoidingView,
   Modal as NativeModal,
@@ -35,7 +36,7 @@ export function Modal({
   children,
   visible,
   onRequestClose,
-  isKeyboardAvoiding = false,
+  isKeyboardAvoiding: isKeyboardAvoidingProp = false,
   keyboardGap = 40,
   onShow,
   onDismiss,
@@ -49,6 +50,8 @@ export function Modal({
   onToastDismiss,
 }: ModalProps) {
   const isNativeVisible = useNativeModalVisible(visible);
+  // 공유 확장은 키보드 위치·높이를 0으로 받아, 키보드를 피하면 카드가 화면 밖으로 밀린다.
+  const isKeyboardAvoiding = isKeyboardAvoidingProp && AppState.currentState !== "extension";
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(() => Keyboard.isVisible());
   useEffect(() => {
     if (!isKeyboardAvoiding) return;
@@ -96,7 +99,7 @@ export function Modal({
           {/* 카드 바깥을 누르면 키보드만 닫는다. 모달은 닫지 않는다. */}
           <Pressable accessible={false} className="absolute inset-0" onPress={Keyboard.dismiss} />
           <View
-            className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-lg ${className ?? "px-2.5 py-4"}`}
+            className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-[0px_4px_20px_rgba(0,0,0,0.1)] ${className ?? "px-2.5 py-4"}`}
             style={
               Platform.OS === "android" && isKeyboardAvoiding ? { maxHeight: "100%" } : undefined
             }

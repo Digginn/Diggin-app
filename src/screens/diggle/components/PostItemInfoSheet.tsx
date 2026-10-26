@@ -34,6 +34,7 @@ export function PostItemInfoSheet({
           <StyledImage
             className="size-[72px] rounded-lg bg-gray-200"
             contentFit="cover"
+            autoplay={false}
             source={imageUrl ?? undefined}
           />
           <View className="min-w-0 flex-1 items-start gap-1">

@@ -3,12 +3,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
 import { useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Linking, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { IconBack } from "@/assets/images/appbar";
-import MoreIcon from "@/assets/images/folder/icon-detail-more.svg";
-import ShareSvg from "@/assets/images/icon-share.svg";
+import { IconBack, IconKebab } from "@/assets/images/appbar";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
@@ -41,9 +39,6 @@ import { useProduct } from "./queries/useProduct";
 import { useProductFolderIds } from "./queries/useProductFolderIds";
 
 const StyledImage = cssInterop(Image, { className: "style" });
-const ShareIcon = cssInterop(ShareSvg, {
-  className: { target: "style", nativeStyleToProp: { width: true, height: true } },
-});
 
 // HERO_FRAME의 높이와 같아야 한다. 뒤로가기 뒤 밝기를 잴 때 쓴다.
 const HERO_HEIGHT = 520;
@@ -152,6 +147,7 @@ export function ItemDetailScreen() {
             <StyledImage
               className={HERO_FRAME}
               contentFit="cover"
+              autoplay={false}
               onError={() => setFailed(true)}
               source={thumbnail}
             />
@@ -183,8 +179,8 @@ export function ItemDetailScreen() {
           </View>
           <View className="absolute right-0 top-0" style={{ paddingTop: insets.top }}>
             <AppBar.IconButton
-              icon={MoreIcon}
-              iconSize={16}
+              icon={IconKebab}
+              iconSize={24}
               accessibilityLabel="아이템 더보기"
               onPress={() => setMenuOpen(true)}
               disabled={isHeaderDisabled}
@@ -215,25 +211,17 @@ export function ItemDetailScreen() {
               />
             )}
           </View>
-
-          <Pressable
-            accessibilityLabel="공유하기"
-            accessibilityRole="button"
-            className="absolute bottom-5 right-4 size-8 items-center justify-center rounded-full border border-gray-300 bg-gray-0 active:opacity-75"
-            hitSlop={8}
-            onPress={() => {}}
-          >
-            <ShareIcon className="size-7" />
-          </Pressable>
         </View>
 
         <View className="gap-6 pt-4">
           <View className="gap-[13px] px-4">
-            <View className="w-full flex-row items-center justify-between gap-2">
-              <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
-                {item.brand}
-              </Text>
-            </View>
+            {item.brand.trim() ? (
+              <View className="w-full flex-row items-center justify-between gap-2">
+                <Text numberOfLines={1} className="flex-1 text-gray-1000 font-label-14">
+                  {item.brand}
+                </Text>
+              </View>
+            ) : null}
             <ItemInfo
               name={item.name}
               price={item.price === "" ? null : Number(item.price)}

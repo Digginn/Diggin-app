@@ -1,11 +1,7 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
-import CheckSvg from "@/assets/images/icon-check-active.svg";
 import { Card } from "@/components/card";
-import { colors } from "@/theme";
 import type { PostItem } from "@/types/post";
-
-const CHECK_SIZE = 12;
 
 type SelectCardProps = {
   item: PostItem;
@@ -24,21 +20,9 @@ export function SelectCard({ item, name, price, brand, isSelected, onToggle }: S
         price={price}
         brand={brand}
         thumbnailUrl={item.imageUrl}
+        select={isSelected ? "selected" : "unselected"}
         onPress={onToggle}
       />
-      <Pressable
-        accessibilityLabel={`${name} 선택`}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: isSelected }}
-        className="absolute -right-1 top-[62px] size-12 items-center justify-center p-2.5"
-        onPress={onToggle}
-      >
-        <View className="size-[18px] items-center justify-center rounded-[3px] border border-gray-600 bg-gray-0">
-          {isSelected ? (
-            <CheckSvg width={CHECK_SIZE} height={CHECK_SIZE} color={colors.gray[700]} />
-          ) : null}
-        </View>
-      </Pressable>
     </View>
   );
 }

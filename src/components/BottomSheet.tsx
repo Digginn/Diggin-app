@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ToastText, type ToastVariant } from "@/components/ToastText";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
 import { colors } from "@/theme";
 
 const BOTTOM_PADDING = 40;
@@ -80,6 +81,7 @@ export function BottomSheet({
   isInline = false,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
+  const isNativeVisible = useNativeModalVisible(visible && !isInline);
   const [isKeyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
   const [availableHeight, setAvailableHeight] = useState<number>();
 
@@ -105,6 +107,21 @@ export function BottomSheet({
     return () => clearTimeout(timer);
   }, [visible, toastMessage, toastVariant, onToastDismiss]);
   const [dragY] = useState(() => new Animated.Value(0));
+  // 배경은 제자리에서 진해지고 시트만 올라오도록 열고 닫힘을 직접 그린다. 닫힘이 끝날 때까지 모달을 남긴다.
+  const [openness] = useState(() => new Animated.Value(0));
+  const [isModalKept, setModalKept] = useState(false);
+  if (isNativeVisible && !isModalKept) setModalKept(true);
+  useEffect(() => {
+    if (isNativeVisible) {
+      Animated.timing(openness, { toValue: 1, duration: 300, useNativeDriver: false }).start();
+      return;
+    }
+    Animated.timing(openness, { toValue: 0, duration: 250, useNativeDriver: false }).start(
+      ({ finished }) => {
+        if (finished) setModalKept(false);
+      },
+    );
+  }, [isNativeVisible, openness]);
 
   // 끌어내린 위치는 열 때만 되돌린다. 닫을 때 되돌리면 모달이 슬라이드로 사라지는 동안
   // 시트가 제자리로 튀어 올라왔다가 닫히는 것처럼 보인다.
@@ -199,26 +216,23 @@ export function BottomSheet({
 
   if (isInline) {
     if (!visible) return null;
+    // 공유 확장은 키보드 위치·높이를 0으로 받아, 키보드를 피하면 시트 높이가 0이 되어 흰 화면만 남는다.
     return (
-      <KeyboardAvoidingView
-        enabled={isKeyboardAvoiding}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1"
-      >
+      <View className="flex-1">
         {sheet}
         {toast}
         {overlay}
-      </KeyboardAvoidingView>
+      </View>
     );
   }
 
   return (
     <NativeModal
-      animationType="slide"
+      animationType="none"
       onRequestClose={onRequestClose}
       onDismiss={onDismiss}
       transparent
-      visible={visible}
+      visible={isModalKept}
     >
       <KeyboardAvoidingView
         enabled={isKeyboardAvoiding}
@@ -232,16 +246,35 @@ export function BottomSheet({
             : undefined
         }
       >
+        <Animated.View
+          pointerEvents="none"
+          className="absolute inset-0 bg-black"
+          style={{
+            opacity: openness.interpolate({ inputRange: [0, 1], outputRange: [0, scrimOpacity] }),
+          }}
+        />
         <Pressable
           accessible={isScrimClosable}
           accessibilityLabel={isScrimClosable ? "닫기" : undefined}
           accessibilityRole={isScrimClosable ? "button" : undefined}
-          className="absolute inset-0 bg-black"
-          style={{ opacity: scrimOpacity }}
+          className="absolute inset-0"
           // 닫지 않는 시트에서도 키보드는 내려줘야 가린 버튼을 누를 수 있다.
           onPress={isScrimClosable ? onRequestClose : Keyboard.dismiss}
         />
-        <Animated.View style={{ transform: [{ translateY: dragY }] }}>{sheet}</Animated.View>
+        <Animated.View
+          style={{
+            transform: [
+              {
+                translateY: Animated.add(
+                  dragY,
+                  openness.interpolate({ inputRange: [0, 1], outputRange: [EXIT_DISTANCE, 0] }),
+                ),
+              },
+            ],
+          }}
+        >
+          {sheet}
+        </Animated.View>
       </KeyboardAvoidingView>
       {toast}
       {overlay}

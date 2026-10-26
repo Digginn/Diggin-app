@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import { AVATAR_UNREADABLE_ERROR } from "@/api/avatar";
 import { IconProfileCamera, ImageProfilePlaceholder } from "@/assets/images/my";
@@ -26,11 +27,7 @@ import { useToast } from "@/hooks/useToast";
 import { textLength } from "@/utils/text";
 
 import { PROFILE_MESSAGES } from "./constants/profileMessages";
-import {
-  MAX_NICKNAME_LENGTH,
-  NICKNAME_HELPER_MESSAGE,
-  validateNickname,
-} from "./utils/validateNickname";
+import { MAX_NICKNAME_LENGTH, validateNickname } from "./utils/validateNickname";
 import { validateProfileImage } from "./utils/validateProfileImage";
 
 const Image = cssInterop(ExpoImage, { className: "style" });
@@ -47,7 +44,7 @@ type ProfileEditScreenProps = {
 const AUTH_PROVIDER_LABELS = { kakao: "카카오", google: "Google", apple: "Apple" } as const;
 
 export function ProfileEditScreen({
-  authProvider = "kakao",
+  authProvider,
   currentNickname,
   avatarUrl,
   onSaveNickname,
@@ -61,8 +58,12 @@ export function ProfileEditScreen({
   const [helperStatus, setHelperStatus] = useState<"default" | "error">("default");
   // MY-002 오류 문구가 보이는 동안 저장을 막고, 닉네임을 고치면 다시 연다.
   const isNicknameError = helperStatus === "error";
-  const [helperMessage, setHelperMessage] = useState(NICKNAME_HELPER_MESSAGE);
+  const [helperMessage, setHelperMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  // MY-02 1자는 문구 없이 테두리·카운터만 빨갛게 하고 저장을 막는다.
+  const isNicknameTooShort = textLength(nickname) === 1;
+  const isSaveDisabled =
+    isSaving || isNicknameError || isNicknameTooShort || (!nickname && !profileImageUri);
 
   const handlePickImage = async (source: "camera" | "library") => {
     try {
@@ -125,7 +126,7 @@ export function ProfileEditScreen({
 
   const handleSave = async () => {
     Keyboard.dismiss();
-    if (isSaving || isNicknameError || (!nickname && !profileImageUri)) return;
+    if (isSaveDisabled) return;
 
     const errorMessage = validateNickname(nickname);
     if (errorMessage) {
@@ -216,19 +217,24 @@ export function ProfileEditScreen({
             <TextField
               accessibilityLabel="닉네임"
               inputClassName="pr-12"
-              isError={isNicknameError}
+              isError={isNicknameError || isNicknameTooShort}
               onChangeText={(value) => {
-                setNickname(value);
+                setNickname(
+                  Array.from(splitGraphemes(value)).slice(0, MAX_NICKNAME_LENGTH).join(""),
+                );
                 setHelperStatus("default");
-                setHelperMessage(NICKNAME_HELPER_MESSAGE);
+                setHelperMessage("");
               }}
               onSubmitEditing={handleSave}
-              placeholder={currentNickname ?? "현재 닉네임"}
+              placeholder={currentNickname ?? ""}
               returnKeyType="done"
               value={nickname}
             />
             {/* AUTH-08 입력칸 오른쪽 글자 수 */}
-            <Text pointerEvents="none" className="absolute right-4 text-gray-600 font-note">
+            <Text
+              pointerEvents="none"
+              className={`absolute right-4 font-note ${isNicknameTooShort ? "text-semantic-error" : "text-gray-600"}`}
+            >
               {textLength(nickname)}/{MAX_NICKNAME_LENGTH}
             </Text>
           </View>
@@ -237,17 +243,19 @@ export function ProfileEditScreen({
 
         <View className="mt-5 h-12 flex-row items-center justify-between border-b border-gray-300">
           <Text className="text-gray-800 font-label-14">가입 수단</Text>
-          <View className="flex-row items-center gap-1">
-            <AuthProviderIcon provider={authProvider} />
-            <Text className="text-gray-600 font-b3">
-              {AUTH_PROVIDER_LABELS[authProvider]} 간편 인증
-            </Text>
-          </View>
+          {authProvider && (
+            <View className="flex-row items-center gap-1">
+              <AuthProviderIcon provider={authProvider} />
+              <Text className="text-gray-600 font-b3">
+                {AUTH_PROVIDER_LABELS[authProvider]} 간편 인증
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
       <View className="absolute left-6 right-6" style={{ bottom: insets.bottom + 10 }}>
-        <Button size="large" isDisabled={isSaving || isNicknameError} onPress={handleSave}>
+        <Button size="large" isDisabled={isSaveDisabled} onPress={handleSave}>
           저장하기
         </Button>
       </View>

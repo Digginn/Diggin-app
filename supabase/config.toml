@@ -447,6 +447,10 @@ verify_jwt = false
 # Supabase 세션 대신 함수 내부에서 제공자 ID token의 서명·issuer·audience를 검증한다.
 [functions.account-restriction]
 verify_jwt = false
+
+# 함수 내부 getUser로 사용자 JWT를 검증한 뒤 authenticated 역할로만 저장한다.
+[functions.csv-import]
+verify_jwt = false
 # Directory under `supabase/` where declarative files are written.
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting. When omitted, SQL is

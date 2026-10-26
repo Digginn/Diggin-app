@@ -44,7 +44,16 @@ function setup(file, os) {
           Platform: { OS: os },
           Dimensions: { get: () => ({ height: 800 }) },
           Keyboard: { isVisible: () => true },
-          Animated: { Value: class {}, View: "AnimatedView" },
+          AppState: { currentState: "active" },
+          Animated: {
+            Value: class {
+              interpolate() {
+                return this;
+              }
+            },
+            add: (a) => a,
+            View: "AnimatedView",
+          },
         };
       if (name === "react-native-safe-area-context")
         return { useSafeAreaInsets: () => ({ top: 24, bottom: 24 }) };

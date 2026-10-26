@@ -6,6 +6,8 @@
 - `google-services.json`은 공개 클라이언트 식별자 파일로 저장소 루트에 둔다. `app.config.ts`가 연결한다. EAS 파일 환경변수 `GOOGLE_SERVICES_JSON`이 있으면 우선 사용한다.
 - FCM V1 서비스 계정 키는 EAS `com.diggin.app`에 등록했다. 비공개 키 파일은 저장소에 넣지 않는다.
 - `expo-notifications` 기본 채널과 등록 코드의 채널 ID는 모두 `default`다. Android 13+ 권한 요청 전에 채널을 만든다.
+- Android 아이콘은 Figma 알림 시안 `2836:55329`의 AppIcons 원본을 사용한다. `icon-app-android.png`를 일반·적응형 앱 아이콘으로, `icon-app-monochrome.png`를 테마용 단색 아이콘으로 연결한다. iOS의 기존 `icon-app.png`는 유지한다.
+- 알림 작은 아이콘은 같은 시안의 흰색 `D,` 벡터를 내보낸 `icon-notification.png`(96×96, 흰색·투명 배경)다. 원본 SVG도 `assets/images/`에 보관한다. 아이콘 변경은 새 Android 빌드 설치 후 반영된다.
 - 공유 확장의 `excludedPackages`는 문자열만 받는다. `expo-notifications`는 문자열로 제외하고 `defaultChannel` 옵션은 루트 plugins에만 둔다. 리뷰 수정 후 lockfile 기준 Linux iOS prebuild에서 생성된 Podfile의 제외 항목을 확인했다. macOS `pod install`과 iOS 컴파일은 별도 검증이 필요하다.
 - Android 운영 빌드는 Firebase 설정이 없으면 실패한다. Firebase SDK/Gradle 연결은 Expo prebuild가 처리한다. 이 설정만으로 Analytics SDK가 앱에 추가되지는 않는다.
 

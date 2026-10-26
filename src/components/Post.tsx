@@ -41,7 +41,7 @@ type PostProps = {
 };
 
 function Meta({ children }: { children: ReactNode }) {
-  return <Text className="text-right text-gray-500 font-b3">{children}</Text>;
+  return <Text className="text-right text-gray-500 font-b4">{children}</Text>;
 }
 
 function toRows(items: PostItem[]): (PostItem | null)[][] {
@@ -85,7 +85,7 @@ export function Post({
           <View className="w-full flex-row items-start gap-3">
             <View className="min-w-0 flex-1 self-stretch">
               <Text
-                className="h-[39px] w-full text-gray-1000 font-b4"
+                className="h-10 w-full text-gray-1000 font-b3"
                 numberOfLines={isPreview ? 1 : 2}
               >
                 {body}
@@ -94,12 +94,13 @@ export function Post({
             <StyledImage
               className="size-20 rounded bg-gray-100"
               contentFit="cover"
+              autoplay={false}
               source={items[0]?.imageUrl ?? undefined}
             />
           </View>
         ) : (
           <View className="w-full gap-4">
-            <Text className="w-full text-gray-1000 font-b4" numberOfLines={1}>
+            <Text className="w-full text-gray-1000 font-b3" numberOfLines={1}>
               {body}
             </Text>
             <View className="w-full gap-2">
@@ -124,7 +125,8 @@ export function Post({
         )}
 
         {!isPreview && (
-          <View className="w-full flex-row items-center justify-between">
+          // 신고 버튼이 없는 본인 글도 같은 간격이 되도록 버튼 높이(48)로 고정한다.
+          <View className="h-12 w-full flex-row items-center justify-between">
             <View className="flex-row items-center gap-1.5">
               <Meta>{timeLabel}</Meta>
               <Text className="text-gray-500 font-b1">·</Text>

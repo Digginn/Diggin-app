@@ -1,3 +1,4 @@
+import * as Application from "expo-application";
 import { useRouter, type Href } from "expo-router";
 import { useRef, useState, type FC } from "react";
 import { Linking, ScrollView, Text, View } from "react-native";
@@ -51,6 +52,13 @@ export function MyScreen({
   onWithdrawComplete,
 }: MyScreenProps = {}) {
   const router = useRouter();
+  const nativeVersion = Application.nativeApplicationVersion;
+  const nativeBuild = Application.nativeBuildVersion;
+  const appVersionLabel = nativeVersion
+    ? nativeBuild
+      ? `${nativeVersion}(${nativeBuild})`
+      : nativeVersion
+    : "버전 정보 없음";
   const [modalToast, setModalToast] = useState<string>();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
@@ -105,7 +113,7 @@ export function MyScreen({
           },
         ]
       : []),
-    { label: "앱 정보", value: "1.0.0 (100)", hasChevron: false },
+    { label: "앱 정보", value: appVersionLabel, hasChevron: false },
   ];
   const settingsRows: MyMenuRow[] = [
     {

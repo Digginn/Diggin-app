@@ -34,7 +34,9 @@ function isBanned(error: unknown) {
 async function signInWithIdentity(
   provider: "google" | "kakao" | "apple",
   token: string,
+  onAuthorized: () => void,
 ): Promise<SignInResult> {
+  onAuthorized();
   const { error } = await supabase.auth.signInWithIdToken({ provider, token });
   if (error) {
     if (!isBanned(error)) throw error;
@@ -86,11 +88,11 @@ async function finishSignIn(): Promise<SignInResult> {
 }
 
 // MY-010 최소 수집: 닉네임은 랜덤으로 만들어 이름·이메일을 요청하지 않는다.
-async function signInWithAppleNative(): Promise<SignInResult> {
+async function signInWithAppleNative(onAuthorized: () => void): Promise<SignInResult> {
   try {
     const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
     if (!credential.identityToken) throw new Error("apple_identity_token_missing");
-    return signInWithIdentity("apple", credential.identityToken);
+    return signInWithIdentity("apple", credential.identityToken, onAuthorized);
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ERR_REQUEST_CANCELED") {
       return { status: "cancelled" };
@@ -99,13 +101,13 @@ async function signInWithAppleNative(): Promise<SignInResult> {
   }
 }
 
-async function signInWithGoogle(): Promise<SignInResult> {
+async function signInWithGoogle(onAuthorized: () => void): Promise<SignInResult> {
   try {
     await GoogleSignin.hasPlayServices();
     const response = await GoogleSignin.signIn();
     if (isCancelledResponse(response)) return { status: "cancelled" };
     if (!response.data.idToken) throw new Error("google_id_token_missing");
-    return signInWithIdentity("google", response.data.idToken);
+    return signInWithIdentity("google", response.data.idToken, onAuthorized);
   } catch (error) {
     if (isErrorWithCode(error) && error.code === statusCodes.IN_PROGRESS) {
       return { status: "cancelled" };
@@ -128,12 +130,12 @@ async function importKakaoAvatar() {
 // AUTH-004 카카오 SDK로 로그인한다. 카카오톡이 있으면 카카오톡으로, 없으면 카카오 계정 화면으로 연다.
 // Supabase 브라우저 로그인은 이메일 동의항목을 항상 요청해 비즈 앱이 아니면 KOE205로 막힌다.
 // ID 토큰 방식은 요청 항목을 카카오 동의항목 설정대로 받는다(MY-010 이메일 미수집).
-async function signInWithKakao(): Promise<SignInResult> {
+async function signInWithKakao(onAuthorized: () => void): Promise<SignInResult> {
   try {
     const token = await loginWithKakao();
     // 카카오 콘솔에서 OpenID Connect를 켜야 idToken이 온다.
     if (!token.idToken) throw new Error("kakao_id_token_missing");
-    const result = await signInWithIdentity("kakao", token.idToken);
+    const result = await signInWithIdentity("kakao", token.idToken, onAuthorized);
     if (result.status === "success" && result.isNewUser) await importKakaoAvatar();
     return result;
   } catch (error) {
@@ -144,9 +146,13 @@ async function signInWithKakao(): Promise<SignInResult> {
   }
 }
 
-export function signIn(provider: LoginProvider): Promise<SignInResult> {
-  if (provider === "google") return signInWithGoogle();
-  if (provider === "kakao") return signInWithKakao();
+// onAuthorized는 소셜 로그인 창이 닫히고 토큰을 받은 뒤 서버 처리 직전에 불린다.
+export function signIn(
+  provider: LoginProvider,
+  onAuthorized: () => void = () => {},
+): Promise<SignInResult> {
+  if (provider === "google") return signInWithGoogle(onAuthorized);
+  if (provider === "kakao") return signInWithKakao(onAuthorized);
   if (Platform.OS !== "ios") return Promise.reject(new Error("apple_login_not_supported"));
-  return signInWithAppleNative();
+  return signInWithAppleNative(onAuthorized);
 }

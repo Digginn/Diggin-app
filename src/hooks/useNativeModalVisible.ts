@@ -6,7 +6,11 @@ import { Platform } from "react-native";
 const DISMISS_MS = 400;
 
 let dismissingCount = 0;
+let shownCount = 0;
 const listeners = new Set<() => void>();
+
+/** 떠 있거나 닫히는 중인 모달이 있는지. 이때 다른 모달을 띄우면 iOS가 무시한다. */
+export const isNativeModalBusy = () => shownCount > 0 || dismissingCount > 0;
 
 function notify() {
   listeners.forEach((listener) => listener());
@@ -42,7 +46,11 @@ export function useNativeModalVisible(visible: boolean) {
 
   useEffect(() => {
     if (!isShown) return;
-    return markDismissing;
+    shownCount += 1;
+    return () => {
+      shownCount -= 1;
+      markDismissing();
+    };
   }, [isShown]);
 
   return isShown;

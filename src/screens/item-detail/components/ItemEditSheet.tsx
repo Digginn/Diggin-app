@@ -29,6 +29,8 @@ type ItemEditSheetProps = {
   errorMessage?: string;
   onErrorDismiss?: () => void;
   isInline?: boolean;
+  /** 공유 시트는 저장 전에 폴더를 고르러 넘어간다. */
+  submitLabel?: string;
 };
 
 export function ItemEditSheet({
@@ -42,6 +44,7 @@ export function ItemEditSheet({
   errorMessage,
   onErrorDismiss,
   isInline,
+  submitLabel = "저장하기",
 }: ItemEditSheetProps) {
   const [values, setValues] = useState(initialValues);
   const [overlay, setOverlay] = useState<ItemInfoOverlay>(null);
@@ -155,7 +158,7 @@ export function ItemEditSheet({
             취소
           </Button>
           <Button className="flex-1" isDisabled={isNameMissing || isSubmitting} onPress={submit}>
-            저장하기
+            {submitLabel}
           </Button>
         </View>
       </ScrollView>

@@ -154,7 +154,7 @@ test("루트는 폰트·세션 복원이 끝난 뒤 앱과 전역 제재 안내�
 });
 
 for (const os of ["ios", "android"]) {
-  test(`${os}: 로그인 화면의 둘러보기·뒤로 가기와 OS별 소셜 로그인이 정상 동작한다`, () => {
+  test(`${os}: 로그인 화면의 둘러보기·뒤로 가기와 OS별 소셜 로그인이 정상 동작한다`, async () => {
     const expectedProviders = os === "ios" ? "google,kakao,apple" : "google,kakao";
     const routes = [];
     const alerts = [];
@@ -213,7 +213,7 @@ for (const os of ["ios", "android"]) {
     assert.equal(scroll.props.contentContainerStyle.paddingBottom, 36);
     const providers = tree.filter((node) => node.type === "SocialLoginButton");
     assert.equal(providers.map((node) => node.props.provider).join(","), expectedProviders);
-    for (const button of providers) button.props.onPress();
+    for (const button of providers) await button.props.onPress();
     assert.equal(signIns.join(","), expectedProviders);
     assert.equal(alerts.length, 0);
     const buttons = tree.filter((node) => node.type === "Pressable");
@@ -425,12 +425,22 @@ test("이미 로그인한 사람의 자동 이동은 공유 링크를 보존하�
 });
 
 test("ALL 탭은 로그인한 뒤에만 맡긴 공유 링크를 꺼내 저장을 이어 간다", async () => {
-  const run = async (session, pathname) => {
+  const run = async (session, pathname, appState = "active") => {
     const started = [];
     let taken = 0;
     const effects = [];
+    const listeners = [];
     const { default: TabLayout } = load("app/(tabs)/_layout.tsx", {
       "react": { useEffect: (effect) => effects.push(effect) },
+      "react-native": {
+        AppState: {
+          currentState: appState,
+          addEventListener: (_type, listener) => {
+            listeners.push(listener);
+            return { remove() {} };
+          },
+        },
+      },
       "expo-router": {
         Tabs: Object.assign(() => null, { Screen: "Screen" }),
         usePathname: () => pathname,
@@ -455,18 +465,23 @@ test("ALL 탭은 로그인한 뒤에만 맡긴 공유 링크를 꺼내 저장을
     TabLayout();
     for (const effect of effects) effect();
     await new Promise((resolve) => setImmediate(resolve));
-    return { started, taken };
+    const becomeActive = async () => {
+      listeners.forEach((listener) => listener("active"));
+      await new Promise((resolve) => setImmediate(resolve));
+    };
+    return { started, taken, becomeActive };
   };
-  assert.deepEqual(
-    await run(null, "/all"),
-    { started: [], taken: 0 },
-    "둘러보기 비회원은 꺼내지 않는다",
-  );
-  assert.deepEqual(await run({ user: { id: "u" } }, "/folder"), { started: [], taken: 0 });
-  assert.deepEqual(await run({ user: { id: "u" } }, "/all"), {
-    started: ["https://www.musinsa.com/products/1"],
-    taken: 1,
-  });
+  const guest = await run(null, "/all");
+  assert.deepEqual([guest.started, guest.taken], [[], 0], "둘러보기 비회원은 꺼내지 않는다");
+  const folder = await run({ user: { id: "u" } }, "/folder");
+  assert.deepEqual([folder.started, folder.taken], [[], 0]);
+  const member = await run({ user: { id: "u" } }, "/all");
+  assert.deepEqual([member.started, member.taken], [["https://www.musinsa.com/products/1"], 1]);
+
+  const afterLogin = await run({ user: { id: "u" } }, "/all", "inactive");
+  assert.equal(afterLogin.taken, 0, "로그인 창이 닫히는 중에는 꺼내지 않는다");
+  await afterLogin.becomeActive();
+  assert.deepEqual(afterLogin.started, ["https://www.musinsa.com/products/1"]);
 });
 
 test("토스트는 디자인 토큰을 사용하고 터치 방해 없이 오류를 안내한다", () => {
@@ -774,6 +789,28 @@ test("카카오 신규 가입만 카카오 프로필 사진을 복사하고, 실
   } finally {
     console.warn = warn;
   }
+});
+
+test("로딩 창은 소셜 로그인 창이 닫히고 토큰을 받은 뒤에만 띄운다", async () => {
+  const order = [];
+  const user = {
+    id: "a",
+    created_at: "2026-10-16T00:00:00Z",
+    last_sign_in_at: "2026-10-16T00:05:00Z",
+  };
+  const { signIn } = loadSignIn({
+    getUser: () => (order.push("server"), user),
+    kakao: {
+      login: async () => {
+        throw Object.assign(new Error("cancel"), { code: "Cancelled" });
+      },
+    },
+  });
+  assert.equal((await signIn("google", () => order.push("loading"))).status, "success");
+  assert.deepEqual(order, ["loading", "server"]);
+  order.length = 0;
+  assert.equal((await signIn("kakao", () => order.push("loading"))).status, "cancelled");
+  assert.deepEqual(order, [], "취소하면 로딩 창을 띄우지 않는다");
 });
 
 test("Auth ban 로그인은 가입 처리 없이 검증된 본인 제재 안내로 전환한다", async () => {

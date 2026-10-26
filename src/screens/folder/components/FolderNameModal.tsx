@@ -13,7 +13,8 @@ const INPUT_FOCUS_DELAY_MS = 200;
 type FolderNameModalProps = {
   initialName?: string;
   onClose: () => void;
-  onSubmit?: (name: string) => boolean | void | Promise<boolean | void>;
+  /** 문자열을 돌려주면 입력칸 아래 오류로 보여 주고 모달을 유지한다. */
+  onSubmit?: (name: string) => boolean | string | void | Promise<boolean | string | void>;
   overlay?: ReactNode;
 };
 
@@ -23,6 +24,7 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
   const [name, setName] = useState(initialName ?? INITIAL_FOLDER_NAME);
   const [hasEditedName, setHasEditedName] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
   const normalizedName = name.normalize("NFC").trim();
   const characterCount = [...splitGraphemes(normalizedName)].length;
@@ -42,7 +44,9 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
-      if ((await onSubmit?.(normalizedName)) !== false) onClose();
+      const result = await onSubmit?.(normalizedName);
+      if (typeof result === "string") setSubmitError(result);
+      else if (result !== false) onClose();
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -86,6 +90,7 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
             onChangeText={(text) => {
               setName(text);
               setHasEditedName(true);
+              setSubmitError(null);
             }}
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
@@ -96,9 +101,11 @@ export function FolderNameModal({ initialName, onClose, onSubmit, overlay }: Fol
             </Text>
           </View>
         </View>
-        {characterCount > MAX_FOLDER_NAME_LENGTH && (
+        {characterCount > MAX_FOLDER_NAME_LENGTH ? (
           <HelperText status="error" message="폴더명은 최대 7자까지 입력할 수 있습니다." />
-        )}
+        ) : submitError ? (
+          <HelperText status="error" message={submitError} />
+        ) : null}
       </View>
     </ActionModal>
   );

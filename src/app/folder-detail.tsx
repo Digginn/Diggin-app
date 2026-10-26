@@ -1,5 +1,5 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 
 import { AppBar } from "@/components/app-bar";
@@ -7,6 +7,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Spinner } from "@/components/Loading";
 import { MemberOnly } from "@/components/MemberOnly";
 import { ActionModal } from "@/components/modal";
+import { TOAST_MESSAGES } from "@/constants/messages";
 import { useFolders } from "@/hooks/useFolders";
 import { useToast } from "@/hooks/useToast";
 import { FolderNameModal } from "@/screens/folder/components/FolderNameModal";
@@ -34,6 +35,10 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
   const deleteFolder = useDeleteFolder();
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"));
 
+  useEffect(() => {
+    if (items.isError || counts.isError) showToast(TOAST_MESSAGES.SYS_001);
+  }, [items.isError, items.errorUpdatedAt, counts.isError, counts.errorUpdatedAt, showToast]);
+
   return (
     <>
       <FolderDetailScreen
@@ -52,8 +57,10 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
         onEndReached={() => {
           if (items.hasNextPage && !items.isFetchingNextPage) void items.fetchNextPage();
         }}
-        isError={items.isError}
-        onRetry={() => void items.refetch()}
+        isRefreshing={items.isRefetching && !items.isFetchingNextPage}
+        onRefresh={() => {
+          void Promise.all([items.refetch(), counts.refetch()]);
+        }}
         onBack={goBack}
         onOpenItem={(item) => router.push({ pathname: "/items/[id]", params: { id: item.id } })}
         onEditFolder={() => setIsRenaming(true)}
@@ -108,10 +115,25 @@ function FolderDetailEntry() {
   const router = useRouter();
   const isPlaceholder = id === "owned";
   const folders = useFolders(isPlaceholder);
+  const showToast = useToast();
+  useEffect(() => {
+    if (isPlaceholder && folders.isError) showToast(TOAST_MESSAGES.SYS_001);
+  }, [isPlaceholder, folders.isError, folders.errorUpdatedAt, showToast]);
   if (!isPlaceholder) return <FolderDetailContent folderId={id} />;
   const ownedId = folders.data?.find((folder) => folder.isOwnedItems)?.id;
   if (ownedId) return <FolderDetailContent folderId={ownedId} />;
   if (!folders.isError && !folders.data) return <Spinner />;
+  if (folders.isError) {
+    return (
+      <FolderDetailScreen
+        folderName="나의 소장템"
+        isOwnedFolder
+        isRefreshing={folders.isRefetching}
+        onRefresh={() => void folders.refetch()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"))}
+      />
+    );
+  }
   return (
     <View className="flex-1 bg-gray-0">
       <AppBar

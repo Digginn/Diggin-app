@@ -90,6 +90,7 @@ jobs:
           supabase test db --local
           supabase db lint --local --schema public,private --fail-on error
           supabase db advisors --local --level warn --fail-on error
+          CSV_IMPORT_TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm exec --yes --package=deno@2.5.6 -- deno test --allow-env --allow-net --config supabase/functions/deno.json supabase/functions/csv-import/database_test.ts
 
       - name: Test shared database deployment guards
         run: |
@@ -160,6 +161,7 @@ jobs:
           supabase functions deploy account-restriction --project-ref "$SUPABASE_PROJECT_ID"
           supabase functions deploy account-withdrawal --project-ref "$SUPABASE_PROJECT_ID"
           supabase functions deploy notification-push --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy csv-import --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Report the deployed commit
         env:
@@ -181,3 +183,5 @@ jobs:
           npm exec --yes --package=deno@2.5.6 -- deno lint --config supabase/functions/deno.json supabase/functions
           npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/admin-moderation/index.ts supabase/functions/account-restriction/index.ts supabase/functions/account-withdrawal/index.ts supabase/functions/notification-push/index.ts
           npm exec --yes --package=deno@2.5.6 -- deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts supabase/functions/account-withdrawal/handler_test.ts supabase/functions/notification-push/handler_test.ts
+          npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/csv-import/index.ts
+          npm exec --yes --package=deno@2.5.6 -- deno test --config supabase/functions/deno.json supabase/functions/csv-import/handler_test.ts
