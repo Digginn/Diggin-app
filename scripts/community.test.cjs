@@ -844,3 +844,12 @@ test("투표글 피드는 일반글과 같은 하단 여백을 쓰고 높이를 
     /h-\[120px\]/,
   );
 });
+
+test("본인 글 상세에서는 좋아요를 누를 수 없다(BUG-074)", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({ post: { ...post, isMine: true } });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const row = nodes(PostDetailScreen({}), "LikeCommentRow")[0];
+  assert.equal(row.props.onPressLike, undefined);
+  assert.equal(row.props.hasLike, true, "좋아요 수는 계속 보여 준다");
+});

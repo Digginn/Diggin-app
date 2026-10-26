@@ -344,8 +344,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                 commentCount={post.commentCount ?? 0}
                 isLiked={like.isLiked}
                 hasLike={post.type === "post"}
+                // 본인 글은 좋아요를 누를 수 없다(BUG-074). 개수는 계속 보여 준다.
                 onPressLike={
-                  post.type === "post" && !like.isPending ? () => void like.toggle() : undefined
+                  post.type === "post" && !post.isMine && !like.isPending
+                    ? () => void like.toggle()
+                    : undefined
                 }
               />
               <View className="h-3 bg-gray-100" />
