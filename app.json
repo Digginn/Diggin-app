@@ -19,11 +19,11 @@
     "android": {
       "package": "com.diggin.app",
       "versionCode": 2,
+      "icon": "./assets/images/icon-app-android.png",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#1E1E1E",
+        "foregroundImage": "./assets/images/icon-app-android.png",
+        "monochromeImage": "./assets/images/icon-app-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -59,7 +59,14 @@
         }
       ],
       ["expo-sharing", { "android": { "enabled": true, "singleShareMimeTypes": ["text/plain"] } }],
-      ["expo-notifications", { "defaultChannel": "default" }],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default",
+          "icon": "./assets/images/icon-notification.png",
+          "color": "#1E1E1E"
+        }
+      ],
       "expo-secure-store",
       "@react-native-google-signin/google-signin",
       "./plugins/withShareExtensionBuild",

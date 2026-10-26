@@ -217,8 +217,9 @@ export function CsvImportScreen({
             {isFolderLimitNoticeVisible && (
               <View accessibilityRole="alert" className="rounded-lg bg-gray-100 py-4 pl-4 pr-10">
                 <Text className="text-gray-700 font-b4">
-                  폴더는 최대 50개까지 만들 수 있습니다. 초과분은 ALL탭에 개별 아이템으로
-                  저장됩니다.
+                  {
+                    "폴더는 최대 50개까지 만들 수 있습니다.\n초과분은 ALL탭에 개별 아이템으로 저장됩니다."
+                  }
                 </Text>
                 <Pressable
                   accessibilityRole="button"

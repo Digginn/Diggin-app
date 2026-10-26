@@ -5,6 +5,7 @@ import { cssInterop } from "nativewind";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import { FolderError, folderKeys } from "@/api/folders";
 import { productKeys, saveProduct } from "@/api/products";
@@ -21,6 +22,7 @@ import { useFolders } from "@/hooks/useFolders";
 import { useToast } from "@/hooks/useToast";
 import { startLogin } from "@/lib/loginIntent";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
+import { itemSaveErrorMessage } from "@/screens/save/domain/itemSaveError";
 import type { ItemSaveValues } from "@/types/wish-item";
 
 import {
@@ -178,7 +180,9 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
               accessibilityLabel="아이템명"
               growsTo={88}
               value={values.name}
-              onChangeText={update("name")}
+              onChangeText={(text) =>
+                update("name")(Array.from(splitGraphemes(text)).slice(0, 100).join(""))
+              }
               isError={!!errors.name}
             />
             {errors.name && <HelperText status="error" message={errors.name} />}
@@ -188,7 +192,9 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
             <TextField
               accessibilityLabel="브랜드"
               value={values.brand}
-              onChangeText={update("brand")}
+              onChangeText={(text) =>
+                update("brand")(Array.from(splitGraphemes(text)).slice(0, 30).join(""))
+              }
               isError={!!errors.brand}
             />
             {errors.brand && <HelperText status="error" message={errors.brand} />}
@@ -249,7 +255,7 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
           folders={folders.data ?? []}
           selectedFolderIds={[]}
           isCompleting={save.isPending}
-          errorMessage={save.isError ? TOAST_MESSAGES.SAVE_012 : undefined}
+          errorMessage={save.isError ? itemSaveErrorMessage(save.error) : undefined}
           onErrorDismiss={save.reset}
           onBack={() => setFolderOpen(false)}
           onClose={() => setFolderOpen(false)}

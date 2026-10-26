@@ -96,7 +96,12 @@ export function FolderCard({
           </View>
         )}
       </View>
-      <View className={clsx("gap-0.5", isCompact ? "pl-3" : "pl-5")}>
+      <View
+        className={clsx(
+          "gap-0.5 self-center",
+          isCompact ? "w-[74px] -translate-x-px" : "w-[112px]",
+        )}
+      >
         <Text numberOfLines={1} className="text-gray-900 font-nickname">
           {folder.name}
         </Text>

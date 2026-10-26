@@ -17,7 +17,42 @@ function nodes(node) {
 const LOGIN_SOURCES = {
   "@/lib/loginIntent": "../src/lib/loginIntent.ts",
   "@/hooks/useLoginGate": "../src/hooks/useLoginGate.tsx",
+  "@/screens/save/domain/itemSaveError": "../src/screens/save/domain/itemSaveError.ts",
 };
+
+test("아이템 저장은 통신 오류만 연결 확인 토스트로 구분한다", () => {
+  const { TOAST_MESSAGES } = load("../src/constants/messages.ts", {});
+  const mocks = {
+    "expo-router": { useRouter: () => ({}) },
+    "@/components/Loading": { LoadingDialog: "LoadingDialog" },
+    "@/constants/messages": { TOAST_MESSAGES },
+    "@/hooks/useItemSave": { EMPTY_ITEM_SAVE_VALUES: {} },
+    "@/hooks/useToast": { useToast: () => () => {} },
+    "@/screens/save/components/ItemSavePage": { ItemSavePage: "ItemSavePage" },
+    "@/screens/save/components/ProductPageReader": { ProductPageReader: "ProductPageReader" },
+  };
+  const { ItemSaveFlow } = load("../src/components/ItemSaveFlow.tsx", mocks);
+  for (const [error, expected] of [
+    [new TypeError("Network request failed"), TOAST_MESSAGES.SYS_001],
+    [
+      { message: "TypeError: Network request failed", code: "", details: "", hint: "" },
+      TOAST_MESSAGES.SYS_001,
+    ],
+    [{ message: "Failed to fetch" }, TOAST_MESSAGES.SYS_001],
+    [{ message: "permission denied", code: "42501" }, TOAST_MESSAGES.SAVE_012],
+    [new Error("invalid_name"), TOAST_MESSAGES.SAVE_012],
+    [null, TOAST_MESSAGES.SAVE_012],
+  ]) {
+    const page = nodes(ItemSaveFlow({ itemSave: { save: { isError: true, error } } })).find(
+      (node) => node.type === "ItemSavePage",
+    );
+    assert.equal(page.props.errorMessage, expected);
+  }
+  const page = nodes(ItemSaveFlow({ itemSave: { save: { isError: false } } })).find(
+    (node) => node.type === "ItemSavePage",
+  );
+  assert.equal(page.props.errorMessage, undefined);
+});
 
 function load(file, mocks) {
   const module = { exports: {} };
@@ -120,6 +155,25 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   priceField().props.onChangeText("0");
   await saveButton().props.onPress();
   assert.equal(saved.at(-1).price, "0");
+
+  const brandField = () =>
+    render().find((node) => node.type === "TextField" && node.props.placeholder === "선택 입력");
+  assert.equal(nameField().props.maxLength, undefined);
+  assert.equal(brandField().props.maxLength, undefined);
+  nameField().props.onChangeText(`${"새".repeat(99)}👍🏻초과`);
+  brandField().props.onChangeText(`${"브".repeat(29)}👨‍👩‍👧‍👦초과`);
+  assert.equal(nameField().props.value, `${"새".repeat(99)}👍🏻`);
+  assert.equal(brandField().props.value, `${"브".repeat(29)}👨‍👩‍👧‍👦`);
+  nameField().props.onChangeText("새".repeat(100));
+  nameField().props.onChangeText(`${nameField().props.value}상품`);
+  assert.equal(nameField().props.value, "새".repeat(100));
+  brandField().props.onChangeText("브".repeat(31));
+  assert.equal(brandField().props.value, "브".repeat(30));
+  await saveButton().props.onPress();
+  assert.equal(saved.at(-1).name, "새".repeat(100), "초과 입력 시 원래 상품명으로 돌아가지 않는다");
+  assert.equal(saved.at(-1).brand, "브".repeat(30));
+  nameField().props.onChangeText("수정한 상품");
+  assert.equal(nameField().props.value, "수정한 상품", "삭제 후 다시 입력할 수 있다");
 
   // 저장 응답 전 연타와 취소·끌어내리기는 막고, 끝나면 풀린다. 실패해도 풀린다.
   let submitCount = 0;

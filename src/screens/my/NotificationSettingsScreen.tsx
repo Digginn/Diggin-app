@@ -31,7 +31,7 @@ type NotificationSettingsScreenProps = {
 export function NotificationSettingsScreen({
   initialSettings = DEFAULT_SETTINGS,
   onSaveSettings,
-  isDevicePushEnabled = true,
+  isDevicePushEnabled,
   onOpenNotificationSettings,
 }: NotificationSettingsScreenProps = {}) {
   const showToast = useToast();
@@ -48,7 +48,7 @@ export function NotificationSettingsScreen({
   }, []);
 
   const handleChange = async (key: keyof NotificationSettings, isEnabled: boolean) => {
-    if (isSavingRef.current) return;
+    if (!isDevicePushEnabled || isSavingRef.current) return;
     const previous = settings;
     const next = { ...settings, [key]: isEnabled };
     setSettings(next);
@@ -74,7 +74,7 @@ export function NotificationSettingsScreen({
       <StatusBar style="dark" />
       <AppBar title="알림 설정" />
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-        {!isDevicePushEnabled && (
+        {isDevicePushEnabled === false && (
           <PushOffBanner
             title="기기 알림이 꺼져 있습니다."
             description="알림을 받으려면 기기 설정에서 알림을 허용해 주세요."
@@ -91,8 +91,8 @@ export function NotificationSettingsScreen({
             </View>
             <Toggle
               accessibilityLabel="푸시 알림"
-              isOn={settings.isAllEnabled}
-              isDisabled={isSaving}
+              isOn={isDevicePushEnabled === true && settings.isAllEnabled}
+              isDisabled={!isDevicePushEnabled || isSaving}
               onChange={(value) => handleChange("isAllEnabled", value)}
             />
           </View>

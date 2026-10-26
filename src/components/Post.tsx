@@ -41,7 +41,7 @@ type PostProps = {
 };
 
 function Meta({ children }: { children: ReactNode }) {
-  return <Text className="text-right text-gray-500 font-b3">{children}</Text>;
+  return <Text className="text-right text-gray-500 font-b4">{children}</Text>;
 }
 
 function toRows(items: PostItem[]): (PostItem | null)[][] {
@@ -85,7 +85,7 @@ export function Post({
           <View className="w-full flex-row items-start gap-3">
             <View className="min-w-0 flex-1 self-stretch">
               <Text
-                className="h-[39px] w-full text-gray-1000 font-b4"
+                className="h-10 w-full text-gray-1000 font-b3"
                 numberOfLines={isPreview ? 1 : 2}
               >
                 {body}
@@ -99,7 +99,7 @@ export function Post({
           </View>
         ) : (
           <View className="w-full gap-4">
-            <Text className="w-full text-gray-1000 font-b4" numberOfLines={1}>
+            <Text className="w-full text-gray-1000 font-b3" numberOfLines={1}>
               {body}
             </Text>
             <View className="w-full gap-2">

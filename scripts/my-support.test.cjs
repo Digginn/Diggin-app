@@ -21,7 +21,10 @@ function loadLoginIntent() {
 }
 const loginIntent = loadLoginIntent();
 
-function setup(screenName) {
+function setup(
+  screenName,
+  application = { nativeApplicationVersion: "1.0.0", nativeBuildVersion: "5" },
+) {
   const toasts = [],
     routes = [],
     opened = [],
@@ -43,6 +46,7 @@ function setup(screenName) {
       exports: screen.exports,
       __DEV__: true,
       require: function mockedRequire(name) {
+        if (name === "expo-application") return application;
         if (name === "react")
           return {
             ...React,
@@ -165,6 +169,29 @@ function descendants(element) {
   if (!React.isValidElement(element)) return [];
   return [element, ...React.Children.toArray(element.props.children).flatMap(descendants)];
 }
+
+test("앱 정보는 설치된 앱의 버전·빌드 번호를 표시하고 없으면 추측하지 않는다", () => {
+  for (const [version, build, expected] of [
+    ["1.0.0", "5", "1.0.0(5)"],
+    ["1.0.0", "3", "1.0.0(3)"],
+    ["2.1.0", "42", "2.1.0(42)"],
+    ["1.0.0", null, "1.0.0"],
+    [null, null, "버전 정보 없음"],
+  ]) {
+    for (const isGuest of [false, true]) {
+      const context = setup("MyScreen", {
+        nativeApplicationVersion: version,
+        nativeBuildVersion: build,
+      });
+      const support = descendants(context.Screen({ isGuest })).find(
+        (node) => node.props.title === "고객지원",
+      );
+      const row = support.props.rows.find((row) => row.label === "앱 정보");
+      assert.equal(row.value, expected);
+      assert.equal(row.hasChevron, false);
+    }
+  }
+});
 
 test("MY는 활동을 프로필의 2depth로 옮기고 CSV를 고객지원에 배치한다", () => {
   const context = setup("MyScreen");

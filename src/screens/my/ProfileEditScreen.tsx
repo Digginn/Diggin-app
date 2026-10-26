@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { splitGraphemes } from "unicode-segmenter/grapheme";
 
 import { AVATAR_UNREADABLE_ERROR } from "@/api/avatar";
 import { IconProfileCamera, ImageProfilePlaceholder } from "@/assets/images/my";
@@ -47,7 +48,7 @@ type ProfileEditScreenProps = {
 const AUTH_PROVIDER_LABELS = { kakao: "카카오", google: "Google", apple: "Apple" } as const;
 
 export function ProfileEditScreen({
-  authProvider = "kakao",
+  authProvider,
   currentNickname,
   avatarUrl,
   onSaveNickname,
@@ -63,6 +64,7 @@ export function ProfileEditScreen({
   const isNicknameError = helperStatus === "error";
   const [helperMessage, setHelperMessage] = useState(NICKNAME_HELPER_MESSAGE);
   const [isSaving, setIsSaving] = useState(false);
+  const isSaveDisabled = isSaving || isNicknameError || (!nickname && !profileImageUri);
 
   const handlePickImage = async (source: "camera" | "library") => {
     try {
@@ -125,7 +127,7 @@ export function ProfileEditScreen({
 
   const handleSave = async () => {
     Keyboard.dismiss();
-    if (isSaving || isNicknameError || (!nickname && !profileImageUri)) return;
+    if (isSaveDisabled) return;
 
     const errorMessage = validateNickname(nickname);
     if (errorMessage) {
@@ -218,12 +220,14 @@ export function ProfileEditScreen({
               inputClassName="pr-12"
               isError={isNicknameError}
               onChangeText={(value) => {
-                setNickname(value);
+                setNickname(
+                  Array.from(splitGraphemes(value)).slice(0, MAX_NICKNAME_LENGTH).join(""),
+                );
                 setHelperStatus("default");
                 setHelperMessage(NICKNAME_HELPER_MESSAGE);
               }}
               onSubmitEditing={handleSave}
-              placeholder={currentNickname ?? "현재 닉네임"}
+              placeholder={currentNickname ?? ""}
               returnKeyType="done"
               value={nickname}
             />
@@ -237,17 +241,19 @@ export function ProfileEditScreen({
 
         <View className="mt-5 h-12 flex-row items-center justify-between border-b border-gray-300">
           <Text className="text-gray-800 font-label-14">가입 수단</Text>
-          <View className="flex-row items-center gap-1">
-            <AuthProviderIcon provider={authProvider} />
-            <Text className="text-gray-600 font-b3">
-              {AUTH_PROVIDER_LABELS[authProvider]} 간편 인증
-            </Text>
-          </View>
+          {authProvider && (
+            <View className="flex-row items-center gap-1">
+              <AuthProviderIcon provider={authProvider} />
+              <Text className="text-gray-600 font-b3">
+                {AUTH_PROVIDER_LABELS[authProvider]} 간편 인증
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
       <View className="absolute left-6 right-6" style={{ bottom: insets.bottom + 10 }}>
-        <Button size="large" isDisabled={isSaving || isNicknameError} onPress={handleSave}>
+        <Button size="large" isDisabled={isSaveDisabled} onPress={handleSave}>
           저장하기
         </Button>
       </View>

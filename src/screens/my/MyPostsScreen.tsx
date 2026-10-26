@@ -190,7 +190,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                     <Button onPress={() => void activity.refetch()}>다시 시도</Button>
                   </View>
                 ) : (
-                  <View className="h-96">
+                  <View className="flex-1">
                     <EmptyState
                       variant={kind === "vote" ? "vote" : "post"}
                       message={
@@ -214,7 +214,10 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                 ) : null
               }
               className="flex-1"
-              contentContainerStyle={{ paddingBottom: insets.bottom }}
+              contentContainerStyle={{
+                paddingBottom: insets.bottom,
+                flexGrow: rows.length === 0 ? 1 : undefined,
+              }}
               showsVerticalScrollIndicator={false}
             />
           )}

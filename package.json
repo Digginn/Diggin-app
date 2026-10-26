@@ -14,6 +14,7 @@
     "clsx": "^2.1.1",
     "expo": "~57.0.21",
     "expo-apple-authentication": "~57.0.2",
+    "expo-application": "~57.0.3",
     "expo-blur": "~57.0.3",
     "expo-build-properties": "~57.0.22",
     "expo-clipboard": "~57.0.2",
@@ -73,7 +74,7 @@
   "scripts": {
     "test:moderation": "node --test scripts/account-access.test.cjs scripts/sanction-notices.test.cjs scripts/login.test.cjs",
     "test:community": "node --test scripts/community.test.cjs scripts/vote-write.test.cjs scripts/community-write.test.cjs scripts/community-interactions.test.cjs scripts/community-save.test.cjs scripts/community-voting.test.cjs scripts/community-activity.test.cjs scripts/my-posts.test.cjs scripts/community-reporting.test.cjs scripts/modal.test.cjs",
-    "test:csv-import": "node --test scripts/csv-import-logic.test.cjs scripts/csv-import.test.cjs scripts/csv-import-api.test.cjs scripts/csv-import-cache.test.cjs",
+    "test:csv-import": "node --test scripts/csv-import-logic.test.cjs scripts/csv-import.test.cjs scripts/csv-import-api.test.cjs scripts/csv-import-cache.test.cjs scripts/csv-import-loading.test.cjs scripts/csv-import-stream.test.cjs",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

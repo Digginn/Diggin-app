@@ -40,6 +40,23 @@ for select to authenticated using ((select auth.uid()) = user_id);
 create policy "import_failures_select_own" on public.import_failures
 for select to authenticated using ((select auth.uid()) = user_id);
 
+-- NOTICE는 COMMIT 전에도 전용 연결에 도착한다. 완료 신호는 Edge가 COMMIT 후 따로 보낸다.
+create or replace function private.report_csv_import_progress(completed integer, total integer)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if current_setting('diggin.csv_progress', true) = 'on'
+    and completed > 0 and completed < total
+    and completed % greatest(1, (total + 99) / 100) = 0 then
+    raise notice 'csv_import_progress' using detail = jsonb_build_object('completed', completed, 'total', total)::text;
+  end if;
+end;
+$$;
+revoke execute on function private.report_csv_import_progress(integer, integer) from public, anon, authenticated;
+
 -- 한 번의 Import를 원자적으로 저장한다. 응답을 잃은 재시도는 같은 request_id로 결과만 다시 읽는다.
 create or replace function private.import_csv(request_id uuid, import_plan jsonb)
 returns jsonb
@@ -164,6 +181,7 @@ begin
   end loop;
 
   for entry in select value from jsonb_array_elements(import_plan->'failures') loop
+    perform private.report_csv_import_progress(imported + duplicate_total + failed_total, total);
     if coalesce(entry->>'rowNumber', '') !~ '^[0-9]{1,8}$' or (entry->>'rowNumber')::integer < 2
       or jsonb_typeof(entry->'productName') is distinct from 'string' or entry->>'reason' is null then
       raise exception 'invalid_import_plan' using errcode = '22023';
@@ -178,6 +196,7 @@ begin
     failed_total := failed_total + 1;
   end loop;
   for entry in select value from jsonb_array_elements(import_plan->'duplicates') loop
+    perform private.report_csv_import_progress(imported + duplicate_total + failed_total, total);
     if coalesce(entry->>'rowNumber', '') !~ '^[0-9]{1,8}$' or (entry->>'rowNumber')::integer < 2
       or jsonb_typeof(entry->'productName') is distinct from 'string' then
       raise exception 'invalid_import_plan' using errcode = '22023';
@@ -187,6 +206,7 @@ begin
   end loop;
 
   for item in select value from jsonb_array_elements(import_plan->'products') loop
+    perform private.report_csv_import_progress(imported + duplicate_total + failed_total, total);
     if coalesce(item->>'rowNumber', '') !~ '^[0-9]{1,8}$' or (item->>'rowNumber')::integer < 2
       or jsonb_typeof(item->'sourceFolderNames') is distinct from 'array'
       or jsonb_typeof(item->'isOwned') is distinct from 'boolean' then

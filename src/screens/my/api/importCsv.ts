@@ -16,6 +16,8 @@ import type {
   CsvImportResult,
 } from "../types/csvImport";
 
+import { streamCsvImport } from "./streamCsvImport";
+
 const REGISTERED_AT_UTC_OFFSET_MINUTES = 540;
 const FAILURE_MESSAGES: Record<string, string> = {
   EMPTY_PRODUCT_NAME: "아이템 이름이 없습니다.",
@@ -163,19 +165,27 @@ export async function importCsv(
       isFolderLimitConfirmed = true;
     }
     await AsyncStorage.setItem(storageKey, JSON.stringify(pending));
-    const { data, error } = await supabase.rpc("import_csv", {
-      request_id: pending.requestId,
-      import_plan: {
-        userId: auth.user.id,
-        totalCount: plan.totalCount,
-        products: plan.products,
-        folderMappings: plan.folderMappings,
-        failures: plan.failures,
-        duplicates: plan.duplicates,
-      } satisfies Json,
-    });
-    if (error) {
-      if ((error.code === "40001" || error.code === "40P01") && attempt < 2) continue;
+    let data: unknown;
+    try {
+      if (attempt > 0) onProgress({ completed: 0, total: plan.totalCount });
+      data = await streamCsvImport(
+        {
+          request_id: pending.requestId,
+          import_plan: {
+            userId: auth.user.id,
+            totalCount: plan.totalCount,
+            products: plan.products,
+            folderMappings: plan.folderMappings,
+            failures: plan.failures,
+            duplicates: plan.duplicates,
+          } satisfies Json,
+        },
+        plan.totalCount,
+        onProgress,
+      );
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+      if ((code === "40001" || code === "40P01") && attempt < 2) continue;
       throw error;
     }
     const result = readResult(data);
