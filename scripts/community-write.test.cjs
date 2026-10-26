@@ -1,4 +1,4 @@
-/* global __dirname, setImmediate */
+/* global __dirname */
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
@@ -333,6 +333,28 @@ test("등록 성공 시 서버 목록을 갱신하고 투표 탭으로 복귀한
   assert.equal(ui.invalidations.length, 1);
   assert.equal(ui.destination().pathname, "/(tabs)/diggle");
   assert.equal(ui.destination().params.tab, "vote");
+});
+
+test("등록 성공 후 화면 이동이 끝나기 전에는 첨부 초안을 비우지 않는다", async () => {
+  for (const isVote of [false, true]) {
+    const ui = editor({ isVote });
+    ui.render();
+    const cleanups = ui.runEffects().filter((cleanup) => typeof cleanup === "function");
+    ui.input("등록할 정상 본문");
+    ui.submit();
+    await settle();
+    const tree = ui.render();
+    assert.equal(nodes(tree, "CommunityBodyField")[0].props.value, "등록할 정상 본문");
+    assert.equal(nodes(tree, "ProductAttachGrid")[0].props.items.length, 1);
+    assert.equal(React.Children.toArray(tree.props.children)[0].props.right.props.disabled, true);
+    ui.submit();
+    await settle();
+    assert.equal(ui.calls.length, 1, "복귀 중 등록을 다시 눌러도 중복 저장하지 않는다");
+    ui.runEffects();
+    assert.equal(ui.destination().pathname, "/(tabs)/diggle");
+    cleanups.forEach((cleanup) => cleanup());
+    assert.equal(nodes(ui.render(), "ProductAttachGrid")[0].props.items.length, 0);
+  }
 });
 
 test("작성 이탈 취소는 초안을 유지하고 나가기는 초안을 폐기해 DIGGLE로 복귀한다", () => {

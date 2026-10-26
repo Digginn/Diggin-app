@@ -706,6 +706,7 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
     "nativewind": { cssInterop: (component) => component },
     "@/components/FallbackImg": { FallbackImg: "FallbackImg" },
     "./FolderPreview": { FolderPreview: "FolderPreview" },
+    "./ClosedFolder": { ClosedFolder: "ClosedFolder" },
   };
   const { FolderCard } = loadComponent("../src/screens/folder/components/FolderCard.tsx", mocks);
   const { FolderPreview } = loadComponent(
@@ -795,10 +796,13 @@ test("폴더 썸네일은 1·2·3장으로 제한되고 소장템과 빈 폴더�
           ).length,
           1,
         );
+      } else {
+        assert.equal(findAll(tree, "ClosedFolder")[0].props.isCompact, columnCount === 3);
       }
       tree = FolderCard({ folder: { ...folder, isOwnedItems: true }, columnCount });
       assert.equal(findAll(tree, "FolderPreview").length, 0);
-      assert.equal(findAll(tree, "Image").length, 1);
+      assert.equal(findAll(tree, "Image").length, 0);
+      assert.equal(findAll(tree, "ClosedFolder")[0].props.isCompact, columnCount === 3);
     }
     const tree = FolderPreview({ itemCount: 2, isCompact: columnCount === 3 });
     const thumbnail = thumbnails(tree)[0];

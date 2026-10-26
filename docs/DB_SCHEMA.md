@@ -369,9 +369,16 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
    - profiles 삭제 전 트리거(`profiles_clear_withdrawn_comments`)가 같은 트랜잭션에서 사용자 글을 먼저 지우고(그 글의 댓글도 함께 지워짐), 남은 사용자 댓글 content를 null로 바꾼다. 글을 FK 연쇄에 맡기면 본인 글에 단 본인 댓글이 먼저 수정된 뒤 글이 지워져 comments_post_id_fkey 위반으로 탈퇴가 실패했다.
 3. 계정이 지워진 뒤 설문을 private.withdrawal_surveys에 저장한다(user_id 없음). 재시도로 중복되지 않게 마지막에 두고, 실패해도 탈퇴는 성공으로 본다.
 
+## 8-1. 계정별 첫 진입 안내 (#152)
+
+- `private.first_visit_guides`는 사용자별 ALL(`all`)·FOLDER(`folder`)·상품 상세(`item-detail`) 안내를 닫은 시각을 각각 저장한다. `(user_id, guide_kind)` unique로 중복 기록을 막는다.
+- `get_first_visit_guides(target_user_id)`와 `dismiss_first_visit_guide(target_user_id, target_guide_kind)` RPC만 허용한다. 실제 세션·계정 상태와 대상 UUID가 본인인지 검사하며, 앱의 테이블 직접 접근은 차단한다.
+- 같은 계정은 재로그인·재설치·다른 기기에서도 닫은 안내를 반복하지 않는다. 기존 기기 저장 기록은 계정 소유자를 구분할 수 없어 승계하지 않는다. 따라서 전환 후 서버 기록이 없는 기존 사용자도 각 안내를 한 번 다시 본다. 탈퇴 시 프로필 FK cascade로 기록도 삭제되므로 새 UUID로 재가입하면 다시 안내한다.
+- 비회원·인증 복원 중에는 표시하지 않는다. 조회 실패 시에는 안내를 표시하고, 닫기 저장 실패 시 현재 앱 실행 중에만 재노출을 막는다. 다음 실행까지의 중복 방지는 서버 저장 성공을 전제로 한다.
+
 ## 9. DB에 두지 않는 것
 
-최근 검색어(기기 저장), 온보딩 완료 여부, 로그인 전 공유 임시 데이터, 툴팁·첫 진입 안내 노출 여부, Analytics, 추천.
+최근 검색어(기기 저장), 온보딩 완료 여부, 로그인 전 공유 임시 데이터, 일반 툴팁 노출 여부, Analytics, 추천. ALL·FOLDER·상품 상세 첫 진입 안내는 위 계정별 서버 기록으로 관리한다.
 
 ## 10. 확인 필요 (PM·팀 결정 대기)
 

@@ -177,6 +177,7 @@ for (const os of ["ios", "android"]) {
         useLocalSearchParams: () => ({}),
         useRouter: () => ({
           replace: (route) => routes.push(route),
+          push: (route) => routes.push(route),
           back: () => routes.push("back"),
           canGoBack: () => canGoBack,
         }),
@@ -220,9 +221,10 @@ for (const os of ["ios", "android"]) {
     buttons[0].props.onPress();
     assert.equal(routes.at(-1), "/browse");
     buttons[1].props.onPress();
+    assert.equal(routes.at(-1), "/policies/terms");
     buttons[2].props.onPress();
-    assert.equal(alerts.at(-2)[0], "이용약관");
-    assert.equal(alerts.at(-1)[0], "개인정보 처리방침");
+    assert.equal(routes.at(-1), "/policies/privacy");
+    assert.equal(alerts.length, 0);
     const errorTree = nodes(LoginScreen({ isLoginError: true }));
     const toast = errorTree.find((node) => node.type === "ToastText");
     assert.equal(toast.props.message, "로그인에 실패했습니다. 다시 시도해 주세요.");

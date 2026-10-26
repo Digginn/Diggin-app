@@ -77,6 +77,18 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
   const activity = useCommunityActivity(kind);
   const rows = activity.data?.pages.flat() ?? [];
   const title = isLiked ? "내가 좋아요한 글" : "내가 쓴 글";
+  const emptyState = (
+    <EmptyState
+      variant={kind === "vote" ? "vote" : "post"}
+      message={
+        isLiked
+          ? "좋아요한 글이 없습니다."
+          : kind === "vote"
+            ? "작성한 투표글이 없습니다."
+            : "작성한 게시글이 없습니다."
+      }
+    />
+  );
   const viewer = session?.user.id ?? null;
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/my-activity"));
   useFocusEffect(
@@ -189,20 +201,9 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                     </Text>
                     <Button onPress={() => void activity.refetch()}>다시 시도</Button>
                   </View>
-                ) : (
-                  <View className="flex-1">
-                    <EmptyState
-                      variant={kind === "vote" ? "vote" : "post"}
-                      message={
-                        isLiked
-                          ? "좋아요한 글이 없습니다."
-                          : kind === "vote"
-                            ? "작성한 투표글이 없습니다."
-                            : "작성한 게시글이 없습니다."
-                      }
-                    />
-                  </View>
-                )
+                ) : isLiked ? (
+                  <View className="flex-1">{emptyState}</View>
+                ) : null
               }
               ListFooterComponent={
                 activity.isFetchingNextPage ? (
@@ -223,6 +224,16 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
           )}
         </>
       )}
+      {!isLiked &&
+        session &&
+        !isRestoring &&
+        !activity.isPending &&
+        !activity.isError &&
+        rows.length === 0 && (
+          <View className="absolute inset-0" pointerEvents="none">
+            {emptyState}
+          </View>
+        )}
       <ReportFlow target={reportTarget} onClose={() => setReportTarget(null)} />
     </View>
   );

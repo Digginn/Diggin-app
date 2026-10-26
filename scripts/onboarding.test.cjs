@@ -35,7 +35,7 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   let cancellations = 0;
   runInNewContext(
     compiled +
-      "\nexports.AppCell=AppCell; exports.ItemTile=ItemTile; exports.ITEMS=ITEMS; exports.VoteResult=VoteResult; exports.FolderIllustration=FolderIllustration; exports.CsvIllustration=CsvIllustration;",
+      "\nexports.AppCell=AppCell; exports.APP_ICONS=APP_ICONS; exports.PhoneIllustration=PhoneIllustration; exports.ItemTile=ItemTile; exports.ITEMS=ITEMS; exports.VoteResult=VoteResult; exports.FolderIllustration=FolderIllustration; exports.CsvIllustration=CsvIllustration;",
     {
       exports: componentModule.exports,
       module: componentModule,
@@ -98,6 +98,13 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   );
   assert.ok(initial.props.className.includes("h-[396px]"));
   assert.ok(initial.props.className.includes("rounded-3xl"));
+  const { APP_ICONS, PhoneIllustration } = componentModule.exports;
+  assert.equal(APP_ICONS.length, 9, "최신 목업은 중복 없는 3×3 앱 아이콘이다");
+  assert.equal(new Set(APP_ICONS).size, 9);
+  const phone = PhoneIllustration({ time });
+  assert.ok(phone.props.className.includes("left-[13px]"));
+  assert.equal(phone.props.style.transformOrigin, "top left");
+  assert.equal(phone.props.style.transform[0].scale, 1.5);
   const cleanup = effect();
   assert.equal(timings[0].options.duration, 3600);
   assert.equal(repeats[0].count, -1);
@@ -223,22 +230,37 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
   assert.equal(React.Children.count(tree.scroll.props.children), 4);
   assert.equal(tree.dots.length, 4);
   assert.equal(tree.dots[0].props.isActive, true);
+  assert.equal(typeof tree.scroll.props.onScroll, "function");
+  assert.equal(tree.scroll.props.scrollEventThrottle, 16);
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 180 } } });
+  assert.equal(pageChanges.at(-1), 1, "스와이프가 끝나기 전에 실제 위치로 페이지를 갱신한다");
+  tree = render();
+  assert.equal(tree.dots[1].props.isActive, true);
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 888 } } });
+  tree = render();
+  assert.equal(tree.dots[3].props.isActive, true);
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 0 } } });
+  tree = render();
+  assert.equal(tree.dots[0].props.isActive, true, "빠른 역방향 이동도 종료 이벤트 없이 반영한다");
   tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
   assert.equal(pageChanges.at(-1), 1);
   tree = render();
   assert.equal(tree.dots[1].props.isActive, true);
   tree.dots[2].props.onPress();
-  assert.equal(activeIndex, 2);
-  assert.equal(pageChanges.at(-1), 2);
+  assert.equal(activeIndex, 1, "점 선택도 화면이 이동하기 전에 다음 장으로 바꾸지 않는다");
   assert.equal(scrollCalls.at(-1).x, 592);
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 592 } } });
+  assert.equal(pageChanges.at(-1), 2);
   tree = render();
   tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 888 } } });
   assert.equal(activeIndex, 3);
   tree = render();
   assert.equal(tree.dots[3].props.isActive, true);
   tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
   assert.equal(activeIndex, 3);
   tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "decrement" } });
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 592 } } });
   assert.equal(activeIndex, 2);
   tree = render();
   tree.scroll.props.onLayout();
@@ -315,11 +337,14 @@ test("자동 전환은 마지막에서 멈추고 스와이프·모션 줄이기 
   render();
   assert.equal(timers.values().next().value.delay, 2500);
   timers.values().next().value.callback();
+  assert.equal(state[0], 0, "자동 이동도 실제 스크롤 위치를 기다린다");
+  render().props.onScroll({ nativeEvent: { contentOffset: { x: 296 } } });
   assert.equal(state[0], 1);
   assert.equal(scrollCalls.at(-1).x, 296);
   render();
   assert.equal(timers.values().next().value.delay, 2500);
   timers.values().next().value.callback();
+  render().props.onScroll({ nativeEvent: { contentOffset: { x: 592 } } });
   assert.equal(state[0], 2);
   assert.equal(scrollCalls.at(-1).x, 592);
   render();
@@ -439,16 +464,21 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
   const cards = React.Children.toArray(firstPage[0].props.children);
   assert.equal(cards.length, 4);
   assert.equal(cards[3].props.mainCopy, "기존에 모아둔 아이템,\n그대로 옮겨 오세요.");
-  assert.equal(firstPage[0].props.media.type, "OnboardingIllustration");
-  assert.equal(firstPage[0].props.media.props.page, 0);
-  for (const card of React.Children.toArray(firstPage[0].props.children))
-    assert.equal(card.props.children, undefined, "미디어는 고정하고 문구만 스와이프한다.");
+  assert.equal(firstPage[0].props.media, undefined);
+  for (const [index, card] of cards.entries()) {
+    assert.equal(card.props.children.type, "OnboardingIllustration");
+    assert.equal(
+      card.props.children.props.page,
+      index,
+      "이미지는 해당 문구와 같은 슬라이드 안에 둔다",
+    );
+  }
   firstPage[0].props.onPageChange(2);
   assert.equal(render().length, 1, "세 번째 장에는 시작하기 버튼이 없다.");
   firstPage[0].props.onPageChange(3);
   const lastPage = render();
   assert.equal(lastPage.length, 2);
-  assert.equal(lastPage[0].props.media.props.page, 3);
+  assert.equal(React.Children.toArray(lastPage[0].props.children)[3].props.children.props.page, 3);
   const button = lastPage[1].props.children;
   assert.equal(button.props.children, "시작하기");
   button.props.onPress();

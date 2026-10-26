@@ -197,9 +197,19 @@ test("좋아요한 글은 탭 없이 실제 카드를 표시하고 상세로 이
 test("빈 상태·최초 오류·추가 페이지 오류를 구분하고 기존 목록을 유지한다", () => {
   let retries = 0,
     next = 0;
-  let Screen = loadScreen();
-  let list = find(Screen(), "FlatList");
-  assert.ok(find(list.props.ListEmptyComponent, "EmptyState"));
+  for (const tab of ["posts", "votes"]) {
+    const Screen = loadScreen("MyPostsScreen", { tab });
+    const tree = Screen();
+    const list = find(tree, "FlatList");
+    assert.equal(list.props.ListEmptyComponent, null);
+    const overlay = React.Children.toArray(tree.props.children).find(
+      (node) => node.props.className === "absolute inset-0",
+    );
+    assert.equal(overlay.props.pointerEvents, "none", "빈 안내가 새로고침과 탭 터치를 막지 않는다");
+    assert.equal(find(overlay, "EmptyState").props.variant, tab === "votes" ? "vote" : "post");
+  }
+  let Screen;
+  let list;
   Screen = loadScreen("MyPostsScreen", {
     result: { isError: true, error: Error("offline"), refetch: () => retries++ },
   });
