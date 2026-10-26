@@ -41,6 +41,8 @@ export function ActionModal({
   onShow,
   overlay,
   scrimOpacity,
+  toastMessage,
+  onToastDismiss,
 }: ActionModalProps) {
   const isTwoButton = type === "2Btn" && secondaryAction;
   const hasCloseButton = type === "1Btn" && onClose !== undefined;
@@ -55,6 +57,8 @@ export function ActionModal({
       onDismiss={onDismiss}
       overlay={overlay}
       scrimOpacity={scrimOpacity}
+      toastMessage={toastMessage}
+      onToastDismiss={onToastDismiss}
       className={hasTallHeader ? undefined : "px-2.5 pb-4 pt-2"}
     >
       <View className={`w-[295px] items-center gap-[30px] ${hasTallHeader ? "-mt-2" : ""}`}>
