@@ -360,3 +360,20 @@ test("작성 이탈 취소는 초안을 유지하고 나가기는 초안을 폐�
   assert.equal(nodes(tree, "ProductAttachGrid")[0].props.items.length, 0);
   assert.equal(ui.destination().pathname, "/(tabs)/diggle");
 });
+
+test("본문 입력 안내는 카운터로만 글자 수를 보여 주고 이모지 언급을 하지 않는다(BUG-093)", () => {
+  const ui = editor({ agreed: true });
+  ui.input("가나");
+  const helper = nodes(ui.render(), "HelperText")[0];
+  assert.equal(helper.props.message, "공백을 제외하고 5자 이상 입력해 주세요.");
+  const { CommunityBodyField } = load("src/screens/diggle/components/CommunityBodyField.tsx", {
+    "react": { useState: () => [false, () => {}] },
+    "react-native": { View: "View", Text: "Text", TextInput: "TextInput" },
+    "@/theme": { colors: { gray: { 400: "gray" } } },
+    "../domain/postBody": body,
+  });
+  for (const isVote of [false, true]) {
+    const field = CommunityBodyField({ value: "", onChangeText: () => {}, isVote });
+    assert.doesNotMatch(nodes(field, "TextInput")[0].props.placeholder, /5~50자/);
+  }
+});

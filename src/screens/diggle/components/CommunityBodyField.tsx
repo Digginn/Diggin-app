@@ -29,8 +29,8 @@ export function CommunityBodyField({
         textAlignVertical="top"
         placeholder={
           isVote
-            ? "구매가 고민되는 아이템은 투표를 올려 의견을 받아보세요. (5~50자)"
-            : "저장한 아이템에 대해 다른 사람들과 의견을 나누어 보세요. (5~50자)"
+            ? "구매가 고민되는 아이템은 투표를 올려 의견을 받아보세요."
+            : "저장한 아이템에 대해 다른 사람들과 의견을 나누어 보세요."
         }
         placeholderTextColor={colors.gray[400]}
         value={value}
