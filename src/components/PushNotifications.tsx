@@ -19,12 +19,16 @@ export function PushNotifications() {
     if (Platform.OS === "web" || isRestoring) return;
     let isActive = true;
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: false,
-        shouldShowList: false,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-      }),
+      // 앱 사용 중에도 내 알림은 배너로 띄운다. 다른 계정 앞으로 온 알림은 띄우지 않는다.
+      handleNotification: async (notification) => {
+        const isMine = !!userId && notification.request.content.data?.recipient_id === userId;
+        return {
+          shouldShowBanner: isMine,
+          shouldShowList: isMine,
+          shouldPlaySound: isMine,
+          shouldSetBadge: false,
+        };
+      },
     });
     const handle = (response: Notifications.NotificationResponse) => {
       if (!isActive || response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER)
