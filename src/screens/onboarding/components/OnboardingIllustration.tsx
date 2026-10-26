@@ -45,12 +45,6 @@ const APP_ICONS = [
   NaverIcon,
   "black",
   KurlyIcon,
-  HouseIcon,
-  "pink",
-  "photo",
-  InstagramIcon,
-  NaverIcon,
-  "black",
 ] as const;
 const ITEMS = [
   {
@@ -121,7 +115,10 @@ function AppCell({ index, time }: { index: number; time: SharedValue<number> }) 
 
 function PhoneIllustration({ time }: { time: SharedValue<number> }) {
   return (
-    <View className="absolute left-[58px] top-11 h-[400px] w-[180px] overflow-hidden rounded-[32px] bg-gray-900">
+    <View
+      className="absolute left-[13px] top-11 h-[400px] w-[180px] overflow-hidden rounded-[32px] bg-gray-900"
+      style={{ transform: [{ scale: 1.5 }], transformOrigin: "top left" }}
+    >
       <View className="absolute left-[5px] top-[5px] h-[390px] w-[170px] overflow-hidden rounded-[27px] bg-gray-50">
         <View className="absolute left-[59px] top-[9px] h-[14px] w-[52px] rounded-[7px] bg-gray-900" />
         <View className="absolute left-[11px] top-10 w-[148px] flex-row flex-wrap gap-[14px]">

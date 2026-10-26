@@ -3,6 +3,7 @@ import { splitGraphemes } from "unicode-segmenter/grapheme";
 import type { ItemSaveValues } from "@/types/wish-item";
 
 import { APP_LINK_HOST, type ProductPageRaw } from "./productPageScript";
+import { toMobileSmartStoreUrl } from "./productPageUrl";
 
 const NAME_MAX = 100;
 const BRAND_MAX = 30;
@@ -123,6 +124,7 @@ export function normalizeProductPage(
   raw: ProductPageRaw,
   sourceUrl: string,
 ): { values: ItemSaveValues; hasFailed: boolean } {
+  const fallbackUrl = stripTrackingParams(toMobileSmartStoreUrl(sourceUrl));
   // 앱 연결 중간 페이지나 로그인 페이지에서 끝났으면 상품 정보가 아니다. 직접 입력으로 넘긴다.
   if (
     APP_LINK_HOST.test(/^https?:\/\/([^/?#]+)/i.exec(raw.finalUrl)?.[1] ?? "") ||
@@ -134,7 +136,7 @@ export function normalizeProductPage(
         name: "",
         brand: "",
         price: "",
-        sourceUrl: stripTrackingParams(sourceUrl),
+        sourceUrl: fallbackUrl,
         thumbnailUrl: null,
         wishLevel: null,
       },
@@ -175,8 +177,8 @@ export function normalizeProductPage(
       // SAVE-003 리다이렉트를 따라간 최종 주소. 못 읽었으면 로그인·만료 페이지일 수 있어 원래 링크를 둔다.
       sourceUrl:
         hasFailed || !raw.finalUrl.startsWith("https://")
-          ? stripTrackingParams(sourceUrl)
-          : stripTrackingParams(raw.finalUrl, true),
+          ? fallbackUrl
+          : stripTrackingParams(toMobileSmartStoreUrl(raw.finalUrl), true),
       // JSON-LD 상품 이미지는 상품명이 없어도 그 상품 것이라 쓴다. og:image는 상품명을 못 읽은 페이지에선
       // 사이트 로고일 때가 많고 저장 후 못 바꾸니(PDT-006) 쓰지 않는다.
       thumbnailUrl: toHttpsImage(ld?.image) ?? (hasFailed ? null : toHttpsImage(og.image)),

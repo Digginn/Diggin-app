@@ -1,6 +1,4 @@
 import { clsx } from "clsx";
-import { Image } from "expo-image";
-import { cssInterop } from "nativewind";
 import { useRef, type RefObject } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -8,10 +6,9 @@ import MoreIcon from "@/assets/images/folder/icon-folder-more.svg";
 import OwnedItemsSmallIcon from "@/assets/images/folder/icon-owned-items-small.svg";
 import OwnedItemsIcon from "@/assets/images/folder/icon-owned-items.svg";
 
+import { ClosedFolder } from "./ClosedFolder";
 import type { FolderMenuAnchor } from "./FolderMenu";
 import { FolderPreview, type FolderThumbnailSource } from "./FolderPreview";
-
-const StyledImage = cssInterop(Image, { className: "style" });
 
 export type FolderItem = {
   id: string;
@@ -75,15 +72,9 @@ export function FolderCard({
             isCompact={isCompact}
           />
         ) : (
-          <StyledImage
-            source={
-              isCompact
-                ? require("@/assets/images/folder/image-closed-folder-small.png")
-                : require("@/assets/images/folder/image-closed-folder.png")
-            }
-            contentFit="contain"
-            className={isCompact ? "h-[56px] w-[74px] -translate-x-px" : "h-[85px] w-[112px]"}
-          />
+          <View className={isCompact ? "h-[56px] w-[74px] -translate-x-px" : "h-[85px] w-[112px]"}>
+            <ClosedFolder isCompact={isCompact} />
+          </View>
         )}
         {folder.isOwnedItems && (
           <View

@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, View } from "react-native";
 
 import { ensureCommunityWriteAllowed, restrictionMessage } from "@/api/accountAccess";
@@ -36,6 +36,13 @@ export function DiggleScreen() {
   const showToast = useToast();
   const feed = useCommunityFeed(tab);
   const posts = feed.data?.pages.flat() ?? [];
+  const isOpeningWriter = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      isOpeningWriter.current = false;
+    }, []),
+  );
 
   useEffect(() => {
     if (feed.error && posts.length > 0) showToast(communityErrorMessage(feed.error));
@@ -126,18 +133,19 @@ export function DiggleScreen() {
           accessibilityLabel={tab === "vote" ? "투표글 작성" : "게시글 작성"}
           isDisabled={isRestoring}
           onPress={() =>
-            requireLogin(
-              () =>
-                void ensureCommunityWriteAllowed()
-                  .then(() => router.push(tab === "vote" ? "/votes/write" : "/posts/write"))
-                  .catch((error) =>
-                    showToast(
-                      restrictionMessage(error) ??
-                        "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
-                      restrictionMessage(error) ? "notice" : "error",
-                    ),
-                  ),
-            )
+            requireLogin(() => {
+              if (isOpeningWriter.current) return;
+              isOpeningWriter.current = true;
+              void ensureCommunityWriteAllowed()
+                .then(() => router.navigate(tab === "vote" ? "/votes/write" : "/posts/write"))
+                .catch((error) => {
+                  isOpeningWriter.current = false;
+                  showToast(
+                    restrictionMessage(error) ?? "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+                    restrictionMessage(error) ? "notice" : "error",
+                  );
+                });
+            })
           }
         />
       </View>

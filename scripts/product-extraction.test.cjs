@@ -39,6 +39,27 @@ const og = (fields = {}) => ({
   ...fields,
 });
 
+test("스마트스토어 저장 주소는 추출 성공·실패·로그인 리다이렉트 모두 모바일 상품 주소로 일치한다", () => {
+  const desktop = "https://smartstore.naver.com/koyasangsa/products/13372231540";
+  const mobile = "https://m.smartstore.naver.com/koyasangsa/products/13372231540";
+  for (const source of [desktop, mobile]) {
+    for (const finalUrl of [
+      desktop,
+      mobile,
+      "https://m.smartstore.naver.com/login",
+      "http://m.smartstore.naver.com/koyasangsa/products/13372231540",
+    ]) {
+      for (const title of [null, "테스트 상품"]) {
+        const { values } = normalizeProductPage(
+          { finalUrl, og: og({ title }) },
+          source + "?utm_source=qa",
+        );
+        assert.equal(values.sourceUrl, mobile);
+      }
+    }
+  }
+});
+
 test("스마트스토어는 공개 메타 제목이 스토어명이라 페이지 데이터의 상품명·할인가·브랜드를 쓴다", () => {
   const { values, hasFailed } = normalizeProductPage(
     {

@@ -130,7 +130,7 @@ function toPrice(price: string) {
 /** SAVE-012·013 같은 링크가 이미 있으면 저장하지 않고 기존 상품 id를 돌려받는다. */
 export async function saveProduct(values: ItemSaveValues, folderIds: readonly string[] = []) {
   const price = toPrice(values.price);
-  const { data, error } = await supabase.rpc("save_product", {
+  const { data, error, status } = await supabase.rpc("save_product", {
     product_url: values.sourceUrl,
     product_name: values.name,
     product_brand: values.brand,
@@ -139,7 +139,11 @@ export async function saveProduct(values: ItemSaveValues, folderIds: readonly st
     ...(values.wishLevel && { product_wish_level: values.wishLevel }),
     folder_ids: folderIds.map(Number),
   });
-  if (error) throw error;
+  if (error) {
+    // SDK는 응답을 못 받은 fetch 실패를 status 0으로 반환한다. 기기별 오류 문구에 의존하지 않는다.
+    if (status === 0) throw new Error("network_offline", { cause: error });
+    throw error;
+  }
   return { productId: String(data[0].product_id), isDuplicate: data[0].is_duplicate };
 }
 
