@@ -8,7 +8,7 @@ export async function saveCsvImport(
   progress: (value: Progress) => void,
   signal: AbortSignal,
 ): Promise<unknown> {
-  // 요청 전용 연결로 NOTICE를 받아 다른 사용자의 진행률이 섞이지 않게 한다.
+  // 요청 전용 연결로 NOTICE를 받는다. max: 1은 요청당 제한이며 전체 동시 요청 제한은 아니다.
   const sql = postgres(databaseUrl, {
     max: 1,
     prepare: false,
@@ -35,6 +35,7 @@ export async function saveCsvImport(
           session_id: identity.sessionId,
         })
       }, true), set_config('diggin.csv_progress', 'on', true)`;
+      // 저장 SQL의 상한이며 60초를 기다리는 동작은 아니다. 완료·실패 시 finally에서 연결을 닫는다.
       await transaction`set local statement_timeout = '60s'`;
       await transaction`set local client_min_messages = notice`;
       const [row] = await transaction`select public.import_csv(${input.request_id}::uuid, ${
