@@ -373,7 +373,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 - `private.first_visit_guides`는 사용자별 ALL(`all`)·FOLDER(`folder`)·상품 상세(`item-detail`) 안내를 닫은 시각을 각각 저장한다. `(user_id, guide_kind)` unique로 중복 기록을 막는다.
 - `get_first_visit_guides(target_user_id)`와 `dismiss_first_visit_guide(target_user_id, target_guide_kind)` RPC만 허용한다. 실제 세션·계정 상태와 대상 UUID가 본인인지 검사하며, 앱의 테이블 직접 접근은 차단한다.
-- 같은 계정은 재로그인·재설치·다른 기기에서도 닫은 안내를 반복하지 않는다. 기존 기기 저장 기록은 승계하지 않는다. 탈퇴 시 프로필 FK cascade로 기록도 삭제되므로 새 UUID로 재가입하면 다시 안내한다.
+- 같은 계정은 재로그인·재설치·다른 기기에서도 닫은 안내를 반복하지 않는다. 기존 기기 저장 기록은 계정 소유자를 구분할 수 없어 승계하지 않는다. 따라서 전환 후 서버 기록이 없는 기존 사용자도 각 안내를 한 번 다시 본다. 탈퇴 시 프로필 FK cascade로 기록도 삭제되므로 새 UUID로 재가입하면 다시 안내한다.
 - 비회원·인증 복원 중에는 표시하지 않는다. 조회 실패 시에는 안내를 표시하고, 닫기 저장 실패 시 현재 앱 실행 중에만 재노출을 막는다. 다음 실행까지의 중복 방지는 서버 저장 성공을 전제로 한다.
 
 ## 9. DB에 두지 않는 것

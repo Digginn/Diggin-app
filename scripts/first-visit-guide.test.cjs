@@ -68,7 +68,7 @@ function guideHarness({ records = new Map(), storageFailure = false } = {}) {
       "@/api/firstVisitGuides": mockApi,
       // 이전 기기 단위 기록은 새 계정의 서버 기록으로 승계하지 않는다.
       "@react-native-async-storage/async-storage": {
-        getItem: async () => null,
+        getItem: async () => "dismissed",
         setItem: async () => {},
       },
     },
