@@ -417,6 +417,10 @@ export type Database = {
       };
       delete_comment: { Args: { target_comment_id: number }; Returns: undefined };
       delete_community_post: { Args: { target_post_id: number }; Returns: undefined };
+      dismiss_first_visit_guide: {
+        Args: { target_guide_kind: string; target_user_id: string };
+        Returns: undefined;
+      };
       finish_notification_push: {
         Args: {
           claim_id: string;
@@ -437,6 +441,7 @@ export type Database = {
         Returns: Json;
       };
       get_community_post: { Args: { target_post_id: number }; Returns: Json };
+      get_first_visit_guides: { Args: { target_user_id: string }; Returns: string[] };
       get_my_community_activity: {
         Args: { activity_type: string; after_activity_at?: string; after_id?: number };
         Returns: Json;

@@ -23,104 +23,179 @@ function load(file, mocks, globals = {}) {
   return module.exports;
 }
 
-test("세 안내는 별도로 저장하며 닫은 안내·비활성 화면·늦은 응답은 표시하지 않는다", async () => {
-  const storage = new Map();
-  let state = false;
-  let focus;
-  let read;
-  let params = {};
+function guideHarness({ records = new Map(), storageFailure = false } = {}) {
+  let state, focus;
+  const auth = { session: { user: { id: "user-a" } }, isRestoring: false };
+  const params = {};
+  const reads = [],
+    writes = [];
+  let pendingRead;
+  const mockApi = {
+    fetchDismissedFirstVisitGuides: async (userId) => {
+      reads.push(userId);
+      if (pendingRead) return pendingRead(userId);
+      if (storageFailure) throw new Error("offline");
+      return [...(records.get(userId) ?? [])];
+    },
+    dismissFirstVisitGuide: async (userId, kind) => {
+      writes.push({ userId, kind });
+      if (storageFailure) throw new Error("offline");
+      records.set(userId, new Set([...(records.get(userId) ?? []), kind]));
+    },
+  };
   const { useFirstVisitGuide } = load(
     "../src/hooks/useFirstVisitGuide.ts",
     {
       "react": {
-        useState: () => [
-          state,
-          (value) => {
-            state = value;
-          },
-        ],
-        useCallback: (callback) => callback,
+        useState: (initial) => {
+          if (state === undefined) state = initial;
+          return [
+            state,
+            (value) => {
+              state = value;
+            },
+          ];
+        },
+        useCallback: (fn) => fn,
       },
       "expo-router": {
-        useFocusEffect: (callback) => {
-          focus = callback;
+        useFocusEffect: (fn) => {
+          focus = fn;
         },
         useLocalSearchParams: () => params,
       },
+      "@/contexts/AuthContext": { useAuth: () => auth },
+      "@/api/firstVisitGuides": mockApi,
+      // 이전 기기 단위 기록은 새 계정의 서버 기록으로 승계하지 않는다.
       "@react-native-async-storage/async-storage": {
-        getItem: (key) => (read ? read(key) : Promise.resolve(storage.get(key))),
-        setItem: (key, value) => {
-          storage.set(key, value);
-          return Promise.resolve();
-        },
+        getItem: async () => null,
+        setItem: async () => {},
       },
     },
     { __DEV__: true },
   );
-  const settle = async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-  };
-  for (const kind of ["all", "folder", "item-detail"]) {
-    useFirstVisitGuide(kind);
-    const blur = focus();
-    await settle();
-    assert.equal(state, true);
-    useFirstVisitGuide(kind).dismiss();
-    assert.equal(state, false);
-    assert.equal(storage.get(`first-visit-guide:${kind}`), "dismissed");
-    blur();
-    useFirstVisitGuide(kind);
-    focus();
-    await settle();
-    assert.equal(state, false);
-  }
-  params = { guide: "all" };
-  useFirstVisitGuide("all", false);
-  focus();
-  assert.equal(state, false);
-  useFirstVisitGuide("all");
-  const blur = focus();
-  assert.equal(state, true);
-  useFirstVisitGuide("all").dismiss();
-  assert.equal(storage.size, 3);
-  blur();
-  params = {};
-  storage.delete("first-visit-guide:folder");
-  // 새로운 훅 모듈로 읽기 중 화면을 벗어나는 경우도 확인합니다.
-  let resolve;
-  read = () =>
-    new Promise((callback) => {
-      resolve = callback;
-    });
-  const fresh = load(
-    "../src/hooks/useFirstVisitGuide.ts",
-    {
-      "react": {
-        useState: () => [
-          state,
-          (value) => {
-            state = value;
-          },
-        ],
-        useCallback: (callback) => callback,
-      },
-      "expo-router": {
-        useFocusEffect: (callback) => {
-          focus = callback;
-        },
-        useLocalSearchParams: () => params,
-      },
-      "@react-native-async-storage/async-storage": { getItem: read },
+  return {
+    auth,
+    params,
+    records,
+    reads,
+    writes,
+    render: (kind = "all", enabled = true) => useFirstVisitGuide(kind, enabled),
+    focus: () => focus(),
+    deferRead: (fn) => {
+      pendingRead = fn;
     },
-    { __DEV__: false },
+  };
+}
+
+const settleGuide = () => new Promise((resolve) => setImmediate(resolve));
+
+test("세 안내는 계정별로 별도 기록하고 같은 계정 재로그인·새 기기에서도 반복하지 않는다", async () => {
+  const h = guideHarness();
+  for (const kind of ["all", "folder", "item-detail"]) {
+    assert.equal(h.render(kind).isVisible, false);
+    const blur = h.focus();
+    await settleGuide();
+    assert.equal(h.render(kind).isVisible, true);
+    h.render(kind).dismiss();
+    await settleGuide();
+    assert.equal(h.render(kind).isVisible, false);
+    assert.ok(h.records.get("user-a").has(kind));
+    blur();
+    h.render(kind);
+    h.focus();
+    await settleGuide();
+    assert.equal(h.render(kind).isVisible, false);
+  }
+  assert.equal(h.writes.length, 3);
+  const otherDevice = guideHarness({ records: h.records });
+  for (const kind of ["all", "folder", "item-detail"]) {
+    otherDevice.render(kind);
+    otherDevice.focus();
+    await settleGuide();
+    assert.equal(otherDevice.render(kind).isVisible, false);
+  }
+  h.auth.session = { user: { id: "user-b" } };
+  h.render();
+  h.focus();
+  await settleGuide();
+  assert.equal(h.render().isVisible, true, "같은 기기의 다른 계정에는 표시한다");
+  h.render().dismiss();
+  await settleGuide();
+  assert.deepEqual(h.writes.at(-1), { userId: "user-b", kind: "all" });
+  h.auth.session = { user: { id: "rejoined-user" } };
+  h.render();
+  h.focus();
+  await settleGuide();
+  assert.equal(h.render().isVisible, true, "탈퇴 후 새 계정으로 재가입하면 표시한다");
+});
+
+test("복원 중·비회원·비활성 화면에는 표시하지 않고 계정 전환 전 늦은 응답을 버린다", async () => {
+  const h = guideHarness();
+  h.auth.isRestoring = true;
+  h.render();
+  h.focus();
+  await settleGuide();
+  assert.equal(h.render().isVisible, false);
+  assert.equal(h.reads.length, 0);
+  h.auth.isRestoring = false;
+  h.auth.session = null;
+  h.render();
+  h.focus();
+  await settleGuide();
+  assert.equal(h.render().isVisible, false);
+  assert.equal(h.reads.length, 0);
+  h.auth.session = { user: { id: "user-a" } };
+  h.render("folder", false);
+  h.focus();
+  await settleGuide();
+  assert.equal(h.render("folder", false).isVisible, false);
+  let resolve;
+  h.deferRead(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
   );
-  fresh.useFirstVisitGuide("folder");
-  focus()();
-  resolve(null);
-  await settle();
-  assert.equal(state, false);
+  h.render();
+  const blur = h.focus();
+  h.auth.session = { user: { id: "user-b" } };
+  assert.equal(h.render().isVisible, false);
+  blur();
+  resolve([]);
+  await settleGuide();
+  assert.equal(h.render().isVisible, false);
+  const visible = guideHarness();
+  visible.render();
+  visible.focus();
+  await settleGuide();
+  assert.equal(visible.render().isVisible, true);
+  visible.auth.session = { user: { id: "user-b" } };
+  assert.equal(visible.render().isVisible, false, "새 계정 첫 렌더에 이전 안내가 남지 않는다");
+});
+
+test("서버 실패에도 안내를 닫을 수 있고 개발 미리보기는 서버 기록을 변경하지 않는다", async () => {
+  const h = guideHarness({ storageFailure: true });
+  h.render();
+  h.focus();
+  await settleGuide();
+  assert.equal(h.render().isVisible, true);
+  h.render().dismiss();
+  await settleGuide();
+  h.render();
+  h.focus();
+  await settleGuide();
+  assert.equal(h.render().isVisible, false);
+  const preview = guideHarness();
+  preview.params.guide = "all";
+  preview.auth.session = null;
+  preview.render();
+  const blur = preview.focus();
+  assert.equal(preview.render().isVisible, true);
+  preview.render().dismiss();
+  blur();
+  assert.equal(preview.reads.length, 0);
+  assert.equal(preview.writes.length, 0);
 });
 
 for (const os of ["android", "ios"]) {
