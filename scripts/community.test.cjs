@@ -654,7 +654,8 @@ test("댓글 첫 조회와 추가 조회 실패는 본문·기존 댓글을 유�
       nodes(tree, "Text").some(
         (text) => text.props.children === "댓글을 불러오지 못했습니다. 다시 시도해 주세요.",
       ),
-      true,
+      false,
+      "댓글 영역에는 다시 시도 버튼만 둔다",
     );
     assert.deepEqual(state.toasts, []);
     nodes(tree, "Button")

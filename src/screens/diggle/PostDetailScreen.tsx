@@ -397,10 +397,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                 </View>
               )}
               {comments.isError && (
-                <View className="items-center gap-3 px-margin py-4">
-                  <Text className="text-center text-gray-500 font-b3">
-                    {communityErrorMessage(comments.error, "댓글")}
-                  </Text>
+                <View className="items-center px-margin py-4">
                   <Button
                     accessibilityLabel="댓글 다시 불러오기"
                     isDisabled={comments.isFetching}
