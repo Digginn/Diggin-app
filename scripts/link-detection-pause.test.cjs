@@ -218,6 +218,14 @@ test("iOS에서 https가 아닌 링크는 감지 모달은 뜨지만 불러오�
   assert.equal(linkDetection.isDetected(), true, "내용을 읽지 않으면 https인지 알 수 없다");
   assert.equal(pasteboard.valueReads, 0);
   assert.equal(await linkDetection.render().readLink(), null);
+  assert.equal(
+    linkDetection.needsPasteGuide(),
+    false,
+    "https가 아니면 붙여넣기 안내도 띄우지 않는다",
+  );
+  linkDetection.render().close();
+  await linkDetection.check();
+  assert.equal(linkDetection.isDetected(), false, "같은 http 복사는 다시 묻지 않는다");
 });
 
 test("iOS 불러오기는 네이티브 모듈의 메인 스레드 읽기를 쓰고, 없으면 expo-clipboard로 읽는다", async () => {

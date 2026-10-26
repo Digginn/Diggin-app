@@ -99,10 +99,20 @@ export function useDetectedLink() {
       const text = DigginPasteboard?.readLinkTextAsync
         ? await DigginPasteboard.readLinkTextAsync()
         : (await Clipboard.getStringAsync()) || (await Clipboard.getUrlAsync());
-      // 빈 값이면 막힌 것이고, 오래 걸렸으면 '묻기' 팝업에 사용자가 답한 것이다. 둘 다 안내(다음부터 바로 불러오기)를 띄운다.
+      // 빈 값이면 막힌 것이고, https 링크를 오래 걸려 읽었으면 '묻기' 팝업에 사용자가 답한 것이다. 둘 다 안내(다음부터 바로 불러오기)를 띄운다.
       // shortcut: 설정값을 읽는 API가 없어 읽기 시간으로 팝업 여부를 가린다. iOS가 설정 조회 API를 주면 그걸로 바꾼다.
-      if (!text || Date.now() - startedAt >= PASTE_PROMPT_MIN_MS) setNeedsPasteGuide(true);
-      return text ? findItemLink(text) : null;
+      if (!text) {
+        setNeedsPasteGuide(true);
+        return null;
+      }
+      const link = findItemLink(text);
+      // https가 아니면 불러오지 않는다(BUG-016). 읽고 확인한 복사라 기록해 같은 복사로 다시 묻지 않는다.
+      if (!link) {
+        if (detected.changeCount != null) saveHandledChangeCount(detected.changeCount);
+        return null;
+      }
+      if (Date.now() - startedAt >= PASTE_PROMPT_MIN_MS) setNeedsPasteGuide(true);
+      return link;
     } catch {
       setNeedsPasteGuide(true);
       return null;
