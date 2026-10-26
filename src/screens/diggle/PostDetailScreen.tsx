@@ -397,7 +397,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                 </View>
               )}
               {comments.isError && (
-                <View className="items-center px-margin py-4">
+                <View className="items-center gap-3 px-margin py-4">
+                  <Text className="text-center text-gray-500 font-b3">
+                    댓글을 불러올 수 없습니다. 다시 시도해 주세요.
+                  </Text>
                   <Button
                     accessibilityLabel="댓글 다시 불러오기"
                     isDisabled={comments.isFetching}

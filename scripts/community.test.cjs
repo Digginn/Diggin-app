@@ -652,10 +652,10 @@ test("댓글 첫 조회와 추가 조회 실패는 본문·기존 댓글을 유�
     assert.equal(nodes(tree, "Comment").length, nextPage ? 1 : 0);
     assert.equal(
       nodes(tree, "Text").some(
-        (text) => text.props.children === "댓글을 불러오지 못했습니다. 다시 시도해 주세요.",
+        (text) => text.props.children === "댓글을 불러올 수 없습니다. 다시 시도해 주세요.",
       ),
-      false,
-      "댓글 영역에는 다시 시도 버튼만 둔다",
+      true,
+      "MSG-COMMENT-007",
     );
     assert.deepEqual(state.toasts, []);
     nodes(tree, "Button")
