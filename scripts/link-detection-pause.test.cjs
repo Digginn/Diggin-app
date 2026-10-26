@@ -22,7 +22,13 @@ function load(file, mocks) {
 function loadDetectedLink(
   pause,
   clipboardText,
-  { isModalBusy = () => false, reads = [], pasteboard = null, clipboardUrl = null } = {},
+  {
+    isModalBusy = () => false,
+    reads = [],
+    pasteboard = null,
+    clipboardUrl = null,
+    storage = {},
+  } = {},
 ) {
   const state = [];
   let cursor = 0;
@@ -48,6 +54,15 @@ function loadDetectedLink(
         return clipboardText;
       },
       getUrlAsync: async () => clipboardUrl,
+    },
+    "@react-native-async-storage/async-storage": {
+      __esModule: true,
+      default: {
+        getItem: async (key) => storage[key] ?? null,
+        setItem: async (key, value) => {
+          storage[key] = value;
+        },
+      },
     },
     "@/hooks/useLinkDetectionPause": pause,
     "@/hooks/useNativeModalVisible": { isNativeModalBusy: () => isModalBusy() },
@@ -152,6 +167,26 @@ test("iOS는 클립보드를 읽지 않고 링크 유무만 보고 묻고, 불�
   pasteboard.changeCount = 2;
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), true, "새로 복사하면 다시 묻는다");
+});
+
+test("iOS에서 답한 복사는 앱을 다시 켜도 묻지 않는다", async () => {
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
+  const url = "https://zigzag.kr/catalog/products/8";
+  const storage = {};
+  const pasteboard = fakePasteboard({ preview: url });
+  pasteboard.changeCount = 30;
+  const first = loadDetectedLink(pause, url, { pasteboard, storage });
+  await first.check();
+  assert.equal(first.isDetected(), true);
+  first.render().handle(null);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const relaunched = loadDetectedLink(pause, url, { pasteboard, storage });
+  await relaunched.check();
+  assert.equal(relaunched.isDetected(), false, "예전에 답한 복사는 다시 묻지 않는다");
+  pasteboard.changeCount = 31;
+  await relaunched.check();
+  assert.equal(relaunched.isDetected(), true, "새로 복사하면 묻는다");
 });
 
 test("iOS에서 URL 형식으로만 복사된 링크도 불러오기를 누르면 읽는다", async () => {
