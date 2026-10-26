@@ -260,8 +260,12 @@ test("수정 가능한 초안에서 이미지·원본 링크는 고정하고 폴
 
 test("상품명 100자·브랜드 30자를 넘겨 붙여넣어도 수정한 초안을 유지해 저장한다", async () => {
   const h = formHarness();
-  assert.equal(h.field("아이템명").maxLength, 100);
-  assert.equal(h.field("브랜드").maxLength, 30);
+  assert.equal(h.field("아이템명").maxLength, undefined);
+  assert.equal(h.field("브랜드").maxLength, undefined);
+  h.field("아이템명").onChangeText(`${"수".repeat(99)}👍🏻초과`);
+  h.field("브랜드").onChangeText(`${"정".repeat(29)}👨‍👩‍👧‍👦초과`);
+  assert.equal(h.field("아이템명").value, `${"수".repeat(99)}👍🏻`);
+  assert.equal(h.field("브랜드").value, `${"정".repeat(29)}👨‍👩‍👧‍👦`);
   h.field("아이템명").onChangeText("수".repeat(101));
   h.field("브랜드").onChangeText("정".repeat(31));
   assert.equal(h.field("아이템명").value, "수".repeat(100));

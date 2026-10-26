@@ -179,7 +179,6 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
             <TextField
               accessibilityLabel="아이템명"
               growsTo={88}
-              maxLength={100}
               value={values.name}
               onChangeText={(text) =>
                 update("name")(Array.from(splitGraphemes(text)).slice(0, 100).join(""))
@@ -192,7 +191,6 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
             <Text className="text-gray-900 font-b3">브랜드</Text>
             <TextField
               accessibilityLabel="브랜드"
-              maxLength={30}
               value={values.brand}
               onChangeText={(text) =>
                 update("brand")(Array.from(splitGraphemes(text)).slice(0, 30).join(""))

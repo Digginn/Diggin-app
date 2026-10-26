@@ -501,7 +501,11 @@ test("닉네임은 타이핑·붙여넣기 모두 10글자로 제한하고 카�
         saved.push(nickname);
       },
     });
-    assert.equal(button("닉네임").props.maxLength, 10);
+    assert.equal(button("닉네임").props.maxLength, undefined);
+    const mixed = `${"가".repeat(9)}👍🏻`;
+    button("닉네임").props.onChangeText(`${mixed}나`);
+    assert.equal(button("닉네임").props.value, mixed);
+    assert.equal(counter(), "10/10");
     button("닉네임").props.onChangeText("가나다라마바사아자차");
     button("닉네임").props.onChangeText("가나다라마바사아자차카");
     assert.equal(button("닉네임").props.value, "가나다라마바사아자차");

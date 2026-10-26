@@ -219,7 +219,6 @@ export function ProfileEditScreen({
               accessibilityLabel="닉네임"
               inputClassName="pr-12"
               isError={isNicknameError}
-              maxLength={MAX_NICKNAME_LENGTH}
               onChangeText={(value) => {
                 setNickname(
                   Array.from(splitGraphemes(value)).slice(0, MAX_NICKNAME_LENGTH).join(""),

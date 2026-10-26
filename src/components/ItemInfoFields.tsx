@@ -79,7 +79,6 @@ export function ItemInfoFields({
           <FieldLabel label="아이템명" isMissing={isNameMissing} />
           <TextField
             growsTo={88}
-            maxLength={100}
             isError={isNameMissing}
             placeholder="아이템명을 입력해 주세요."
             value={values.name}
@@ -93,7 +92,6 @@ export function ItemInfoFields({
           <View className="flex-1 gap-2">
             <Text className="text-gray-900 font-b3">브랜드명</Text>
             <TextField
-              maxLength={30}
               placeholder="선택 입력"
               value={values.brand}
               onChangeText={(text) =>

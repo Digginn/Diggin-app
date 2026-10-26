@@ -158,8 +158,12 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
 
   const brandField = () =>
     render().find((node) => node.type === "TextField" && node.props.placeholder === "선택 입력");
-  assert.equal(nameField().props.maxLength, 100);
-  assert.equal(brandField().props.maxLength, 30);
+  assert.equal(nameField().props.maxLength, undefined);
+  assert.equal(brandField().props.maxLength, undefined);
+  nameField().props.onChangeText(`${"새".repeat(99)}👍🏻초과`);
+  brandField().props.onChangeText(`${"브".repeat(29)}👨‍👩‍👧‍👦초과`);
+  assert.equal(nameField().props.value, `${"새".repeat(99)}👍🏻`);
+  assert.equal(brandField().props.value, `${"브".repeat(29)}👨‍👩‍👧‍👦`);
   nameField().props.onChangeText("새".repeat(100));
   nameField().props.onChangeText(`${nameField().props.value}상품`);
   assert.equal(nameField().props.value, "새".repeat(100));
