@@ -354,7 +354,6 @@ test("로그아웃 모달은 공용 ActionModal로 Figma 문구·36% scrim·로�
   assert.equal(tree.type, "ActionModal");
   assert.equal(tree.props.type, "2Btn");
   assert.equal(tree.props.scrimOpacity, 0.36);
-  assert.equal(tree.props.hasTallHeader, undefined, "제목 줄은 Figma처럼 기본 높이다");
   assert.equal(tree.props.title, "로그아웃하시겠습니까?");
   assert.equal(tree.props.description, "저장된 정보는 안전하게 보관됩니다.");
   assert.equal(tree.props.secondaryAction.label, "로그아웃", "왼쪽 회색 버튼");

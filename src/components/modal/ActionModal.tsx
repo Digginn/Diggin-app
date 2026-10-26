@@ -16,7 +16,6 @@ type ActionModalProps = Omit<ModalProps, "children"> & {
   primaryAction: ModalAction;
   secondaryAction?: ModalAction;
   isPrimaryDisabled?: boolean;
-  hasTallHeader?: boolean;
 };
 
 const CloseIcon = cssInterop(CloseSvg, {
@@ -35,7 +34,6 @@ export function ActionModal({
   primaryAction,
   secondaryAction,
   isPrimaryDisabled = true,
-  hasTallHeader = false,
   isKeyboardAvoiding,
   keyboardGap,
   onShow,
@@ -59,10 +57,10 @@ export function ActionModal({
       scrimOpacity={scrimOpacity}
       toastMessage={toastMessage}
       onToastDismiss={onToastDismiss}
-      className={hasTallHeader ? undefined : "px-2.5 pb-4 pt-2"}
+      className="px-2.5 pb-4 pt-2"
     >
-      <View className={`w-[295px] items-center gap-[30px] ${hasTallHeader ? "-mt-2" : ""}`}>
-        <View className={`w-[295px] items-center gap-1 ${hasTallHeader ? "" : "pt-2.5"}`}>
+      <View className="w-[295px] items-center gap-[30px]">
+        <View className="w-[295px] items-center gap-1 pt-2.5">
           {hasCloseButton ? (
             <>
               <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>
@@ -77,10 +75,6 @@ export function ActionModal({
                 </View>
               </Pressable>
             </>
-          ) : hasTallHeader ? (
-            <View className="h-12 justify-center">
-              <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>
-            </View>
           ) : (
             <Text className="text-center text-gray-900 font-label-16-semibold">{title}</Text>
           )}

@@ -86,7 +86,6 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
       <ActionModal
         visible={isDeleteConfirmOpen}
         type="2Btn"
-        hasTallHeader
         title="폴더 삭제하기"
         description={"삭제된 폴더는 복구할 수 없으며,\n폴더 내 아이템은 삭제되지 않습니다."}
         onRequestClose={() => setIsDeleteConfirmOpen(false)}
