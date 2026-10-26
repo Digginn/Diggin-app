@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { Modal } from "@/components/modal/Modal";
 import { ModalButton } from "@/components/modal/ModalButton";
@@ -88,7 +88,9 @@ export function ReportDialog({ target, onClose }: { target: ReportTarget; onClos
 
   return (
     <Modal
-      isKeyboardAvoiding={Platform.OS === "android" && phase === "report"}
+      // 직접 작성 입력칸이 키보드에 가려지지 않게 iOS도 키보드 위로 올린다(BUG-051).
+      isKeyboardAvoiding={phase === "report"}
+      keyboardGap={16}
       visible={!!viewer && viewer === owner}
       onRequestClose={close}
       toastMessage={error || undefined}

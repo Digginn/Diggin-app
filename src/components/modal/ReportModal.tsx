@@ -1,6 +1,6 @@
 import { cssInterop } from "nativewind";
 import { useState } from "react";
-import { Platform, Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { graphemeSegments } from "unicode-segmenter/grapheme";
 
 import RadioActiveSvg from "@/assets/images/icon-radio-active.svg";
@@ -35,7 +35,7 @@ export function ReportModal({
   ...modalProps
 }: ReportModalProps) {
   return (
-    <Modal isKeyboardAvoiding={Platform.OS === "android"} {...modalProps}>
+    <Modal isKeyboardAvoiding keyboardGap={16} {...modalProps}>
       <ReportForm onCancel={onCancel} onReport={onReport} isPending={isPending} error={error} />
     </Modal>
   );

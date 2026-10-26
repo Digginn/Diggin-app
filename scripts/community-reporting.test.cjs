@@ -39,6 +39,7 @@ function harness({
   report = async () => {},
   block = async () => {},
   refresh = async () => {},
+  os = "android",
 } = {}) {
   const slots = [],
     effects = new Map(),
@@ -80,7 +81,7 @@ function harness({
   };
   const { ReportDialog } = load("src/components/ReportFlow.tsx", {
     react,
-    "react-native": { Text: "Text", View: "View", Platform: { OS: "android" } },
+    "react-native": { Text: "Text", View: "View", Platform: { OS: os } },
     "@/components/modal/Modal": { Modal: "Modal" },
     "@/components/modal/ModalButton": { ModalButton: "ModalButton" },
     "@/components/modal/ReportModal": { ReportForm: "ReportForm" },
@@ -165,6 +166,8 @@ test("신고 성공 뒤 차단 확인을 한 번 표시하고 괜찮아요는 �
   let tree = ui.render();
   assert.equal(tree.type, "Modal");
   assert.equal(tree.props.isKeyboardAvoiding, true);
+  // BUG-051 iOS도 직접 작성 중 입력칸이 키보드에 가려지지 않게 모달을 키보드 위로 올린다.
+  assert.equal(harness({ os: "ios" }).render().props.isKeyboardAvoiding, true);
   nodes(tree, "ReportForm")[0].props.onReport("spam", "");
   await settle();
   tree = ui.render();
