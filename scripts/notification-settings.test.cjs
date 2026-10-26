@@ -70,7 +70,7 @@ function setup(props = {}) {
   const render = () => {
     cursor = 0;
     refCursor = 0;
-    return screen.exports.NotificationSettingsScreen(props);
+    return screen.exports.NotificationSettingsScreen({ isDevicePushEnabled: true, ...props });
   };
   const toggles = () =>
     descendants(render())
@@ -147,6 +147,26 @@ test("저장 중 중복 요청을 막고 언마운트 후 실패 토스트를 �
   finish(new Error("late failure"));
   await pending;
   assert.equal(toasts.length, 0);
+});
+
+test("기기 권한 확인 전에는 토글이 OFF·비활성이며 저장하거나 차단 안내를 표시하지 않는다", async () => {
+  const saved = [];
+  const props = {
+    isDevicePushEnabled: undefined,
+    onSaveSettings: async (settings) => saved.push(settings),
+  };
+  const context = setup(props);
+  assert.equal(context.toggles()[0].isOn, false);
+  assert.equal(context.toggles()[0].isDisabled, true);
+  await context.toggles()[0].onChange(false);
+  assert.equal(saved.length, 0);
+  assert.equal(
+    descendants(context.render()).some((node) => node.type === "PushOffBanner"),
+    false,
+  );
+  props.isDevicePushEnabled = true;
+  assert.equal(context.toggles()[0].isOn, true);
+  assert.equal(context.toggles()[0].isDisabled, false);
 });
 
 test("기기에서 차단하면 토글은 OFF·비활성이고 다시 허용하면 저장된 설정을 복원한다", async () => {
