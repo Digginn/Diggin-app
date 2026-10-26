@@ -16,7 +16,7 @@ type LinkDetectModalProps = {
 
 // 탭 화면 어디서든 떠야 해서 탭 레이아웃에서 한 번만 렌더함
 export function LinkDetectModal({ onLoad, isBusy = false }: LinkDetectModalProps) {
-  const { isDetected, readLink, handle, hasReadClipboard } = useDetectedLink();
+  const { isDetected, readLink, handle, close, hasReadClipboard } = useDetectedLink();
   // 닫히는 애니메이션이 끝나면 넘길 링크. iOS 는 닫히는 중에 다른 모달을 띄우면 무시한다.
   const [pendingLink, setPendingLink] = useState<string | null>(null);
   const isReadingRef = useRef(false);
@@ -30,8 +30,11 @@ export function LinkDetectModal({ onLoad, isBusy = false }: LinkDetectModalProps
     try {
       // iOS는 여기서 클립보드를 읽어 붙여넣기 허용 팝업이 뜬다(SAVE-017).
       const link = await readLink();
+      if (!link) {
+        close();
+        return;
+      }
       handle(link);
-      if (!link) return;
       setPendingLink(link);
       // 안드로이드는 이어서 띄워도 가려지지 않아 기다릴 필요가 없다.
       if (Platform.OS !== "ios") onLoad(link);

@@ -133,5 +133,8 @@ export function useDetectedLink() {
     return () => subscription.remove();
   }, [check]);
 
-  return { isDetected: detected !== null, readLink, handle, hasReadClipboard };
+  // 링크를 못 읽어 닫을 때는 처리 기록을 남기지 않는다. 설정에서 허용하고 돌아오면 같은 링크를 다시 묻는다.
+  const close = useCallback(() => setDetected(null), []);
+
+  return { isDetected: detected !== null, readLink, handle, close, hasReadClipboard };
 }

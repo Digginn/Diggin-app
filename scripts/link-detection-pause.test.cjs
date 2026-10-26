@@ -230,3 +230,25 @@ test("iOS 불러오기는 네이티브 모듈의 메인 스레드 읽기를 쓰�
   assert.equal(await linkDetection.render().readLink(), url);
   assert.deepEqual(reads, [], "expo-clipboard는 답을 기다리지 않아 쓰지 않는다");
 });
+
+test("불러오기에서 링크를 못 읽으면 처리 기록을 남기지 않아, 설정에서 허용하고 돌아오면 다시 묻는다", async () => {
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
+  const url = "https://zigzag.kr/catalog/products/10";
+  let text = "";
+  const pasteboard = { ...fakePasteboard(), readLinkTextAsync: async () => text };
+  pasteboard.changeCount = 50;
+  const storage = {};
+  const linkDetection = loadDetectedLink(pause, "", { pasteboard, storage });
+  await linkDetection.check();
+  assert.equal(linkDetection.isDetected(), true);
+  assert.equal(await linkDetection.render().readLink(), null, "묻기 설정에서 못 읽음");
+  linkDetection.render().close();
+  assert.equal(linkDetection.isDetected(), false);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(storage, {}, "같은 복사를 처리한 것으로 기록하지 않는다");
+
+  text = url;
+  await linkDetection.check();
+  assert.equal(linkDetection.isDetected(), true, "돌아오면 같은 링크로 다시 묻는다");
+  assert.equal(await linkDetection.render().readLink(), url);
+});
