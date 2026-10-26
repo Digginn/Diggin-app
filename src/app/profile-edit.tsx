@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 
 import { saveAvatar } from "@/api/avatar";
 import { AppBar } from "@/components/app-bar";
-import { Button } from "@/components/Button";
+import { ErrorState } from "@/components/ErrorState";
+import { Spinner } from "@/components/Loading";
 import { MemberOnly } from "@/components/MemberOnly";
 import { TOAST_MESSAGES } from "@/constants/messages";
 import { useToast } from "@/hooks/useToast";
@@ -36,20 +37,22 @@ function ProfileEditContent() {
     return (
       <View className="flex-1 bg-gray-50">
         <AppBar title="프로필 수정" />
-        <View className="flex-1 items-center justify-center">
-          {hasError ? (
-            <Button
-              onPress={() => {
-                setHasError(false);
-                setAttempt((value) => value + 1);
-              }}
-            >
-              다시 시도
-            </Button>
-          ) : (
-            <ActivityIndicator accessibilityLabel="프로필 불러오는 중" />
-          )}
-        </View>
+        {hasError ? (
+          <ErrorState
+            message={TOAST_MESSAGES.SYS_002}
+            onRetry={() => {
+              setHasError(false);
+              setAttempt((value) => value + 1);
+            }}
+          />
+        ) : (
+          <View
+            accessibilityLabel="프로필 불러오는 중"
+            className="flex-1 items-center justify-center"
+          >
+            <Spinner />
+          </View>
+        )}
       </View>
     );
 

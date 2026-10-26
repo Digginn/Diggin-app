@@ -44,14 +44,14 @@ function setup(fetchMyProfile) {
               }
             },
           };
-        if (name === "react-native")
-          return { View: "View", ActivityIndicator: "ActivityIndicator" };
+        if (name === "react-native") return { View: "View" };
         if (name === "@/screens/my/api/profile") return { fetchMyProfile, saveNickname() {} };
         if (name === "@/screens/my/ProfileEditScreen")
           return { ProfileEditScreen: "ProfileEditScreen" };
         if (name === "@/components/MemberOnly") return { MemberOnly: "MemberOnly" };
         if (name === "@/components/app-bar") return { AppBar: "AppBar" };
-        if (name === "@/components/Button") return { Button: "Button" };
+        if (name === "@/components/ErrorState") return { ErrorState: "ErrorState" };
+        if (name === "@/components/Loading") return { Spinner: "Spinner" };
         if (name === "@/api/avatar") return { saveAvatar() {} };
         if (name === "@/hooks/useToast") return { useToast: () => showToast };
         if (name === "@/constants/messages")
@@ -94,7 +94,7 @@ test("진입 시 폼 대신 로딩을 표시하고 실제 닉네임·가입수�
     false,
   );
   assert.equal(
-    pending.some((node) => node.type === "ActivityIndicator"),
+    pending.some((node) => node.type === "Spinner"),
     true,
   );
   resolve({ nickname: "테스트닉네임", authProvider: "google", avatarUrl: "signed-photo" });
@@ -121,9 +121,15 @@ test("조회 실패는 임시 폼을 열지 않고 토스트와 재시도를 제
   );
   assert.equal(h.toasts.length, 1);
   assert.equal(h.toasts[0], "요청을 처리하지 못했습니다. 다시 시도해 주세요.");
-  failed.find((node) => node.type === "Button").props.onPress();
+  const errorState = failed.find((node) => node.type === "ErrorState");
+  assert.equal(errorState.props.message, h.toasts[0]);
   assert.equal(
-    h.render().some((node) => node.type === "ActivityIndicator"),
+    failed.some((node) => node.type === "Spinner"),
+    false,
+  );
+  errorState.props.onRetry();
+  assert.equal(
+    h.render().some((node) => node.type === "Spinner"),
     true,
   );
   await new Promise((done) => setImmediate(done));
