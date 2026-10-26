@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { WebView } from "react-native-webview";
 
-import { isNaverShortLink, resolveProductPageUrl } from "../api/resolveProductPageUrl";
+import {
+  isNaverShortLink,
+  resolveProductPageUrl,
+  toMobileSmartStoreUrl,
+} from "../api/resolveProductPageUrl";
 import { PRODUCT_PAGE_SCRIPT, type ProductPageRaw } from "../domain/productPageScript";
 
 // 페이지 스크립트는 페이지마다 최대 8초를 기다린다. 앱 공유 링크는 짧은 링크→중간 페이지→상품 페이지를 거친다.
@@ -23,7 +27,11 @@ export function ProductPageReader({ url, onDone }: ProductPageReaderProps) {
   const { width, height } = useWindowDimensions();
   const isDoneRef = useRef(false);
   const [resolved, setResolved] = useState<{ source: string; target: string } | null>(null);
-  const pageUrl = isNaverShortLink(url) ? (resolved?.source === url ? resolved.target : null) : url;
+  const pageUrl = isNaverShortLink(url)
+    ? resolved?.source === url
+      ? resolved.target
+      : null
+    : toMobileSmartStoreUrl(url);
   const finish = useCallback(
     (raw: ProductPageRaw | null) => {
       if (isDoneRef.current) return;

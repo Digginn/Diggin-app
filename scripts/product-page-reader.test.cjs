@@ -9,6 +9,8 @@ const ts = require("typescript");
 
 const SHORT = "https://naver.me/GdTGsdkm";
 const PRODUCT = "https://m.smartstore.naver.com/ssg_9007/products/10889520045";
+const DESKTOP = "https://smartstore.naver.com/koyasangsa/products/13372231540";
+const MOBILE = "https://m.smartstore.naver.com/koyasangsa/products/13372231540";
 function load(file, mocks = {}) {
   const module = { exports: {} };
   runInNewContext(
@@ -40,6 +42,7 @@ test("네이버 짧은 링크는 상품 주소를 확인한 뒤 WebView를 열�
     refCursor = 0,
     resolveHead;
   const api = {
+    ...resolver(() => assert.fail("Unexpected HTTP request")),
     isNaverShortLink: (url) => url === SHORT,
     resolveProductPageUrl: async () => PRODUCT,
   };
@@ -105,6 +108,47 @@ test("네이버 짧은 링크는 상품 주소를 확인한 뒤 WebView를 열�
   assert.equal(done.length, 1);
   assert.equal(done[0].shop.price, 39850);
   cleanups.forEach((cleanup) => cleanup?.());
+});
+
+test("스마트스토어 PC 상품 주소는 추가 HTTP 요청 없이 모바일 주소로 WebView를 연다", () => {
+  const api = resolver(() => assert.fail("상품 페이지는 WebView로만 연다"));
+  const { ProductPageReader } = load("../src/screens/save/components/ProductPageReader.tsx", {
+    "react": {
+      useState: () => [null, () => {}],
+      useRef: () => ({ current: false }),
+      useCallback: (callback) => callback,
+      useEffect: () => {},
+    },
+    "react-native": { View: "View", useWindowDimensions: () => ({ width: 393, height: 852 }) },
+    "react-native-webview": { WebView: "WebView" },
+    "../domain/productPageScript": { PRODUCT_PAGE_SCRIPT: "extract" },
+    "../api/resolveProductPageUrl": api,
+  });
+  const suffix = "?NaPm=tracking#detail";
+  const view = ProductPageReader({ url: DESKTOP + suffix, onDone() {} }).props.children;
+  assert.equal(view.props.source.uri, MOBILE + suffix);
+});
+
+test("짧은 링크의 PC 상품 목적지도 모바일로 바꾸고 다른 사이트·비상품 주소는 보존한다", async () => {
+  let requests = 0;
+  const { resolveProductPageUrl } = resolver(async () => {
+    requests++;
+    return { status: 307, headers: new Headers({ Location: DESKTOP }) };
+  });
+  assert.equal(await resolveProductPageUrl(DESKTOP), MOBILE);
+  assert.equal(requests, 0);
+  assert.equal(await resolveProductPageUrl(SHORT), MOBILE);
+  assert.equal(requests, 1);
+  for (const url of [
+    MOBILE,
+    "https://smartstore.naver.com/koyasangsa/category/1",
+    "https://smartstore.naver.com.evil.test/koyasangsa/products/13372231540",
+    "https://smartstore.naver.com@evil.test/koyasangsa/products/13372231540",
+    "https://example.com/koyasangsa/products/13372231540",
+    "https://brand.naver.com/koyasangsa/products/13372231540",
+  ])
+    assert.equal(await resolveProductPageUrl(url), url);
+  assert.equal(requests, 1);
 });
 
 test("실제 307 응답의 Location만 읽고 쇼핑몰 방문·해석은 기존 WebView에 맡긴다", async () => {
