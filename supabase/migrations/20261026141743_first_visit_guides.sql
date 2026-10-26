@@ -13,6 +13,10 @@ CREATE TABLE "private"."first_visit_guides" (
 ALTER TABLE "private"."first_visit_guides"
   ENABLE ROW LEVEL SECURITY;
 
+-- pg-delta는 기본 ACL과 결과가 같은 REVOKE를 생략한다. 선언형 스키마의 권한 계약을 명시한다.
+REVOKE ALL ON TABLE "private"."first_visit_guides" FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON SEQUENCE "private"."first_visit_guides_id_seq" FROM PUBLIC, anon, authenticated;
+
 CREATE OR REPLACE FUNCTION private.dismiss_first_visit_guide (
   target_user_id    uuid,
   target_guide_kind text

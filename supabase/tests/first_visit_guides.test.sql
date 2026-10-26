@@ -1,7 +1,12 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(23);
+select plan(27);
+
+select ok(not has_table_privilege('anon', 'private.first_visit_guides', 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'), 'Guests have no table privileges');
+select ok(not has_table_privilege('authenticated', 'private.first_visit_guides', 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'), 'Members have no table privileges');
+select ok(not has_sequence_privilege('anon', 'private.first_visit_guides_id_seq', 'USAGE, SELECT, UPDATE'), 'Guests have no sequence privileges');
+select ok(not has_sequence_privilege('authenticated', 'private.first_visit_guides_id_seq', 'USAGE, SELECT, UPDATE'), 'Members have no sequence privileges');
 
 insert into auth.users (id, email) values
   ('15200000-0000-0000-0000-000000000001', 'guide-a@test.dev'),
