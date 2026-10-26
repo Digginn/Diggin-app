@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
@@ -11,11 +12,28 @@ import { DigginPasteboard } from "../../modules/diggin-pasteboard";
 // 불러오기를 시작했거나 감지 모달에서 답한 링크. 같은 앱 실행 동안 다시 묻지 않는다.
 const handledLinks = new Set<string>();
 // iOS는 내용을 읽지 않고 복사 횟수로 같은 복사를 가린다. 답한 복사는 다시 묻지 않는다.
+// 복사 횟수는 앱을 다시 켜도 유지돼 기기에 저장한다. 재부팅하면 처음부터 다시 센다.
+const HANDLED_CHANGE_COUNT_KEY = "link-detection-handled-change-count";
 let handledChangeCount: number | null = null;
+let handledChangeCountLoad: Promise<void> | null = null;
+
+function loadHandledChangeCount() {
+  handledChangeCountLoad ??= AsyncStorage.getItem(HANDLED_CHANGE_COUNT_KEY)
+    .then((value) => {
+      if (value !== null && handledChangeCount === null) handledChangeCount = Number(value);
+    })
+    .catch(() => {});
+  return handledChangeCountLoad;
+}
+
+function saveHandledChangeCount(changeCount: number) {
+  handledChangeCount = changeCount;
+  void AsyncStorage.setItem(HANDLED_CHANGE_COUNT_KEY, String(changeCount)).catch(() => {});
+}
 
 export function markLinkHandled(url: string) {
   handledLinks.add(url);
-  if (DigginPasteboard) handledChangeCount = DigginPasteboard.getChangeCount();
+  if (DigginPasteboard) saveHandledChangeCount(DigginPasteboard.getChangeCount());
 }
 
 /** url이 null이면 iOS에서 아직 읽지 않은 링크다. 불러오기를 누를 때 읽는다. */
@@ -36,13 +54,14 @@ export function useDetectedLink() {
     try {
       // SAVE-017 iOS는 링크가 있는지만 팝업 없이 보고, 내용은 불러오기를 누른 뒤에 읽는다.
       if (DigginPasteboard) {
+        await loadHandledChangeCount();
         const changeCount = DigginPasteboard.getChangeCount();
         if (changeCount === handledChangeCount) return;
         if (!(await DigginPasteboard.hasWebUrlAsync())) return;
         const preview = await DigginPasteboard.detectWebUrlAsync().catch(() => null);
         // https가 아니면 묻지 않는다.
         if (preview !== null && !findItemLink(preview)) {
-          handledChangeCount = changeCount;
+          saveHandledChangeCount(changeCount);
           return;
         }
         if (isLinkDetectionPaused() || isNativeModalBusy()) return;
@@ -90,7 +109,7 @@ export function useDetectedLink() {
   const handle = useCallback(
     (url: string | null) => {
       if (url) handledLinks.add(url);
-      if (detected?.changeCount != null) handledChangeCount = detected.changeCount;
+      if (detected?.changeCount != null) saveHandledChangeCount(detected.changeCount);
       setDetected(null);
     },
     [detected],
