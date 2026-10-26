@@ -23,7 +23,11 @@ function load(file, mocks = {}) {
       AbortController,
       setTimeout,
       clearTimeout,
-      require: (name) => mocks[name] ?? require(name),
+      require: (name) =>
+        mocks[name] ??
+        (name.startsWith(".")
+          ? load(path.join(path.dirname(file), name + ".ts"), mocks)
+          : require(name)),
     },
   );
   return module.exports;

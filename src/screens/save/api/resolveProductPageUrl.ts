@@ -1,14 +1,9 @@
 import { fetch } from "expo/fetch";
 
+import { toMobileSmartStoreUrl } from "../domain/productPageUrl";
+
 export const isNaverShortLink = (url: string) =>
   /^https:\/\/naver\.me\/[a-z0-9]+\/?(?:[?#].*)?$/i.test(url);
-
-/** PC 주소 진입 시 오류가 나는 상품도 모바일 상세에서는 읽을 수 있다. 상품 경로만 바꾼다. */
-export const toMobileSmartStoreUrl = (url: string) =>
-  url.replace(
-    /^https:\/\/smartstore\.naver\.com(?=\/[^/?#]+\/products\/\d+(?:[/?#]|$))/i,
-    "https://m.smartstore.naver.com",
-  );
 
 /** 네이버 짧은 공유 링크는 상품 주소부터 확인한다. 상품 정보 자체는 기존 WebView가 읽는다. */
 export async function resolveProductPageUrl(url: string, signal?: AbortSignal): Promise<string> {

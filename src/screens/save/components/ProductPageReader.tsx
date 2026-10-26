@@ -2,12 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { WebView } from "react-native-webview";
 
-import {
-  isNaverShortLink,
-  resolveProductPageUrl,
-  toMobileSmartStoreUrl,
-} from "../api/resolveProductPageUrl";
+import { isNaverShortLink, resolveProductPageUrl } from "../api/resolveProductPageUrl";
 import { PRODUCT_PAGE_SCRIPT, type ProductPageRaw } from "../domain/productPageScript";
+import { toMobileSmartStoreUrl } from "../domain/productPageUrl";
 
 // 페이지 스크립트는 페이지마다 최대 8초를 기다린다. 앱 공유 링크는 짧은 링크→중간 페이지→상품 페이지를 거친다.
 // 로드가 끝나지 않거나 스크립트가 못 돌면(쿠팡 빈 화면) 여기서 끊는다.
