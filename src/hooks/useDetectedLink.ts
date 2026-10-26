@@ -57,13 +57,8 @@ export function useDetectedLink() {
         await loadHandledChangeCount();
         const changeCount = DigginPasteboard.getChangeCount();
         if (changeCount === handledChangeCount) return;
+        // 값을 돌려주는 detectValues는 클립보드를 읽은 것으로 쳐 팝업이 먼저 뜬다(BUG-058). 링크 유무만 본다.
         if (!(await DigginPasteboard.hasWebUrlAsync())) return;
-        const preview = await DigginPasteboard.detectWebUrlAsync().catch(() => null);
-        // https가 아니면 묻지 않는다.
-        if (preview !== null && !findItemLink(preview)) {
-          saveHandledChangeCount(changeCount);
-          return;
-        }
         if (isLinkDetectionPaused() || isNativeModalBusy()) return;
         setDetected({ url: null, changeCount });
         return;

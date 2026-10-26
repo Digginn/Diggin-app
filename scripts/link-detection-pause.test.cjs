@@ -135,14 +135,19 @@ test("https 링크가 없으면 붙여넣기 안내 조건을 켜지 않는다",
   assert.equal(https.hasReadClipboard(), true);
 });
 
-function fakePasteboard({ preview }) {
+function fakePasteboard() {
   return {
     changeCount: 1,
+    valueReads: 0,
     getChangeCount() {
       return this.changeCount;
     },
     hasWebUrlAsync: async () => true,
-    detectWebUrlAsync: async () => preview,
+    // detectValues는 값을 읽어 iOS 붙여넣기 팝업을 띄운다. 감지 단계에서 부르면 안 된다.
+    detectWebUrlAsync: async function () {
+      this.valueReads++;
+      return null;
+    },
   };
 }
 
@@ -150,12 +155,13 @@ test("iOS는 클립보드를 읽지 않고 링크 유무만 보고 묻고, 불�
   const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
   const url = "https://zigzag.kr/catalog/products/5";
   const reads = [];
-  const pasteboard = fakePasteboard({ preview: url });
+  const pasteboard = fakePasteboard();
   const linkDetection = loadDetectedLink(pause, url, { reads, pasteboard });
 
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), true);
   assert.deepEqual(reads, [], "감지만으로는 붙여넣기 팝업이 뜨지 않는다");
+  assert.equal(pasteboard.valueReads, 0, "링크 값을 미리 읽지 않는다(BUG-058)");
 
   assert.equal(await linkDetection.render().readLink(), url);
   assert.equal(reads.length, 1, "불러오기를 누를 때 읽는다");
@@ -173,7 +179,7 @@ test("iOS에서 답한 복사는 앱을 다시 켜도 묻지 않는다", async (
   const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
   const url = "https://zigzag.kr/catalog/products/8";
   const storage = {};
-  const pasteboard = fakePasteboard({ preview: url });
+  const pasteboard = fakePasteboard();
   pasteboard.changeCount = 30;
   const first = loadDetectedLink(pause, url, { pasteboard, storage });
   await first.check();
@@ -192,7 +198,7 @@ test("iOS에서 답한 복사는 앱을 다시 켜도 묻지 않는다", async (
 test("iOS에서 URL 형식으로만 복사된 링크도 불러오기를 누르면 읽는다", async () => {
   const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
   const url = "https://zigzag.kr/catalog/products/7";
-  const pasteboard = fakePasteboard({ preview: url });
+  const pasteboard = fakePasteboard();
   pasteboard.changeCount = 20;
   const linkDetection = loadDetectedLink(pause, "", { pasteboard, clipboardUrl: url });
 
@@ -200,11 +206,15 @@ test("iOS에서 URL 형식으로만 복사된 링크도 불러오기를 누르�
   assert.equal(await linkDetection.render().readLink(), url);
 });
 
-test("iOS에서 https가 아닌 링크는 묻지 않는다", async () => {
+test("iOS에서 https가 아닌 링크는 감지 모달은 뜨지만 불러오기를 눌러도 저장으로 넘기지 않는다", async () => {
   const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
-  const pasteboard = fakePasteboard({ preview: "http://zigzag.kr/catalog/products/6" });
+  const pasteboard = fakePasteboard();
   pasteboard.changeCount = 10;
-  const linkDetection = loadDetectedLink(pause, "", { pasteboard });
+  const linkDetection = loadDetectedLink(pause, "http://zigzag.kr/catalog/products/6", {
+    pasteboard,
+  });
   await linkDetection.check();
-  assert.equal(linkDetection.isDetected(), false);
+  assert.equal(linkDetection.isDetected(), true, "내용을 읽지 않으면 https인지 알 수 없다");
+  assert.equal(pasteboard.valueReads, 0);
+  assert.equal(await linkDetection.render().readLink(), null);
 });

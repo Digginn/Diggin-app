@@ -25,15 +25,5 @@ public class DigginPasteboardModule: Module {
         }
       }
     }
-
-    AsyncFunction("detectWebUrlAsync") { (promise: Promise) in
-      UIPasteboard.general.detectValues(for: [.probableWebURL]) { result in
-        if case .success(let values) = result {
-          promise.resolve(values[.probableWebURL] as? String)
-        } else {
-          promise.resolve(nil)
-        }
-      }
-    }
   }
 }
