@@ -273,3 +273,24 @@ test("묻기 설정에서 팝업을 거쳐 읽었으면(읽기가 오래 걸림)
     assert.equal(linkDetection.needsPasteGuide(), expected, `${delay}ms`);
   }
 });
+
+test("설정을 허용으로 바꾼 뒤 불러오면(바로 읽힘) 안내 조건이 다시 꺼진다", async () => {
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
+  const url = "https://zigzag.kr/catalog/products/12";
+  let delay = 400;
+  const pasteboard = {
+    ...fakePasteboard(),
+    readLinkTextAsync: () => new Promise((resolve) => setTimeout(() => resolve(url), delay)),
+  };
+  pasteboard.changeCount = 70;
+  const linkDetection = loadDetectedLink(pause, "", { pasteboard });
+  await linkDetection.check();
+  await linkDetection.render().readLink();
+  linkDetection.render().handle(url);
+  assert.equal(linkDetection.needsPasteGuide(), true, "묻기: 안내");
+  delay = 0;
+  pasteboard.changeCount = 71;
+  await linkDetection.check();
+  await linkDetection.render().readLink();
+  assert.equal(linkDetection.needsPasteGuide(), false, "허용: 안내 안 함");
+});

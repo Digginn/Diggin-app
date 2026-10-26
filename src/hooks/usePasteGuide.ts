@@ -1,42 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Platform } from "react-native";
-
-// TODO: 팀 확인이 끝나면 아래 주석을 풀어 1회만 뜨게 되돌린다.
-// import AsyncStorage from "@react-native-async-storage/async-storage";
-// const STORAGE_KEY = "paste-guide-seen";
 
 /**
  * 붙여넣기 설정 안내를 띄운다.
  *
  * iOS 는 클립보드를 읽을 때마다 시스템 팝업이 뜨는데, 설정에서 '허용'으로 바꾸면 다시 묻지 않는다.
  * 그 경로를 알려주는 안내라 팝업을 거쳤거나 붙여넣기가 막혔을 때 띄운다. '허용'이면 뜨지 않는다. 안드로이드는 이 팝업 자체가 없다.
- *
- * 원래는 평생 한 번만 띄우는데, 팀이 화면을 확인할 수 있도록 그 제한을 잠시 꺼뒀다.
- * 지금은 앱을 켤 때마다 한 번씩 뜬다.
+ * '다음에 하기'로 닫아도 다음 불러오기에서 조건이 다시 켜지면 또 띄운다.
  */
 export function usePasteGuide(needsPasteGuide: boolean) {
-  const [isVisible, setVisible] = useState(false);
-  const isCheckedRef = useRef(false);
+  const [isDismissed, setDismissed] = useState(false);
+  const [previous, setPrevious] = useState(needsPasteGuide);
+  // 조건이 꺼졌다 다시 켜지면(다음 불러오기) 닫은 기록을 지운다.
+  if (previous !== needsPasteGuide) {
+    setPrevious(needsPasteGuide);
+    if (!needsPasteGuide) setDismissed(false);
+  }
 
-  useEffect(() => {
-    if (Platform.OS !== "ios" || !needsPasteGuide || isCheckedRef.current) return;
-    isCheckedRef.current = true;
-    setVisible(true);
+  const dismiss = useCallback(() => setDismissed(true), []);
 
-    // AsyncStorage.getItem(STORAGE_KEY)
-    //   .then((seen) => {
-    //     if (!seen) setVisible(true);
-    //   })
-    //   .catch(() => {
-    //     // 저장소를 못 읽으면 안내를 건너뛴다. 반복해서 띄우는 것보다 낫다.
-    //   });
-  }, [needsPasteGuide]);
-
-  // 어느 버튼을 눌렀든 다시 띄우지 않는다.
-  const dismiss = useCallback(() => {
-    setVisible(false);
-    // void AsyncStorage.setItem(STORAGE_KEY, "1");
-  }, []);
-
-  return { isVisible, dismiss };
+  return { isVisible: Platform.OS === "ios" && needsPasteGuide && !isDismissed, dismiss };
 }

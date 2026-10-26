@@ -93,6 +93,8 @@ export function useDetectedLink() {
     try {
       // 붙여넣기 설정이 '묻기'면 메인 스레드에서 읽어야 사용자의 답을 기다린다(BUG-058). 모듈이 없는 빌드는 expo-clipboard로 읽는다.
       // URL 형식으로만 복사되면 문자열이 비어 있어 URL로 한 번 더 읽는다.
+      // 불러올 때마다 다시 판단한다. 설정을 허용으로 바꿨으면 이번에는 안내가 꺼진다.
+      setNeedsPasteGuide(false);
       const startedAt = Date.now();
       const text = DigginPasteboard?.readLinkTextAsync
         ? await DigginPasteboard.readLinkTextAsync()
