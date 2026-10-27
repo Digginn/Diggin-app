@@ -613,6 +613,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const signOutOptions = [];
   const order = [];
   const cacheClears = [];
+  const analyticsUsers = [];
   const supabase = {
     auth: {
       getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
@@ -648,6 +649,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     },
     "@/lib/supabase": { supabase },
     "@/lib/queryClient": { queryClient: { clear: () => cacheClears.push(true) } },
+    "@/lib/analytics": { setAnalyticsUser: (userId) => analyticsUsers.push(userId) },
     "@/lib/pushNotifications": {
       unregisterDevicePush: async () => {
         order.push("unregisterPush");
@@ -669,12 +671,13 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     "세션을 끊기 전에 이 기기 Push 토큰을 지우고, 세션을 끊은 뒤에야 등록 막기를 푼다",
   );
   assert.equal(render().isSessionExpired, false);
-  emit("TOKEN_REFRESHED", { id: "s2" });
+  emit("TOKEN_REFRESHED", { id: "s2", user: { id: "u2" } });
   assert.equal(render().isSessionExpired, false);
   emit("SIGNED_OUT", null);
   await Promise.resolve();
   assert.equal(render().isSessionExpired, true);
   assert.equal(cacheClears.length, 2, "로그아웃·만료 모두 상품 캐시를 비운다");
+  assert.deepEqual(analyticsUsers, [null, "u2", null], "로그인하면 회원을 연결하고 로그아웃·만료하면 끊는다");
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);
 });
