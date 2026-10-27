@@ -287,6 +287,12 @@ test("폴더 무선택은 ALL에만 저장하고 성공 시 목록을 갱신해 
   assert.equal(h.returned, 1);
   assert.deepEqual(h.invalidated, [["products"], ["folders"]]);
   assert.deepEqual(h.destinations, []);
+  assert.equal(
+    domain.takeCommunityItemSaved(SNAPSHOT.id),
+    true,
+    "돌아간 상세가 정보 시트를 다시 열지 않게 남긴다",
+  );
+  assert.equal(domain.takeCommunityItemSaved(SNAPSHOT.id), false, "한 번 쓰면 지운다");
 });
 
 test("선택 폴더와 0원·수정 정보를 전달하고 소장템 선택 시 위시레벨을 비운다", async () => {
@@ -339,10 +345,12 @@ test("DIGGLE 저장도 통신 오류는 연결 확인 문구로, 일반 오류�
 });
 
 test("중복은 새 저장 성공으로 알리지 않고 기존 상품 확인 동작만 제공한다", async () => {
+  domain.takeCommunityItemSaved(SNAPSHOT.id); // 앞선 저장 테스트가 남긴 표시를 지운다
   const h = formHarness({ duplicate: true });
   h.open();
   await h.sheet().onComplete(["2"]);
   assert.equal(h.returned, 0);
+  assert.equal(domain.takeCommunityItemSaved(SNAPSHOT.id), false, "중복은 저장 성공이 아니다");
   assert.deepEqual(h.invalidated, []);
   assert.deepEqual(h.toasts, []);
   const modal = h.sheet().overlay;

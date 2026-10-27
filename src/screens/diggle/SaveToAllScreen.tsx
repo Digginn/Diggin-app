@@ -29,6 +29,7 @@ import {
   communitySaveErrors,
   normalizeSaveValues,
   snapshotSaveValues,
+  markCommunityItemSaved,
 } from "./domain/communitySave";
 import { useCommunityPost } from "./queries/useCommunity";
 import type { CommunityItem } from "./types/community";
@@ -143,6 +144,7 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
       void queryClient.invalidateQueries({ queryKey: productKeys.all });
       void queryClient.invalidateQueries({ queryKey: folderKeys.all });
       showToast(TOAST_MESSAGES.SAVE_011);
+      markCommunityItemSaved(item.id);
       onBack();
     },
   });

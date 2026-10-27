@@ -291,6 +291,8 @@ test("오래된 캐시로 상세에 재진입해도 마감 상태를 유지하�
   assert.equal(ordinaryPost.hasListeners(), false);
 });
 
+const communitySaveDomain = load("src/screens/diggle/domain/communitySave.ts");
+
 function nodes(node, type) {
   if (!React.isValidElement(node)) return [];
   return [
@@ -415,6 +417,7 @@ function screenMocks({
     "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
     "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
     "./domain/comments": load("src/screens/diggle/domain/comments.ts"),
+    "./domain/communitySave": communitySaveDomain,
     "./hooks/useCommentActions": {
       useCommentActions: () => ({
         changes: {},
@@ -540,6 +543,11 @@ test("상품 저장은 게시글·Snapshot 위치로 이동하고 취소 후 해
   const restored = nodes(render(), "PostItemInfoSheet")[0];
   assert.equal(restored.props.visible, true);
   assert.equal(restored.props.name, post.items[0].name);
+  // 저장에 성공하고 돌아오면 정보 시트를 다시 열지 않는다.
+  restored.props.onSaveToAll();
+  communitySaveDomain.markCommunityItemSaved(post.items[0].id);
+  onFocus();
+  assert.equal(nodes(render(), "PostItemInfoSheet")[0].props.visible, false);
 });
 
 test("회원 피드는 all 탭에서도 투표글 유형으로 라우팅하고 마지막 페이지는 더 요청하지 않는다", () => {

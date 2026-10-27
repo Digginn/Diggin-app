@@ -41,6 +41,7 @@ import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
 import { VoteBlock } from "./components/VoteBlock";
 import { mergeComments } from "./domain/comments";
+import { takeCommunityItemSaved } from "./domain/communitySave";
 import { useCommentActions } from "./hooks/useCommentActions";
 import { useCommunityLike } from "./hooks/useCommunityLike";
 import { useCommunityVote } from "./hooks/useCommunityVote";
@@ -123,7 +124,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   useFocusEffect(
     useCallback(() => {
       if (returnItem.current) {
-        setInfoItem(returnItem.current);
+        if (!takeCommunityItemSaved(returnItem.current.id)) setInfoItem(returnItem.current);
         returnItem.current = null;
       }
     }, []),
