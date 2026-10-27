@@ -188,10 +188,7 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
           <View className="gap-2.5">
             <CommunityBodyField isVote={isVote} value={body} onChangeText={setBody} />
             {body.length > 0 && count < 5 && (
-              <HelperText
-                status="error"
-                message="공백을 제외하고 5자 이상 입력해 주세요. (이모지 포함)"
-              />
+              <HelperText status="error" message="공백을 제외하고 5자 이상 입력해 주세요." />
             )}
           </View>
           <View className="gap-3">

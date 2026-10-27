@@ -106,7 +106,7 @@ function setup(
           return { useAuth: () => ({ session: { user: { id: "viewer" } }, isRestoring: false }) };
         if (name === "@/components/app-bar") return { AppBar: "AppBar" };
         if (name === "@/components/Button") return { Button: "Button" };
-        if (name === "@/components/modal") return { Modal: "Modal" };
+        if (name === "@/components/modal") return { Modal: "Modal", ActionModal: "ActionModal" };
         if (name === "@/components/BottomSheet") return { BottomSheet: "BottomSheet" };
         if (name === "@/components/ToastText") return { ToastText: "ToastText" };
         if (name === "@/theme") return { colors: { gray: { 0: "#FFFFFF", 900: "#1E1E1E" } } };
@@ -342,24 +342,25 @@ test("로그아웃 미연결은 성공을 가장하지 않고, 진행 중 연타
   assert.equal(modal(props).isVisible, false);
 });
 
-test("로그아웃 모달은 Figma 문구·36% scrim·48px 제목과 버튼을 재사용한다", () => {
+test("로그아웃 모달은 공용 ActionModal로 Figma 문구·36% scrim·로그아웃 좌측·취소 우측을 쓴다", () => {
   const { Screen } = setup("components/LogoutModal");
+  const confirmed = [];
   const tree = Screen({
     isVisible: true,
     isLoggingOut: false,
-    onClose: () => {},
-    onConfirm: () => {},
+    onClose: () => confirmed.push("close"),
+    onConfirm: () => confirmed.push("logout"),
   });
-  assert.equal(tree.type, "Modal");
+  assert.equal(tree.type, "ActionModal");
+  assert.equal(tree.props.type, "2Btn");
   assert.equal(tree.props.scrimOpacity, 0.36);
-  const nodes = descendants(tree);
-  assert.ok(nodes.some((node) => node.props.children === "로그아웃하시겠습니까?"));
-  assert.ok(nodes.some((node) => node.props.children === "저장된 정보는 안전하게 보관됩니다."));
-  assert.ok(nodes.some((node) => node.props.className === "h-12 justify-center"));
-  assert.deepEqual(
-    nodes.filter((node) => node.type === "Button").map((node) => node.props.children),
-    ["취소", "로그아웃"],
-  );
+  assert.equal(tree.props.title, "로그아웃하시겠습니까?");
+  assert.equal(tree.props.description, "저장된 정보는 안전하게 보관됩니다.");
+  assert.equal(tree.props.secondaryAction.label, "로그아웃", "왼쪽 회색 버튼");
+  assert.equal(tree.props.primaryAction.label, "취소", "오른쪽 검정 버튼");
+  tree.props.secondaryAction.onPress();
+  tree.props.primaryAction.onPress();
+  assert.deepEqual(confirmed, ["logout", "close"]);
 });
 
 test("고객지원은 원본 로고와 URL을 표시하고 복사·이동 실패를 처리한다", async () => {

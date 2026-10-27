@@ -276,6 +276,13 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   assert.equal(button(tree, "취소").props.isDisabled, true);
   assert.equal(button(tree, "저장하기").props.isDisabled, true);
 
+  // BUG-024 공유 시트는 클립보드 저장(SAVE-10)처럼 폴더 선택하기 버튼 하나만 둔다.
+  const shared = render({ submitLabel: "폴더 선택하기" }).filter((node) => node.type === "Button");
+  assert.deepEqual(
+    shared.map((node) => node.props.children),
+    ["폴더 선택하기"],
+  );
+
   nameField().props.onChangeText("   ");
   assert.equal(nameField().props.isError, true, "공백만 있는 아이템명은 빈 값이다");
   assert.equal(requiredCount(), 1);

@@ -33,3 +33,16 @@ export function communitySaveErrors(values: ItemSaveValues) {
         : undefined,
   };
 }
+
+// 저장을 마치고 돌아간 상세가 상품 정보 시트를 다시 열지 않게 남긴다. 그냥 뒤로 가면 시트로 돌아간다.
+let savedItemId: string | null = null;
+
+export function markCommunityItemSaved(itemId: string) {
+  savedItemId = itemId;
+}
+
+export function takeCommunityItemSaved(itemId: string) {
+  const isSaved = savedItemId === itemId;
+  savedItemId = null;
+  return isSaved;
+}

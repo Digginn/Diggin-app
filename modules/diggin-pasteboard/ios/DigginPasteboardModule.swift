@@ -26,14 +26,10 @@ public class DigginPasteboardModule: Module {
       }
     }
 
-    AsyncFunction("detectWebUrlAsync") { (promise: Promise) in
-      UIPasteboard.general.detectValues(for: [.probableWebURL]) { result in
-        if case .success(let values) = result {
-          promise.resolve(values[.probableWebURL] as? String)
-        } else {
-          promise.resolve(nil)
-        }
-      }
-    }
+    // 붙여넣기 설정이 '묻기'면 iOS가 사용자의 답을 받아 값을 돌려준다. 백그라운드에서 읽으면 답을 기다리지 않고 빈 값이 온다.
+    AsyncFunction("readLinkTextAsync") { () -> String? in
+      let pasteboard = UIPasteboard.general
+      return pasteboard.string ?? pasteboard.url?.absoluteString
+    }.runOnQueue(.main)
   }
 }

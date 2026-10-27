@@ -2,6 +2,7 @@ import type { PostTab } from "@/types/post";
 
 // 키는 시안 MSG 프레임 이름을 그대로 씀
 export const TOAST_MESSAGES = {
+  LINK_HTTPS_REQUIRED: "https로 시작하는 아이템 링크를 입력해 주세요.",
   SAVE_003: "공유한 내용에서 아이템 링크를 찾지 못했습니다.",
   SAVE_004: "아이템 링크를 확인하고 다시 시도해 주세요.",
   SAVE_005: "다른 아이템 링크를 입력해 주세요.",

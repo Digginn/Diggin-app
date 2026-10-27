@@ -45,7 +45,7 @@ test("상품 상세의 양쪽 48px 터치 영역 밝기를 각각 적용하고 �
       Text: "Text",
       ScrollView: "ScrollView",
       Pressable: "Pressable",
-      useWindowDimensions: () => ({ width: 375 }),
+      useWindowDimensions: () => ({ width: 375, height: 874 }),
     },
     "expo-image": { Image: "Image" },
     "expo-linear-gradient": { LinearGradient: "LinearGradient" },
@@ -70,7 +70,9 @@ test("상품 상세의 양쪽 48px 터치 영역 밝기를 각각 적용하고 �
     "@/hooks/useProductCounts": { useProductCounts: () => ({}) },
     "@/hooks/useLinkDetectionPause": { useLinkDetectionPause: () => {} },
     "@/screens/all/mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
-    "./queries/useProduct": { useProduct: () => ({ data: { values: { thumbnailUrl, brand: "" } } }) },
+    "./queries/useProduct": {
+      useProduct: () => ({ data: { values: { thumbnailUrl, brand: "" } } }),
+    },
     "./queries/useProductFolderIds": { useProductFolderIds: () => ({ data: [] }) },
     "./mutations/useUpdateProduct": { useUpdateProduct: () => ({}) },
     "./mutations/useSaveProductFolders": { useSaveProductFolders: () => ({}) },
@@ -101,6 +103,8 @@ test("상품 상세의 양쪽 48px 터치 영역 밝기를 각각 적용하고 �
     const icon = IconButton(menu.props).props.children;
     assert.equal(icon.type(icon.props).props.color, more ? "#FFFFFF" : "#1E1E1E");
     assert.equal(sampled.at(-1).url, thumbnailUrl);
+    // BUG-009 시안(375×812)의 이미지 520 비율을 기기 높이에 맞춰 유지한다: 874 × 520 / 812 ≈ 560
+    assert.deepEqual({ ...sampled.at(-1).frame }, { width: 375, height: 560 });
     assert.deepEqual({ ...sampled.at(-1).area }, { x: 327, y: 59, width: 48, height: 48 });
     assert.deepEqual({ ...sampled.at(-2).area }, { x: 0, y: 59, width: 48, height: 48 });
   }

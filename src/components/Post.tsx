@@ -1,12 +1,13 @@
 import { clsx } from "clsx";
 import { Image } from "expo-image";
 import { cssInterop } from "nativewind";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import CommentSvg from "@/assets/images/icon-comment.svg";
 import HeartSvg from "@/assets/images/icon-heart.svg";
 import ReportSvg from "@/assets/images/icon-report.svg";
+import { FallbackImg } from "@/components/FallbackImg";
 import { ProductImg } from "@/components/ProductImg";
 import { colors } from "@/theme";
 
@@ -43,6 +44,26 @@ function Meta({ children }: { children: ReactNode }) {
   return <Text className="text-right text-gray-500 font-b4">{children}</Text>;
 }
 
+function VoteThumbnail({ url }: { url?: string | null }) {
+  const [isFailed, setIsFailed] = useState(false);
+  if (!url || isFailed) {
+    return (
+      <View className="size-20 overflow-hidden rounded">
+        <FallbackImg size="vote" className="h-full" />
+      </View>
+    );
+  }
+  return (
+    <StyledImage
+      className="size-20 rounded bg-gray-100"
+      contentFit="cover"
+      autoplay={false}
+      onError={() => setIsFailed(true)}
+      source={url}
+    />
+  );
+}
+
 function toRows(items: PostItem[]): (PostItem | null)[][] {
   const rows: (PostItem | null)[][] = [];
   for (let index = 0; index < items.length; index += COLUMN_COUNT) {
@@ -73,13 +94,14 @@ export function Post({
       accessibilityRole={onPress ? "button" : undefined}
       className={clsx(
         "w-full border-b border-gray-200 bg-gray-0 px-margin pt-4",
-        isVote ? "items-start pb-1" : "items-center justify-center pb-1.5",
+        // 하단 정보와 구분선 사이를 일반글 기준으로 맞춘다(BUG-028·091).
+        isVote ? "items-start pb-1.5" : "items-center justify-center pb-1.5",
         onPress && "active:opacity-75",
       )}
       disabled={!onPress}
       onPress={onPress}
     >
-      <View className={clsx("w-full items-start", isVote && "h-[120px]")}>
+      <View className="w-full items-start">
         {isVote ? (
           <View className="w-full flex-row items-start gap-3">
             <View className="min-w-0 flex-1 self-stretch">
@@ -90,12 +112,7 @@ export function Post({
                 {body}
               </Text>
             </View>
-            <StyledImage
-              className="size-20 rounded bg-gray-100"
-              contentFit="cover"
-              autoplay={false}
-              source={items[0]?.imageUrl ?? undefined}
-            />
+            <VoteThumbnail url={items[0]?.imageUrl} />
           </View>
         ) : (
           <View className="w-full gap-4">

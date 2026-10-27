@@ -16,7 +16,8 @@ export function CommunityBodyField({
 }) {
   const [hasOverflowed, setOverflowed] = useState(false);
   const count = postBodyLength(value);
-  const hasError = (value.length > 0 && count < 5) || hasOverflowed;
+  // 5자 미만은 아래 안내만 띄운다. 빨간 표시는 50자에서 더 입력하려 할 때만 쓴다(DGL-005).
+  const hasError = hasOverflowed;
   return (
     <View
       className={`h-[120px] w-full rounded-field border-field bg-gray-0 p-4 ${hasError ? "border-semantic-error" : "border-gray-300"}`}
@@ -28,8 +29,8 @@ export function CommunityBodyField({
         textAlignVertical="top"
         placeholder={
           isVote
-            ? "구매가 고민되는 아이템은 투표를 올려 의견을 받아보세요. (5~50자)"
-            : "저장한 아이템에 대해 다른 사람들과 의견을 나누어 보세요. (5~50자)"
+            ? "구매가 고민되는 아이템은 투표를 올려 의견을 받아보세요."
+            : "저장한 아이템에 대해 다른 사람들과 의견을 나누어 보세요."
         }
         placeholderTextColor={colors.gray[400]}
         value={value}
@@ -44,7 +45,7 @@ export function CommunityBodyField({
         }}
       />
       <Text className={`self-end font-note ${hasError ? "text-semantic-error" : "text-gray-600"}`}>
-        {count}/{count > 0 && count < 5 ? 5 : 50}자
+        {count}/{50}자
       </Text>
     </View>
   );

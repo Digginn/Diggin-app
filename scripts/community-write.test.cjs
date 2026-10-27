@@ -100,6 +100,14 @@ test("입력창은 50자 초과를 반영하지 않고 테두리·카운터를 �
   assert.doesNotMatch(render().props.className, /border-semantic-error/);
   nodes(render(), "TextInput")[0].props.onChangeText("👍🏽".repeat(70));
   assert.equal(value, "👍🏽".repeat(50));
+  // BUG-094 5자 미만은 아래 안내만 띄우고, 카운터는 n/50자·기본 색을 유지한다.
+  overflow = false;
+  value = "가나";
+  const short = render();
+  assert.doesNotMatch(short.props.className, /border-semantic-error/);
+  const counter = nodes(short, "Text")[0];
+  assert.doesNotMatch(counter.props.className, /text-semantic-error/);
+  assert.equal(counter.props.children.join(""), "2/50자");
 });
 
 test("등록 API는 본문·상품 ID·재시도 키만 전달하고 상품 정보는 클라이언트에서 보내지 않는다", async () => {
@@ -373,4 +381,21 @@ test("작성 이탈 취소는 초안을 유지하고 나가기는 초안을 폐�
   ui.runEffects();
   assert.equal(nodes(tree, "ProductAttachGrid")[0].props.items.length, 0);
   assert.equal(ui.destination().pathname, "/(tabs)/diggle");
+});
+
+test("본문 입력 안내는 카운터로만 글자 수를 보여 주고 이모지 언급을 하지 않는다(BUG-093)", () => {
+  const ui = editor({ agreed: true });
+  ui.input("가나");
+  const helper = nodes(ui.render(), "HelperText")[0];
+  assert.equal(helper.props.message, "공백을 제외하고 5자 이상 입력해 주세요.");
+  const { CommunityBodyField } = load("src/screens/diggle/components/CommunityBodyField.tsx", {
+    "react": { useState: () => [false, () => {}] },
+    "react-native": { View: "View", Text: "Text", TextInput: "TextInput" },
+    "@/theme": { colors: { gray: { 400: "gray" } } },
+    "../domain/postBody": body,
+  });
+  for (const isVote of [false, true]) {
+    const field = CommunityBodyField({ value: "", onChangeText: () => {}, isVote });
+    assert.doesNotMatch(nodes(field, "TextInput")[0].props.placeholder, /5~50자/);
+  }
 });

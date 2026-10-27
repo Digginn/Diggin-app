@@ -63,7 +63,7 @@ select lives_ok($$ select public.set_community_like(current_setting('test.post')
 select lives_ok($$ select public.set_community_like(current_setting('test.post')::bigint, false) $$, '좋아요를 취소한다');
 select lives_ok($$ select public.set_community_like(current_setting('test.post')::bigint, true) $$, '다시 누른다');
 set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
-select lives_ok($$ select public.set_community_like(current_setting('test.post')::bigint, true) $$, '글쓴이가 자기 글에 좋아요를 누른다');
+select throws_ok($$ select public.set_community_like(current_setting('test.post')::bigint, true) $$, '42501', 'own_post_like', '글쓴이는 자기 글에 좋아요를 누를 수 없다');
 reset role;
 select is((select count(*) from pg_temp.notifications_for('post_liked')), 1::bigint, '같은 사람·같은 글은 취소 후 다시 눌러도 한 번만, 본인 좋아요는 알리지 않는다');
 select is((select body from pg_temp.notifications_for('post_liked')), '''알림 테스트 일반글'' 게시글을 누군가 좋아해요.', '좋아요한 사람을 밝히지 않는다');

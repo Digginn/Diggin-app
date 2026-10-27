@@ -291,6 +291,8 @@ test("오래된 캐시로 상세에 재진입해도 마감 상태를 유지하�
   assert.equal(ordinaryPost.hasListeners(), false);
 });
 
+const communitySaveDomain = load("src/screens/diggle/domain/communitySave.ts");
+
 function nodes(node, type) {
   if (!React.isValidElement(node)) return [];
   return [
@@ -415,6 +417,7 @@ function screenMocks({
     "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
     "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
     "./domain/comments": load("src/screens/diggle/domain/comments.ts"),
+    "./domain/communitySave": communitySaveDomain,
     "./hooks/useCommentActions": {
       useCommentActions: () => ({
         changes: {},
@@ -540,6 +543,11 @@ test("상품 저장은 게시글·Snapshot 위치로 이동하고 취소 후 해
   const restored = nodes(render(), "PostItemInfoSheet")[0];
   assert.equal(restored.props.visible, true);
   assert.equal(restored.props.name, post.items[0].name);
+  // 저장에 성공하고 돌아오면 정보 시트를 다시 열지 않는다.
+  restored.props.onSaveToAll();
+  communitySaveDomain.markCommunityItemSaved(post.items[0].id);
+  onFocus();
+  assert.equal(nodes(render(), "PostItemInfoSheet")[0].props.visible, false);
 });
 
 test("회원 피드는 all 탭에서도 투표글 유형으로 라우팅하고 마지막 페이지는 더 요청하지 않는다", () => {
@@ -702,9 +710,10 @@ test("댓글 첫 조회와 추가 조회 실패는 본문·기존 댓글을 유�
     assert.equal(nodes(tree, "Comment").length, nextPage ? 1 : 0);
     assert.equal(
       nodes(tree, "Text").some(
-        (text) => text.props.children === "댓글을 불러오지 못했습니다. 다시 시도해 주세요.",
+        (text) => text.props.children === "댓글을 불러올 수 없습니다. 다시 시도해 주세요.",
       ),
       true,
+      "MSG-COMMENT-007",
     );
     assert.deepEqual(state.toasts, []);
     nodes(tree, "Button")
@@ -742,6 +751,26 @@ test("피드·상세 첫 조회 실패는 화면 안내만 표시하고 기존 �
         errorStates[0].props.message,
         "게시글을 불러오지 못했습니다. 다시 시도해 주세요.",
       );
+  }
+});
+
+test("댓글 영역이 다시 시도로 알리는 실패는 게시글 재조회 실패 토스트로 또 알리지 않는다", async () => {
+  const error = { message: "Network request failed" };
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  for (const [commentsResult, toastCount] of [
+    [{ isError: true, error }, 0],
+    [{ isFetching: true }, 0],
+    [{}, 1],
+  ]) {
+    const detail = screenMocks({
+      post,
+      postResult: { isError: true, error, errorUpdatedAt: 1 },
+      commentsResult,
+    });
+    detail.mocks.react.useEffect = (effect) => effect();
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", detail.mocks);
+    PostDetailScreen({});
+    assert.equal(detail.toasts.length, toastCount);
   }
 });
 
@@ -799,4 +828,86 @@ test("삭제 실패는 원래 상세에 남고 잘못된 글 종류를 교정해
   const corrected = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks).PostDetailScreen;
   corrected({ type: "all" });
   assert.equal(state.destination().params.returnTo, "my-posts");
+});
+
+test("투표글 미리보기 이미지가 없거나 불러오지 못하면 상품 카드와 같은 비율의 로고 Placeholder를 보여 준다", () => {
+  const state = [];
+  let cursor = 0;
+  const { Post } = load("src/components/Post.tsx", {
+    "react": {
+      ...React,
+      useState: (initial) => {
+        const index = cursor++;
+        if (!(index in state)) state[index] = initial;
+        return [state[index], (value) => (state[index] = value)];
+      },
+    },
+    "react-native": { Pressable: "Pressable", Text: "Text", View: "View" },
+    "expo-image": { Image: "Image" },
+    "nativewind": { cssInterop: (component) => component },
+    "@/components/FallbackImg": { FallbackImg: "FallbackImg" },
+    "@/components/ProductImg": { ProductImg: "ProductImg" },
+    "@/theme": { colors: { gray: {}, semantic: {} } },
+  });
+  const props = {
+    type: "vote",
+    body: "본문",
+    timeLabel: "방금 전",
+    authorLabel: "익명",
+    commentCount: 0,
+  };
+  const thumb = (imageUrl) => {
+    const element = Post({ ...props, items: [{ id: "1", imageUrl }] });
+    const found = [];
+    const walk = (node) => {
+      if (!React.isValidElement(node)) return;
+      if (typeof node.type === "function") found.push(node);
+      React.Children.toArray(node.props.children).forEach(walk);
+    };
+    walk(element);
+    cursor = 0;
+    return found[0].type(found[0].props);
+  };
+  const placeholder = (tree) => nodes(tree, "FallbackImg").map((node) => node.props.size);
+  assert.deepEqual(placeholder(thumb(null)), ["vote"]);
+  const loaded = thumb("https://shop.test/a.jpg");
+  assert.deepEqual(placeholder(loaded), []);
+  nodes(loaded, "Image")[0].props.onError();
+  assert.deepEqual(placeholder(thumb("https://shop.test/a.jpg")), ["vote"], "불러오기 실패");
+});
+
+test("투표글 피드는 일반글과 같은 하단 여백을 쓰고 높이를 고정하지 않아 구분선 간격이 같다(BUG-028·091)", () => {
+  const { Post } = load("src/components/Post.tsx", {
+    "react": { ...React, useState: (initial) => [initial, () => {}] },
+    "react-native": { Pressable: "Pressable", Text: "Text", View: "View" },
+    "expo-image": { Image: "Image" },
+    "nativewind": { cssInterop: (component) => component },
+    "@/components/FallbackImg": { FallbackImg: "FallbackImg" },
+    "@/components/ProductImg": { ProductImg: "ProductImg" },
+    "@/theme": { colors: { gray: {}, semantic: {} } },
+  });
+  const props = {
+    body: "본문",
+    timeLabel: "방금 전",
+    authorLabel: "익명",
+    commentCount: 0,
+    items: [],
+  };
+  const vote = Post({ ...props, type: "vote" });
+  const all = Post({ ...props, type: "all" });
+  const bottom = (tree) => tree.props.className.match(/\bpb-\S+/)[0];
+  assert.equal(bottom(vote), bottom(all));
+  assert.doesNotMatch(
+    React.Children.toArray(vote.props.children)[0].props.className,
+    /h-\[120px\]/,
+  );
+});
+
+test("본인 글 상세에서는 좋아요를 누를 수 없다(BUG-074)", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({ post: { ...post, isMine: true } });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const row = nodes(PostDetailScreen({}), "LikeCommentRow")[0];
+  assert.equal(row.props.onPressLike, undefined);
+  assert.equal(row.props.hasLike, true, "좋아요 수는 계속 보여 준다");
 });

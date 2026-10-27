@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 
 import LogoSymbol from "@/assets/images/logo-symbol.svg";
 
-type FallbackImgSize = "card" | "detail" | "field";
+type FallbackImgSize = "card" | "detail" | "field" | "vote";
 
 type FallbackImgProps = {
   size?: FallbackImgSize;
@@ -15,6 +15,8 @@ const SYMBOL_SIZE: Record<FallbackImgSize, number> = {
   detail: 86,
   // 저장 시트의 92 박스 안에 들어가는 크기
   field: 34,
+  // 투표 미리보기 80 칸. 시안이 없어 상품 카드(106 칸에 40)와 같은 비율로 둔다.
+  vote: 30,
 };
 
 export function FallbackImg({ size = "card", className }: FallbackImgProps) {
