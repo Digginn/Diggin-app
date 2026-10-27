@@ -1,4 +1,4 @@
-/* global __dirname, setImmediate */
+/* global __dirname */
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
@@ -100,6 +100,14 @@ test("입력창은 50자 초과를 반영하지 않고 테두리·카운터를 �
   assert.doesNotMatch(render().props.className, /border-semantic-error/);
   nodes(render(), "TextInput")[0].props.onChangeText("👍🏽".repeat(70));
   assert.equal(value, "👍🏽".repeat(50));
+  // BUG-094 5자 미만은 아래 안내만 띄우고, 카운터는 n/50자·기본 색을 유지한다.
+  overflow = false;
+  value = "가나";
+  const short = render();
+  assert.doesNotMatch(short.props.className, /border-semantic-error/);
+  const counter = nodes(short, "Text")[0];
+  assert.doesNotMatch(counter.props.className, /text-semantic-error/);
+  assert.equal(counter.props.children.join(""), "2/50자");
 });
 
 test("등록 API는 본문·상품 ID·재시도 키만 전달하고 상품 정보는 클라이언트에서 보내지 않는다", async () => {
@@ -335,6 +343,28 @@ test("등록 성공 시 서버 목록을 갱신하고 투표 탭으로 복귀한
   assert.equal(ui.destination().params.tab, "vote");
 });
 
+test("등록 성공 후 화면 이동이 끝나기 전에는 첨부 초안을 비우지 않는다", async () => {
+  for (const isVote of [false, true]) {
+    const ui = editor({ isVote });
+    ui.render();
+    const cleanups = ui.runEffects().filter((cleanup) => typeof cleanup === "function");
+    ui.input("등록할 정상 본문");
+    ui.submit();
+    await settle();
+    const tree = ui.render();
+    assert.equal(nodes(tree, "CommunityBodyField")[0].props.value, "등록할 정상 본문");
+    assert.equal(nodes(tree, "ProductAttachGrid")[0].props.items.length, 1);
+    assert.equal(React.Children.toArray(tree.props.children)[0].props.right.props.disabled, true);
+    ui.submit();
+    await settle();
+    assert.equal(ui.calls.length, 1, "복귀 중 등록을 다시 눌러도 중복 저장하지 않는다");
+    ui.runEffects();
+    assert.equal(ui.destination().pathname, "/(tabs)/diggle");
+    cleanups.forEach((cleanup) => cleanup());
+    assert.equal(nodes(ui.render(), "ProductAttachGrid")[0].props.items.length, 0);
+  }
+});
+
 test("작성 이탈 취소는 초안을 유지하고 나가기는 초안을 폐기해 DIGGLE로 복귀한다", () => {
   const ui = editor();
   ui.input("작성하는 본문");
@@ -351,4 +381,21 @@ test("작성 이탈 취소는 초안을 유지하고 나가기는 초안을 폐�
   ui.runEffects();
   assert.equal(nodes(tree, "ProductAttachGrid")[0].props.items.length, 0);
   assert.equal(ui.destination().pathname, "/(tabs)/diggle");
+});
+
+test("본문 입력 안내는 카운터로만 글자 수를 보여 주고 이모지 언급을 하지 않는다(BUG-093)", () => {
+  const ui = editor({ agreed: true });
+  ui.input("가나");
+  const helper = nodes(ui.render(), "HelperText")[0];
+  assert.equal(helper.props.message, "공백을 제외하고 5자 이상 입력해 주세요.");
+  const { CommunityBodyField } = load("src/screens/diggle/components/CommunityBodyField.tsx", {
+    "react": { useState: () => [false, () => {}] },
+    "react-native": { View: "View", Text: "Text", TextInput: "TextInput" },
+    "@/theme": { colors: { gray: { 400: "gray" } } },
+    "../domain/postBody": body,
+  });
+  for (const isVote of [false, true]) {
+    const field = CommunityBodyField({ value: "", onChangeText: () => {}, isVote });
+    assert.doesNotMatch(nodes(field, "TextInput")[0].props.placeholder, /5~50자/);
+  }
 });

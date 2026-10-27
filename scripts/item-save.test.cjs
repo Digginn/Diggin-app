@@ -54,6 +54,65 @@ test("아이템 저장은 통신 오류만 연결 확인 토스트로 구분한�
   assert.equal(page.props.errorMessage, undefined);
 });
 
+test("실제 SDK의 응답 없는 저장 실패는 오류 문구·선택 폴더 수와 무관하게 연결 확인으로 안내한다", async () => {
+  const { createClient } = require("@supabase/supabase-js");
+  const { TOAST_MESSAGES } = load("../src/constants/messages.ts", {});
+  const { itemSaveErrorMessage } = load("../src/screens/save/domain/itemSaveError.ts", {
+    "@/constants/messages": { TOAST_MESSAGES },
+  });
+  const values = {
+    name: "테스트 상품",
+    brand: "브랜드",
+    price: "1000",
+    sourceUrl: "https://example.com/products/1",
+    thumbnailUrl: null,
+    wishLevel: null,
+  };
+  for (const message of ["Network request failed", "Load failed", "fetch failed"]) {
+    for (const count of [0, 1, 50]) {
+      const supabase = createClient("https://offline-test.supabase.co", "public-test-key", {
+        accessToken: async () => "test-token",
+        db: { retry: false },
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        global: {
+          fetch: async (_url, options) => {
+            assert.equal(JSON.parse(options.body).folder_ids.length, count);
+            throw new TypeError(message);
+          },
+        },
+      });
+      const { saveProduct } = load("../src/api/products.ts", { "@/lib/supabase": { supabase } });
+      await assert.rejects(
+        saveProduct(
+          values,
+          Array.from({ length: count }, (_, i) => String(i + 1)),
+        ),
+        (error) => {
+          assert.equal(itemSaveErrorMessage(error), TOAST_MESSAGES.SYS_001, `${message}, ${count}`);
+          return true;
+        },
+      );
+    }
+  }
+  const supabase = createClient("https://offline-test.supabase.co", "public-test-key", {
+    accessToken: async () => "test-token",
+    db: { retry: false },
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: {
+      fetch: async () =>
+        new Response(JSON.stringify({ code: "42501", message: "permission denied" }), {
+          status: 403,
+        }),
+    },
+  });
+  const { saveProduct } = load("../src/api/products.ts", { "@/lib/supabase": { supabase } });
+  await assert.rejects(saveProduct(values), (error) => {
+    assert.equal(error.code, "42501");
+    assert.equal(itemSaveErrorMessage(error), TOAST_MESSAGES.SAVE_012);
+    return true;
+  });
+});
+
 function load(file, mocks) {
   const module = { exports: {} };
   runInNewContext(
@@ -216,6 +275,13 @@ test("아이템명이 비면 바로 오류를 띄우고 저장을 막으며, 가
   assert.equal(tree[0].props.isCloseConfirmed, true);
   assert.equal(button(tree, "취소").props.isDisabled, true);
   assert.equal(button(tree, "저장하기").props.isDisabled, true);
+
+  // BUG-024 공유 시트는 클립보드 저장(SAVE-10)처럼 폴더 선택하기 버튼 하나만 둔다.
+  const shared = render({ submitLabel: "폴더 선택하기" }).filter((node) => node.type === "Button");
+  assert.deepEqual(
+    shared.map((node) => node.props.children),
+    ["폴더 선택하기"],
+  );
 
   nameField().props.onChangeText("   ");
   assert.equal(nameField().props.isError, true, "공백만 있는 아이템명은 빈 값이다");

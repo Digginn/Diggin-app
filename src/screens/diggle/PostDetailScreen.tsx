@@ -41,6 +41,7 @@ import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
 import { VoteBlock } from "./components/VoteBlock";
 import { mergeComments } from "./domain/comments";
+import { takeCommunityItemSaved } from "./domain/communitySave";
 import { useCommentActions } from "./hooks/useCommentActions";
 import { useCommunityLike } from "./hooks/useCommunityLike";
 import { useCommunityVote } from "./hooks/useCommunityVote";
@@ -123,7 +124,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   useFocusEffect(
     useCallback(() => {
       if (returnItem.current) {
-        setInfoItem(returnItem.current);
+        if (!takeCommunityItemSaved(returnItem.current.id)) setInfoItem(returnItem.current);
         returnItem.current = null;
       }
     }, []),
@@ -200,9 +201,14 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }
 
+  // 댓글 조회가 끝난 뒤 실패마다 한 번만 정한다. 댓글 영역이 다시 시도로 알리면 토스트는 띄우지 않는다(CMT-006).
+  const toastedPostError = useRef<number | null>(null);
   useEffect(() => {
-    if (result.error && post) showToast(communityErrorMessage(result.error));
-  }, [result.error, post, showToast]);
+    if (!result.error || !post || comments.isFetching) return;
+    if (toastedPostError.current === result.errorUpdatedAt) return;
+    toastedPostError.current = result.errorUpdatedAt;
+    if (!comments.isError) showToast(communityErrorMessage(result.error));
+  }, [result.error, result.errorUpdatedAt, post, comments.isFetching, comments.isError, showToast]);
 
   useEffect(() => {
     if (!isRestoring && session && post && isWrongRoute) {
@@ -339,8 +345,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                 commentCount={post.commentCount ?? 0}
                 isLiked={like.isLiked}
                 hasLike={post.type === "post"}
+                // 본인 글은 좋아요를 누를 수 없다(BUG-074). 개수는 계속 보여 준다.
                 onPressLike={
-                  post.type === "post" && !like.isPending ? () => void like.toggle() : undefined
+                  post.type === "post" && !post.isMine && !like.isPending
+                    ? () => void like.toggle()
+                    : undefined
                 }
               />
               <View className="h-3 bg-gray-100" />
@@ -394,19 +403,21 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               {comments.isError && (
                 <View className="items-center gap-3 px-margin py-4">
                   <Text className="text-center text-gray-500 font-b3">
-                    {communityErrorMessage(comments.error, "댓글")}
+                    댓글을 불러올 수 없습니다. 다시 시도해 주세요.
                   </Text>
-                  <Button
-                    accessibilityLabel="댓글 다시 불러오기"
-                    isDisabled={comments.isFetching}
-                    onPress={() => {
-                      if (comments.isFetchNextPageError)
-                        void comments.fetchNextPage({ cancelRefetch: false });
-                      else void comments.refetch();
-                    }}
-                  >
-                    다시 시도
-                  </Button>
+                  <View className="w-[156px]">
+                    <Button
+                      accessibilityLabel="댓글 다시 불러오기"
+                      isDisabled={comments.isFetching}
+                      onPress={() => {
+                        if (comments.isFetchNextPageError)
+                          void comments.fetchNextPage({ cancelRefetch: false });
+                        else void comments.refetch();
+                      }}
+                    >
+                      다시 시도
+                    </Button>
+                  </View>
                 </View>
               )}
             </>

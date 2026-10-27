@@ -229,7 +229,7 @@ import_failures
 - 모든 댓글·좋아요 쓰기는 `private.lock_community_post_for_write()`로 인증·제재를 확인하고 부모 글 행을 잠근 뒤 변경한다. 글 삭제도 같은 행을 먼저 잠그므로 삭제 후 댓글이나 좋아요가 추가되는 경합을 막는다. 삭제·숨김·차단/신고로 접근할 수 없는 글은 쓰기도 허용하지 않는다. 댓글 수정·삭제는 글쓴이에게도 타인 댓글 권한을 주지 않는다.
 - `post_anon_numbers`는 최초 댓글 때만 할당하고 같은 글에서 유지한다. 부모 글 잠금 안에서 `next_anon_number`를 올리므로 동시 참여에도 중복 번호가 없다. 글쓴이는 번호를 소비하지 않는다. 본인·글쓴이·탈퇴 라벨과 본문 비공개는 조회 계약을 따른다.
 - `comments.creation_request_id`와 `(author_id, creation_request_id)` unique로 응답 유실·동시 재시도에 같은 댓글을 반환한다. 다른 게시글로 키를 재사용하면 거부한다. 앱은 성공한 댓글을 서버 페이지와 중복 없이 합치며 서버 커서를 바꾸지 않는다. 등록 후 새 댓글까지 남은 페이지를 읽고 이동하고, 실패한 조회는 댓글 영역에서 재시도한다.
-- `set_community_like(target_post_id, is_liked)`는 일반글에만 적용하고 `{is_liked, like_count}`를 반환한다. 계정당 한 행이며 원하는 상태를 지정하므로 재시도해도 토글되지 않는다. 댓글 작성과 독립적으로 실행하며 앱의 낙관적 아이콘·개수는 실패 시 원상 복구한다.
+- `set_community_like(target_post_id, is_liked)`는 일반글에만 적용하고 `{is_liked, like_count}`를 반환한다. 본인 글 좋아요 등록은 `own_post_like`(42501)로 거부하고, 취소는 예전에 눌러 둔 좋아요를 지울 수 있게 허용한다(BUG-074). 계정당 한 행이며 원하는 상태를 지정하므로 재시도해도 토글되지 않는다. 댓글 작성과 독립적으로 실행하며 앱의 낙관적 아이콘·개수는 실패 시 원상 복구한다.
 - 등록·수정·삭제·좋아요 성공은 `community` 캐시를 갱신한다. 후속 내 활동도 같은 키 아래에 두어 함께 갱신한다. 계정이 바뀌거나 화면을 떠난 후 도착한 응답으로 새 계정의 초안·캐시를 변경하지 않는다.
 - 알림 연동 계약: 댓글 등록 성공 트랜잭션에서 `comment:{comment_id}`를 이벤트 키로 사용하고 본인 댓글은 알리지 않는다. 수정·삭제·재시도는 새 등록 이벤트가 아니다. 좋아요 알림은 `(post_id, actor_id)`를 `like_notification_log`에 최초 한 번 기록하는 계약이며 취소·재등록으로 다시 발송하지 않는다. 수신자는 서버가 글에서 결정하고 UUID를 앱에 반환하지 않는다. 알림 테이블·실제 이벤트 저장·Push 발송은 알림 작업에서 이 RPC에 연결한다.
 - 로컬 검증: 전체 pgTAP, DB lint·Advisors와 `scripts/check_community_concurrency.py --container supabase_db_diggin-97`로 실제 동시 요청을 확인한다. 테스트 데이터만 사용하는 임시 DB에서 실행한다.
@@ -369,9 +369,16 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
    - profiles 삭제 전 트리거(`profiles_clear_withdrawn_comments`)가 같은 트랜잭션에서 사용자 글을 먼저 지우고(그 글의 댓글도 함께 지워짐), 남은 사용자 댓글 content를 null로 바꾼다. 글을 FK 연쇄에 맡기면 본인 글에 단 본인 댓글이 먼저 수정된 뒤 글이 지워져 comments_post_id_fkey 위반으로 탈퇴가 실패했다.
 3. 계정이 지워진 뒤 설문을 private.withdrawal_surveys에 저장한다(user_id 없음). 재시도로 중복되지 않게 마지막에 두고, 실패해도 탈퇴는 성공으로 본다.
 
+## 8-1. 계정별 첫 진입 안내 (#152)
+
+- `private.first_visit_guides`는 사용자별 ALL(`all`)·FOLDER(`folder`)·상품 상세(`item-detail`) 안내를 닫은 시각을 각각 저장한다. `(user_id, guide_kind)` unique로 중복 기록을 막는다.
+- `get_first_visit_guides(target_user_id)`와 `dismiss_first_visit_guide(target_user_id, target_guide_kind)` RPC만 허용한다. 실제 세션·계정 상태와 대상 UUID가 본인인지 검사하며, 앱의 테이블 직접 접근은 차단한다.
+- 같은 계정은 재로그인·재설치·다른 기기에서도 닫은 안내를 반복하지 않는다. 기존 기기 저장 기록은 계정 소유자를 구분할 수 없어 승계하지 않는다. 따라서 전환 후 서버 기록이 없는 기존 사용자도 각 안내를 한 번 다시 본다. 탈퇴 시 프로필 FK cascade로 기록도 삭제되므로 새 UUID로 재가입하면 다시 안내한다.
+- 비회원·인증 복원 중에는 표시하지 않는다. 조회 실패 시에는 안내를 표시하고, 닫기 저장 실패 시 현재 앱 실행 중에만 재노출을 막는다. 다음 실행까지의 중복 방지는 서버 저장 성공을 전제로 한다.
+
 ## 9. DB에 두지 않는 것
 
-최근 검색어(기기 저장), 온보딩 완료 여부, 로그인 전 공유 임시 데이터, 툴팁·첫 진입 안내 노출 여부, Analytics, 추천.
+최근 검색어(기기 저장), 온보딩 완료 여부, 로그인 전 공유 임시 데이터, 일반 툴팁 노출 여부, Analytics, 추천. ALL·FOLDER·상품 상세 첫 진입 안내는 위 계정별 서버 기록으로 관리한다.
 
 ## 10. 확인 필요 (PM·팀 결정 대기)
 

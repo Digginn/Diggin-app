@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
 import { Linking, Platform } from "react-native";
 
+import { TOAST_MESSAGES } from "@/constants/messages";
 import { useDetectedLink } from "@/hooks/useDetectedLink";
 import { usePasteGuide } from "@/hooks/usePasteGuide";
+import { useToast } from "@/hooks/useToast";
 
 import { FolderModal } from "./modal";
 import { PasteGuideModal } from "./PasteGuideModal";
@@ -16,22 +18,29 @@ type LinkDetectModalProps = {
 
 // 탭 화면 어디서든 떠야 해서 탭 레이아웃에서 한 번만 렌더함
 export function LinkDetectModal({ onLoad, isBusy = false }: LinkDetectModalProps) {
-  const { isDetected, readLink, handle, hasReadClipboard } = useDetectedLink();
+  const { isDetected, readLink, handle, close, needsPasteGuide } = useDetectedLink();
+  const showToast = useToast();
   // 닫히는 애니메이션이 끝나면 넘길 링크. iOS 는 닫히는 중에 다른 모달을 띄우면 무시한다.
   const [pendingLink, setPendingLink] = useState<string | null>(null);
   const isReadingRef = useRef(false);
   const pasteGuide = usePasteGuide(
-    hasReadClipboard && !isDetected && pendingLink === null && !isBusy,
+    needsPasteGuide && !isDetected && pendingLink === null && !isBusy,
   );
 
   async function load() {
     if (isReadingRef.current) return;
     isReadingRef.current = true;
     try {
-      // iOS는 여기서 클립보드를 읽어 붙여넣기 허용 팝업이 뜬다(SAVE-017).
-      const link = await readLink();
+      // iOS는 여기서 클립보드를 읽어 '묻기'면 붙여넣기 팝업이 뜬다(SAVE-017).
+      const result = await readLink();
+      if (result.link === null) {
+        close();
+        // https가 아니면 불러올 수 없다고 알린다. 거부는 별도 안내 없이 닫는다.
+        if (result.reason === "not_https") showToast(TOAST_MESSAGES.LINK_HTTPS_REQUIRED, "error");
+        return;
+      }
+      const link = result.link;
       handle(link);
-      if (!link) return;
       setPendingLink(link);
       // 안드로이드는 이어서 띄워도 가려지지 않아 기다릴 필요가 없다.
       if (Platform.OS !== "ios") onLoad(link);

@@ -57,6 +57,8 @@ select is(public.create_comment(current_setting('test.post')::bigint,'글쓴이 
 select is(public.create_comment(current_setting('test.post')::bigint,'글쓴이 세 번째 댓글',gen_random_uuid())->>'anon_number',null,'글쓴이에게 번호 없음');
 select throws_ok($$select public.update_comment(current_setting('test.comment')::bigint,'타인 수정')$$,'42501','comment_not_found','글쓴이도 타인 댓글 수정 불가');
 select throws_ok($$select public.delete_comment(current_setting('test.comment')::bigint)$$,'42501','comment_not_found','글쓴이도 타인 댓글 삭제 불가');
+select throws_ok($$select public.set_community_like(current_setting('test.post')::bigint,true)$$,'42501','own_post_like','본인 글 좋아요 불가');
+select is(public.set_community_like(current_setting('test.post')::bigint,false)->>'like_count','1','본인 글 좋아요 취소 요청은 허용');
 reset role;
 set local request.jwt.claims = '{"sub":"97000000-0000-0000-0000-000000000003","role":"authenticated"}';
 set local role authenticated;

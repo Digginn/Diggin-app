@@ -82,7 +82,12 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
   const maxAttachCount = isVote ? 1 : MAX_ATTACH_COUNT;
   const count = postBodyLength(body);
   const canSubmit =
-    canEdit && count >= 5 && count <= 50 && items.length > 0 && items.length <= maxAttachCount;
+    !isLeaving &&
+    canEdit &&
+    count >= 5 &&
+    count <= 50 &&
+    items.length > 0 &&
+    items.length <= maxAttachCount;
   const hasDraft = body.length > 0 || items.length > 0;
 
   useEffect(() => {
@@ -148,14 +153,13 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
       await createCommunityPost({ ...input, requestId: request.current.id });
       if (!mounted.current) return;
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
-      reset();
       setLeaving(true);
       showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글을 등록했습니다.");
     } catch (error) {
+      busy.current = false;
       if (mounted.current)
         showToast(communityWriteError(error), restrictionMessage(error) ? "notice" : "error");
     } finally {
-      busy.current = false;
       if (mounted.current) setSubmitting(false);
     }
   }
@@ -184,10 +188,7 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
           <View className="gap-2.5">
             <CommunityBodyField isVote={isVote} value={body} onChangeText={setBody} />
             {body.length > 0 && count < 5 && (
-              <HelperText
-                status="error"
-                message="공백을 제외하고 5자 이상 입력해 주세요. (이모지 포함)"
-              />
+              <HelperText status="error" message="공백을 제외하고 5자 이상 입력해 주세요." />
             )}
           </View>
           <View className="gap-3">

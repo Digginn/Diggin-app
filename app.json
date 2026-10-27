@@ -9,7 +9,7 @@
     "scheme": "diggin",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "buildNumber": "6",
+      "buildNumber": "7",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "ITSAppUsesNonExemptEncryption": false
@@ -18,12 +18,13 @@
     },
     "android": {
       "package": "com.diggin.app",
-      "versionCode": 4,
+      "versionCode": 5,
       "icon": "./assets/images/icon-app-android.png",
       "adaptiveIcon": {
         "backgroundColor": "#1E1E1E",
-        "foregroundImage": "./assets/images/icon-app-android.png",
-        "monochromeImage": "./assets/images/icon-app-monochrome.png"
+        "backgroundImage": "./assets/images/icon-app-adaptive-background.png",
+        "foregroundImage": "./assets/images/icon-app-adaptive-foreground.png",
+        "monochromeImage": "./assets/images/icon-app-adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false
     },

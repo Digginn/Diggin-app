@@ -27,7 +27,8 @@ const PAGES = [
   },
   {
     mainCopy: "기존에 모아둔 아이템,\n그대로 옮겨 오세요.",
-    subCopy: "로그인 후 MY탭에서 위시리스트 CSV 파일로\n저장해둔 아이템을 간편하게 옮겨올 수 있어요.",
+    subCopy:
+      "로그인 후 MY탭에서 위시리스트 CSV 파일로\n저장해둔 아이템을 간편하게 옮겨올 수 있어요.",
   },
 ] as const;
 
@@ -56,10 +57,11 @@ export function OnboardingScreen() {
           accessibilityLabel="서비스 소개"
           onPageChange={setActiveIndex}
           autoAdvanceDelays={AUTO_ADVANCE_DELAYS_MS}
-          media={<OnboardingIllustration page={activeIndex} />}
         >
-          {PAGES.map((page) => (
-            <CardCarousel key={page.mainCopy} mainCopy={page.mainCopy} subCopy={page.subCopy} />
+          {PAGES.map((page, index) => (
+            <CardCarousel key={page.mainCopy} mainCopy={page.mainCopy} subCopy={page.subCopy}>
+              <OnboardingIllustration page={index} />
+            </CardCarousel>
           ))}
         </SwipeCarousel>
         {activeIndex === PAGES.length - 1 && (
