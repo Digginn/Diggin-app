@@ -35,17 +35,15 @@ function saveHandledChangeCount(changeCount: number) {
   void AsyncStorage.setItem(HANDLED_CHANGE_COUNT_KEY, String(changeCount)).catch(() => {});
 }
 
-/** 안내에서 설정으로 이동하면 돌아왔을 때 같은 복사를 다시 읽는다. 허용으로 바꿨으면 바로 불러온다. */
-export function retryAfterSettings() {
-  deniedChangeCount = null;
-}
-
 export function markLinkHandled(url: string) {
   handledLinks.add(url);
   if (DigginPasteboard) saveHandledChangeCount(DigginPasteboard.getChangeCount());
 }
 
-type DetectedLink = { url: string; changeCount: number | null };
+/** url이 null이면 iOS에서 아직 읽지 않은 링크다. 불러오기를 누를 때 읽는다. */
+type DetectedLink = { url: string | null; changeCount: number | null };
+/** 불러오기 결과. 링크가 없으면 거부했는지, https가 아닌지 알려 준다. */
+export type ReadLinkResult = { link: string } | { link: null; reason: "denied" | "not_https" };
 
 export function useDetectedLink() {
   const [detected, setDetected] = useState<DetectedLink | null>(null);
@@ -60,36 +58,14 @@ export function useDetectedLink() {
     if (isLinkDetectionPaused() || isNativeModalBusy()) return;
     checkingRef.current = true;
     try {
-      // SAVE-017 iOS는 진입·복귀 때 읽어 https일 때만 감지 모달을 띄운다. '묻기'면 읽는 순간 팝업이 먼저 뜬다.
+      // SAVE-017 iOS는 진입·복귀 때 읽지 않고 링크 유무만 봐 감지 모달을 먼저 띄운다. 읽는 순간 '묻기' 팝업이 뜬다.
       if (DigginPasteboard) {
         await loadHandledChangeCount();
         const changeCount = DigginPasteboard.getChangeCount();
         if (changeCount === handledChangeCount || changeCount === deniedChangeCount) return;
-        // 웹 링크가 없는 복사는 읽지 않아 팝업도 띄우지 않는다.
         if (!(await DigginPasteboard.hasWebUrlAsync())) return;
         if (isLinkDetectionPaused() || isNativeModalBusy()) return;
-        setNeedsPasteGuide(false);
-        const startedAt = Date.now();
-        // 메인 스레드에서 읽어야 '묻기' 팝업에 대한 사용자의 답을 기다린다. 모듈이 없는 빌드는 expo-clipboard로 읽는다.
-        // URL 형식으로만 복사되면 문자열이 비어 있어 URL로 한 번 더 읽는다.
-        const text = DigginPasteboard.readLinkTextAsync
-          ? await DigginPasteboard.readLinkTextAsync()
-          : (await Clipboard.getStringAsync()) || (await Clipboard.getUrlAsync());
-        if (!text) {
-          // 거부한 복사는 이번 실행 동안만 다시 묻지 않는다. 앱을 다시 켜면 다시 묻는다.
-          deniedChangeCount = changeCount;
-          setNeedsPasteGuide(true);
-          return;
-        }
-        const url = findItemLink(text);
-        // https가 아니면 모달을 띄우지 않고, 같은 복사로 다시 읽지 않는다(BUG-016).
-        if (!url || handledLinks.has(url)) {
-          saveHandledChangeCount(changeCount);
-          return;
-        }
-        // shortcut: 설정값을 읽는 API가 없어 읽기 시간으로 '묻기' 팝업 여부를 가린다. iOS가 설정 조회 API를 주면 그걸로 바꾼다.
-        if (Date.now() - startedAt >= PASTE_PROMPT_MIN_MS) setNeedsPasteGuide(true);
-        setDetected({ url, changeCount });
+        setDetected({ url: null, changeCount });
         return;
       }
 
@@ -113,8 +89,38 @@ export function useDetectedLink() {
     }
   }, []);
 
-  /** 감지한 링크를 돌려준다. 진입 때 이미 읽어 두어 여기서는 다시 읽지 않는다. */
-  const readLink = useCallback(async () => detected?.url ?? null, [detected]);
+  /** 감지한 링크를 돌려준다. iOS는 여기서 클립보드를 읽어 '묻기'면 붙여넣기 팝업이 뜬다. */
+  const readLink = useCallback(async (): Promise<ReadLinkResult> => {
+    if (!detected) return { link: null, reason: "denied" };
+    if (detected.url) return { link: detected.url };
+    const { changeCount } = detected;
+    setNeedsPasteGuide(false);
+    const startedAt = Date.now();
+    let text: string | null = null;
+    try {
+      // 메인 스레드에서 읽어야 '묻기' 팝업에 대한 사용자의 답을 기다린다. 모듈이 없는 빌드는 expo-clipboard로 읽는다.
+      // URL 형식으로만 복사되면 문자열이 비어 있어 URL로 한 번 더 읽는다.
+      text = DigginPasteboard?.readLinkTextAsync
+        ? await DigginPasteboard.readLinkTextAsync()
+        : (await Clipboard.getStringAsync()) || (await Clipboard.getUrlAsync());
+    } catch {
+      text = null;
+    }
+    if (!text) {
+      // 거부한 복사는 이번 실행 동안만 다시 묻지 않는다. 앱을 다시 켜면 다시 묻는다.
+      if (changeCount != null) deniedChangeCount = changeCount;
+      return { link: null, reason: "denied" };
+    }
+    const link = findItemLink(text);
+    if (!link) {
+      // https가 아니면 불러오지 않는다(BUG-016). 같은 복사로 다시 묻지 않는다.
+      if (changeCount != null) saveHandledChangeCount(changeCount);
+      return { link: null, reason: "not_https" };
+    }
+    // shortcut: 설정값을 읽는 API가 없어 읽기 시간으로 '묻기' 팝업 여부를 가린다. iOS가 설정 조회 API를 주면 그걸로 바꾼다.
+    if (Date.now() - startedAt >= PASTE_PROMPT_MIN_MS) setNeedsPasteGuide(true);
+    return { link };
+  }, [detected]);
 
   const handle = useCallback(
     (url: string | null) => {
@@ -145,5 +151,8 @@ export function useDetectedLink() {
     return () => subscription.remove();
   }, [check]);
 
-  return { isDetected: detected !== null, readLink, handle, needsPasteGuide };
+  // 링크를 못 읽었을 때 닫는다. 기록은 readLink가 사유에 맞게 남긴다.
+  const close = useCallback(() => setDetected(null), []);
+
+  return { isDetected: detected !== null, readLink, handle, close, needsPasteGuide };
 }

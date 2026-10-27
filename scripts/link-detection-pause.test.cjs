@@ -85,7 +85,6 @@ function loadDetectedLink(
     render,
     isDetected: () => state[0] !== null,
     markLinkHandled: detected.markLinkHandled,
-    retryAfterSettings: detected.retryAfterSettings,
     needsPasteGuide: () => state[1],
   };
 }
@@ -158,47 +157,60 @@ function fakePasteboard(value, { delay = 0, hasWebUrl = true } = {}) {
 const pauseNone = () =>
   load("../src/hooks/useLinkDetectionPause.ts", { react: { useEffect: () => {} } });
 
-test("iOS는 진입 시 읽어 https일 때만 감지 모달을 띄우고, 불러오기는 다시 읽지 않는다", async () => {
+test("iOS는 진입 시 읽지 않고 감지 모달을 먼저 띄우고, 불러오기를 누를 때 한 번 읽는다(SAVE-017)", async () => {
   const url = "https://zigzag.kr/catalog/products/5";
   const pasteboard = fakePasteboard(url);
   const linkDetection = loadDetectedLink(pauseNone(), "", { pasteboard });
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), true);
-  assert.equal(pasteboard.reads, 1, "진입 시 한 번 읽는다");
-  assert.equal(await linkDetection.render().readLink(), url);
-  assert.equal(pasteboard.reads, 1, "불러오기에서 팝업이 다시 뜨지 않는다");
+  assert.equal(pasteboard.reads, 0, "모달보다 iOS 팝업이 먼저 뜨지 않는다");
+  assert.deepEqual({ ...(await linkDetection.render().readLink()) }, { link: url });
+  assert.equal(pasteboard.reads, 1);
 });
 
-test("iOS에서 http 링크는 감지 모달을 띄우지 않고 같은 복사로 다시 읽지 않는다(SAVE-017)", async () => {
+test("iOS에서 http 링크는 불러오기 후 안내 토스트 사유를 돌려주고 같은 복사로 다시 묻지 않는다", async () => {
   const pasteboard = fakePasteboard("http://zigzag.kr/catalog/products/6");
   pasteboard.changeCount = 10;
   const linkDetection = loadDetectedLink(pauseNone(), "", { pasteboard });
   await linkDetection.check();
-  assert.equal(linkDetection.isDetected(), false);
-  assert.equal(linkDetection.needsPasteGuide(), false, "안내도 띄우지 않는다");
+  assert.equal(linkDetection.isDetected(), true);
+  assert.deepEqual(
+    { ...(await linkDetection.render().readLink()) },
+    { link: null, reason: "not_https" },
+  );
+  assert.equal(linkDetection.needsPasteGuide(), false);
+  linkDetection.render().close();
   await linkDetection.check();
-  assert.equal(pasteboard.reads, 1, "같은 복사로 팝업을 다시 띄우지 않는다");
+  assert.equal(linkDetection.isDetected(), false, "같은 복사는 다시 묻지 않는다");
 });
 
-test("iOS에서 웹 링크가 없으면 읽지 않아 팝업도 띄우지 않는다", async () => {
+test("iOS에서 웹 링크가 없으면 모달을 띄우지 않는다", async () => {
   const pasteboard = fakePasteboard("메모", { hasWebUrl: false });
   const linkDetection = loadDetectedLink(pauseNone(), "", { pasteboard });
   await linkDetection.check();
-  assert.equal(pasteboard.reads, 0);
   assert.equal(linkDetection.isDetected(), false);
+  assert.equal(pasteboard.reads, 0);
 });
 
-test("iOS에서 붙여넣기를 거부하면 안내를 띄우고, 이번 실행 동안 같은 복사로 다시 묻지 않으며 재실행하면 다시 묻는다", async () => {
+test("iOS 붙여넣기를 거부하면 안내 없이 닫고, 이번 실행 동안 다시 묻지 않으며 재실행하면 다시 묻는다", async () => {
   const url = "https://zigzag.kr/catalog/products/10";
   const pasteboard = fakePasteboard("");
   pasteboard.changeCount = 50;
   const storage = {};
   const linkDetection = loadDetectedLink(pauseNone(), "", { pasteboard, storage });
   await linkDetection.check();
-  assert.equal(linkDetection.isDetected(), false);
-  assert.equal(linkDetection.needsPasteGuide(), true);
+  assert.deepEqual(
+    { ...(await linkDetection.render().readLink()) },
+    { link: null, reason: "denied" },
+  );
+  assert.equal(
+    linkDetection.needsPasteGuide(),
+    false,
+    "거부한 사용자에게만 보이는 안내는 띄우지 않는다",
+  );
+  linkDetection.render().close();
   await linkDetection.check();
-  assert.equal(pasteboard.reads, 1, "같은 실행에서는 다시 묻지 않는다");
+  assert.equal(linkDetection.isDetected(), false, "같은 실행에서는 다시 묻지 않는다");
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(storage, {}, "거부는 기기에 남기지 않는다");
 
@@ -226,7 +238,7 @@ test("iOS에서 답한 복사는 앱을 다시 켜도 묻지 않고, 새로 복�
   assert.equal(relaunched.isDetected(), true);
 });
 
-test("묻기 팝업을 거쳐 읽었으면(오래 걸림) 안내 조건을 켜고, 허용처럼 바로 읽히면 켜지 않는다", async () => {
+test("묻기 팝업을 거쳐 https를 읽었으면(오래 걸림) 저장 후 안내 조건을 켜고, 허용처럼 바로 읽히면 켜지 않는다", async () => {
   const url = "https://zigzag.kr/catalog/products/11";
   for (const [delay, expected] of [
     [0, false],
@@ -236,8 +248,7 @@ test("묻기 팝업을 거쳐 읽었으면(오래 걸림) 안내 조건을 켜�
     pasteboard.changeCount = 60 + delay;
     const linkDetection = loadDetectedLink(pauseNone(), "", { pasteboard });
     await linkDetection.check();
-    await new Promise((resolve) => setTimeout(resolve, delay + 10));
-    assert.equal(linkDetection.isDetected(), true);
+    assert.deepEqual({ ...(await linkDetection.render().readLink()) }, { link: url });
     assert.equal(linkDetection.needsPasteGuide(), expected, `${delay}ms`);
   }
 });
@@ -248,32 +259,17 @@ test("네이티브 읽기가 없는 빌드는 expo-clipboard로 읽고 URL 형�
   pasteboard.changeCount = 20;
   const linkDetection = loadDetectedLink(pauseNone(), "", { pasteboard, clipboardUrl: url });
   await linkDetection.check();
-  assert.equal(linkDetection.isDetected(), true);
-  assert.equal(await linkDetection.render().readLink(), url);
+  assert.deepEqual({ ...(await linkDetection.render().readLink()) }, { link: url });
 });
 
-test("iOS도 다른 모달이 떠 있으면 읽지 않아 팝업을 띄우지 않는다", async () => {
+test("iOS도 다른 모달이 떠 있으면 감지 모달을 띄우지 않는다", async () => {
   let busy = true;
   const pasteboard = fakePasteboard("https://zigzag.kr/catalog/products/13");
   pasteboard.changeCount = 80;
   const linkDetection = loadDetectedLink(pauseNone(), "", { pasteboard, isModalBusy: () => busy });
   await linkDetection.check();
-  assert.equal(pasteboard.reads, 0);
+  assert.equal(linkDetection.isDetected(), false);
   busy = false;
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), true);
-});
-
-test("거부 후 안내에서 설정으로 이동해 허용하고 돌아오면 같은 복사를 다시 읽어 감지 모달을 띄운다", async () => {
-  const url = "https://zigzag.kr/catalog/products/14";
-  const pasteboard = fakePasteboard("");
-  pasteboard.changeCount = 90;
-  const linkDetection = loadDetectedLink(pauseNone(), "", { pasteboard });
-  await linkDetection.check();
-  assert.equal(linkDetection.isDetected(), false);
-  linkDetection.retryAfterSettings();
-  pasteboard.value = url;
-  await linkDetection.check();
-  assert.equal(linkDetection.isDetected(), true, "설정에서 돌아오면 같은 복사로 불러온다");
-  assert.equal(await linkDetection.render().readLink(), url);
 });
