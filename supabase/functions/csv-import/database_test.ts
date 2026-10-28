@@ -27,8 +27,7 @@ Deno.test({
         folderMappings: [],
         products: Array.from({ length: 100 }, (_, i) => ({
           rowNumber: i + 2,
-          // 정상 상품 fixture에는 출시 차단 키워드인 숫자 19가 들어가지 않게 한다.
-          name: `상품 ${String.fromCharCode(0xac00 + i)}`,
+          name: `상품 ${i}`,
           url: `https://csv.test/${i}`,
           brand: null,
           price: "100",
@@ -123,7 +122,7 @@ Deno.test({
           failures: [],
           duplicates: [],
           products: [
-            { ...sample, name: "상품 19", url: "https://csv.test/restricted/age" },
+            { ...sample, name: "상품 19금", url: "https://csv.test/restricted/age" },
             {
               ...sample,
               rowNumber: 3,

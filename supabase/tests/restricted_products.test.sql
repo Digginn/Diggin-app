@@ -6,12 +6,16 @@ select no_plan();
 select ok(private.is_restricted_product('ADULT 상품'), '영문 대소문자 무시');
 select ok(private.is_restricted_product('ＳＥＸ　ＴＯＹ'), '전각·공백 정규화');
 select ok(private.is_restricted_product('운동화', array['청소년 구매불가']), '상품명에 없어도 연령 표시 차단');
-select ok(private.is_restricted_product('미술 도구'), '요청한 술 부분 문자열은 오탐도 차단');
+select ok(not private.is_restricted_product('미술 도구'), '단독 술 제외로 미술 상품 허용');
+select ok(not private.is_restricted_product('1954 모델'), '단독 19 제외로 모델명 허용');
+select ok(not private.is_restricted_product('2019 한정판'), '상품명의 연도 허용');
 select ok(not private.is_restricted_product('운동화', array['신발']), '일반 상품 통과');
 
 insert into auth.users(id, email) values ('00000000-0000-0000-0000-00000000000a', 'restricted@test.dev');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}';
+select lives_ok($$select * from public.save_product('https://shop.test/model', '1954 미술 도구')$$,
+  '이전 오탐 상품도 실제 저장 경로에서 허용');
 select throws_ok($$select * from public.save_product('https://shop.test/adult', '성인 상품')$$,
   '22023', 'restricted_product', '이전 앱의 7인자 기본 호출도 상품명을 검사');
 select throws_ok($$select * from public.save_product('https://shop.test/category', '선물', null, null, null, null, null, array['주류'])$$,

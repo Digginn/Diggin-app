@@ -39,7 +39,9 @@ test("출시 목록 전체를 부분 문자열로 차단하고 대소문자·공
   for (const word of ["ＡＤＵＬＴ", "SEX\n TOY", "성 인 인 증", "１８＋", "청소년\t구매불가"]) {
     assert.equal(policy.isRestrictedProduct(word), true, word);
   }
-  assert.equal(policy.isRestrictedProduct("미술 도구"), true, "오탐을 허용한 술 부분 문자열 정책");
+  for (const name of ["1954 모델", "2019 한정판", "상품 19", "미술 도구", "예술 작품"]) {
+    assert.equal(policy.isRestrictedProduct(name), false, name);
+  }
   assert.equal(policy.isRestrictedProduct("운동화", ["주류 > 맥주"]), true);
   assert.equal(policy.isRestrictedProduct("운동화", ["신발"]), false);
 });
@@ -93,6 +95,31 @@ test("CSV는 제한 상품만 실패로 제외하고 정상 상품을 계속 저
     result.plan.failures.every((entry) => entry.reason === "RESTRICTED_PRODUCT"),
     true,
   );
+});
+
+test("CSV 상품명에 연도·모델명·미술이 있어도 제한 상품으로 제외하지 않는다", () => {
+  const headers = [...csv.CSV_REQUIRED_HEADERS];
+  const names = ["1954 모델", "2019 한정판", "상품 19", "미술 도구", "예술 작품"];
+  const rows = names.map((name, index) =>
+    headers.map(
+      (header) =>
+        ({
+          "상품명": name,
+          "상품 링크": `https://shop.test/allowed/${index}`,
+        })[header] ?? "",
+    ),
+  );
+  const result = csv.prepareCsvImport(
+    { name: "items.csv", bytes: new TextEncoder().encode(Papa.unparse([headers, ...rows])) },
+    {
+      importedAt: "2026-10-28T00:00:00Z",
+      registeredAtUtcOffsetMinutes: 540,
+      existingFolderNames: [],
+    },
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.plan.products.length, names.length);
+  assert.equal(result.plan.failures.length, 0);
 });
 
 test("상품 페이지의 JSON-LD 카테고리·연령 정보와 메타 연령 표시를 추출한다", () => {

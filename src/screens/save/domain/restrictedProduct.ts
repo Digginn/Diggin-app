@@ -1,7 +1,6 @@
 // #157 출시용 부분 문자열 정책. 정상 상품 오탐을 허용하며, DB 검사와 같은 목록을 유지한다.
 export const RESTRICTED_PRODUCT_KEYWORDS = [
   "성인",
-  "19",
   "19금",
   "19세",
   "19+",
@@ -10,7 +9,6 @@ export const RESTRICTED_PRODUCT_KEYWORDS = [
   "청소년유해",
   "청소년 구매불가",
   "미성년자 구매불가",
-  "술",
   "주류",
   "소주",
   "맥주",
