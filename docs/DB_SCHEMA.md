@@ -362,6 +362,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 `account-withdrawal` Edge Function이 JWT의 사용자만 지운다(#120).
 
+0. 애플 가입자는 앱이 탈퇴 직전 다시 받은 애플 인증 코드(`apple_authorization_code`)로 애플 토큰을 받아 해지한다(#159, Apple 계정 삭제 가이드). 코드가 없으면 400, 재인증한 애플 계정이 가입 계정과 다르면 403, 토큰 발급·해지가 실패하면 503으로 계정을 지우지 않는다. 재시도는 새 코드로 다시 해지한다. 애플 토큰은 저장하지 않는다. Edge secret `APPLE_PRIVATE_KEY`(Sign in with Apple .p8), `APPLE_KEY_ID`, `APPLE_TEAM_ID`가 필요하고, client_id는 앱 번들 ID다.
 1. Storage avatars/{user_id}/ 파일을 지운다. 실패하면 계정을 지우지 않는다.
 2. auth.users를 지운다. 세션·리프레시 토큰이 함께 지워지고, 나머지는 FK가 처리한다. 이미 발급된 access token은 만료 전까지 남지만 프로필이 없어 쓸 데이터가 없다.
    - cascade: profiles, products, folders, product_folders, import_*, posts(와 그 글의 하위 데이터), notifications, push_tokens, user_policy_consents, user_blocks, like_notification_log

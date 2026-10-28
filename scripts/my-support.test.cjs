@@ -636,7 +636,17 @@ test("MY 정책과 작성 동의·보기는 동일한 커뮤니티 전문을 표
 test("탈퇴 설문 문구를 DB 사유 값으로 보내고, 실패는 알리되 이미 지워진 계정은 성공으로 본다", async () => {
   const sent = [];
   let failure = null,
-    userError = null;
+    userError = null,
+    provider = "kakao";
+  const appleResults = [];
+  const apple = {
+    signInAsync: async (options) => {
+      assert.deepEqual(JSON.parse(JSON.stringify(options)), { requestedScopes: [] });
+      const result = appleResults.shift();
+      if (result instanceof Error) throw result;
+      return { authorizationCode: result };
+    },
+  };
   const module = { exports: {} };
   runInNewContext(
     ts.transpileModule(
@@ -646,11 +656,20 @@ test("탈퇴 설문 문구를 DB 사유 값으로 보내고, 실패는 알리되
     {
       module,
       exports: module.exports,
+      // 취소 오류를 instanceof Error로 가려서 테스트와 같은 Error를 쓴다.
+      Error,
       require: (name) => {
+        if (name === "expo-apple-authentication") return apple;
+        if (name === "react-native") return { Platform: { OS: "ios" } };
         if (name === "@/lib/supabase")
           return {
             supabase: {
-              auth: { getUser: async () => ({ error: userError }) },
+              auth: {
+                getUser: async () => ({
+                  data: { user: { identities: [{ provider }] } },
+                  error: userError,
+                }),
+              },
               functions: {
                 invoke: async (fn, options) => {
                   sent.push([fn, options.body]);
@@ -677,4 +696,19 @@ test("탈퇴 설문 문구를 DB 사유 값으로 보내고, 실패는 알리되
   await assert.rejects(withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }));
   userError = { code: "user_not_found" };
   await withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" });
+
+  // 애플 가입자는 다시 인증한 코드를 같이 보내고, 취소하면 요청하지 않는다.
+  failure = null;
+  userError = null;
+  provider = "apple";
+  sent.length = 0;
+  appleResults.push("apple-code");
+  assert.equal(await withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }), "withdrawn");
+  assert.deepEqual(sent.map(([, body]) => body.apple_authorization_code), ["apple-code"]);
+  appleResults.push(Object.assign(new Error("canceled"), { code: "ERR_REQUEST_CANCELED" }));
+  assert.equal(await withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }), "cancelled");
+  assert.equal(sent.length, 1);
+  appleResults.push(Object.assign(new Error("apple failed"), { code: "ERR_REQUEST_FAILED" }));
+  await assert.rejects(withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }));
+  assert.equal(sent.length, 1);
 });
