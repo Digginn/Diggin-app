@@ -27,7 +27,8 @@ Deno.test({
         folderMappings: [],
         products: Array.from({ length: 100 }, (_, i) => ({
           rowNumber: i + 2,
-          name: `상품 ${i}`,
+          // 정상 상품 fixture에는 출시 차단 키워드인 숫자 19가 들어가지 않게 한다.
+          name: `상품 ${String.fromCharCode(0xac00 + i)}`,
           url: `https://csv.test/${i}`,
           brand: null,
           price: "100",
@@ -111,6 +112,45 @@ Deno.test({
         throw new Error("completed_job_must_not_restart");
       }, new AbortController().signal) as { importedCount: number };
       assert(replay.importedCount === 100);
+
+      // 제한 상품이 섞여도 스트리밍 저장은 정상 상품만 반영하고 제외 사유를 반환한다.
+      const sample = (input.import_plan.products as Record<string, unknown>[])[0];
+      const restrictedInput: ImportRequest = {
+        request_id: crypto.randomUUID(),
+        import_plan: {
+          ...input.import_plan,
+          totalCount: 3,
+          failures: [],
+          duplicates: [],
+          products: [
+            { ...sample, name: "상품 19", url: "https://csv.test/restricted/age" },
+            {
+              ...sample,
+              rowNumber: 3,
+              name: "선물",
+              restrictionLabels: ["주류"],
+              url: "https://csv.test/restricted/category",
+            },
+            { ...sample, rowNumber: 4, name: "가방", url: "https://csv.test/restricted/allowed" },
+          ],
+        },
+      };
+      const restrictedResult = await saveCsvImport(
+        databaseUrl!,
+        identity,
+        restrictedInput,
+        () => {},
+        new AbortController().signal,
+      ) as { importedCount: number; excludedProducts: { reason: string }[] };
+      assert(restrictedResult.importedCount === 1, "restricted_rows_must_not_be_imported");
+      assert(
+        restrictedResult.excludedProducts.length === 2 &&
+          restrictedResult.excludedProducts.every((item) => item.reason === "RESTRICTED_PRODUCT"),
+        "restricted_rows_must_have_policy_reason",
+      );
+      const [restrictedStored] = await sql`select count(*)::int as n from public.products
+        where user_id=${userId} and url like 'https://csv.test/restricted/%'`;
+      assert(restrictedStored.n === 1, "only_allowed_product_must_be_committed");
 
       // 마지막 잘못된 행에서 실패해도 앞서 생성한 상품·폴더·작업 기록은 모두 롤백한다.
       const broken: ImportRequest = {
