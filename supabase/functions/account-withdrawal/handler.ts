@@ -50,7 +50,7 @@ function parseSurvey(value: unknown): Survey {
   // 자모가 나뉜 한글(NFD)은 DB가 자모마다 1자로 세서, 합친 형태로 세고 저장한다.
   const customText = custom_text?.normalize("NFC").trim() || null;
   const length = customText ? [...graphemes.segment(customText)].length : 0;
-  if (length > CUSTOM_TEXT_MAX || (!reasons.length && !customText)) {
+  if (length > CUSTOM_TEXT_MAX) {
     throw new Error("invalid_request");
   }
   return { reasons, customText };
@@ -118,6 +118,8 @@ export function createWithdrawalHandler(services: Services) {
     } catch {
       return json({ error: "withdrawal_failed" }, 503);
     }
+    // 설문은 선택 응답이라 아무것도 고르지 않았으면 남기지 않는다.
+    if (!survey.reasons.length && !survey.customText) return json({ withdrawn: true });
     try {
       await services.recordSurvey(survey);
     } catch {

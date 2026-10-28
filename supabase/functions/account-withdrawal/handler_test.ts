@@ -76,8 +76,6 @@ Deno.test("사진 → 계정 → 설문 순서로 지우고, 본문의 사용자
 Deno.test("잘못된 설문은 지우기 전에 거부한다", async () => {
   for (
     const payload of [
-      { reasons: [] },
-      { reasons: [], custom_text: "   " },
       { reasons: ["unknown"] },
       { reasons: ["rarely_used", "rarely_used"] },
       { reasons: ["rarely_used"], custom_text: "가".repeat(101) },
@@ -180,5 +178,15 @@ Deno.test("잘못된 애플 코드 형식은 지우기 전에 거부한다", asy
     const payload = { reasons: ["rarely_used"], apple_authorization_code: code };
     assert((await handler(request(payload))).status === 400);
     assert(calls.length === 0);
+  }
+});
+
+Deno.test("설문을 고르지 않아도 탈퇴하고 빈 설문은 남기지 않는다", async () => {
+  for (const payload of [{ reasons: [] }, { reasons: [], custom_text: "   " }]) {
+    const { handler, calls } = setup();
+    const response = await handler(request(payload));
+    assert(response.status === 200);
+    assert(calls.some((call) => call.startsWith("user:")));
+    assert(!calls.some((call) => call.startsWith("survey:")));
   }
 });

@@ -556,7 +556,9 @@ test("탈퇴 설문은 복수 선택·해제, 직접 작성 30자 제한, 빈 �
   const nodes = () => descendants(tree());
   const row = (label) => nodes().find((node) => node.props.accessibilityLabel === label);
   const submit = () => nodes().filter((node) => node.type === "Button")[1];
-  assert.equal(submit().props.isDisabled, true);
+  assert.equal(submit().props.isDisabled, false, "사유를 고르지 않아도 탈퇴할 수 있다.");
+  submit().props.onPress();
+  assert.deepEqual(Array.from(submitted.shift().reasons), []);
   row("자주 사용하지 않아요.").props.onPress();
   row("원하는 기능이 없어요.").props.onPress();
   assert.equal(row("자주 사용하지 않아요.").props.accessibilityState.checked, true);
