@@ -1,7 +1,10 @@
 import Papa from "papaparse";
 import { splitGraphemes } from "unicode-segmenter/grapheme";
 
-import { isRestrictedProduct } from "../../save/domain/restrictedProduct";
+import {
+  isRestrictedProduct,
+  normalizeRestrictionLabels,
+} from "../../save/domain/restrictedProduct";
 import type {
   CsvDuplicateRow,
   CsvExistingProduct,
@@ -272,7 +275,9 @@ export function prepareCsvImport(
         rowNumber,
         savedAtTime,
         product: {
-          ...(restrictionLabels.length ? { restrictionLabels } : {}),
+          ...(restrictionLabels.length
+            ? { restrictionLabels: normalizeRestrictionLabels(restrictionLabels) }
+            : {}),
           rowNumber,
           name,
           url,

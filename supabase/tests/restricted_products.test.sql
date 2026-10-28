@@ -21,6 +21,18 @@ select throws_ok($$select * from public.save_product('https://shop.test/adult', 
 select throws_ok($$select * from public.save_product('https://shop.test/category', '선물', null, null, null, null, null, array['주류'])$$,
   '22023', 'restricted_product', '카테고리를 전달한 저장도 차단');
 select lives_ok($$select * from public.save_product('https://shop.test/shoes', '운동화')$$, '일반 상품은 저장');
+select lives_ok($$select * from public.save_product('https://shop.test/bounded', '선물', null, null, null, null, null,
+  array_fill(repeat('가', 101), array[12]))$$, '긴 일반 카테고리는 잘라 저장');
+select is((select cardinality(restriction_labels) from public.products where url='https://shop.test/bounded'), 10,
+  'RPC를 직접 호출해도 최대 10개 저장');
+select is((select max(char_length(label)) from public.products p cross join unnest(p.restriction_labels) as label
+  where p.url='https://shop.test/bounded'), 100, '각 표시는 최대 100자 저장');
+select throws_ok($$select * from public.save_product('https://shop.test/late-label', '선물', null, null, null, null, null,
+  array_fill('의류'::text, array[10]) || array['주류'])$$,
+  '22023', 'restricted_product', '11번째 표시의 제한 키워드도 자르기 전에 차단');
+select throws_ok($$select * from public.save_product('https://shop.test/late-text', '선물', null, null, null, null, null,
+  array[repeat('가', 100) || '전자담배'])$$,
+  '22023', 'restricted_product', '100자 뒤의 제한 키워드도 자르기 전에 차단');
 select throws_ok($$update public.products set name='전자담배' where url='https://shop.test/shoes'$$,
   '22023', 'restricted_product', '직접 REST 수정도 트리거에서 차단');
 select throws_ok($$update public.products set restriction_labels='{}' where url='https://shop.test/shoes'$$,
@@ -30,13 +42,17 @@ create function pg_temp.restricted_csv() returns jsonb language sql as $$
   select public.import_csv('10000000-0000-0000-0000-000000000157', jsonb_build_object(
     'userId', auth.uid(), 'totalCount', 3, 'folderMappings', '[]'::jsonb,
     'failures', '[]'::jsonb, 'duplicates', '[]'::jsonb,
-    'products', '[
+    'products', jsonb_set('[
       {"rowNumber":2,"name":"와인","url":"https://shop.test/wine","sourceFolderNames":[],"isOwned":false,"savedAt":"2026-10-28T00:00:00Z"},
       {"rowNumber":3,"name":"선물","url":"https://shop.test/gift","restrictionLabels":["성인인증"],"sourceFolderNames":[],"isOwned":false,"savedAt":"2026-10-28T00:00:00Z"},
       {"rowNumber":4,"name":"가방","url":"https://shop.test/bag","sourceFolderNames":[],"isOwned":false,"savedAt":"2026-10-28T00:00:00Z"}
-    ]'::jsonb));
+    ]'::jsonb, '{2,restrictionLabels}', to_jsonb(array_fill(repeat('가', 101), array[12])))));
 $$;
 select is((pg_temp.restricted_csv()->>'importedCount')::integer, 1, '클라이언트 검사를 우회한 CSV도 정상 상품만 저장');
+select is((select cardinality(restriction_labels) from public.products where url='https://shop.test/bag'), 10,
+  'CSV 직접 호출도 최대 10개 저장');
+select is((select max(char_length(label)) from public.products p cross join unnest(p.restriction_labels) as label
+  where p.url='https://shop.test/bag'), 100, 'CSV의 긴 일반 카테고리도 최대 100자 저장');
 select is((select count(*)::integer from public.import_failures where reason='RESTRICTED_PRODUCT'), 2,
   '제한 상품 둘은 사유를 기록하고 전체 가져오기를 롤백하지 않는다');
 select is((select count(*)::integer from public.products where url in ('https://shop.test/wine','https://shop.test/gift')), 0,

@@ -32,6 +32,28 @@ const policy = load("../src/screens/save/domain/restrictedProduct.ts");
 const csv = load("../src/screens/my/domain/prepareCsvImport.ts");
 const { normalizeProductPage } = load("../src/screens/save/domain/normalizeProductPage.ts");
 
+test("제한 표시는 최대 10개·각 100자로 보관하고 상한 밖 금지어도 유지한다", () => {
+  const bounded = policy.normalizeRestrictionLabels(["  ", ...Array(12).fill("가".repeat(101))]);
+  assert.equal(bounded.length, 10);
+  assert(bounded.every((label) => Array.from(label).length === 100));
+  const unicode = policy.normalizeRestrictionLabels(["😀".repeat(101)]);
+  assert.equal(Array.from(unicode[0]).length, 100);
+  for (const labels of [[...Array(10).fill("의류"), "주류"], ["가".repeat(100) + "전자담배"]]) {
+    const result = policy.normalizeRestrictionLabels(labels);
+    assert.equal(policy.isRestrictedProduct("선물", result), true);
+    const page = normalizeProductPage(
+      {
+        finalUrl: "https://shop.test/limits",
+        ld: null,
+        og: { title: "선물", image: null, url: null, siteName: null },
+        restrictionLabels: labels,
+      },
+      "https://shop.test/limits",
+    );
+    assert.equal(policy.isRestrictedProduct("선물", page.values.restrictionLabels), true);
+  }
+});
+
 test("출시 목록 전체를 부분 문자열로 차단하고 대소문자·공백·전각 표기도 검사한다", () => {
   for (const word of policy.RESTRICTED_PRODUCT_KEYWORDS) {
     assert.equal(policy.isRestrictedProduct(`상품 ${word} 한정`), true, word);
@@ -75,9 +97,9 @@ test("CSV는 제한 상품만 실패로 제외하고 정상 상품을 계속 저
       bytes: new TextEncoder().encode(
         Papa.unparse([
           headers,
-          row("운동화", "신발", 1),
+          row("운동화", "가".repeat(101), 1),
           row("가".repeat(110) + "성인", "", 2),
-          row("선물", "주류", 3),
+          row("선물", "가".repeat(100) + "주류", 3),
         ]),
       ),
     },
@@ -90,6 +112,7 @@ test("CSV는 제한 상품만 실패로 제외하고 정상 상품을 계속 저
   assert.equal(result.ok, true);
   assert.equal(result.plan.totalCount, 3);
   assert.equal(result.plan.products.length, 1);
+  assert.equal(Array.from(result.plan.products[0].restrictionLabels[0]).length, 100);
   assert.equal(result.plan.failures.length, 2);
   assert.equal(
     result.plan.failures.every((entry) => entry.reason === "RESTRICTED_PRODUCT"),

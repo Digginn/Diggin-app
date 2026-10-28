@@ -54,3 +54,17 @@ export function isRestrictedProduct(name: string, labels: readonly string[] = []
     return keywords.some((keyword) => text.includes(keyword));
   });
 }
+
+/** 원문 전체를 검사한 뒤 제한 표시는 짧은 키워드로 보존하고, 일반 표시는 저장 상한을 적용한다. */
+export function normalizeRestrictionLabels(labels: readonly string[]) {
+  for (const label of labels) {
+    const text = normalize(label);
+    const keyword = RESTRICTED_PRODUCT_KEYWORDS.find((value) => text.includes(normalize(value)));
+    if (keyword) return [keyword];
+  }
+  return labels
+    .map((label) => label.normalize("NFC").trim())
+    .filter(Boolean)
+    .slice(0, 10)
+    .map((label) => Array.from(label).slice(0, 100).join(""));
+}
