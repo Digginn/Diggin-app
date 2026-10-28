@@ -7,6 +7,13 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 function loadTs(file) {
   const module = { exports: {} };
   runInNewContext(
@@ -47,6 +54,7 @@ function loadShareSave({
     opened: [],
     kept: [],
     closed: 0,
+    entryPoints: [],
     marked: 0,
     timers: [],
     toasts: [],
@@ -112,7 +120,10 @@ function loadShareSave({
           "@/hooks/useItemSave": {
             EMPTY_ITEM_SAVE_VALUES: {},
             useItemSave: () => ({
-              start: (url) => calls.started.push(url),
+              start: (url, entryPoint) => {
+                calls.started.push(url);
+                calls.entryPoints.push(entryPoint);
+              },
               isLoading: false,
               openAfterLoading: () => calls.openedAfterLoading++,
               values: VALUES,
@@ -156,7 +167,7 @@ function loadShareSave({
           "@/assets/fonts/Pretendard-SemiBold.otf": 3,
           "@/assets/fonts/Pretendard-Bold.otf": 4,
         };
-        return mocks[name] ?? require(name);
+        return mocks[name] ?? (name === "@/lib/analytics" ? analytics : require(name));
       },
     },
   );
@@ -198,6 +209,7 @@ test("로그인돼 있으면 카드 안의 아이템 정보 수정에서 저장�
   const { run, render, find, calls } = loadShareSave({ session: { user: { id: "u" } } });
   const view = await run(`이거 봐 ${LINK}`);
   assert.deepEqual(calls.started, [LINK]);
+  assert.deepEqual(calls.entryPoints, ["share"], "공유로 시작한 저장은 share로 보낸다");
   assert.ok(calls.openedAfterLoading > 0, "로딩 모달 없이 다 불러오면 바로 연다");
   const sheet = find(view, "ItemEditSheet");
   assert.equal(sheet.props.isInline, true, "모달을 또 올리지 않고 카드 안에 그린다");
@@ -224,6 +236,8 @@ test("로그인돼 있으면 카드 안의 아이템 정보 수정에서 저장�
   );
   assert.equal(calls.timers[0][1], 1500);
   calls.timers[0][0]();
+  // 닫기 전에 모아 둔 분석 이벤트를 보낸다.
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(calls.closed, 1);
 });
 

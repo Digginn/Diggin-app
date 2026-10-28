@@ -6,6 +6,13 @@ const { test } = require("node:test");
 const { runInNewContext } = require("node:vm");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 function load(file, mocks = {}) {
   const module = { exports: {} };
   runInNewContext(
@@ -18,6 +25,7 @@ function load(file, mocks = {}) {
       URL,
       require: (name) =>
         mocks[name] ??
+        (name === "@/lib/analytics" ? analytics : undefined) ??
         (name === "@/api/accountAccess"
           ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
           : require(name)),

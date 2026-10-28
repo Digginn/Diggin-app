@@ -31,6 +31,7 @@ import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
+import { trackEvent } from "@/lib/analytics";
 import { startLogin } from "@/lib/loginIntent";
 import { normalizeText } from "@/utils/text";
 
@@ -77,6 +78,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const comments = useCommunityComments(id, !!post && !isWrongRoute);
   const actions = useCommentActions(id, session?.user.id ?? null);
   const like = useCommunityLike(post, session?.user.id ?? null);
+  const viewedPostId = post && !isWrongRoute ? post.id : null;
+  useEffect(() => {
+    if (viewedPostId)
+      trackEvent("community_view", { view_type: "post_detail", post_id: viewedPostId });
+  }, [viewedPostId]);
   const commentRows = useMemo(
     () => mergeComments(comments.data?.pages.flat() ?? [], actions.changes),
     [comments.data, actions.changes],
@@ -472,6 +478,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             showToast("아이템 링크를 확인하고 다시 시도해 주세요.");
             return;
           }
+          trackEvent("external_product_click", { product_id: infoItem.id });
           void Linking.openURL(url).catch(() =>
             showToast("아이템 페이지를 열지 못했습니다. 다시 시도해 주세요."),
           );

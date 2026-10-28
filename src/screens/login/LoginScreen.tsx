@@ -11,6 +11,7 @@ import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
+import { trackEvent } from "@/lib/analytics";
 import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
 import { discardShareLink } from "@/lib/pendingShareLink";
 import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeModal";
@@ -78,6 +79,7 @@ export function LoginScreen({
       const resume = takeLoginIntent();
       // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다. 이어 할 동작은 안내를 지난 뒤에 한다.
       if (result.isNewUser) {
+        trackEvent("signup_complete", { signup_method: provider });
         if (resume) keepLoginIntent(resume);
         router.replace("/signup-complete" as Href);
         return;

@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { AppState, Platform } from "react-native";
 
 import { folderKeys } from "@/api/folders";
 import { productKeys, saveProduct } from "@/api/products";
 import { markLinkHandled } from "@/hooks/useDetectedLink";
+import { trackEvent, type EntryPoint } from "@/lib/analytics";
 import { normalizeProductPage } from "@/screens/save/domain/normalizeProductPage";
 import type { ProductPageRaw } from "@/screens/save/domain/productPageScript";
 import type { ItemSaveValues } from "@/types/wish-item";
@@ -35,10 +36,13 @@ export function useItemSave() {
   const [waiting, setWaiting] = useState<Loaded | null>(null);
 
   const [readingUrl, setReadingUrl] = useState<string | null>(null);
+  const entryPoint = useRef<EntryPoint>("direct");
 
-  const start = useCallback((sourceUrl: string) => {
+  const start = useCallback((sourceUrl: string, from: EntryPoint = "direct") => {
     // 링크 입력 시트로 직접 넣은 링크를 클립보드에서 다시 묻지 않는다.
     markLinkHandled(sourceUrl);
+    entryPoint.current = from;
+    trackEvent("product_add_start", { entry_point: from });
     setLoading(true);
     setReadingUrl(sourceUrl);
   }, []);
@@ -84,6 +88,7 @@ export function useItemSave() {
       saveProduct(values, folderIds),
     onSuccess: ({ isDuplicate }) => {
       if (isDuplicate) return;
+      trackEvent("product_add_complete", { entry_point: entryPoint.current });
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: productKeys.all }),
         queryClient.invalidateQueries({ queryKey: folderKeys.all }),

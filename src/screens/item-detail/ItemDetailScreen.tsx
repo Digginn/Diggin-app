@@ -22,6 +22,7 @@ import { useFolders } from "@/hooks/useFolders";
 import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useToast } from "@/hooks/useToast";
+import { trackEvent } from "@/lib/analytics";
 import { useDeleteProducts } from "@/screens/all/mutations/useDeleteProducts";
 import { FolderMenu } from "@/screens/folder/components/FolderMenu";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
@@ -203,7 +204,10 @@ export function ItemDetailScreen() {
                 onSelect={(level) =>
                   updateProduct.mutate(
                     { wishLevel: level },
-                    { onError: () => showToast(TOAST_MESSAGES.ALL_005) },
+                    {
+                      onSuccess: () => trackEvent("product_edit", { product_id: id }),
+                      onError: () => showToast(TOAST_MESSAGES.ALL_005),
+                    },
                   )
                 }
                 hint={
@@ -260,6 +264,7 @@ export function ItemDetailScreen() {
             },
             {
               onSuccess: () => {
+                trackEvent("product_edit", { product_id: id });
                 setEditOpen(false);
                 showToast(TOAST_MESSAGES.ALL_004);
               },
@@ -354,9 +359,10 @@ export function ItemDetailScreen() {
           <View className="flex-1">
             <Button
               variant="secondary"
-              onPress={() =>
-                Linking.openURL(item.sourceUrl).catch(() => showToast(TOAST_MESSAGES.ALL_009))
-              }
+              onPress={() => {
+                trackEvent("external_product_click", { product_id: id });
+                Linking.openURL(item.sourceUrl).catch(() => showToast(TOAST_MESSAGES.ALL_009));
+              }}
             >
               웹사이트 이동
             </Button>

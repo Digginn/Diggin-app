@@ -9,6 +9,7 @@ import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFolders } from "@/hooks/useFolders";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
+import { flushAnalytics, setAnalyticsUser } from "@/lib/analytics";
 import { markSharedSave } from "@/lib/sharedSaves";
 import { supabase } from "@/lib/supabase";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
@@ -67,7 +68,11 @@ export function ShareSaveScreen({
       .getSession()
       .then(({ data, error }) => {
         if (!isMounted.current) return;
-        if (data.session) return start(link);
+        if (data.session) {
+          // iOS 공유 확장은 앱과 따로 실행돼 AuthProvider가 없다.
+          setAnalyticsUser(data.session.user.id);
+          return start(link, "share");
+        }
         // 만료된 토큰을 갱신하다 연결이 끊긴 것은 로그인이 풀린 게 아니다. 여기서 알리고 앱으로 보내지 않는다.
         if (isAuthRetryableFetchError(error)) return setSessionError("network");
         // 비회원은 앱에서 로그인한 뒤 이 링크로 저장을 이어 간다(SAVE-002).
@@ -108,7 +113,13 @@ export function ShareSaveScreen({
     markSharedSave();
     setSaved(true);
     showToast(TOAST_MESSAGES.SAVE_011);
-    closeTimer.current = setTimeout(onClose, CLOSE_AFTER_SAVE_MS);
+    closeTimer.current = setTimeout(
+      () =>
+        void flushAnalytics()
+          .catch(() => {})
+          .finally(onClose),
+      CLOSE_AFTER_SAVE_MS,
+    );
   }
 
   if (reason) {

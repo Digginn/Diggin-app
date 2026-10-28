@@ -8,6 +8,13 @@ const { runInNewContext } = require("node:vm");
 const Papa = require("papaparse");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 function load(relativePath, overrides = {}) {
   const module = { exports: {} };
   runInNewContext(
@@ -19,7 +26,8 @@ function load(relativePath, overrides = {}) {
       exports: module.exports,
       TextDecoder,
       URL,
-      require: (name) => overrides[name] ?? require(name),
+      require: (name) =>
+        overrides[name] ?? (name === "@/lib/analytics" ? analytics : undefined) ?? require(name),
     },
   );
   return module.exports;
@@ -380,4 +388,35 @@ test("충돌 재시도 중 처음 한도를 넘으면 저장 전에 한 번만 �
   });
   assert.equal(confirmations, 1);
   assert.equal(calls.length, 3);
+});
+
+test("가져오기 시작·완료 이벤트를 같은 작업 ID로 보내고 결과 수를 나눠 담는다", async () => {
+  analyticsEvents.length = 0;
+  const excluded = (kind) => ({ productName: "상품", reason: "INVALID_PRODUCT_DATA", kind });
+  const { run, calls } = setup({
+    folders: ["abcdefg"],
+    rpc: async () => ({
+      data: {
+        importedCount: 1,
+        excludedProducts: [excluded("duplicate"), excluded("failed"), excluded("failed")],
+        folderFailures: [],
+      },
+      error: null,
+    }),
+  });
+  await run();
+  const jobId = calls[0].request_id;
+  assert.deepEqual(JSON.parse(JSON.stringify(analyticsEvents)), [
+    ["wishlist_import_start", { import_job_id: jobId }],
+    [
+      "wishlist_import_complete",
+      {
+        import_job_id: jobId,
+        total_count: 1,
+        success_count: 1,
+        duplicate_count: 1,
+        fail_count: 2,
+      },
+    ],
+  ]);
 });
