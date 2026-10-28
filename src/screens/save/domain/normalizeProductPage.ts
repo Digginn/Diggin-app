@@ -4,6 +4,7 @@ import type { ItemSaveValues } from "@/types/wish-item";
 
 import { APP_LINK_HOST, type ProductPageRaw } from "./productPageScript";
 import { toMobileSmartStoreUrl } from "./productPageUrl";
+import { isRestrictedProduct } from "./restrictedProduct";
 
 const NAME_MAX = 100;
 const BRAND_MAX = 30;
@@ -160,11 +161,18 @@ export function normalizeProductPage(
     toKrwPrice(og.price, og.currency) ??
     toKrwPrice(raw.md?.price, raw.md?.currency);
   const hasFailed = name === "";
+  // 추출 상품명은 화면 길이 제한 전에 검사할 수 있도록 원문도 보존한다.
+  const originalName = asText(shop?.name) ?? asText(ld?.name) ?? asText(og.title) ?? "";
+  const restrictionLabels = [
+    ...(raw.restrictionLabels ?? []),
+    ...(isRestrictedProduct(originalName) ? [originalName] : []),
+  ].filter(Boolean);
 
   return {
     hasFailed,
     values: {
       name,
+      ...(restrictionLabels.length ? { restrictionLabels } : {}),
       brand: truncate(
         asText(shop?.brand) ??
           asText(ld?.brand) ??

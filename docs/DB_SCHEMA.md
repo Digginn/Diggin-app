@@ -85,7 +85,7 @@ report_status       received | reviewing | resolved | rejected
 account_status      active | warning | community_restricted | suspended   (구현)
 notification_type   vote_ended | post_commented | post_liked
 import_status       processing | completed | failed                     (구현)
-import_fail_reason  EMPTY_PRODUCT_NAME | EMPTY_PRODUCT_URL | INVALID_PRODUCT_URL | CSV_ROW_PARSE_ERROR | INVALID_PRODUCT_DATA | FOLDER_LIMIT_EXCEEDED | FOLDER_SAVE_FAILED (구현)
+import_fail_reason  EMPTY_PRODUCT_NAME | EMPTY_PRODUCT_URL | INVALID_PRODUCT_URL | CSV_ROW_PARSE_ERROR | INVALID_PRODUCT_DATA | RESTRICTED_PRODUCT | FOLDER_LIMIT_EXCEEDED | FOLDER_SAVE_FAILED (구현)
 withdrawal_reason   rarely_used | missing_feature | other_service | hard_to_use | frequent_error   (구현)
 admin_role          operator | super_admin
 ```
@@ -110,6 +110,7 @@ report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와
 ## 5-1. 구현된 영역 요약 (#78 아이템)
 
 - products: 앱은 본인 상품 select·delete, update는 name·brand·price·wish_level만. 링크·대표 이미지는 고칠 수 없다(PDT-006). 만들기는 `save_product`로만.
+- 제한 상품(#157): `restriction_labels text[]`에 확인 가능한 카테고리·연령 표시를 저장하고 앱에는 해당 열의 수정 권한을 주지 않는다. `save_product`의 마지막 선택 인자 `product_restriction_labels`는 기본값 `{}`라 이전 앱 호출과 호환된다. `private.is_restricted_product`가 상품명·표시를 NFKC/소문자/공백 제거 후 출시용 키워드의 부분 문자열로 검사한다. 저장 RPC와 INSERT/UPDATE 트리거가 `restricted_product`로 거부하고 CSV는 `RESTRICTED_PRODUCT` 실패 행만 제외한다. 기존 상품은 소급 삭제하지 않는다. 숫자 `19`·`술` 등의 오탐을 허용한 초기 정책이며, 표시에 없거나 수집되지 않은 성인 상품을 완전히 판별하지는 못한다.
 - 입력 검사 `private.product_input_error(url, name, brand, price)`: `invalid_url | name_required | name_too_long | brand_too_long | invalid_price` 중 하나 또는 null. 저장과 CSV 가져오기가 같은 함수로 검사한다. 상한을 넘는 자동 추출·CSV 값은 호출하는 쪽이 잘라서 넘긴다.
 - 정규화 트리거: 링크는 앞뒤 공백 제거, 상품명·브랜드는 NFC + 앞뒤 공백 제거, 빈 브랜드는 null.
 - `save_product(url, name, brand?, price?, image_url?, wish_level?, folder_ids?)` → `(product_id, is_duplicate)`. 같은 링크면 저장하지 않고 기존 상품 id와 `is_duplicate = true`를 돌려준다(SAVE-012). 입력 오류는 `22023` 예외(메시지가 위 오류 코드). 나의 소장템을 같이 고르면 위시레벨을 비운다.

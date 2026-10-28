@@ -41,6 +41,10 @@ test("아이템 저장은 통신 오류만 연결 확인 토스트로 구분한�
     [{ message: "Failed to fetch" }, TOAST_MESSAGES.SYS_001],
     [{ message: "permission denied", code: "42501" }, TOAST_MESSAGES.SAVE_012],
     [new Error("invalid_name"), TOAST_MESSAGES.SAVE_012],
+    [
+      { message: "restricted_product", code: "22023" },
+      "이용정책에 따라 저장할 수 없는 상품입니다.",
+    ],
     [null, TOAST_MESSAGES.SAVE_012],
   ]) {
     const page = nodes(ItemSaveFlow({ itemSave: { save: { isError: true, error } } })).find(
@@ -124,11 +128,13 @@ function load(file, mocks) {
       exports: module.exports,
       require: (name) =>
         mocks[name] ??
-        (name.startsWith("@/assets/")
-          ? name
-          : LOGIN_SOURCES[name]
-            ? load(LOGIN_SOURCES[name], mocks)
-            : require(name)),
+        (name === "../domain/restrictedProduct"
+          ? load("../src/screens/save/domain/restrictedProduct.ts", mocks)
+          : name.startsWith("@/assets/")
+            ? name
+            : LOGIN_SOURCES[name]
+              ? load(LOGIN_SOURCES[name], mocks)
+              : require(name)),
     },
   );
   return module.exports;

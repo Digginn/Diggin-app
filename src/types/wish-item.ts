@@ -30,6 +30,8 @@ export type WishLevelCounts = {
 
 /** 아이템 저장 시트가 다루는 입력 값. */
 export type ItemSaveValues = {
+  /** 추출 가능한 카테고리·연령 표시. 사용자가 이름을 수정해도 원래의 제한 정보를 보존한다. */
+  restrictionLabels?: string[];
   name: string;
   brand: string;
   price: string;

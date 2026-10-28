@@ -235,6 +235,7 @@ export type Database = {
           image_url: string | null;
           name: string;
           price: number | null;
+          restriction_labels: string[];
           saved_at: string;
           updated_at: string;
           url: string;
@@ -249,6 +250,7 @@ export type Database = {
           image_url?: string | null;
           name: string;
           price?: number | null;
+          restriction_labels?: string[];
           saved_at?: string;
           updated_at?: string;
           url: string;
@@ -262,6 +264,7 @@ export type Database = {
           image_url?: string | null;
           name?: string;
           price?: number | null;
+          restriction_labels?: string[];
           saved_at?: string;
           updated_at?: string;
           url?: string;
@@ -497,6 +500,7 @@ export type Database = {
           product_image_url?: string;
           product_name: string;
           product_price?: number;
+          product_restriction_labels?: string[];
           product_url: string;
           product_wish_level?: Database["public"]["Enums"]["wish_level"];
         };
@@ -537,6 +541,7 @@ export type Database = {
         | "INVALID_PRODUCT_URL"
         | "CSV_ROW_PARSE_ERROR"
         | "INVALID_PRODUCT_DATA"
+        | "RESTRICTED_PRODUCT"
         | "FOLDER_LIMIT_EXCEEDED"
         | "FOLDER_SAVE_FAILED";
       import_status: "processing" | "completed" | "failed";
@@ -671,6 +676,7 @@ export const Constants = {
         "INVALID_PRODUCT_URL",
         "CSV_ROW_PARSE_ERROR",
         "INVALID_PRODUCT_DATA",
+        "RESTRICTED_PRODUCT",
         "FOLDER_LIMIT_EXCEEDED",
         "FOLDER_SAVE_FAILED",
       ],

@@ -19,7 +19,11 @@ function load(relativePath, overrides = {}) {
       exports: module.exports,
       TextDecoder,
       URL,
-      require: (name) => overrides[name] ?? require(name),
+      require: (name) =>
+        overrides[name] ??
+        (name === "../../save/domain/restrictedProduct"
+          ? load("../src/screens/save/domain/restrictedProduct.ts")
+          : require(name)),
     },
   );
   return module.exports;
@@ -218,7 +222,7 @@ test("IMP-005 승인 판매처 가격을 실제 가져오기 RPC에 전달하고
     Papa.unparse([
       domain.CSV_REQUIRED_HEADERS,
       ...cases.map(([store, url, regular, sale], index) => [
-        `상품${index}`,
+        `상품${String.fromCharCode(0xac00 + index)}`,
         store,
         "",
         regular,

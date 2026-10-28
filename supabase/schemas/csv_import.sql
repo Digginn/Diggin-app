@@ -88,6 +88,7 @@ declare
   price_value integer;
   saved_time timestamptz;
   input_error text;
+  restriction_labels text[];
   failure_reason public.import_fail_reason;
   was_duplicate boolean;
 begin
@@ -218,6 +219,11 @@ begin
       if (item->>'price')::numeric <= 2147483647 then price_value := (item->>'price')::integer; end if;
     end if;
     input_error := private.product_input_error(item->>'url', item->>'name', item->>'brand', price_value);
+    select coalesce(array_agg(value), '{}') into restriction_labels
+      from jsonb_array_elements_text(coalesce(item->'restrictionLabels', '[]'::jsonb));
+    if private.is_restricted_product(item->>'name', restriction_labels) then
+      input_error := 'restricted_product';
+    end if;
     if input_error is null and ((item->>'url') ~ '[[:space:]]'
       or (item->>'url') !~* '^https://[^/?#[:space:]]+') then input_error := 'invalid_url'; end if;
     begin
@@ -232,6 +238,7 @@ begin
       failure_reason := case input_error
         when 'invalid_url' then 'INVALID_PRODUCT_URL'::public.import_fail_reason
         when 'name_required' then 'EMPTY_PRODUCT_NAME'::public.import_fail_reason
+        when 'restricted_product' then 'RESTRICTED_PRODUCT'::public.import_fail_reason
         else 'INVALID_PRODUCT_DATA'::public.import_fail_reason end;
       insert into public.import_failures (job_id, user_id, row_number, product_name, reason)
       values (job_id, current_user_id, (item->>'rowNumber')::integer, item->>'name', failure_reason);
@@ -241,8 +248,8 @@ begin
       continue;
     end if;
 
-    insert into public.products (user_id, url, name, brand, price, saved_at)
-    values (current_user_id, item->>'url', item->>'name', item->>'brand', price_value, saved_time)
+    insert into public.products (user_id, url, name, brand, price, saved_at, restriction_labels)
+    values (current_user_id, item->>'url', item->>'name', item->>'brand', price_value, saved_time, restriction_labels)
     on conflict on constraint products_user_id_url_key do nothing
     returning id into target_product_id;
     was_duplicate := target_product_id is null;

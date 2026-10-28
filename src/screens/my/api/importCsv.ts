@@ -25,6 +25,7 @@ const FAILURE_MESSAGES: Record<string, string> = {
   INVALID_PRODUCT_URL: "아이템 링크가 올바르지 않습니다.",
   CSV_ROW_PARSE_ERROR: "CSV 행을 읽을 수 없습니다.",
   INVALID_PRODUCT_DATA: "아이템 정보를 확인할 수 없습니다.",
+  RESTRICTED_PRODUCT: "이용정책에 따라 저장할 수 없는 상품입니다.",
   DUPLICATE: "이미 저장된 아이템입니다.",
 };
 
