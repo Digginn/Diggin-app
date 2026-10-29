@@ -52,6 +52,15 @@ create table private.moderation_requests (
   action_id bigint references private.admin_actions(id)
 );
 create unique index moderation_requests_one_pending_user on private.moderation_requests(user_id) where state = 'pending';
+-- 처리방침 제3조 운영자의 개인정보 조회 기록. 신고 상세(작성자 UUID·원문)를 본 운영자와 시각을 남긴다(#164).
+create table private.admin_access_logs (
+  id bigint generated always as identity primary key,
+  admin_id uuid not null references private.admin_users(id),
+  report_id bigint not null,
+  created_at timestamptz not null default now()
+);
+create index admin_access_logs_admin_idx on private.admin_access_logs(admin_id);
+create index admin_access_logs_created_idx on private.admin_access_logs(created_at);
 create index admin_actions_admin_idx on private.admin_actions(admin_id);
 create index admin_actions_target_idx on private.admin_actions(target_type,target_id,id desc);
 create index admin_actions_report_idx on private.admin_actions(report_id,id desc);
@@ -67,12 +76,17 @@ alter table private.admin_users enable row level security;
 alter table private.admin_actions enable row level security;
 alter table private.user_sanctions enable row level security;
 alter table private.moderation_requests enable row level security;
-revoke all on private.admin_users, private.admin_actions, private.user_sanctions, private.moderation_requests from public, anon, authenticated, service_role;
+alter table private.admin_access_logs enable row level security;
+revoke all on private.admin_users, private.admin_actions, private.user_sanctions, private.moderation_requests, private.admin_access_logs from public, anon, authenticated, service_role;
 revoke all on sequence private.admin_actions_id_seq, private.user_sanctions_id_seq from public, anon, authenticated, service_role;
 
 create or replace function private.reject_audit_change()
 returns trigger language plpgsql set search_path = '' as $$
-begin raise exception 'audit_is_append_only' using errcode = '42501'; end;
+begin
+  -- private.delete_expired_records()만 보관기간이 지난 기록을 지운다. 앱·service_role은 테이블 권한이 없어 이 설정으로 우회할 수 없다.
+  if tg_op = 'DELETE' and current_setting('private.retention_cleanup', true) = 'on' then return old; end if;
+  raise exception 'audit_is_append_only' using errcode = '42501';
+end;
 $$;
 create trigger admin_actions_append_only before update or delete on private.admin_actions
 for each row execute function private.reject_audit_change();
@@ -96,7 +110,7 @@ $$;
 create or replace function private.validate_moderation_reason(category text, explanation text)
 returns void language plpgsql set search_path = '' as $$
 begin
-  if category is null or category not in ('abuse','spam','inappropriate','other') or
+  if category is null or category not in ('abuse','spam','inappropriate','other','underage') or
     explanation is null or explanation !~ '[^[:space:]]' or private.char_count(btrim(explanation)) not between 1 and 1000 then
     raise exception 'invalid_moderation_reason' using errcode = '22023';
   end if;
@@ -147,6 +161,7 @@ begin
     left join private.comments c on c.id=r.comment_id
     left join private.posts p on p.id=coalesce(r.post_id,c.post_id)
     left join public.profiles profile on profile.id=r.reported_user_id;
+  insert into private.admin_access_logs(admin_id, report_id) values (actor, report);
   return result;
 end;
 $$;
@@ -159,6 +174,8 @@ declare r private.reports%rowtype; audit private.admin_actions%rowtype; previous
 begin
   perform private.assert_moderator(actor, actor_session);
   perform private.validate_moderation_reason(category, explanation);
+  -- 만 14세 미만(AUTH-002~004)은 계정 이용 중단 사유라 콘텐츠 조치에는 쓰지 않는다.
+  if category='underage' then raise exception 'invalid_moderation_reason' using errcode='22023'; end if;
   if request_id is null or operation is null or operation not in ('report_status','hide','restore') then
     raise exception 'invalid_moderation_action' using errcode='22023'; end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(request_id::text,0));
@@ -222,6 +239,8 @@ begin
   perform private.validate_moderation_reason(category,explanation);
   if request_id is null or operation is null or operation not in ('warning','community_restricted','suspended','release') or
     target_user is null or target_user=actor then raise exception 'invalid_sanction' using errcode='22023'; end if;
+  if category='underage' and operation not in ('suspended','release') then
+    raise exception 'invalid_moderation_reason' using errcode='22023'; end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(request_id::text,0));
   select * into saved from private.moderation_requests where id=request_id;
   if found then
@@ -235,6 +254,10 @@ begin
   if not found then raise exception 'user_not_found' using errcode='P0002'; end if;
   if exists(select 1 from private.admin_users where id=target_user and disabled_at is null) then
     raise exception 'cannot_sanction_admin' using errcode='22023'; end if;
+  -- 자동 삭제가 시작된 계정을 해제하면 복구한 계정이 지워진다. 한 시간이 지난 중단 작업만 다시 해제할 수 있다.
+  if operation='release' and exists(select 1 from private.underage_deletion_claims
+    where user_id=target_user and claimed_at > now() - interval '1 hour') then
+    raise exception 'account_deletion_in_progress' using errcode='55000'; end if;
   if (profile.status='suspended' and operation<>'release') or (profile.status='active' and operation='release') then
     raise exception 'sanction_state_conflict' using errcode='22023'; end if;
   if report is not null and not exists(select 1 from private.reports where id=report and reported_user_id=target_user) then

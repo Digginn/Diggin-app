@@ -80,7 +80,7 @@ folder_kind         custom | owned                                    (구현)
 post_type           post | vote
 vote_choice         buy | not
 report_target       post | comment
-report_reason       abuse | spam | inappropriate | other
+report_reason       abuse | spam | inappropriate | other | underage
 report_status       received | reviewing | resolved | rejected
 account_status      active | warning | community_restricted | suspended   (구현)
 notification_type   vote_ended | post_commented | post_liked
@@ -90,7 +90,7 @@ withdrawal_reason   rarely_used | missing_feature | other_service | hard_to_use 
 admin_role          operator | super_admin
 ```
 
-report_reason은 `src/components/modal/ReportModal.tsx`의 사유 4개 순서와 같다. withdrawal_reason은 MY-006 선택지 5개 순서와 같다.
+report_reason의 앞 4개는 `src/components/modal/ReportModal.tsx`의 사유 순서와 같다. underage(만 14세 미만, AUTH-002~004)는 운영자가 영구 이용 중단·해제에만 쓰고 사용자 신고와 콘텐츠 조치에는 쓰지 않는다(#164). withdrawal_reason은 MY-006 선택지 5개 순서와 같다.
 
 ## 5. 구현된 영역 요약 (#71)
 
@@ -358,12 +358,15 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - warning: 기능 제한 없이 이력과 안내만.
 - community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 모든 쓰기 RPC(본인 게시글 삭제 포함)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. 프로필 행을 잠가 운영자 제재와 변경 요청의 경합을 보호한다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다.
 - suspended: profiles.status 변경과 함께 Supabase Auth 계정 정지(ban)와 전체 세션 무효화를 한다. status만으로는 상품·폴더 접근을 못 막기 때문이다. 해제할 때 둘 다 푼다.
+- 만 14세 미만(AUTH-002~004, #164): 운영자가 `underage` 사유로 suspended 처리한다. 앱은 MSG-AUTH-007 이용 중단 안내를 띄운다. 한 달 안에 해제(release)되지 않으면 pg_cron `underage-account-cleanup`(매일 03:30 KST)이 대상이 있을 때만 Vault의 `underage_cleanup_url`/`underage_cleanup_secret`으로 `underage-cleanup` Edge Function을 부른다. 함수는 `due_underage_deletions()`(service_role 전용, 50건씩)로 대상을 받아 MY-007 탈퇴와 같은 순서(애플 연결 해제 → 프로필 사진 → auth.users 삭제)로 지운다. 각 계정은 지우기 직전에 `claim_underage_deletion`으로 프로필 행을 잠그고 아직 대상인지, 진행 중인 제재·해제 요청이 없는지 다시 확인한다. 확인되면 `private.underage_deletion_claims`에 표시하고, 이후 한 시간 동안 운영자 해제(release)는 `account_deletion_in_progress`로 거부한다. 목록을 받은 뒤 복구된 계정은 건너뛴다. 애플 해제가 실패한 계정은 지우지 않고 다음 날 다시 시도한다. 저장된 애플 토큰이 없는 계정은 연결 해제 없이 지운다. 함수 secret `UNDERAGE_CLEANUP_SECRET`과 Vault 값이 없으면 호출하지 않는다.
+- 보관기간 경과 기록 삭제(#164, 개인정보 처리방침 제3조): pg_cron `expired-records-cleanup`(매일 03:20 KST)이 `private.delete_expired_records()`를 실행한다. 탈퇴 설문은 30일, 처리 완료(resolved·rejected, 이후 상태가 바뀌지 않아 updated_at이 완료 시각) 신고의 `reported_content` 사본은 30일, 제재 이력은 경고 적용일·7일 제한 종료일·영구 제한 해제일부터 6개월, 운영자 조치 기록(`admin_actions`)과 완료된 `moderation_requests`는 1년 뒤 지운다. 해제되지 않은 영구 제한과 그 조치 기록, `private.retention_holds`로 보관 유지 중인 신고·제재(운영 API `retention_hold`)는 남긴다. `admin_actions`는 append-only 트리거를 유지하고 이 함수의 트랜잭션 설정으로만 삭제를 허용한다. 운영자의 개인정보 "조회" 기록은 아직 따로 저장하지 않는다.
+- 애플 refresh token(#164): 앱이 애플 로그인 직후 받은 인증 코드를 `apple-token` Edge Function에 보낸다. 함수는 JWT 사용자의 애플 계정과 코드의 계정이 같을 때만 토큰을 받아 `store_apple_refresh_token`으로 Vault에 저장한다. `private.apple_refresh_tokens`에는 Vault secret ID만 두고 앱·service_role 모두 테이블을 직접 읽지 못한다. 계정을 지우면 FK cascade와 트리거로 Vault 토큰도 지운다.
 
 ## 8. 탈퇴 (MY-007, Edge Function)
 
 `account-withdrawal` Edge Function이 JWT의 사용자만 지운다(#120).
 
-0. 애플 가입자는 앱이 탈퇴 직전 다시 받은 애플 인증 코드(`apple_authorization_code`)로 애플 토큰을 받아 해지한다(#159, Apple 계정 삭제 가이드). 코드가 없으면 400, 재인증한 애플 계정이 가입 계정과 다르면 403, 토큰 발급·해지가 실패하면 503으로 계정을 지우지 않는다. 재시도는 새 코드로 다시 해지한다. 애플 토큰은 저장하지 않는다. Edge secret `APPLE_PRIVATE_KEY`(Sign in with Apple .p8), `APPLE_KEY_ID`, `APPLE_TEAM_ID`가 필요하고, client_id는 앱 번들 ID다.
+0. 애플 가입자는 앱이 탈퇴 직전 다시 받은 애플 인증 코드(`apple_authorization_code`)로 애플 토큰을 받아 해지한다(#159, Apple 계정 삭제 가이드). 코드가 없으면 400, 재인증한 애플 계정이 가입 계정과 다르면 403, 토큰 발급·해지가 실패하면 503으로 계정을 지우지 않는다. 재시도는 새 코드로 다시 해지한다. 로그인 때 저장한 애플 토큰(7장)은 탈퇴에 쓰지 않고 계정 삭제와 함께 지운다. Edge secret `APPLE_PRIVATE_KEY`(Sign in with Apple .p8), `APPLE_KEY_ID`, `APPLE_TEAM_ID`가 필요하고, client_id는 앱 번들 ID다.
 1. Storage avatars/{user_id}/ 파일을 지운다. 실패하면 계정을 지우지 않는다.
 2. auth.users를 지운다. 세션·리프레시 토큰이 함께 지워지고, 나머지는 FK가 처리한다. 이미 발급된 access token은 만료 전까지 남지만 프로필이 없어 쓸 데이터가 없다.
    - cascade: profiles, products, folders, product_folders, import_*, posts(와 그 글의 하위 데이터), notifications, push_tokens, user_policy_consents, user_blocks, like_notification_log

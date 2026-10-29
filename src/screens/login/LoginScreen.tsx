@@ -5,11 +5,15 @@ import { Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SANCTION_REASON_LABELS, type AccountAccess } from "@/api/accountAccess";
+import CheckboxOff from "@/assets/images/icon-checkbox-off.svg";
+import CheckboxOn from "@/assets/images/icon-checkbox-on.svg";
 import BackIcon from "@/assets/images/icon-login-back.svg";
 import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
+import { ActionModal } from "@/components/modal";
 import { ToastText } from "@/components/ToastText";
+import { UnderageNoticeModal } from "@/components/UnderageNoticeModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
 import { discardShareLink } from "@/lib/pendingShareLink";
@@ -39,6 +43,8 @@ export function LoginScreen({
   const [hasError, setHasError] = useState(isLoginError);
   const [isLoading, setIsLoading] = useState(isLoginLoading);
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
+  const [isAgeConsented, setIsAgeConsented] = useState(false);
+  const [isConsentNoticeOpen, setIsConsentNoticeOpen] = useState(false);
   const hasSignedIn = useRef(false);
   const isSigningIn = useRef(false);
   const [didSignIn, setDidSignIn] = useState(false);
@@ -63,6 +69,10 @@ export function LoginScreen({
 
   async function handleLogin(provider: LoginProvider) {
     if (isSigningIn.current) return;
+    if (!isAgeConsented) {
+      setIsConsentNoticeOpen(true);
+      return;
+    }
     isSigningIn.current = true;
     setHasError(false);
     try {
@@ -156,52 +166,61 @@ export function LoginScreen({
             />
           ))}
         </View>
+        {/* Figma AgeConsentRow는 화면 왼쪽 1.5, 오른쪽 46.5 여백 안에서 가운데 정렬돼 있다. */}
+        <View className="mt-4 w-full flex-row items-center justify-center pl-[1.5px] pr-[46.5px]">
+          <Pressable
+            onPress={() => setIsAgeConsented((checked) => !checked)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isAgeConsented }}
+            accessibilityLabel="(필수) 만 14세 이상이며 이용약관 및 개인정보 처리방침에 동의합니다."
+            className="size-12 items-center justify-center"
+          >
+            {isAgeConsented ? <CheckboxOn /> : <CheckboxOff />}
+          </Pressable>
+          <Text className="text-center text-[#333333] font-meta">
+            {"(필수) 만 14세 이상이며\n"}
+            <Text accessibilityRole="link" onPress={() => router.push("/policies/terms")}>
+              이용약관
+            </Text>
+            {" 및 "}
+            <Text accessibilityRole="link" onPress={() => router.push("/policies/privacy")}>
+              개인정보 처리방침
+            </Text>
+            에 동의합니다.
+          </Text>
+        </View>
         <Pressable
           onPress={() => router.replace("/browse")}
           accessibilityRole="button"
-          className="mt-6 h-12 min-w-12 items-center justify-center"
+          className="mt-1 h-12 min-w-12 items-center justify-center"
         >
           <Text className="text-gray-500 underline font-b3">회원가입 없이 둘러보기</Text>
         </Pressable>
-        <View className="mt-6 w-full flex-1 flex-row flex-wrap items-end justify-center gap-x-[3px]">
-          <View className="h-12 justify-center">
-            <Text className="text-gray-500 font-meta">로그인 시</Text>
-          </View>
-          <Pressable
-            onPress={() => router.push("/policies/terms")}
-            accessibilityRole="button"
-            className="h-12 items-center justify-center"
-          >
-            <Text className="text-gray-700 underline font-meta">이용약관</Text>
-          </Pressable>
-          <View className="h-12 justify-center">
-            <Text className="text-gray-500 font-meta">및</Text>
-          </View>
-          <View className="h-12 flex-row items-center">
-            <Pressable
-              onPress={() => router.push("/policies/privacy")}
-              accessibilityRole="button"
-              className="h-12 items-center justify-center"
-            >
-              <Text className="text-gray-700 underline font-meta">개인정보 처리방침</Text>
-            </Pressable>
-            <Text className="text-gray-500 font-meta">에 동의하게 됩니다.</Text>
-          </View>
-        </View>
       </ScrollView>
       {isLoading && <LoadingDialog message="로그인 중입니다." />}
-      {suspension && (
-        <SanctionNoticeModal
-          visible
-          notice={{
-            type: "suspended",
-            reasonLabel: suspension.reasonCategory
-              ? SANCTION_REASON_LABELS[suspension.reasonCategory]
-              : "1:1 문의로 확인해 주세요.",
-          }}
-          onConfirm={() => setSuspension(null)}
-        />
-      )}
+      <ActionModal
+        visible={isConsentNoticeOpen}
+        title="약관 동의가 필요합니다."
+        description="필수 항목에 동의한 후 다시 로그인해 주세요."
+        isPrimaryDisabled={false}
+        onRequestClose={() => setIsConsentNoticeOpen(false)}
+        primaryAction={{ label: "확인", onPress: () => setIsConsentNoticeOpen(false) }}
+      />
+      {suspension &&
+        (suspension.reasonCategory === "underage" ? (
+          <UnderageNoticeModal onConfirm={() => setSuspension(null)} />
+        ) : (
+          <SanctionNoticeModal
+            visible
+            notice={{
+              type: "suspended",
+              reasonLabel: suspension.reasonCategory
+                ? SANCTION_REASON_LABELS[suspension.reasonCategory]
+                : "1:1 문의로 확인해 주세요.",
+            }}
+            onConfirm={() => setSuspension(null)}
+          />
+        ))}
     </View>
   );
 }

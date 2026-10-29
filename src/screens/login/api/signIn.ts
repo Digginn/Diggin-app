@@ -92,7 +92,13 @@ async function signInWithAppleNative(onAuthorized: () => void): Promise<SignInRe
   try {
     const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
     if (!credential.identityToken) throw new Error("apple_identity_token_missing");
-    return signInWithIdentity("apple", credential.identityToken, onAuthorized);
+    const result = await signInWithIdentity("apple", credential.identityToken, onAuthorized);
+    // 자동 삭제 때 재인증 없이 애플 연결을 끊으려고 맡긴다. 실패해도 로그인은 이어 간다.
+    if (result.status === "success" && credential.authorizationCode)
+      void supabase.functions
+        .invoke("apple-token", { body: { authorization_code: credential.authorizationCode } })
+        .catch(() => {});
+    return result;
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ERR_REQUEST_CANCELED") {
       return { status: "cancelled" };

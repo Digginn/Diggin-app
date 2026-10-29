@@ -399,12 +399,23 @@ export type Database = {
         Args: { actor: string; actor_session: string; mark_failed?: boolean; request_id: string };
         Returns: Json;
       };
+      admin_set_retention_hold: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          hold_id: number;
+          hold_type: string;
+          is_held: boolean;
+        };
+        Returns: boolean;
+      };
       agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
       block_community_author: {
         Args: { target_id: number; target_type: string };
         Returns: undefined;
       };
       claim_notification_pushes: { Args: { receipts?: boolean }; Returns: Json };
+      claim_underage_deletion: { Args: { target: string }; Returns: boolean };
       create_comment: {
         Args: { comment_content: string; request_id: string; target_post_id: number };
         Returns: Json;
@@ -423,6 +434,13 @@ export type Database = {
       dismiss_first_visit_guide: {
         Args: { target_guide_kind: string; target_user_id: string };
         Returns: undefined;
+      };
+      due_underage_deletions: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          apple_refresh_token: string;
+          user_id: string;
+        }[];
       };
       finish_notification_push: {
         Args: {
@@ -526,6 +544,10 @@ export type Database = {
         Returns: undefined;
       };
       set_push_enabled: { Args: { enabled: boolean }; Returns: boolean };
+      store_apple_refresh_token: {
+        Args: { refresh_token: string; target_user: string };
+        Returns: undefined;
+      };
       update_comment: {
         Args: { comment_content: string; target_comment_id: number };
         Returns: Json;
@@ -547,7 +569,7 @@ export type Database = {
       import_status: "processing" | "completed" | "failed";
       notification_type: "vote_ended" | "post_commented" | "post_liked";
       post_type: "post" | "vote";
-      report_reason: "abuse" | "spam" | "inappropriate" | "other";
+      report_reason: "abuse" | "spam" | "inappropriate" | "other" | "underage";
       report_status: "received" | "reviewing" | "resolved" | "rejected";
       report_target: "post" | "comment";
       vote_choice: "buy" | "not";
@@ -683,7 +705,7 @@ export const Constants = {
       import_status: ["processing", "completed", "failed"],
       notification_type: ["vote_ended", "post_commented", "post_liked"],
       post_type: ["post", "vote"],
-      report_reason: ["abuse", "spam", "inappropriate", "other"],
+      report_reason: ["abuse", "spam", "inappropriate", "other", "underage"],
       report_status: ["received", "reviewing", "resolved", "rejected"],
       report_target: ["post", "comment"],
       vote_choice: ["buy", "not"],

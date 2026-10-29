@@ -24,8 +24,9 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 | hide / restore   | request_id, report_id, reason_category, reason                     | 운영자 숨김·복구. 작성자 삭제는 복구하지 않음                                               |
 | sanction         | request_id, user_id, sanction, reason_category, reason, report_id? | warning / community_restricted / suspended / release                                        |
 | sanction_request | request_id                                                         | 본인이 시작한 제재 요청의 pending/applied/failed와 action_id 조회                           |
+| retention_hold   | target_type(report/sanction), target_id, held(true/false)          | 이의제기·분쟁 중인 신고·제재를 보관기간 자동 삭제에서 빼거나(true) 다시 넣음(false)         |
 
-`reason_category`: abuse, spam, inappropriate, other. `reason`: 공백만으로 구성되지 않은 1~1000 사용자 인식 문자. 사용자 안내에는 유형만 표시하고 상세 사유는 공개하지 않는다. 신고 수에 따른 자동 숨김·삭제·제재·단계 상승은 없다.
+`reason_category`: abuse, spam, inappropriate, other, underage. underage(만 14세 미만)는 `suspended`·`release`에만 허용하며 앱은 제재 안내 대신 MSG-AUTH-007 이용 중단 안내를 띄운다. `reason`: 공백만으로 구성되지 않은 1~1000 사용자 인식 문자. 사용자 안내에는 유형만 표시하고 상세 사유는 공개하지 않는다. 신고 수에 따른 자동 숨김·삭제·제재·단계 상승은 없다.
 
 ```json
 {
@@ -76,6 +77,7 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
    - #115 최초 Retool 계정은 `20261021173103_register_retool_operator.sql` 데이터 마이그레이션으로 등록한다. 지정한 UID의 이메일 확인이 완료된 Auth 계정만 `operator`로 추가하며, 계정이 없는 로컬/CI에서는 건너뛴다. 기존 운영자의 권한·비활성화 상태는 바꾸지 않는다. PR 승인·병합 후 자동 배포가 끝나야 Retool에서 관리자 API를 사용할 수 있다.
    - #121은 승인 리뷰 없이 병합되어 배포의 승인 검사에서 중단됐다. 사용자 지시에 따라 복구 PR #122만 팀원 승인 예외로 배포하며 다른 PR의 승인 조건은 유지한다. DB 등록 SQL은 직접 실행하지 않는다. #122의 `deploy` 성공 후 Retool 관리자 로그인과 `list_reports` 성공을 확인한다. 신고가 없어 빈 배열이 반환되어도 정상이며, 403이면 Auth 이메일 확인과 해당 UID의 운영자 등록·비활성화 상태를 확인한다.
 4. 승인된 PR을 develop에 병합하면 기존 검증과 DB 배포 후 두 Edge Function을 배포한다. 함수 배포 실패는 Actions 실패로 남기며 설정을 고쳐 같은 실행을 다시 실행한다. API 설정·관리자 계정·audience 값은 코드에서 임의 생성하지 않는다.
+5. 만 14세 미만 자동 삭제(#164)를 켜려면 운영자가 충분히 긴 임의 비밀값을 만들어 `underage-cleanup` 함수 secret `UNDERAGE_CLEANUP_SECRET`으로 등록하고, Vault에 같은 값을 `underage_cleanup_secret`, 함수 주소 `https://<project-ref>.supabase.co/functions/v1/underage-cleanup`를 `underage_cleanup_url`로 등록한다. 설정이 없으면 함수는 503, DB cron은 호출 없이 종료한다. `apple-token`·`underage-cleanup`은 탈퇴와 같은 `APPLE_PRIVATE_KEY`·`APPLE_KEY_ID`·`APPLE_TEAM_ID` secret을 쓴다. Retool 제재 화면의 사유 목록에 `underage`(만 14세 미만)를 추가해야 운영자가 고를 수 있다.
 
 ## 로컬 검증
 
