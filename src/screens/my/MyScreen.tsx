@@ -41,7 +41,7 @@ function MySection({ title, Icon, rows }: MySectionProps) {
 type MyScreenProps = {
   isGuest?: boolean;
   onLogout?: () => Promise<void>;
-  onWithdraw?: (survey: WithdrawalSurvey) => Promise<void>;
+  onWithdraw?: (survey: WithdrawalSurvey) => Promise<"cancelled" | void>;
   onWithdrawComplete?: () => void;
 };
 

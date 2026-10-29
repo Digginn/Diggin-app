@@ -363,12 +363,13 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 `account-withdrawal` Edge Function이 JWT의 사용자만 지운다(#120).
 
+0. 애플 가입자는 앱이 탈퇴 직전 다시 받은 애플 인증 코드(`apple_authorization_code`)로 애플 토큰을 받아 해지한다(#159, Apple 계정 삭제 가이드). 코드가 없으면 400, 재인증한 애플 계정이 가입 계정과 다르면 403, 토큰 발급·해지가 실패하면 503으로 계정을 지우지 않는다. 재시도는 새 코드로 다시 해지한다. 애플 토큰은 저장하지 않는다. Edge secret `APPLE_PRIVATE_KEY`(Sign in with Apple .p8), `APPLE_KEY_ID`, `APPLE_TEAM_ID`가 필요하고, client_id는 앱 번들 ID다.
 1. Storage avatars/{user_id}/ 파일을 지운다. 실패하면 계정을 지우지 않는다.
 2. auth.users를 지운다. 세션·리프레시 토큰이 함께 지워지고, 나머지는 FK가 처리한다. 이미 발급된 access token은 만료 전까지 남지만 프로필이 없어 쓸 데이터가 없다.
    - cascade: profiles, products, folders, product_folders, import_*, posts(와 그 글의 하위 데이터), notifications, push_tokens, user_policy_consents, user_blocks, like_notification_log
    - set null: comments.author_id, vote_responses.user_id, post_likes.user_id, reports.reporter_id
    - profiles 삭제 전 트리거(`profiles_clear_withdrawn_comments`)가 같은 트랜잭션에서 사용자 글을 먼저 지우고(그 글의 댓글도 함께 지워짐), 남은 사용자 댓글 content를 null로 바꾼다. 글을 FK 연쇄에 맡기면 본인 글에 단 본인 댓글이 먼저 수정된 뒤 글이 지워져 comments_post_id_fkey 위반으로 탈퇴가 실패했다.
-3. 계정이 지워진 뒤 설문을 private.withdrawal_surveys에 저장한다(user_id 없음). 재시도로 중복되지 않게 마지막에 두고, 실패해도 탈퇴는 성공으로 본다.
+3. 계정이 지워진 뒤 설문을 private.withdrawal_surveys에 저장한다(user_id 없음). 재시도로 중복되지 않게 마지막에 두고, 실패해도 탈퇴는 성공으로 본다. 설문은 선택 응답이라(#159) 사유와 직접 작성이 모두 비어 있으면 저장하지 않는다. 직접 작성만 고른 경우는 앱이 내용 입력 전까지 탈퇴하기를 막는다.
 
 ## 8-1. 계정별 첫 진입 안내 (#152)
 

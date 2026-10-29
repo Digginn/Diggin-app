@@ -42,9 +42,8 @@ export function AccountWithdrawalSurvey({
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(() => Keyboard.isVisible());
   const hasCustomReason = reasons.includes("직접 작성");
   const count = Array.from(splitGraphemes(detail)).length;
-  const canSubmit =
-    reasons.some((reason) => reason !== "직접 작성") ||
-    (hasCustomReason && detail.trim().length > 0);
+  // 설문은 선택 응답이다. 직접 작성만 골랐다면 내용을 채워야 한다.
+  const canSubmit = !hasCustomReason || reasons.length > 1 || detail.trim().length > 0;
 
   useEffect(() => {
     const show = Keyboard.addListener(
