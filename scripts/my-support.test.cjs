@@ -423,7 +423,7 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
   const context = setup("PolicyDocumentScreen");
   for (const [document, title, lastText] of [
     ["terms", "이용약관", "고객지원: diggin.app@gmail.com"],
-    ["privacy", "개인정보 처리방침", "· 개인정보 관련 문의처: [확인 필요]"],
+    ["privacy", "개인정보 처리방침", "· 개인정보 관련 문의처: diggin.app@gmail.com"],
     [
       "community",
       "커뮤니티 이용정책",
