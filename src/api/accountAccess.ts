@@ -5,7 +5,7 @@ export type AccountAccess = {
   status: "active" | "warning" | "community_restricted" | "suspended";
   restrictedUntil: string | null;
   sanctionId: string | null;
-  reasonCategory: "abuse" | "spam" | "inappropriate" | "other" | null;
+  reasonCategory: keyof typeof SANCTION_REASON_LABELS | "underage" | null;
   noticeSeenAt: string | null;
 };
 export const SANCTION_REASON_LABELS = {
@@ -27,6 +27,7 @@ export function parseAccountAccess(value: unknown): AccountAccess {
     (row.sanction_id != null &&
       (typeof row.sanction_id !== "string" || !/^\d+$/.test(row.sanction_id))) ||
     (row.reason_category != null &&
+      row.reason_category !== "underage" &&
       !Object.hasOwn(SANCTION_REASON_LABELS, String(row.reason_category))) ||
     (row.notice_seen_at != null &&
       (typeof row.notice_seen_at !== "string" || !Number.isFinite(Date.parse(row.notice_seen_at))))

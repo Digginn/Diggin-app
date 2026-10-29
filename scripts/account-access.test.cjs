@@ -235,6 +235,7 @@ function noticeHarness() {
     "@/screens/diggle/components/SanctionNoticeModal": {
       SanctionNoticeModal: "SanctionNoticeModal",
     },
+    "@/components/UnderageNoticeModal": { UnderageNoticeModal: "UnderageNoticeModal" },
   });
   return {
     render() {
@@ -326,6 +327,25 @@ test("영구 제한은 DIGGLE 밖에서도 세션 종료·비회원 로그인 �
   assert.deepEqual(harness.routes, ["/login"]);
   tree.props.onConfirm();
   assert.equal(harness.confirmed, 1);
+});
+
+test("만 14세 미만으로 이용 중단된 계정은 제재 안내 대신 이용 중단 안내를 띄운다", async () => {
+  const harness = noticeHarness();
+  harness.setAccess({ status: "suspended", sanctionId: "4", reasonCategory: "underage" });
+  harness.render();
+  await settle();
+  const tree = harness.render();
+  assert.equal(tree.type, "UnderageNoticeModal");
+  assert.deepEqual(harness.routes, ["/login"]);
+  tree.props.onConfirm();
+  assert.equal(harness.confirmed, 1);
+});
+test("서버가 보낸 만 14세 미만 사유를 그대로 읽는다", () => {
+  const { api } = accountApi();
+  assert.equal(
+    api.parseAccountAccess({ status: "suspended", reason_category: "underage" }).reasonCategory,
+    "underage",
+  );
 });
 
 test("재조회 중 경고·7일 제한 모달을 유지하고 확인·해제 응답에서 닫는다", () => {
