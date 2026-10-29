@@ -427,7 +427,7 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
     [
       "community",
       "커뮤니티 이용정책",
-      "게시글을 등록하면 DIGGIN 커뮤니티 이용정책에 동의한 것으로 간주됩니다.",
+      "게시글을 등록하면 Diggin 커뮤니티 이용규칙을 확인하고 준수하는 것으로 안내됩니다.",
     ],
   ]) {
     const nodes = expand(context.Screen({ document }));
