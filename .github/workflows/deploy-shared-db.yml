@@ -162,6 +162,8 @@ jobs:
           supabase functions deploy account-withdrawal --project-ref "$SUPABASE_PROJECT_ID"
           supabase functions deploy notification-push --project-ref "$SUPABASE_PROJECT_ID"
           supabase functions deploy csv-import --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy apple-token --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy underage-cleanup --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Report the deployed commit
         env:
@@ -181,7 +183,7 @@ jobs:
         run: |
           npm exec --yes --package=deno@2.5.6 -- deno fmt --config supabase/functions/deno.json --check supabase/functions
           npm exec --yes --package=deno@2.5.6 -- deno lint --config supabase/functions/deno.json supabase/functions
-          npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/admin-moderation/index.ts supabase/functions/account-restriction/index.ts supabase/functions/account-withdrawal/index.ts supabase/functions/notification-push/index.ts
-          npm exec --yes --package=deno@2.5.6 -- deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts supabase/functions/account-withdrawal/handler_test.ts supabase/functions/notification-push/handler_test.ts
+          npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/admin-moderation/index.ts supabase/functions/account-restriction/index.ts supabase/functions/account-withdrawal/index.ts supabase/functions/notification-push/index.ts supabase/functions/apple-token/index.ts supabase/functions/underage-cleanup/index.ts
+          npm exec --yes --package=deno@2.5.6 -- deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts supabase/functions/account-withdrawal/handler_test.ts supabase/functions/notification-push/handler_test.ts supabase/functions/apple-token/handler_test.ts supabase/functions/underage-cleanup/handler_test.ts
           npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/csv-import/index.ts
           npm exec --yes --package=deno@2.5.6 -- deno test --config supabase/functions/deno.json supabase/functions/csv-import/handler_test.ts

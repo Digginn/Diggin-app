@@ -166,3 +166,26 @@ Deno.test("Content-Length가 없는 16KiB 초과 요청은 RPC 없이 거부", a
   assert((await handler(request({ ...body, reason: "a".repeat(16384) }))).status === 413);
   assert(calls === 0);
 });
+
+Deno.test("보관 유지 표시는 대상과 true/false만 받아 인증한 운영자로 저장", async () => {
+  const calls: [string, Record<string, unknown>][] = [];
+  const handler = createAdminHandler({
+    authenticate: () => Promise.resolve(actor),
+    rpc: (name, args) => {
+      calls.push([name, args]);
+      return Promise.resolve(true);
+    },
+    updateAuth: () => Promise.resolve(),
+  });
+  const ok = await handler(
+    request({ action: "retention_hold", target_type: "sanction", target_id: "7", held: true }),
+  );
+  assert(ok.status === 200 && (await ok.json()).held === true);
+  assert(calls[0][0] === "admin_set_retention_hold");
+  assert(calls[0][1].hold_id === "7" && calls[0][1].is_held === true);
+  assert(calls[0][1].actor === actor.userId && calls[0][1].actor_session === actor.sessionId);
+  const bad = await handler(
+    request({ action: "retention_hold", target_type: "sanction", target_id: "7", held: "yes" }),
+  );
+  assert(bad.status === 400 && calls.length === 1);
+});

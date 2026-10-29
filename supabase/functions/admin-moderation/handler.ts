@@ -100,6 +100,16 @@ export function createAdminHandler(services: Services) {
           }),
         );
       }
+      if (body.action === "retention_hold") {
+        if (typeof body.held !== "boolean") return json({ error: "invalid_request" }, 400);
+        return json({
+          held: await rpc("admin_set_retention_hold", {
+            hold_type: text(body.target_type, 20),
+            hold_id: id(body.target_id),
+            is_held: body.held,
+          }),
+        });
+      }
       const requestId = uuid(body.request_id);
       if (body.action === "sanction_request") {
         return json(await rpc("admin_sanction_request", { request_id: requestId }));

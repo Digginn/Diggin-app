@@ -440,6 +440,13 @@ verify_jwt = true
 [functions.account-withdrawal]
 verify_jwt = true
 
+[functions.apple-token]
+verify_jwt = true
+
+# 전용 UNDERAGE_CLEANUP_SECRET을 함수 내부에서 검증한다. pg_cron만 부른다.
+[functions.underage-cleanup]
+verify_jwt = false
+
 # 전용 PUSH_DISPATCH_SECRET을 함수 내부에서 검증한다. 앱의 사용자 JWT는 허용하지 않는다.
 [functions.notification-push]
 verify_jwt = false
