@@ -100,17 +100,21 @@ export type ProductDetail = { values: ItemSaveValues; isOwned: boolean };
 export async function fetchProduct(id: string): Promise<ProductDetail> {
   const { data, error } = await supabase
     .from("products")
-    .select("name, brand, price, url, image_url, wish_level, product_folders(folders(kind))")
+    .select(
+      "name, brand, price, url, image_url, wish_level, restriction_labels, product_folders(folders(kind))",
+    )
     .eq("id", Number(id))
     .single();
   if (error) throw error;
   const row = data as Omit<ProductRow, "id"> & {
     url: string;
     wish_level: WishLevelKey | null;
+    restriction_labels: string[];
   };
   return {
     isOwned: row.product_folders.some((relation) => relation.folders?.kind === "owned"),
     values: {
+      ...(row.restriction_labels?.length ? { restrictionLabels: row.restriction_labels } : {}),
       name: row.name,
       brand: row.brand ?? "",
       price: row.price === null ? "" : String(row.price),
@@ -138,6 +142,9 @@ export async function saveProduct(values: ItemSaveValues, folderIds: readonly st
     ...(values.thumbnailUrl && { product_image_url: values.thumbnailUrl }),
     ...(values.wishLevel && { product_wish_level: values.wishLevel }),
     folder_ids: folderIds.map(Number),
+    ...(values.restrictionLabels?.length && {
+      product_restriction_labels: values.restrictionLabels,
+    }),
   });
   if (error) {
     // SDK는 응답을 못 받은 fetch 실패를 status 0으로 반환한다. 기기별 오류 문구에 의존하지 않는다.

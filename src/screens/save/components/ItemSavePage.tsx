@@ -23,6 +23,8 @@ import { FolderManageSheet } from "@/screens/item-detail/components/FolderManage
 import { ITEM_INFO_DESCRIPTION } from "@/screens/item-detail/components/ItemEditSheet";
 import type { ItemSaveValues } from "@/types/wish-item";
 
+import { isRestrictedProduct, RESTRICTED_PRODUCT_MESSAGE } from "../domain/restrictedProduct";
+
 type ItemSavePageProps = {
   visible: boolean;
   initialValues: ItemSaveValues;
@@ -99,6 +101,10 @@ export function ItemSavePage({
 
   // 폴더를 다 고른 뒤에 중복을 알리지 않도록 시트를 열기 전에 확인한다. 확인에 실패하면 저장 때 서버가 막는다.
   async function openFolderSheet() {
+    if (isRestrictedProduct(values.name, values.restrictionLabels)) {
+      setToast(RESTRICTED_PRODUCT_MESSAGE);
+      return;
+    }
     if (isCheckingRef.current) return;
     isCheckingRef.current = true;
     setOverlay(null);

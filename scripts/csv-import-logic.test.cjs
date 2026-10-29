@@ -16,7 +16,21 @@ runInNewContext(
   {
     module: domainModule,
     exports: domainModule.exports,
-    require,
+    require: (name) => {
+      if (name !== "../../save/domain/restrictedProduct") return require(name);
+      const policy = { exports: {} };
+      runInNewContext(
+        ts.transpileModule(
+          readFileSync(
+            path.join(__dirname, "../src/screens/save/domain/restrictedProduct.ts"),
+            "utf8",
+          ),
+          { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+        ).outputText,
+        { module: policy, exports: policy.exports },
+      );
+      return policy.exports;
+    },
     TextDecoder,
     URL,
   },

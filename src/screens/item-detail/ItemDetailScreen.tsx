@@ -24,6 +24,7 @@ import { useProductCounts } from "@/hooks/useProductCounts";
 import { useToast } from "@/hooks/useToast";
 import { useDeleteProducts } from "@/screens/all/mutations/useDeleteProducts";
 import { FolderMenu } from "@/screens/folder/components/FolderMenu";
+import { itemSaveErrorMessage } from "@/screens/save/domain/itemSaveError";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { FolderManageButton } from "./components/FolderManageButton";
@@ -263,7 +264,12 @@ export function ItemDetailScreen() {
                 setEditOpen(false);
                 showToast(TOAST_MESSAGES.ALL_004);
               },
-              onError: () => setEditError(TOAST_MESSAGES.ALL_005),
+              onError: (error) =>
+                setEditError(
+                  error.message.includes("restricted_product")
+                    ? itemSaveErrorMessage(error)
+                    : TOAST_MESSAGES.ALL_005,
+                ),
             },
           )
         }

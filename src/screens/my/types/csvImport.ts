@@ -21,7 +21,11 @@ export type CsvFileError =
   "INVALID_FILE_TYPE" | "FILE_TOO_LARGE" | "INVALID_UTF8" | "INVALID_HEADERS";
 
 export type CsvRowFailureReason =
-  "EMPTY_PRODUCT_NAME" | "EMPTY_PRODUCT_URL" | "INVALID_PRODUCT_URL" | "CSV_ROW_PARSE_ERROR";
+  | "EMPTY_PRODUCT_NAME"
+  | "EMPTY_PRODUCT_URL"
+  | "INVALID_PRODUCT_URL"
+  | "CSV_ROW_PARSE_ERROR"
+  | "RESTRICTED_PRODUCT";
 
 export type CsvRowFailure = {
   rowNumber: number;
@@ -36,6 +40,7 @@ export type CsvDuplicateRow = {
 };
 
 export type CsvPlannedProduct = {
+  restrictionLabels?: string[];
   rowNumber: number;
   name: string;
   url: string;

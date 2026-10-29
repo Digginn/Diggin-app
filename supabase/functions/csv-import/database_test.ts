@@ -112,6 +112,45 @@ Deno.test({
       }, new AbortController().signal) as { importedCount: number };
       assert(replay.importedCount === 100);
 
+      // 제한 상품이 섞여도 스트리밍 저장은 정상 상품만 반영하고 제외 사유를 반환한다.
+      const sample = (input.import_plan.products as Record<string, unknown>[])[0];
+      const restrictedInput: ImportRequest = {
+        request_id: crypto.randomUUID(),
+        import_plan: {
+          ...input.import_plan,
+          totalCount: 3,
+          failures: [],
+          duplicates: [],
+          products: [
+            { ...sample, name: "상품 19금", url: "https://csv.test/restricted/age" },
+            {
+              ...sample,
+              rowNumber: 3,
+              name: "선물",
+              restrictionLabels: ["주류"],
+              url: "https://csv.test/restricted/category",
+            },
+            { ...sample, rowNumber: 4, name: "가방", url: "https://csv.test/restricted/allowed" },
+          ],
+        },
+      };
+      const restrictedResult = await saveCsvImport(
+        databaseUrl!,
+        identity,
+        restrictedInput,
+        () => {},
+        new AbortController().signal,
+      ) as { importedCount: number; excludedProducts: { reason: string }[] };
+      assert(restrictedResult.importedCount === 1, "restricted_rows_must_not_be_imported");
+      assert(
+        restrictedResult.excludedProducts.length === 2 &&
+          restrictedResult.excludedProducts.every((item) => item.reason === "RESTRICTED_PRODUCT"),
+        "restricted_rows_must_have_policy_reason",
+      );
+      const [restrictedStored] = await sql`select count(*)::int as n from public.products
+        where user_id=${userId} and url like 'https://csv.test/restricted/%'`;
+      assert(restrictedStored.n === 1, "only_allowed_product_must_be_committed");
+
       // 마지막 잘못된 행에서 실패해도 앞서 생성한 상품·폴더·작업 기록은 모두 롤백한다.
       const broken: ImportRequest = {
         request_id: crypto.randomUUID(),
