@@ -17,6 +17,11 @@ Deno.serve(createUnderageCleanupHandler({
     if (error || !Array.isArray(data)) throw new Error("lookup_failed");
     return data as DueAccount[];
   },
+  async claim(userId) {
+    const { data, error } = await client.rpc("claim_underage_deletion", { target: userId });
+    if (error || typeof data !== "boolean") throw new Error("claim_failed");
+    return data;
+  },
   revokeAppleToken,
   removeAvatars: (userId) => removeAvatars(client, userId),
   deleteUser: (userId) => deleteUser(client, userId),

@@ -254,6 +254,10 @@ begin
   if not found then raise exception 'user_not_found' using errcode='P0002'; end if;
   if exists(select 1 from private.admin_users where id=target_user and disabled_at is null) then
     raise exception 'cannot_sanction_admin' using errcode='22023'; end if;
+  -- 자동 삭제가 시작된 계정을 해제하면 복구한 계정이 지워진다. 한 시간이 지난 중단 작업만 다시 해제할 수 있다.
+  if operation='release' and exists(select 1 from private.underage_deletion_claims
+    where user_id=target_user and claimed_at > now() - interval '1 hour') then
+    raise exception 'account_deletion_in_progress' using errcode='55000'; end if;
   if (profile.status='suspended' and operation<>'release') or (profile.status='active' and operation='release') then
     raise exception 'sanction_state_conflict' using errcode='22023'; end if;
   if report is not null and not exists(select 1 from private.reports where id=report and reported_user_id=target_user) then

@@ -112,6 +112,10 @@ begin
   if not found then raise exception 'user_not_found' using errcode='P0002'; end if;
   if exists(select 1 from private.admin_users where id=target_user and disabled_at is null) then
     raise exception 'cannot_sanction_admin' using errcode='22023'; end if;
+  -- 자동 삭제가 시작된 계정을 해제하면 복구한 계정이 지워진다. 한 시간이 지난 중단 작업만 다시 해제할 수 있다.
+  if operation='release' and exists(select 1 from private.underage_deletion_claims
+    where user_id=target_user and claimed_at > now() - interval '1 hour') then
+    raise exception 'account_deletion_in_progress' using errcode='55000'; end if;
   if (profile.status='suspended' and operation<>'release') or (profile.status='active' and operation='release') then
     raise exception 'sanction_state_conflict' using errcode='22023'; end if;
   if report is not null and not exists(select 1 from private.reports where id=report and reported_user_id=target_user) then
@@ -192,6 +196,27 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION private.claim_underage_deletion (
+  target uuid
+)
+  RETURNS boolean
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+begin
+  perform 1 from public.profiles where id = target for update;
+  if not found or not private.is_underage_deletion_due(target) or
+    exists (select 1 from private.moderation_requests where user_id = target and state = 'pending') or
+    exists (select 1 from private.underage_deletion_claims where user_id = target and claimed_at > now() - interval '1 hour') then
+    return false;
+  end if;
+  insert into private.underage_deletion_claims(user_id) values (target)
+    on conflict (user_id) do update set claimed_at = now();
+  return true;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION private.delete_apple_refresh_token_secret()
   RETURNS TRIGGER
   LANGUAGE plpgsql
@@ -264,6 +289,7 @@ CREATE OR REPLACE FUNCTION private.due_underage_deletions()
   left join vault.decrypted_secrets secret on secret.id = token.secret_id
   where p.status = 'suspended' and sanction.reason_category = 'underage'
     and sanction.created_at <= now() - interval '1 month'
+    and not exists (select 1 from private.underage_deletion_claims c where c.user_id = p.id and c.claimed_at > now() - interval '1 hour')
   order by sanction.created_at
   limit 50;
 $function$;
@@ -302,6 +328,27 @@ CREATE OR REPLACE FUNCTION private.is_admin_action_expired (
     where a.id = action_id and a.created_at < now() - interval '1 year'
       and not exists (select 1 from private.user_sanctions s where s.action_id = a.id)
       and not exists (select 1 from private.retention_holds h where h.target_type = 'report' and h.target_id = a.report_id)
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION private.is_underage_deletion_due (
+  target uuid
+)
+  RETURNS boolean
+  LANGUAGE sql
+  STABLE
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+  select exists (
+    select 1 from public.profiles p
+    join lateral (
+      select s.reason_category, s.created_at from private.user_sanctions s
+      where s.user_id = p.id and s.kind = 'suspended' and s.released_at is null
+      order by s.id desc limit 1
+    ) sanction on true
+    where p.id = target and p.status = 'suspended' and sanction.reason_category = 'underage'
+      and sanction.created_at <= now() - interval '1 month'
   );
 $function$;
 
@@ -376,6 +423,18 @@ $function$;
 
 REVOKE ALL ON FUNCTION "public"."admin_set_retention_hold"(uuid, uuid, text, bigint, boolean) FROM PUBLIC, "anon", "authenticated";
 
+CREATE OR REPLACE FUNCTION public.claim_underage_deletion (
+  target uuid
+)
+  RETURNS boolean
+  LANGUAGE sql
+  SET search_path TO ''
+  AS $function$
+  select private.claim_underage_deletion(target);
+$function$;
+
+REVOKE ALL ON FUNCTION "public"."claim_underage_deletion"(uuid) FROM PUBLIC, "anon", "authenticated";
+
 CREATE OR REPLACE FUNCTION public.due_underage_deletions()
   RETURNS TABLE (
     user_id             uuid,
@@ -412,6 +471,9 @@ ALTER TABLE "private"."apple_refresh_tokens"
 ALTER TABLE "private"."retention_holds"
   ADD CONSTRAINT "retention_holds_admin_id_fkey" FOREIGN KEY (admin_id) REFERENCES private.admin_users(id);
 
+ALTER TABLE "private"."underage_deletion_claims"
+  ADD CONSTRAINT "underage_deletion_claims_user_id_fkey" FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
 CREATE INDEX admin_access_logs_admin_idx ON private.admin_access_logs USING btree (admin_id);
 
 CREATE INDEX admin_access_logs_created_idx ON private.admin_access_logs USING btree (created_at);
@@ -425,6 +487,10 @@ REVOKE ALL ON FUNCTION "private"."admin_set_retention_hold"(uuid, uuid, text, bi
 
 GRANT EXECUTE ON FUNCTION "private"."admin_set_retention_hold"(uuid, uuid, text, bigint, boolean) TO "service_role";
 
+REVOKE ALL ON FUNCTION "private"."claim_underage_deletion"(uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."claim_underage_deletion"(uuid) TO "service_role";
+
 REVOKE ALL ON FUNCTION "private"."delete_apple_refresh_token_secret"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "private"."delete_expired_records"() FROM PUBLIC;
@@ -437,6 +503,8 @@ REVOKE ALL ON FUNCTION "private"."invoke_underage_cleanup"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "private"."is_admin_action_expired"(bigint) FROM PUBLIC;
 
+REVOKE ALL ON FUNCTION "private"."is_underage_deletion_due"(uuid) FROM PUBLIC;
+
 REVOKE ALL ON FUNCTION "private"."store_apple_refresh_token"(uuid, text) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION "private"."store_apple_refresh_token"(uuid, text) TO "service_role";
@@ -446,6 +514,12 @@ REVOKE ALL ON FUNCTION "public"."admin_set_retention_hold"(uuid, uuid, text, big
 GRANT EXECUTE ON FUNCTION "public"."admin_set_retention_hold"(uuid, uuid, text, bigint, boolean) TO "postgres";
 
 GRANT EXECUTE ON FUNCTION "public"."admin_set_retention_hold"(uuid, uuid, text, bigint, boolean) TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."claim_underage_deletion"(uuid) FROM "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."claim_underage_deletion"(uuid) TO "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."claim_underage_deletion"(uuid) TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."due_underage_deletions"() FROM "postgres";
 

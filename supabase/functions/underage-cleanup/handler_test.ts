@@ -9,11 +9,20 @@ function request(token: string | null = "secret") {
     headers: token ? { Authorization: "Bearer " + token } : {},
   });
 }
-function setup(accounts: DueAccount[], failRevoke = false, secret: string | undefined = "secret") {
+function setup(
+  accounts: DueAccount[],
+  failRevoke = false,
+  secret: string | undefined = "secret",
+  released: string[] = [],
+) {
   const calls: string[] = [];
   const handler = createUnderageCleanupHandler({
     secret,
     dueAccounts: () => Promise.resolve(accounts),
+    claim: (id) => {
+      calls.push("claim:" + id);
+      return Promise.resolve(!released.includes(id));
+    },
     revokeAppleToken: (token) => {
       calls.push("revoke:" + token);
       return failRevoke ? Promise.reject(new Error("x")) : Promise.resolve();
@@ -52,7 +61,8 @@ Deno.test("애플 연결을 먼저 끊고 사진·계정 순서로 지운다", a
   const response = await handler(request());
   assert((await response.json()).deleted === 2);
   assert(
-    calls.join(",") === "revoke:token,avatars:apple,user:apple,avatars:kakao,user:kakao",
+    calls.join(",") ===
+      "claim:apple,revoke:token,avatars:apple,user:apple,claim:kakao,avatars:kakao,user:kakao",
   );
 });
 
@@ -61,4 +71,16 @@ Deno.test("애플 연결 해제가 실패하면 그 계정은 지우지 않고 �
   const body = await (await handler(request())).json();
   assert(body.deleted === 0 && body.failed === 1);
   assert(!calls.some((call) => call.startsWith("user:")));
+});
+
+Deno.test("목록을 받은 뒤 운영자가 해제한 계정은 애플 해제·삭제 없이 건너뛴다", async () => {
+  const { handler, calls } = setup(
+    [{ user_id: "restored", apple_refresh_token: "token" }],
+    false,
+    "secret",
+    ["restored"],
+  );
+  const body = await (await handler(request())).json();
+  assert(body.deleted === 0 && body.skipped === 1);
+  assert(calls.join(",") === "claim:restored");
 });

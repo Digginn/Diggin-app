@@ -3,6 +3,8 @@ export type DueAccount = { user_id: string; apple_refresh_token: string | null }
 type Services = {
   secret: string | undefined;
   dueAccounts: () => Promise<DueAccount[]>;
+  /** 삭제 직전에 아직 대상인지 다시 확인하고 운영자 해제를 막는다. false면 건너뛴다. */
+  claim: (userId: string) => Promise<boolean>;
   revokeAppleToken: (refreshToken: string) => Promise<void>;
   removeAvatars: (userId: string) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
@@ -28,9 +30,13 @@ export function createUnderageCleanupHandler(services: Services) {
     } catch {
       return Response.json({ error: "lookup_failed" }, { status: 503 });
     }
-    let deleted = 0, failed = 0;
+    let deleted = 0, failed = 0, skipped = 0;
     for (const account of accounts) {
       try {
+        if (!(await services.claim(account.user_id))) {
+          skipped++;
+          continue;
+        }
         if (account.apple_refresh_token) {
           await services.revokeAppleToken(account.apple_refresh_token);
         }
@@ -41,6 +47,6 @@ export function createUnderageCleanupHandler(services: Services) {
         failed++;
       }
     }
-    return Response.json({ deleted, failed });
+    return Response.json({ deleted, failed, skipped });
   };
 }

@@ -34,5 +34,14 @@ CREATE TABLE "private"."retention_holds" (
 ALTER TABLE "private"."retention_holds"
   ENABLE ROW LEVEL SECURITY;
 
+CREATE TABLE "private"."underage_deletion_claims" (
+  "user_id"    uuid                     NOT NULL,
+  "claimed_at" timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "underage_deletion_claims_pkey" PRIMARY KEY (user_id)
+);
+
+ALTER TABLE "private"."underage_deletion_claims"
+  ENABLE ROW LEVEL SECURITY;
+
 ALTER TYPE "public"."report_reason" ADD VALUE 'underage' AFTER 'other';
 

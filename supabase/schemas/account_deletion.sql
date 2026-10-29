@@ -40,6 +40,54 @@ $$;
 revoke execute on function private.store_apple_refresh_token(uuid, text) from public, anon, authenticated;
 grant execute on function private.store_apple_refresh_token(uuid, text) to service_role;
 
+-- 삭제를 시작한 계정. 운영자 해제와 같은 프로필 행 잠금으로 순서를 정해 복구한 계정을 지우지 않는다.
+create table private.underage_deletion_claims (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  claimed_at timestamptz not null default now()
+);
+alter table private.underage_deletion_claims enable row level security;
+revoke all on table private.underage_deletion_claims from public, anon, authenticated, service_role;
+
+create or replace function private.is_underage_deletion_due(target uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.profiles p
+    join lateral (
+      select s.reason_category, s.created_at from private.user_sanctions s
+      where s.user_id = p.id and s.kind = 'suspended' and s.released_at is null
+      order by s.id desc limit 1
+    ) sanction on true
+    where p.id = target and p.status = 'suspended' and sanction.reason_category = 'underage'
+      and sanction.created_at <= now() - interval '1 month'
+  );
+$$;
+revoke execute on function private.is_underage_deletion_due(uuid) from public, anon, authenticated, service_role;
+
+-- 삭제 직전에 부른다. 아직 대상이고 진행 중인 제재·해제 요청이 없을 때만 표시하고 true를 돌려준다.
+create or replace function private.claim_underage_deletion(target uuid)
+returns boolean language plpgsql security definer set search_path = '' as $$
+begin
+  perform 1 from public.profiles where id = target for update;
+  if not found or not private.is_underage_deletion_due(target) or
+    exists (select 1 from private.moderation_requests where user_id = target and state = 'pending') or
+    exists (select 1 from private.underage_deletion_claims where user_id = target and claimed_at > now() - interval '1 hour') then
+    return false;
+  end if;
+  insert into private.underage_deletion_claims(user_id) values (target)
+    on conflict (user_id) do update set claimed_at = now();
+  return true;
+end;
+$$;
+revoke execute on function private.claim_underage_deletion(uuid) from public, anon, authenticated;
+grant execute on function private.claim_underage_deletion(uuid) to service_role;
+
+create or replace function public.claim_underage_deletion(target uuid)
+returns boolean language sql security invoker set search_path = '' as $$
+  select private.claim_underage_deletion(target);
+$$;
+revoke execute on function public.claim_underage_deletion(uuid) from public, anon, authenticated;
+grant execute on function public.claim_underage_deletion(uuid) to service_role;
+
 -- AUTH-002~004 만 14세 미만으로 이용 중단한 지 한 달이 지나도 해제되지 않은 계정. 한 번에 50개씩 처리한다.
 create or replace function private.due_underage_deletions()
 returns table(user_id uuid, apple_refresh_token text) language sql stable security definer set search_path = '' as $$
@@ -54,6 +102,7 @@ returns table(user_id uuid, apple_refresh_token text) language sql stable securi
   left join vault.decrypted_secrets secret on secret.id = token.secret_id
   where p.status = 'suspended' and sanction.reason_category = 'underage'
     and sanction.created_at <= now() - interval '1 month'
+    and not exists (select 1 from private.underage_deletion_claims c where c.user_id = p.id and c.claimed_at > now() - interval '1 hour')
   order by sanction.created_at
   limit 50;
 $$;
