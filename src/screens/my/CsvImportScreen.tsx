@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   BackHandler,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -15,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FolderLimitClose from "@/assets/images/icon-notification-banner-close.svg";
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
+import { ActionModal } from "@/components/modal";
 import { useToast } from "@/hooks/useToast";
 import { colors } from "@/theme";
 
@@ -66,6 +68,9 @@ export function CsvImportScreen({
   const [result, setResult] = useState<CsvImportResult | null>(null);
   const [isExcludedListOpen, setIsExcludedListOpen] = useState(false);
   const [isFolderLimitNoticeVisible, setIsFolderLimitNoticeVisible] = useState(false);
+  const [isImageNoticeVisible, setIsImageNoticeVisible] = useState(false);
+  const isImageNoticeOpen = useRef(false);
+  const isPickerPending = useRef(false);
   const folderLimitResolver = useRef<((confirmed: boolean) => void) | null>(null);
   const activeResult = suppliedResult ?? result;
   const isLoading = isImporting || suppliedProgress !== undefined;
@@ -79,6 +84,7 @@ export function CsvImportScreen({
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      isPickerPending.current = false;
       folderLimitResolver.current?.(false);
       folderLimitResolver.current = null;
     };
@@ -109,7 +115,7 @@ export function CsvImportScreen({
   };
 
   const handleSelectCsv = async () => {
-    if (isSelectingRef.current) return;
+    if (!isMounted.current || isSelectingRef.current) return;
     isSelectingRef.current = true;
     setIsSelecting(true);
     try {
@@ -163,6 +169,35 @@ export function CsvImportScreen({
     }
   };
 
+  const handleImageNoticeDismiss = () => {
+    if (!isPickerPending.current) return;
+    isPickerPending.current = false;
+    return handleSelectCsv();
+  };
+
+  const handleImageNoticeConfirm = () => {
+    if (!isImageNoticeOpen.current) return;
+    isImageNoticeOpen.current = false;
+    setIsImageNoticeVisible(false);
+    // iOS에서는 안내 모달이 완전히 닫힌 뒤 시스템 파일 선택기를 연다.
+    if (Platform.OS === "ios") {
+      isPickerPending.current = true;
+      return;
+    }
+    return handleSelectCsv();
+  };
+
+  const handleRequestCsv = () => {
+    if (isSelectingRef.current || isImageNoticeOpen.current || isPickerPending.current) return;
+    isImageNoticeOpen.current = true;
+    setIsImageNoticeVisible(true);
+  };
+
+  const handleCloseImageNotice = () => {
+    isImageNoticeOpen.current = false;
+    setIsImageNoticeVisible(false);
+  };
+
   return (
     <View
       className="flex-1 bg-gray-1000"
@@ -200,7 +235,7 @@ export function CsvImportScreen({
             contentContainerClassName={`items-center px-margin ${activeResult ? "pt-[65px]" : "pt-10"}`}
           >
             <View className="items-center gap-6">
-              <Text className="text-center text-gray-0 font-h1">
+              <Text className="text-center text-gray-0 font-h2">
                 {"모아둔 취향,\nDiggin에서 이어갑니다"}
               </Text>
               <Text className="text-center text-gray-400 font-label-16-medium">
@@ -236,13 +271,27 @@ export function CsvImportScreen({
               size="large"
               bgColor={colors.gray[0]}
               isDisabled={isSelecting && !isFolderLimitNoticeVisible}
-              onPress={isFolderLimitNoticeVisible ? () => answerFolderLimit(true) : handleSelectCsv}
+              onPress={
+                isFolderLimitNoticeVisible ? () => answerFolderLimit(true) : handleRequestCsv
+              }
             >
-              CSV 파일로 데이터 불러오기
+              {isFolderLimitNoticeVisible ? "데이터 이어서 불러오기" : "CSV 파일로 데이터 불러오기"}
             </Button>
           </View>
         </>
       )}
+      <ActionModal
+        visible={isImageNoticeVisible}
+        title="CSV 파일에서 이미지는 불러오지 않습니다."
+        description={
+          "아이템명, 가격(원화) 등의 정보를 불러와 저장합니다.\n아이템 이미지는 모두 기본으로 표시됩니다."
+        }
+        primaryAction={{ label: "확인", onPress: handleImageNoticeConfirm }}
+        isPrimaryDisabled={false}
+        scrimOpacity={0.36}
+        onRequestClose={handleCloseImageNotice}
+        onDismiss={handleImageNoticeDismiss}
+      />
       <CsvImportResultModal
         result={activeResult}
         isExcludedListOpen={isExcludedListOpen}

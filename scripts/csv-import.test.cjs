@@ -7,7 +7,7 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
-function setup(pick, bottomInset = 34) {
+function setup(pick, bottomInset = 34, platform = "android") {
   const alerts = [];
   const toasts = [];
   const showToast = (...args) => toasts.push(args);
@@ -56,6 +56,7 @@ function setup(pick, bottomInset = 34) {
             Pressable: "Pressable",
             ScrollView: "ScrollView",
             Alert: { alert: (...args) => alerts.push(args) },
+            Platform: { OS: platform },
             useWindowDimensions: () => ({ width: 375, height: 812 }),
           };
         if (name === "expo-document-picker") return { getDocumentAsync: pick };
@@ -64,6 +65,7 @@ function setup(pick, bottomInset = 34) {
           return { useSafeAreaInsets: () => ({ bottom: bottomInset }) };
         if (name === "@/components/app-bar") return { AppBar: "AppBar" };
         if (name === "@/components/Button") return { Button: "Button" };
+        if (name === "@/components/modal") return { ActionModal: "ActionModal" };
         if (name === "@/hooks/useToast") return { useToast: () => showToast };
         if (name === "@/theme") return { colors: { gray: { 0: "#FFFFFF" } } };
         if (name.endsWith("icon-notification-banner-close.svg")) return "FolderLimitClose";
@@ -90,7 +92,11 @@ function setup(pick, bottomInset = 34) {
       .find(Boolean);
   }
   const select = (props) => {
-    return find(render(props), "Button").props.onPress();
+    const pending = find(render(props), "Button").props.onPress();
+    const notice = find(render(props), "ActionModal");
+    if (!notice.props.visible) return pending;
+    const selection = notice.props.primaryAction.onPress();
+    return platform === "ios" ? find(render(props), "ActionModal").props.onDismiss() : selection;
   };
   return { render, select, alerts, toasts, selecting, find, unmount: () => unmount?.() };
 }
@@ -118,6 +124,63 @@ test("CSV 버튼 아래에 Figma의 최소 44dp 간격을 확보하고 큰 safe 
       Math.max(44, bottomInset + 10),
       `bottom inset ${bottomInset}: 버튼이 화면 아래에 붙으면 안 됩니다`,
     );
+  }
+});
+
+test("불러오기 버튼은 이미지 안내를 먼저 띄우고 확인한 뒤에만 파일 선택기를 연다", async () => {
+  let picks = 0;
+  const ui = setup(async () => {
+    picks++;
+    return { canceled: true, assets: null };
+  });
+  assert.equal(ui.find(ui.render(), "ActionModal").props.visible, false);
+  ui.find(ui.render(), "Button").props.onPress();
+  let notice = ui.find(ui.render(), "ActionModal");
+  assert.equal(picks, 0);
+  assert.equal(notice.props.visible, true);
+  assert.equal(notice.props.title, "CSV 파일에서 이미지는 불러오지 않습니다.");
+  assert.equal(
+    notice.props.description,
+    "아이템명, 가격(원화) 등의 정보를 불러와 저장합니다.\n아이템 이미지는 모두 기본으로 표시됩니다.",
+  );
+  assert.equal(notice.props.scrimOpacity, 0.36);
+  assert.equal(notice.props.isPrimaryDisabled, false);
+  assert.equal(notice.props.onClose, undefined);
+  notice.props.onRequestClose();
+  assert.equal(ui.find(ui.render(), "ActionModal").props.visible, false);
+  assert.equal(picks, 0);
+  ui.find(ui.render(), "Button").props.onPress();
+  notice = ui.find(ui.render(), "ActionModal");
+  const pending = notice.props.primaryAction.onPress();
+  notice.props.primaryAction.onPress();
+  await pending;
+  assert.equal(picks, 1);
+  assert.equal(ui.find(ui.render(), "ActionModal").props.visible, false);
+  ui.find(ui.render(), "Button").props.onPress();
+  assert.equal(ui.find(ui.render(), "ActionModal").props.visible, true);
+});
+
+test("iOS에서는 안내 모달의 닫힘 완료를 기다리고 중복 확인·화면 이탈로 선택기를 열지 않는다", async () => {
+  for (const leave of [false, true]) {
+    let picks = 0;
+    const ui = setup(
+      async () => {
+        picks++;
+        return { canceled: true, assets: null };
+      },
+      34,
+      "ios",
+    );
+    ui.find(ui.render(), "Button").props.onPress();
+    const notice = ui.find(ui.render(), "ActionModal");
+    notice.props.primaryAction.onPress();
+    notice.props.primaryAction.onPress();
+    ui.find(ui.render(), "Button").props.onPress();
+    assert.equal(picks, 0);
+    if (leave) ui.unmount();
+    await notice.props.onDismiss();
+    await notice.props.onDismiss();
+    assert.equal(picks, leave ? 0 : 1);
   }
 });
 
@@ -383,7 +446,7 @@ test("폴더 한도 배너에서 불러오기·닫기·뒤로가기·화면 이�
     };
     const originalSelect = ui.find(ui.render(props), "Button").props.onPress;
     assert.equal(ui.find(ui.render(props), "FolderLimitClose"), undefined);
-    const pending = originalSelect();
+    const pending = ui.select(props);
     await new Promise((resolve) => setImmediate(resolve));
     const notice = ui.render(props);
     assert.ok(
@@ -395,7 +458,7 @@ test("폴더 한도 배너에서 불러오기·닫기·뒤로가기·화면 이�
     assert.equal(writes, 0);
     const continueButton = ui.find(
       notice,
-      (node) => node.type === "Button" && node.props.children === "CSV 파일로 데이터 불러오기",
+      (node) => node.type === "Button" && node.props.children === "데이터 이어서 불러오기",
     );
     assert.equal(continueButton.props.isDisabled, false);
     // 확인 대기 중 파일 선택 콜백을 다시 실행해도 중복 작업이 생기지 않는다.
