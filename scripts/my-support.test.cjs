@@ -423,7 +423,7 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
   const context = setup("PolicyDocumentScreen");
   for (const [document, title, lastText] of [
     ["terms", "이용약관", "고객지원: diggin.app@gmail.com"],
-    ["privacy", "개인정보 처리방침", "· 개인정보 관련 문의처: diggin.app@gmail.com"],
+    ["privacy", "개인정보 처리방침", "개인정보 관련 문의처: diggin.app@gmail.com"],
     [
       "community",
       "커뮤니티 이용정책",
@@ -434,10 +434,33 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
     assert.equal(nodes.find((node) => node.type === "AppBar").props.title, title);
     assert.ok(nodes.some((node) => node.type === "ScrollView"));
     const textNodes = nodes.filter((node) => node.type === "Text");
-    assert.ok(textNodes.at(-1).props.children.endsWith(lastText));
+    const displayedText = textNodes
+      .filter((node) => typeof node.props.children === "string")
+      .map((node) => node.props.children)
+      .join("");
+    assert.ok(displayedText.endsWith(lastText));
     assert.ok(textNodes.every((node) => node.props.selectable));
     assert.ok(textNodes.every((node) => node.props.className));
   }
+});
+
+test("개인정보 목록은 항목명과 설명을 한 문단으로 묶고 항목명만 굵게 표시한다", () => {
+  const context = setup("PolicyDocumentScreen");
+  const nodes = expand(context.Screen({ document: "privacy" }));
+  const item = nodes.find(
+    (node) =>
+      node.type === "Text" &&
+      React.Children.toArray(node.props.children).some(
+        (child) => React.isValidElement(child) && child.props.children === "소셜 로그인:",
+      ),
+  );
+  assert.ok(item);
+  assert.match(item.props.className, /flex-1/);
+  const segments = React.Children.toArray(item.props.children);
+  assert.equal(segments[0].props.className, "font-pretendard-semibold");
+  assert.equal(segments[1].props.className, "font-pretendard");
+  assert.equal(segments[1].props.children, " 소셜 로그인 제공자, 제공자별 회원 식별정보");
+  assert.ok(nodes.some((node) => node.type === "Text" && node.props.children === "\u2022"));
 });
 
 test("MY 회원탈퇴 메뉴가 확인 창을 열고 취소하며 콜백을 전달한다", () => {
@@ -705,10 +728,19 @@ test("탈퇴 설문 문구를 DB 사유 값으로 보내고, 실패는 알리되
   provider = "apple";
   sent.length = 0;
   appleResults.push("apple-code");
-  assert.equal(await withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }), "withdrawn");
-  assert.deepEqual(sent.map(([, body]) => body.apple_authorization_code), ["apple-code"]);
+  assert.equal(
+    await withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }),
+    "withdrawn",
+  );
+  assert.deepEqual(
+    sent.map(([, body]) => body.apple_authorization_code),
+    ["apple-code"],
+  );
   appleResults.push(Object.assign(new Error("canceled"), { code: "ERR_REQUEST_CANCELED" }));
-  assert.equal(await withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }), "cancelled");
+  assert.equal(
+    await withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }),
+    "cancelled",
+  );
   assert.equal(sent.length, 1);
   appleResults.push(Object.assign(new Error("apple failed"), { code: "ERR_REQUEST_FAILED" }));
   await assert.rejects(withdrawAccount({ reasons: ["자주 사용하지 않아요."], detail: "" }));
