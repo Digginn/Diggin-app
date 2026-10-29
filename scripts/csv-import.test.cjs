@@ -458,7 +458,7 @@ test("폴더 한도 배너에서 불러오기·닫기·뒤로가기·화면 이�
     assert.equal(writes, 0);
     const continueButton = ui.find(
       notice,
-      (node) => node.type === "Button" && node.props.children === "CSV 파일로 데이터 불러오기",
+      (node) => node.type === "Button" && node.props.children === "데이터 이어서 불러오기",
     );
     assert.equal(continueButton.props.isDisabled, false);
     // 확인 대기 중 파일 선택 콜백을 다시 실행해도 중복 작업이 생기지 않는다.

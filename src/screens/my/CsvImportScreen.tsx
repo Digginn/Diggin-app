@@ -275,7 +275,7 @@ export function CsvImportScreen({
                 isFolderLimitNoticeVisible ? () => answerFolderLimit(true) : handleRequestCsv
               }
             >
-              CSV 파일로 데이터 불러오기
+              {isFolderLimitNoticeVisible ? "데이터 이어서 불러오기" : "CSV 파일로 데이터 불러오기"}
             </Button>
           </View>
         </>
