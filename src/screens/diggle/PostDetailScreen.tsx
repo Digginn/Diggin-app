@@ -478,7 +478,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             showToast("아이템 링크를 확인하고 다시 시도해 주세요.");
             return;
           }
-          trackEvent("external_product_click", { product_id: infoItem.id });
+          trackEvent("external_product_click", {
+            product_id: infoItem.id,
+            click_source: "community_product",
+          });
           void Linking.openURL(url).catch(() =>
             showToast("아이템 페이지를 열지 못했습니다. 다시 시도해 주세요."),
           );

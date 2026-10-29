@@ -295,6 +295,9 @@ test("폴더 무선택은 ALL에만 저장하고 성공 시 목록을 갱신해 
   assert.equal(h.returned, 1);
   assert.deepEqual(h.invalidated, [["products"], ["folders"]]);
   assert.deepEqual(h.destinations, []);
+  const [name, properties] = analyticsEvents.at(-1);
+  assert.equal(name, "community_product_save");
+  assert.deepEqual(Object.keys(properties), ["product_id"], "시트대로 저장된 상품 ID만 보낸다");
   assert.equal(
     domain.takeCommunityItemSaved(SNAPSHOT.id),
     true,
@@ -356,7 +359,9 @@ test("중복은 새 저장 성공으로 알리지 않고 기존 상품 확인 �
   domain.takeCommunityItemSaved(SNAPSHOT.id); // 앞선 저장 테스트가 남긴 표시를 지운다
   const h = formHarness({ duplicate: true });
   h.open();
+  const eventCount = analyticsEvents.length;
   await h.sheet().onComplete(["2"]);
+  assert.equal(analyticsEvents.length, eventCount, "중복은 저장 이벤트를 보내지 않는다");
   assert.equal(h.returned, 0);
   assert.equal(domain.takeCommunityItemSaved(SNAPSHOT.id), false, "중복은 저장 성공이 아니다");
   assert.deepEqual(h.invalidated, []);

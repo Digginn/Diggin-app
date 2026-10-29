@@ -360,7 +360,10 @@ export function ItemDetailScreen() {
             <Button
               variant="secondary"
               onPress={() => {
-                trackEvent("external_product_click", { product_id: id });
+                trackEvent("external_product_click", {
+                  product_id: id,
+                  click_source: "my_product",
+                });
                 Linking.openURL(item.sourceUrl).catch(() => showToast(TOAST_MESSAGES.ALL_009));
               }}
             >
