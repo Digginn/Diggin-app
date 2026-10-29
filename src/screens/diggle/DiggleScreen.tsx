@@ -17,6 +17,7 @@ import { DIGGLE_EMPTY_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLoginGate } from "@/hooks/useLoginGate";
 import { useToast } from "@/hooks/useToast";
+import { trackEvent } from "@/lib/analytics";
 
 import { useCommunityFeed } from "./queries/useCommunity";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
@@ -41,6 +42,7 @@ export function DiggleScreen() {
   useFocusEffect(
     useCallback(() => {
       isOpeningWriter.current = false;
+      trackEvent("community_view", { view_type: "feed" });
     }, []),
   );
 

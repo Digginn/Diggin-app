@@ -3,6 +3,7 @@ import * as Crypto from "expo-crypto";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import { File } from "expo-file-system";
 
+import { trackEvent } from "@/lib/analytics";
 import { supabase } from "@/lib/supabase";
 import type { Json } from "@/types/database.types";
 
@@ -132,6 +133,8 @@ export async function importCsv(
     }
   }
   pending ??= { fingerprint, requestId: Crypto.randomUUID(), importedAt: options.importedAt };
+  // 앱은 서버의 import_jobs.id를 받지 않는다. 같은 작업을 가리키는 request_id를 작업 ID로 쓴다.
+  trackEvent("wishlist_import_start", { import_job_id: pending.requestId });
   let isFolderLimitConfirmed = false;
 
   // 폴더 이름이 조회 이후 바뀌면 전체 트랜잭션이 취소된다. 최신 목록으로 최대 두 번 재계산한다.
@@ -189,6 +192,13 @@ export async function importCsv(
       throw error;
     }
     const result = readResult(data);
+    trackEvent("wishlist_import_complete", {
+      import_job_id: pending.requestId,
+      total_count: plan.totalCount,
+      success_count: result.importedCount,
+      duplicate_count: result.excludedProducts.filter((entry) => entry.kind === "duplicate").length,
+      fail_count: result.excludedProducts.filter((entry) => entry.kind === "failed").length,
+    });
     onProgress({ completed: plan.totalCount, total: plan.totalCount });
     // 저장된 결과를 받았으므로 로컬 기록 삭제 실패 때문에 완료를 실패로 바꾸지 않는다.
     await AsyncStorage.removeItem(storageKey).catch(() => {});

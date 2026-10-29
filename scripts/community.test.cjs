@@ -8,6 +8,13 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 const LOGIN_SOURCES = {
   "@/lib/loginIntent": "src/lib/loginIntent.ts",
   "@/hooks/useLoginGate": "src/hooks/useLoginGate.tsx",
@@ -24,6 +31,7 @@ function load(file, mocks = {}, globals = {}) {
       exports: module.exports,
       require: (name) =>
         mocks[name] ??
+        (name === "@/lib/analytics" ? analytics : undefined) ??
         (name === "@/api/accountAccess"
           ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
           : name.endsWith(".svg")

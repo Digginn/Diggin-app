@@ -2,6 +2,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { fetchAccountAccess, type AccountAccess } from "@/api/accountAccess";
+import { setAnalyticsUser } from "@/lib/analytics";
 import { finishDeviceSignOut, unregisterDevicePush } from "@/lib/pushNotifications";
 import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
@@ -42,7 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionRef.current = nextSession;
       const currentRevision = ++revision.current;
       setSession(nextSession);
-      if (event !== "SIGNED_OUT") return;
+      if (event !== "SIGNED_OUT") {
+        if (nextSession) setAnalyticsUser(nextSession.user.id);
+        return;
+      }
+      setAnalyticsUser(null);
       // 다음에 로그인한 계정에 이전 계정의 상품이 잠깐이라도 보이지 않게 비운다.
       queryClient.clear();
       if (!isSigningOutRef.current) {

@@ -5,6 +5,7 @@ import { AppState } from "react-native";
 import { restrictionMessage } from "@/api/accountAccess";
 import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
 import { useToast } from "@/hooks/useToast";
+import { trackEvent } from "@/lib/analytics";
 import type { VoteChoice } from "@/types/post";
 
 import { communityKeys } from "../api/community";
@@ -57,6 +58,7 @@ export function useCommunityVote(
     setPending({ scope, isPending: true });
     try {
       const saved = await setCommunityVote(post.id, choice);
+      trackEvent("vote_participate", { post_id: post.id, vote_option: choice });
       if (!current.active) return;
       queryClient.setQueryData<CommunityPost | null>(
         communityKeys.post(viewer, post.id),
