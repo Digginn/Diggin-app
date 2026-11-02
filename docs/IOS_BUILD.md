@@ -2,9 +2,9 @@
 
 ## 최근 빌드
 
-- 버전: `1.0.0 (5)`
-- 소스: develop `a70c74cd549aae8e25027e1842151d89f4500862`
-- [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/12f593e4-376a-4709-bd8d-11c95bf4b742)
+- 버전: `1.0.0 (10)`
+- 소스: develop `06734e33968ff1f6ef33ae03cb2b6658d5f6adc0`
+- [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/ddd6264b-5711-4201-8a21-eaaff44d90b6)
 - 본 앱과 공유 확장 서명, 운영용 APNs 권한, App Group, 소셜 로그인 URL 스킴, 공유 Supabase 주소를 IPA에서 확인했다.
 - 빌드 성공과 TestFlight 업로드는 별개다. TestFlight 확인 전에는 App Store Connect 업로드 및 처리가 필요하다.
 
