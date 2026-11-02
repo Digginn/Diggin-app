@@ -2,10 +2,12 @@
 
 ## 최근 빌드
 
-- 버전: `1.0.0 (5)`
-- 소스: develop `a70c74cd549aae8e25027e1842151d89f4500862`
-- [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/12f593e4-376a-4709-bd8d-11c95bf4b742)
-- 본 앱과 공유 확장 서명, 운영용 APNs 권한, App Group, 소셜 로그인 URL 스킴, 공유 Supabase 주소를 IPA에서 확인했다.
+- 버전: `1.0.0 (9)`
+- 소스: develop `cc1a4a9e9b20daa6a1ffdf0f020d14b54a7df6f9`
+- [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/953bf958-e17e-4f2d-88f8-21c13cfa8531)
+- 이전 성공 빌드 `1.0.0 (8)`에서 번호를 올려 production 프로필로 빌드했다. Android 버전 코드는 변경하지 않았다.
+- IPA와 검증·업로드 정보는 `Documents/DigginReleases/ios/Diggin-1.0.0-9.ipa` 및 같은 이름의 JSON에 보관한다.
+- IPA 무결성, 본 앱·공유 확장의 번들 ID와 버전, App Group, 운영 푸시 및 Apple 로그인 프로비저닝 권한을 확인했다.
 - 빌드 성공과 TestFlight 업로드는 별개다. TestFlight 확인 전에는 App Store Connect 업로드 및 처리가 필요하다.
 
 ## 다음 빌드
