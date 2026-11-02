@@ -47,6 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 다음에 로그인한 계정에 이전 계정의 상품이 잠깐이라도 보이지 않게 비운다.
       queryClient.clear();
       if (!isSigningOutRef.current) {
+        // 직접 로그아웃 외의 세션 만료·철회에서도 Google 상태를 비운다.
+        void GoogleSignin.signOut().catch(() => undefined);
         if (!previous) {
           setIsSessionExpired(true);
           return;

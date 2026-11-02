@@ -759,10 +759,13 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     "SDK 초기화 후 Push·Google 로그인 상태를 비우고 앱 세션을 끊는다",
   );
   assert.equal(render().isSessionExpired, false);
+  order.length = 0;
   emit("TOKEN_REFRESHED", { id: "s2" });
   assert.equal(render().isSessionExpired, false);
+  assert.deepEqual(order, [], "세션 갱신 시 Google 상태를 해제하지 않는다");
   emit("SIGNED_OUT", null);
   await Promise.resolve();
+  assert.deepEqual(order, ["signOutGoogle"], "세션 만료 시에도 Google 상태를 해제한다");
   assert.equal(render().isSessionExpired, true);
   assert.equal(cacheClears.length, 2, "로그아웃·만료 모두 상품 캐시를 비운다");
   render().confirmSessionExpired();
@@ -773,6 +776,11 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.deepEqual(order, ["unregisterPush", "signOutGoogle", "signOut", "finishPush"]);
   assert.equal(signOutOptions.length, 2, "Google SDK 오류가 앱 로그아웃을 막지 않는다");
   assert.equal(render().isSessionExpired, false);
+  order.length = 0;
+  emit("SIGNED_OUT", null);
+  await Promise.resolve();
+  assert.deepEqual(order, ["signOutGoogle"], "이전 세션 정보가 없어도 Google 상태를 해제한다");
+  assert.equal(render().isSessionExpired, true, "Google SDK 오류가 세션 만료 안내를 막지 않는다");
 });
 
 function loadSignIn({
