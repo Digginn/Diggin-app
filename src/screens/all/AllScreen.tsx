@@ -155,50 +155,52 @@ export function AllScreen() {
       ) : isEmpty ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
-        <WishItemGrid
-          key={savedAt}
-          items={items}
-          isLoading={list.isPending}
-          onEndReached={() => {
-            if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
-          }}
-          selectedIds={isSelectMode ? selectedIds : undefined}
-          onItemPress={(item) =>
-            isSelectMode ? toggleItem(item) : router.push(`/items/${item.id}`)
-          }
-          header={
-            <View className="gap-2 pt-4">
-              <View className="h-[21px] flex-row items-center justify-between">
-                <Text className="text-gray-1000 font-label-12-semibold">
-                  저장한 아이템 {shownCount}개
-                </Text>
-                {/* 선택 모드에서는 상단 바가 취소를 맡으므로 숨긴다. */}
-                {!isSelectMode && items.length > 0 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    className="active:opacity-75"
-                    hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-                    onPress={() => setSelectMode(true)}
-                  >
-                    <Text className="text-gray-900 font-label-14">선택</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-              <View className="h-12 flex-row items-center justify-between">
-                <View>
-                  <WishLevel
-                    hasScrim
-                    levels={counts.data?.levels ?? EMPTY_LEVELS}
-                    hint={WISH_LEVEL_HINT}
-                    selected={wishLevel}
-                    onSelect={(level) => setWishLevel((prev) => (prev === level ? null : level))}
-                  />
-                </View>
-                <SortLabel value={sortOrder} onChange={setSortOrder} />
-              </View>
+        <>
+          {/* FOLDER 상세처럼 개수·위시레벨·정렬은 고정하고 목록만 스크롤한다. */}
+          <View className="gap-2 px-[15.75px] pt-4">
+            <View className="h-[21px] flex-row items-center justify-between">
+              <Text className="text-gray-1000 font-label-12-semibold">
+                저장한 아이템 {shownCount}개
+              </Text>
+              {/* 선택 모드에서는 상단 바가 취소를 맡으므로 숨긴다. */}
+              {!isSelectMode && items.length > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  className="active:opacity-75"
+                  hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                  onPress={() => setSelectMode(true)}
+                >
+                  <Text className="text-gray-900 font-label-14">선택</Text>
+                </Pressable>
+              ) : null}
             </View>
-          }
-        />
+            <View className="h-12 flex-row items-center justify-between">
+              <View>
+                <WishLevel
+                  hasScrim
+                  levels={counts.data?.levels ?? EMPTY_LEVELS}
+                  hint={WISH_LEVEL_HINT}
+                  selected={wishLevel}
+                  onSelect={(level) => setWishLevel((prev) => (prev === level ? null : level))}
+                />
+              </View>
+              <SortLabel value={sortOrder} onChange={setSortOrder} />
+            </View>
+          </View>
+
+          <WishItemGrid
+            key={savedAt}
+            items={items}
+            isLoading={list.isPending}
+            onEndReached={() => {
+              if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
+            }}
+            selectedIds={isSelectMode ? selectedIds : undefined}
+            onItemPress={(item) =>
+              isSelectMode ? toggleItem(item) : router.push(`/items/${item.id}`)
+            }
+          />
+        </>
       )}
 
       {isSelectMode ? (

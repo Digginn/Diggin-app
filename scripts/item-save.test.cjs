@@ -450,11 +450,17 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "./components/SortLabel": { SortLabel: "SortLabel" },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
   });
+  let tree;
   const render = () => {
     cursor = 0;
-    return nodes(AllScreen()).find((node) => node.type === "WishItemGrid");
+    tree = AllScreen();
+    return nodes(tree).find((node) => node.type === "WishItemGrid");
   };
-  const header = (grid, type) => nodes(grid.props.header).find((node) => node.type === type);
+  // 개수·위시레벨·정렬은 목록 밖에 고정돼 있다.
+  const header = (grid, type) => {
+    assert.equal(grid.props.header, undefined, "목록 머리말로 넣으면 같이 스크롤된다");
+    return nodes(tree).find((node) => node.type === type);
+  };
 
   let grid = render();
   header(grid, "SortLabel").props.onChange("oldest");
