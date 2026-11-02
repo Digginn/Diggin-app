@@ -20,6 +20,13 @@ test("운영자 등록 예외만 허용하고 다른 PR·직접 push의 승인 �
     { number: 122, merged: false, allowed: false },
     { number: 122, sha: "other-commit", allowed: false },
     { number: 122, base: "main", allowed: false },
+    { number: 177, head: "chore/175-register-retool-test-operator", allowed: true },
+    { number: 177, head: "other-branch", allowed: false },
+    { number: 177, head: "chore/175-register-retool-test-operator", owner: "other-owner", allowed: false },
+    { number: 177, head: "chore/175-register-retool-test-operator", merged: false, allowed: false },
+    { number: 177, head: "chore/175-register-retool-test-operator", sha: "other-commit", allowed: false },
+    { number: 177, head: "chore/175-register-retool-test-operator", base: "main", allowed: false },
+    { number: 178, head: "chore/175-register-retool-test-operator", allowed: false },
   ]) {
     const owner = scenario.owner ?? "Digginn";
     const failures = [];
