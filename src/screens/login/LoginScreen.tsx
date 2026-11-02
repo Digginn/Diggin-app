@@ -38,7 +38,7 @@ export function LoginScreen({
   isRedirectedWhenSignedIn = false,
 }: LoginScreenProps = {}) {
   const router = useRouter();
-  const { height } = useWindowDimensions();
+  const { height, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [hasError, setHasError] = useState(isLoginError);
   const [isLoading, setIsLoading] = useState(isLoginLoading);
@@ -177,17 +177,37 @@ export function LoginScreen({
           >
             {isAgeConsented ? <CheckboxOn /> : <CheckboxOff />}
           </Pressable>
-          <Text className="text-center text-[#333333] font-meta">
-            {"(필수) 만 14세 이상이며\n"}
-            <Text accessibilityRole="link" onPress={() => router.push("/policies/terms")}>
-              이용약관
-            </Text>
-            {" 및 "}
-            <Text accessibilityRole="link" onPress={() => router.push("/policies/privacy")}>
-              개인정보 처리방침
-            </Text>
-            에 동의합니다.
-          </Text>
+          <View className="shrink items-center pt-2">
+            <Text className="text-center text-[#333333] font-meta">(필수) 만 14세 이상이며</Text>
+            <View
+              className="min-h-12 flex-row flex-wrap items-center justify-center gap-x-[3px]"
+              // 기본 크기는 Figma의 두 줄 간격을 맞추고, 글자 확대 시에는 겹치지 않게 분리한다.
+              style={{ marginTop: fontScale > 1 ? 0 : -16 }}
+            >
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="이용약관"
+                onPress={() => router.push("/policies/terms")}
+                className="min-h-12 min-w-12 items-center justify-center"
+              >
+                <Text className="text-center text-gray-700 underline font-meta">이용약관</Text>
+              </Pressable>
+              <Text className="text-center text-[#333333] font-meta">및</Text>
+              <View className="max-w-full flex-row flex-wrap items-center justify-center">
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel="개인정보 처리방침"
+                  onPress={() => router.push("/policies/privacy")}
+                  className="min-h-12 min-w-12 items-center justify-center"
+                >
+                  <Text className="text-center text-gray-700 underline font-meta">
+                    개인정보 처리방침
+                  </Text>
+                </Pressable>
+                <Text className="text-center text-[#333333] font-meta">에 동의합니다.</Text>
+              </View>
+            </View>
+          </View>
         </View>
         <Pressable
           onPress={() => router.replace("/browse")}

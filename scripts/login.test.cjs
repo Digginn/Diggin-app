@@ -275,10 +275,24 @@ for (const os of ["ios", "android"]) {
     assert.equal(signIns.join(","), expectedProviders);
     assert.equal(alerts.length, 0);
     const links = consented.filter((node) => node.props.accessibilityRole === "link");
+    assert.equal(links.length, 2);
+    for (const link of links) {
+      assert.equal(link.type, "Pressable", "약관 링크는 독립적인 터치 영역을 사용한다");
+      assert.ok(link.props.className.includes("min-h-12"));
+      assert.ok(link.props.className.includes("min-w-12"));
+      const label = nodes(link).find((node) => node.type === "Text");
+      assert.ok(label.props.className.includes("underline"));
+    }
     links[0].props.onPress();
     assert.equal(routes.at(-1), "/policies/terms");
     links[1].props.onPress();
     assert.equal(routes.at(-1), "/policies/privacy");
+    assert.equal(
+      hooks.render(LoginScreen).find((node) => node.props.accessibilityRole === "checkbox").props
+        .accessibilityState.checked,
+      true,
+      "정책 링크를 눌러도 필수 동의 체크는 바뀌지 않는다",
+    );
     consented
       .find((node) => node.type === "Pressable" && node.props.accessibilityRole === "button")
       .props.onPress();
