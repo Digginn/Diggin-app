@@ -102,6 +102,7 @@ export function ItemDetailScreen() {
   const isDeletingRef = useRef(false);
   // 시트·모달 위에 클립보드 감지 모달이 겹치면 iOS가 무시하고 투명한 창만 남아 화면이 멈춘다.
   useLinkDetectionPause(isEditOpen || isFolderOpen || isMenuOpen || isDeleteOpen);
+  useLinkDetectionPause(guide.isPending, true);
   const isHeaderDisabled = isEditOpen || isFolderOpen;
   const headerIconColor = (isDark: boolean) =>
     isHeaderDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900";

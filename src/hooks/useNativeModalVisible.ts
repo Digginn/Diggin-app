@@ -23,6 +23,23 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** 떠 있거나 닫히는 중인 모달이 모두 사라지면 부른다. 지금 없으면 바로 부른다. */
+export function whenNativeModalIdle(callback: () => void) {
+  if (!isNativeModalBusy()) {
+    callback();
+    return () => {};
+  }
+  const listener = () => {
+    if (isNativeModalBusy()) return;
+    listeners.delete(listener);
+    callback();
+  };
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 function isOtherModalDismissing() {
   return dismissingCount > 0;
 }

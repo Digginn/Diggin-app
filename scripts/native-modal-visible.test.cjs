@@ -106,6 +106,7 @@ function loadHook(os) {
     return instance;
   }
   mount.isBusy = () => hookModule.exports.isNativeModalBusy();
+  mount.whenIdle = (callback) => hookModule.exports.whenNativeModalIdle(callback);
   return mount;
 }
 
@@ -147,6 +148,34 @@ test("안드로이드는 다른 모달이 닫히는 중에도 바로 띄운다",
     loading.unmount();
     guide.setVisible(true);
     assert.equal(guide.value, true);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test("떠 있거나 닫히는 중인 모달이 모두 사라진 뒤에 부르고, 없으면 바로 부른다", () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const mount = loadHook("ios");
+    let calls = 0;
+    mount.whenIdle(() => (calls += 1));
+    assert.equal(calls, 1, "모달이 없으면 바로 부른다");
+
+    const guide = mount(true);
+    mount.whenIdle(() => (calls += 1));
+    assert.equal(calls, 1, "떠 있는 동안은 기다린다");
+    guide.setVisible(false);
+    mock.timers.tick(399);
+    assert.equal(calls, 1, "닫히는 중에도 기다린다");
+    mock.timers.tick(1);
+    assert.equal(calls, 2, "다 닫히면 부른다");
+
+    const sheet = mount(true);
+    const cancel = mount.whenIdle(() => (calls += 1));
+    cancel();
+    sheet.setVisible(false);
+    mock.timers.tick(400);
+    assert.equal(calls, 2, "취소하면 부르지 않는다");
   } finally {
     mock.timers.reset();
   }

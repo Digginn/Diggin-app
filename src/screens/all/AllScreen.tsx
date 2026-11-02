@@ -72,6 +72,8 @@ export function AllScreen() {
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const itemSave = useItemSave();
   useLinkDetectionPause(isLinkSheetOpen || itemSave.isBusy);
+  // 첫 진입 안내보다 감지 모달이 먼저 뜨면 안내가 가려져 빈 화면만 남는다.
+  useLinkDetectionPause(guide.isPending, true);
 
   const selectedCount = selectedIds.size;
 

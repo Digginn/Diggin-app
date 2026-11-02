@@ -13,6 +13,7 @@ import { Button } from "@/components/Button";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { ActionModal } from "@/components/modal";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
+import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
 
 import { FolderCard, type FolderItem } from "./components/FolderCard";
 import { FolderMenu, type FolderMenuAnchor } from "./components/FolderMenu";
@@ -61,6 +62,7 @@ export function FolderScreen({
 }: FolderScreenProps = {}) {
   const { height } = useWindowDimensions();
   const guide = useFirstVisitGuide("folder", !isError && !isGuest);
+  useLinkDetectionPause(guide.isPending, true);
   const ownedGuideRef = useRef<View>(null);
   const fabGuideRef = useRef<View>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
