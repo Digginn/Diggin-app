@@ -68,7 +68,11 @@ export function ReportDialog({ target, onClose }: { target: ReportTarget; onClos
         await reportCommunityContent(target, reason, detail);
       } else await blockCommunityAuthor(target);
       if (!current.active) return;
-      await queryClient.invalidateQueries({ queryKey: communityKeys.all }, { throwOnError: true });
+      // 댓글 상세에서 차단해도 돌아갈 피드·투표 탭·활동 목록에 이전 작성자 콘텐츠가 남지 않게 한다.
+      await queryClient.invalidateQueries(
+        { queryKey: communityKeys.all, refetchType: "all" },
+        { throwOnError: true },
+      );
       if (!current.active) return;
       if (phase === "report") setPhase("block");
       else {

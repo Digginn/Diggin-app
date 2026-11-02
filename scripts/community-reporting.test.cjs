@@ -6,6 +6,7 @@ const { test } = require("node:test");
 const { setImmediate } = require("node:timers");
 const { runInNewContext } = require("node:vm");
 const React = require("react");
+const { QueryClient, QueryObserver } = require("@tanstack/react-query");
 const ts = require("typescript");
 function load(file, mocks = {}) {
   const module = { exports: {} };
@@ -40,6 +41,7 @@ function harness({
   block = async () => {},
   refresh = async () => {},
   os = "android",
+  target = { type: "post", id: "12" },
 } = {}) {
   const slots = [],
     effects = new Map(),
@@ -76,7 +78,7 @@ function harness({
     invalidateQueries: async (...args) => {
       invalidations++;
       assert.equal(args[1].throwOnError, true);
-      return refresh();
+      return refresh(...args);
     },
   };
   const { ReportDialog } = load("src/components/ReportFlow.tsx", {
@@ -111,7 +113,7 @@ function harness({
       viewer = nextViewer;
       index = 0;
       pending = [];
-      const tree = ReportDialog({ target: { type: "post", id: "12" }, onClose: close });
+      const tree = ReportDialog({ target, onClose: close });
       for (const { i, callback, deps } of pending) {
         effects.get(i)?.cleanup?.();
         effects.set(i, { deps, cleanup: callback() });
@@ -181,6 +183,98 @@ test("신고 성공 뒤 차단 확인을 한 번 표시하고 괜찮아요는 �
   assert.equal(ui.closed(), 1);
   assert.equal(ui.calls.length, 1);
   assert.equal(ui.invalidations(), 1);
+});
+
+test("BUG-108: 댓글 신고는 그 댓글만, 차단은 이전 화면 캐시의 작성자 콘텐츠까지 갱신한다", async (t) => {
+  const cache = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  let reported = false;
+  let blocked = false;
+  const posts = [
+    { id: "21", type: "post" },
+    { id: "22", type: "vote" },
+    { id: "23", type: "other" },
+  ];
+  const feed = {
+    queryKey: community.communityKeys.feed("viewer", "all"),
+    queryFn: async () => ({ pages: [blocked ? posts.slice(2) : posts], pageParams: [null] }),
+  };
+  const comments = {
+    queryKey: community.communityKeys.comments("viewer", "23"),
+    queryFn: async () => ({
+      pages: [
+        blocked
+          ? ["other"]
+          : reported
+            ? ["same-author", "reply", "other"]
+            : ["reported", "same-author", "reply", "other"],
+      ],
+      pageParams: [null],
+    }),
+  };
+  const detail = {
+    queryKey: community.communityKeys.post("viewer", "21"),
+    queryFn: async () => (blocked ? null : posts[0]),
+  };
+  const votes = {
+    queryKey: community.communityKeys.feed("viewer", "vote"),
+    queryFn: async () => ({ pages: [blocked ? [] : [posts[1]]], pageParams: [null] }),
+  };
+  const activity = {
+    queryKey: community.communityKeys.activity("viewer", "liked"),
+    queryFn: async () => ({ pages: [blocked ? [] : [posts[0]]], pageParams: [null] }),
+  };
+  await Promise.all(
+    [feed, comments, detail, votes, activity].map((query) => cache.fetchQuery(query)),
+  );
+  // 댓글 화면만 활성 상태이고, 돌아갈 피드·상세 화면은 캐시만 남아 있다.
+  const observer = new QueryObserver(cache, { ...comments, staleTime: Infinity });
+  const unsubscribe = observer.subscribe(() => {});
+  t.after(() => {
+    unsubscribe();
+    cache.clear();
+  });
+  const ui = harness({
+    target: { type: "comment", id: "12" },
+    report: async () => {
+      reported = true;
+    },
+    block: async () => {
+      blocked = true;
+    },
+    refresh: (...args) => cache.invalidateQueries(...args),
+  });
+  nodes(ui.render(), "ReportForm")[0].props.onReport("spam", "");
+  await settle();
+  assert.deepEqual(cache.getQueryData(comments.queryKey).pages[0], [
+    "same-author",
+    "reply",
+    "other",
+  ]);
+  assert.equal(
+    cache.getQueryData(feed.queryKey).pages[0].length,
+    3,
+    "댓글 신고만으로 작성자 글을 숨기지 않는다",
+  );
+  nodes(ui.render(), "ModalButton")
+    .find((node) => node.props.action.label === "차단하기")
+    .props.action.onPress();
+  await settle();
+  assert.deepEqual(
+    cache.getQueryData(feed.queryKey).pages[0],
+    posts.slice(2),
+    "차단 완료 시 비활성 피드에서도 작성자 게시글·투표글을 제거한다",
+  );
+  assert.equal(
+    cache.getQueryData(detail.queryKey),
+    null,
+    "이전 상세 화면에도 차단 작성자의 글을 남기지 않는다",
+  );
+  assert.deepEqual(cache.getQueryData(comments.queryKey).pages[0], ["other"]);
+  assert.deepEqual(cache.getQueryData(votes.queryKey).pages[0], []);
+  assert.deepEqual(cache.getQueryData(activity.queryKey).pages[0], []);
+  assert.equal(ui.closed(), 1);
 });
 
 test("신고 실패는 폼과 입력을 유지하고 재시도 성공 후에만 차단 확인으로 넘어간다", async () => {
