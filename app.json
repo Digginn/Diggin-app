@@ -9,7 +9,7 @@
     "scheme": "diggin",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "buildNumber": "5",
+      "buildNumber": "7",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "ITSAppUsesNonExemptEncryption": false
@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.diggin.app",
-      "versionCode": 2,
+      "versionCode": 5,
       "icon": "./assets/images/icon-app-android.png",
       "adaptiveIcon": {
         "backgroundColor": "#1E1E1E",
