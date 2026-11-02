@@ -177,18 +177,19 @@ export function LoginScreen({
           >
             {isAgeConsented ? <CheckboxOn /> : <CheckboxOff />}
           </Pressable>
-          <View className="shrink items-center pt-2">
+          <View className="shrink items-center pt-[7.75px]">
             <Text className="text-center text-[#333333] font-meta">(필수) 만 14세 이상이며</Text>
             <View
               className="min-h-12 flex-row flex-wrap items-center justify-center gap-x-[3px]"
               // 기본 크기는 Figma의 두 줄 간격을 맞추고, 글자 확대 시에는 겹치지 않게 분리한다.
-              style={{ marginTop: fontScale > 1 ? 0 : -16 }}
+              style={{ marginTop: fontScale > 1 ? 0 : -15.5 }}
             >
               <Pressable
                 accessibilityRole="link"
                 accessibilityLabel="이용약관"
                 onPress={() => router.push("/policies/terms")}
-                className="min-h-12 min-w-12 items-center justify-center"
+                // Figma AgeConsentText의 이용약관은 최소 너비 없이 글자 너비만 쓴다.
+                className="min-h-12 items-center justify-center"
               >
                 <Text className="text-center text-gray-700 underline font-meta">이용약관</Text>
               </Pressable>
