@@ -30,6 +30,7 @@ runInNewContext(compiled, {
     if (name.endsWith("useFirstVisitGuide"))
       return { useFirstVisitGuide: () => ({ isVisible: isGuideVisible }) };
     if (name.endsWith("FirstVisitGuide")) return { FirstVisitGuide: "FirstVisitGuide" };
+    if (name.endsWith("useLinkDetectionPause")) return { useLinkDetectionPause: () => {} };
     if (name === "react-native") {
       return {
         Pressable: "Pressable",

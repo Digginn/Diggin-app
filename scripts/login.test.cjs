@@ -280,10 +280,12 @@ for (const os of ["ios", "android"]) {
     for (const link of links) {
       assert.equal(link.type, "Pressable", "약관 링크는 독립적인 터치 영역을 사용한다");
       assert.ok(link.props.className.includes("min-h-12"));
-      assert.ok(link.props.className.includes("min-w-12"));
       const label = nodes(link).find((node) => node.type === "Text");
       assert.ok(label.props.className.includes("underline"));
     }
+    // Figma처럼 이용약관은 글자 너비, 개인정보 처리방침만 최소 너비 48px이다.
+    assert.ok(!links[0].props.className.includes("min-w-12"));
+    assert.ok(links[1].props.className.includes("min-w-12"));
     links[0].props.onPress();
     assert.equal(routes.at(-1), "/policies/terms");
     links[1].props.onPress();

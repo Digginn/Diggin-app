@@ -3,8 +3,8 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 
-import { isLinkDetectionPaused } from "@/hooks/useLinkDetectionPause";
-import { isNativeModalBusy } from "@/hooks/useNativeModalVisible";
+import { isLinkDetectionPaused, onLinkDetectionResume } from "@/hooks/useLinkDetectionPause";
+import { isNativeModalBusy, whenNativeModalIdle } from "@/hooks/useNativeModalVisible";
 import { findItemLink } from "@/utils/itemLink";
 
 import { DigginPasteboard } from "../../modules/diggin-pasteboard";
@@ -148,7 +148,18 @@ export function useDetectedLink() {
 
     void Promise.resolve().then(() => check());
 
-    return () => subscription.remove();
+    // 안내 모달이 닫히는 중이면 iOS가 감지 모달을 무시하니 다 닫힌 뒤에 본다.
+    let cancelIdle = () => {};
+    const stopResume = onLinkDetectionResume(() => {
+      cancelIdle();
+      cancelIdle = whenNativeModalIdle(() => void check());
+    });
+
+    return () => {
+      subscription.remove();
+      stopResume();
+      cancelIdle();
+    };
   }, [check]);
 
   // 링크를 못 읽었을 때 닫는다. 기록은 readLink가 사유에 맞게 남긴다.

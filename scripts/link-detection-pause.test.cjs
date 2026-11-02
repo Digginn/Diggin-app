@@ -65,7 +65,13 @@ function loadDetectedLink(
       },
     },
     "@/hooks/useLinkDetectionPause": pause,
-    "@/hooks/useNativeModalVisible": { isNativeModalBusy: () => isModalBusy() },
+    "@/hooks/useNativeModalVisible": {
+      isNativeModalBusy: () => isModalBusy(),
+      whenNativeModalIdle: (callback) => {
+        callback();
+        return () => {};
+      },
+    },
     "@/utils/itemLink": { findItemLink: (text) => (text.startsWith("https://") ? text : null) },
     "../../modules/diggin-pasteboard": { DigginPasteboard: pasteboard },
   });
@@ -272,4 +278,37 @@ test("iOS도 다른 모달이 떠 있으면 감지 모달을 띄우지 않는다
   busy = false;
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), true);
+});
+
+test("첫 진입 안내를 확인하는 동안 막은 링크는 안내가 끝나면 앱 복귀 없이 바로 묻는다", async () => {
+  let effect;
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", {
+    react: { useEffect: (callback) => (effect = callback) },
+  });
+  pause.useLinkDetectionPause(true, true);
+  const release = effect();
+  const pasteboard = fakePasteboard("https://zigzag.kr/catalog/products/20");
+  pasteboard.changeCount = 90;
+  const linkDetection = loadDetectedLink(pause, "", { pasteboard });
+  await linkDetection.check();
+  assert.equal(linkDetection.isDetected(), false, "안내보다 감지 모달이 먼저 뜨지 않는다");
+  release();
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(linkDetection.isDetected(), true, "안내가 끝나면 바로 다시 본다");
+});
+
+test("다시 보기를 요청하지 않은 멈춤은 풀려도 앱 복귀 전까지 묻지 않는다", async () => {
+  let effect;
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", {
+    react: { useEffect: (callback) => (effect = callback) },
+  });
+  pause.useLinkDetectionPause(true);
+  const release = effect();
+  const pasteboard = fakePasteboard("https://zigzag.kr/catalog/products/21");
+  pasteboard.changeCount = 91;
+  const linkDetection = loadDetectedLink(pause, "", { pasteboard });
+  await linkDetection.check();
+  release();
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(linkDetection.isDetected(), false);
 });

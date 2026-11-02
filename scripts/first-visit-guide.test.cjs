@@ -63,6 +63,7 @@ function guideHarness({ records = new Map(), storageFailure = false } = {}) {
           focus = fn;
         },
         useLocalSearchParams: () => params,
+        useIsFocused: () => true,
       },
       "@/contexts/AuthContext": { useAuth: () => auth },
       "@/api/firstVisitGuides": mockApi,
@@ -284,3 +285,25 @@ for (const os of ["android", "ios"]) {
     assert.equal(closeCount, 2);
   });
 }
+
+test("안내를 띄울지 확인하는 동안과 떠 있는 동안만 다른 모달을 막는다", async () => {
+  const h = guideHarness();
+  let resolveRead;
+  h.deferRead(() => new Promise((resolve) => (resolveRead = resolve)));
+  h.render();
+  h.focus();
+  assert.equal(h.render().isPending, true, "서버 기록 확인 중");
+  resolveRead([]);
+  await settleGuide();
+  assert.equal(h.render().isVisible, true);
+  assert.equal(h.render().isPending, true, "안내가 떠 있는 동안");
+  h.render().dismiss();
+  await settleGuide();
+  assert.equal(h.render().isPending, false, "닫은 뒤");
+
+  const seen = guideHarness({ records: new Map([["user-a", new Set(["all"])]]) });
+  seen.render();
+  seen.focus();
+  await settleGuide();
+  assert.equal(seen.render().isPending, false, "이미 본 안내는 확인이 끝나면 막지 않는다");
+});
