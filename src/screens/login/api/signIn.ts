@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  GoogleSignin,
   isCancelledResponse,
   isErrorWithCode,
   statusCodes,
@@ -12,6 +11,7 @@ import { Platform } from "react-native";
 
 import { fetchAccountAccess, parseAccountAccess, type AccountAccess } from "@/api/accountAccess";
 import { saveAvatar } from "@/api/avatar";
+import { GoogleSignin } from "@/lib/googleSignIn";
 import { supabase } from "@/lib/supabase";
 
 import type { LoginProvider } from "../components/SocialLoginButton";
@@ -52,11 +52,6 @@ async function signInWithIdentity(
 
 const NEW_USER_WINDOW_MS = 60_000;
 const SIGNUP_COMPLETE_SHOWN_KEY = "signup-complete-shown";
-
-GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-});
 
 const kakaoNativeAppKey = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY;
 if (kakaoNativeAppKey) void initializeKakaoSDK(kakaoNativeAppKey);

@@ -32,6 +32,7 @@ function load(relativePath, mocks = {}) {
     module: componentModule,
     require: (name) => {
       if (name in mocks) return mocks[name];
+      if (name === "@/lib/googleSignIn") return load("lib/googleSignIn.ts", mocks);
       if (name === "@/api/accountAccess")
         return {
           ensureCommunityWriteAllowed: async () => undefined,
@@ -690,6 +691,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const signOutOptions = [];
   const order = [];
   const cacheClears = [];
+  let googleSignOutFails = false;
   const supabase = {
     auth: {
       getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
@@ -708,6 +710,17 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const refs = [];
   let refCursor = 0;
   const { AuthProvider } = load("contexts/AuthContext.tsx", {
+    "@react-native-google-signin/google-signin": {
+      GoogleSignin: {
+        configure() {
+          order.push("configureGoogle");
+        },
+        async signOut() {
+          order.push("signOutGoogle");
+          if (googleSignOutFails) throw new Error("google_signout_failed");
+        },
+      },
+    },
     "react": {
       ...React,
       createContext: () => ({ Provider: "Provider" }),
@@ -742,8 +755,8 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.equal(signOutOptions[0].scope, "local", "이 기기 세션만 끊는다");
   assert.deepEqual(
     order,
-    ["unregisterPush", "signOut", "finishPush"],
-    "세션을 끊기 전에 이 기기 Push 토큰을 지우고, 세션을 끊은 뒤에야 등록 막기를 푼다",
+    ["configureGoogle", "unregisterPush", "signOutGoogle", "signOut", "finishPush"],
+    "SDK 초기화 후 Push·Google 로그인 상태를 비우고 앱 세션을 끊는다",
   );
   assert.equal(render().isSessionExpired, false);
   emit("TOKEN_REFRESHED", { id: "s2" });
@@ -753,6 +766,12 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.equal(render().isSessionExpired, true);
   assert.equal(cacheClears.length, 2, "로그아웃·만료 모두 상품 캐시를 비운다");
   render().confirmSessionExpired();
+  assert.equal(render().isSessionExpired, false);
+  googleSignOutFails = true;
+  order.length = 0;
+  await render().signOut();
+  assert.deepEqual(order, ["unregisterPush", "signOutGoogle", "signOut", "finishPush"]);
+  assert.equal(signOutOptions.length, 2, "Google SDK 오류가 앱 로그아웃을 막지 않는다");
   assert.equal(render().isSessionExpired, false);
 });
 
