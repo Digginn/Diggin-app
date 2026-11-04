@@ -1,6 +1,6 @@
 import * as MailComposer from "expo-mail-composer";
 import { StatusBar } from "expo-status-bar";
-import { Linking, Text, View } from "react-native";
+import { Linking, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSupportKakaoBadge, ImageSupportApp } from "@/assets/images/my";
@@ -42,7 +42,12 @@ export function CustomerSupportScreen() {
     <View className="flex-1 bg-gray-0">
       <StatusBar style="dark" />
       <AppBar title="고객 지원" titleClassName="font-label-20" />
-      <View className="flex-1 items-center justify-center px-margin">
+      {/* 글자 크기를 키운 작은 화면에서도 안내가 잘리지 않게 공간이 부족할 때만 스크롤한다. */}
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="grow items-center justify-center px-margin"
+        showsVerticalScrollIndicator={false}
+      >
         <View className="items-center gap-4">
           <View className="size-20">
             <ImageSupportApp accessibilityLabel="디긴 로고" />
@@ -57,7 +62,7 @@ export function CustomerSupportScreen() {
             </Text>
           </View>
         </View>
-      </View>
+      </ScrollView>
       <View className="gap-2 px-margin pt-3" style={{ paddingBottom: Math.max(insets.bottom, 34) }}>
         <Button onPress={() => void open(SUPPORT_CHANNEL_URL)}>카카오톡 채널 열기</Button>
         <Button
