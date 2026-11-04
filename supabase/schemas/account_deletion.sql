@@ -58,7 +58,7 @@ returns boolean language sql stable security definer set search_path = '' as $$
       order by s.id desc limit 1
     ) sanction on true
     where p.id = target and p.status = 'suspended' and sanction.reason_category = 'underage'
-      and sanction.created_at <= now() - interval '1 month'
+      and sanction.created_at <= now() - interval '30 days'
   );
 $$;
 revoke execute on function private.is_underage_deletion_due(uuid) from public, anon, authenticated, service_role;
@@ -88,7 +88,7 @@ $$;
 revoke execute on function public.claim_underage_deletion(uuid) from public, anon, authenticated;
 grant execute on function public.claim_underage_deletion(uuid) to service_role;
 
--- AUTH-002~004 만 14세 미만으로 이용 중단한 지 한 달이 지나도 해제되지 않은 계정. 한 번에 50개씩 처리한다.
+-- AUTH-002~004 만 14세 미만으로 이용 중단한 지 30일이 지나도 해제되지 않은 계정. 한 번에 50개씩 처리한다.
 create or replace function private.due_underage_deletions()
 returns table(user_id uuid, apple_refresh_token text) language sql stable security definer set search_path = '' as $$
   select p.id, secret.decrypted_secret
@@ -101,7 +101,7 @@ returns table(user_id uuid, apple_refresh_token text) language sql stable securi
   left join private.apple_refresh_tokens token on token.user_id = p.id
   left join vault.decrypted_secrets secret on secret.id = token.secret_id
   where p.status = 'suspended' and sanction.reason_category = 'underage'
-    and sanction.created_at <= now() - interval '1 month'
+    and sanction.created_at <= now() - interval '30 days'
     and not exists (select 1 from private.underage_deletion_claims c where c.user_id = p.id and c.claimed_at > now() - interval '1 hour')
   order by sanction.created_at
   limit 50;

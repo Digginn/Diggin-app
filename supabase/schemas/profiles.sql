@@ -90,22 +90,8 @@ begin
   if nickname !~ '^[가-힣A-Za-z0-9]+$' then
     return 'invalid_characters';
   end if;
-  if exists (
-    select 1
-    from private.nickname_banned_words as banned
-    cross join generate_series(1, char_length(nickname_lower)) as found(pos)
-    where banned.kind = 'profanity'
-      and substr(nickname_lower, found.pos, char_length(banned.word)) = banned.word
-      and not exists (
-        select 1
-        from private.nickname_allowed_words as allowed
-        cross join generate_series(
-          greatest(1, found.pos + char_length(banned.word) - char_length(allowed.word)),
-          found.pos
-        ) as cover(pos)
-        where substr(nickname_lower, cover.pos, char_length(allowed.word)) = allowed.word
-      )
-  ) then
+  -- 게시글·댓글과 같은 검사를 쓴다(숫자를 끼워 넣은 우회 포함).
+  if private.contains_community_profanity(nickname_lower) then
     return 'profanity';
   end if;
   if private.is_impersonation(nickname_lower) then

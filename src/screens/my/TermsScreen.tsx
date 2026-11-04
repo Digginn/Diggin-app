@@ -11,7 +11,7 @@ export type TermsDocument = "terms" | "privacy" | "community" | "licenses";
 const DOCUMENTS: { key: TermsDocument; label: string }[] = [
   { key: "terms", label: "이용약관" },
   { key: "privacy", label: "개인정보 처리방침" },
-  { key: "community", label: "커뮤니티 이용정책" },
+  { key: "community", label: "커뮤니티 이용규칙" },
   { key: "licenses", label: "오픈소스 라이센스" },
 ];
 

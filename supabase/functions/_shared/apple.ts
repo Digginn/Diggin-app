@@ -27,7 +27,12 @@ async function applePost(path: "token" | "revoke", params: Record<string, string
     }),
     signal: AbortSignal.timeout(10_000),
   });
-  if (!response.ok) throw new Error(`apple_${path}_failed`);
+  if (!response.ok) {
+    // Apple 오류 이름(invalid_client·invalid_grant 등)만 남긴다. 토큰·키 값은 응답에 없다.
+    const error = await response.json().then((body) => body?.error, () => null);
+    console.warn(`apple_${path}_failed`, response.status, error);
+    throw new Error(`apple_${path}_failed`);
+  }
   return response;
 }
 

@@ -19,16 +19,16 @@ export function sanctionNoticeMessage(notice: SanctionNotice) {
   if (notice.type === "warning")
     return {
       title: "커뮤니티 이용에 주의해 주세요.",
-      description: "커뮤니티 이용정책 위반으로 경고가 적용되었습니다.",
+      description: "커뮤니티 이용규칙 위반으로 경고가 적용되었습니다.",
     };
   if (notice.type === "suspended")
     return {
       title: "서비스 이용이 제한되었습니다.",
-      description: "커뮤니티 이용정책 위반으로 이 계정의\n서비스 이용이 영구적으로 제한되었습니다.",
+      description: "커뮤니티 이용규칙 위반으로 이 계정의\n서비스 이용이 영구적으로 제한되었습니다.",
     };
   const date = formatRestrictionDate(notice.restrictedUntil);
   return {
     title: "커뮤니티 이용이 제한되었습니다.",
-    description: `커뮤니티 이용정책 위반으로${date ? ` ${date}까지` : ""}\n커뮤니티를 읽기 전용으로 이용할 수 있습니다.`,
+    description: `커뮤니티 이용규칙 위반으로${date ? ` ${date}까지` : ""}\n커뮤니티를 읽기 전용으로 이용할 수 있습니다.`,
   };
 }

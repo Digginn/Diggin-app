@@ -1,7 +1,7 @@
 import * as Application from "expo-application";
 import { useRouter, type Href } from "expo-router";
 import { useRef, useState, type FC } from "react";
-import { Linking, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import type { SvgProps } from "react-native-svg";
 
 import { IconMyProfile, IconMySettings, IconMySupport } from "@/assets/images/my";
@@ -12,7 +12,6 @@ import { AccountWithdrawalModal } from "./components/AccountWithdrawalModal";
 import type { WithdrawalSurvey } from "./components/AccountWithdrawalSurvey";
 import { LogoutModal } from "./components/LogoutModal";
 import { MyMenuList, type MyMenuRow } from "./components/MyMenuList";
-import { SUPPORT_CHANNEL_URL } from "./constants/supportChannel";
 
 type MySectionProps = {
   title: string;
@@ -89,19 +88,10 @@ export function MyScreen({
       setIsLoggingOut(false);
     }
   };
-  const handleContactSupport = async () => {
-    try {
-      await Linking.openURL(SUPPORT_CHANNEL_URL);
-    } catch {
-      router.push("/customer-support" as Href);
-    }
-  };
   const supportRows: MyMenuRow[] = [
     {
       label: "1:1 문의",
-      onPress: handleContactSupport,
-      // 개발 중에는 길게 눌러 채널 이동 실패 화면을 확인합니다.
-      onLongPress: __DEV__ ? () => router.push("/customer-support" as Href) : undefined,
+      onPress: () => router.push("/customer-support" as Href),
     },
     { label: "약관 및 정책", onPress: () => router.push("/terms" as Href) },
     ...(!isGuest
