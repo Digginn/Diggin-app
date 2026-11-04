@@ -2,6 +2,7 @@ import * as Application from "expo-application";
 import * as Device from "expo-device";
 import * as MailComposer from "expo-mail-composer";
 import { StatusBar } from "expo-status-bar";
+import { useEffect, useRef } from "react";
 import { Linking, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -17,6 +18,9 @@ import { colors } from "@/theme";
 import { SUPPORT_CHANNEL_URL, SUPPORT_EMAIL } from "./constants/supportChannel";
 import { buildSupportEmail } from "./utils/supportEmail";
 
+// 조회가 늦어도 메일 작성은 막지 않는다.
+const NICKNAME_TIMEOUT_MS = 1500;
+
 async function readNickname(userId: string | undefined) {
   if (!userId) return null;
   const { data } = await supabase.from("profiles").select("nickname").eq("id", userId).single();
@@ -27,6 +31,13 @@ export function CustomerSupportScreen() {
   const insets = useSafeAreaInsets();
   const showToast = useToast();
   const { session } = useAuth();
+  const userId = session?.user.id;
+  const nickname = useRef<Promise<string | null> | null>(null);
+
+  // 버튼을 누르기 전에 미리 받아 둔다.
+  useEffect(() => {
+    nickname.current = readNickname(userId).catch(() => null);
+  }, [userId]);
 
   // MY-012 OS가 URL 열기 요청 자체를 거절한 경우에만 안내한다.
   const open = async (url: string) => {
@@ -39,9 +50,14 @@ export function CustomerSupportScreen() {
 
   // iOS 기본 메일 앱에 계정이 있으면 앱 안 작성 시트를, 없으면 기본 메일 앱(Gmail 등)을 연다.
   const sendEmail = async () => {
-    const nickname = await readNickname(session?.user.id).catch(() => null);
+    nickname.current ??= readNickname(userId).catch(() => null);
+    const name = await Promise.race([
+      nickname.current,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), NICKNAME_TIMEOUT_MS)),
+    ]);
     const { subject, body } = buildSupportEmail({
-      nickname,
+      // 로그인했는데 닉네임을 못 받으면 비회원으로 적지 않는다.
+      nickname: name ?? (userId ? "-" : null),
       appVersion: Application.nativeApplicationVersion,
       buildNumber: Application.nativeBuildVersion,
       os: Platform.OS === "android" ? "android" : "ios",

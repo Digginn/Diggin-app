@@ -34,6 +34,7 @@ function setup(
     copyResult = true,
     mailAvailable = false,
     mailFailure = false;
+  let readNickname = async () => ({ data: { nickname: "디기" } });
   const composed = [];
   const states = [],
     refs = [];
@@ -49,6 +50,7 @@ function setup(
       module: screen,
       exports: screen.exports,
       __DEV__: true,
+      setTimeout: (...args) => setTimeout(...args),
       require: function mockedRequire(name) {
         if (name === "expo-application")
           return {
@@ -67,7 +69,7 @@ function setup(
             supabase: {
               from: () => ({
                 select: () => ({
-                  eq: () => ({ single: async () => ({ data: { nickname: "디기" } }) }),
+                  eq: () => ({ single: () => readNickname() }),
                 }),
               }),
             },
@@ -216,6 +218,9 @@ function setup(
     },
     setCopyResult: (value) => {
       copyResult = value;
+    },
+    setReadNickname: (read) => {
+      readNickname = read;
     },
   };
 }
@@ -454,6 +459,28 @@ test("고객지원은 카카오톡 채널과 이메일을 열고, 열기 요청�
   await button("카카오톡 채널 열기").props.onPress();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(context.toasts.pop(), "요청을 처리하지 못했습니다. 다시 시도해 주세요.");
+});
+
+test("닉네임 조회가 늦어도 1.5초 뒤 메일을 열고, 회원을 비회원으로 적지 않는다", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const context = setup("CustomerSupportScreen");
+  context.setReadNickname(() => new Promise(() => {}));
+  const nodes = descendants(context.Screen());
+  const send = nodes.find(
+    (node) => node.type === "Button" && node.props.children === "이메일 보내기",
+  );
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  send.props.onPress();
+  await settle();
+  t.mock.timers.tick(1499);
+  await settle();
+  assert.equal(context.opened.length, 0);
+  t.mock.timers.tick(1);
+  await settle();
+  await settle();
+  const mail = new URL(context.opened[0]);
+  assert.equal(mail.searchParams.get("subject"), "[DIGGIN] -님의 메일입니다.");
+  assert.ok(mail.searchParams.get("body").includes("\n\n\nName: -\n"));
 });
 
 test("약관 목록은 48px 행·safe area를 적용하고 문서 종류를 사용처에 전달한다", () => {
