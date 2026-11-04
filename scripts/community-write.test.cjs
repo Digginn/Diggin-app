@@ -42,6 +42,17 @@ function nodes(node, type) {
 const body = load("src/screens/diggle/domain/postBody.ts");
 const settle = () => new Promise(setImmediate);
 
+test("금칙어 서버 오류는 일반글·투표글 공통 안내로 변환한다", () => {
+  const { communityWriteError } = load("src/screens/diggle/api/communityWrite.ts", {
+    "@/lib/supabase": { supabase: {} },
+  });
+  assert.equal(
+    communityWriteError({ message: "community_profanity" }),
+    "사용할 수 없는 표현이 포함되어 있습니다. 내용을 수정해 주세요.",
+  );
+  assert.equal(communityWriteError(null, "댓글 수정 실패"), "댓글 수정 실패");
+});
+
 test("본문은 NFC·사용자 인식 문자 기준이며 공백을 제외하고 이모지 중간을 자르지 않는다", () => {
   assert.equal(body.postBodyLength("가 나\n다\t라 👨‍👩‍👧‍👦"), 5);
   assert.equal(body.postBodyLength("👍🏽🇰🇷1️⃣"), 3);

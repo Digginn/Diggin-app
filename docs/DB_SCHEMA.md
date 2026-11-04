@@ -268,6 +268,7 @@ post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)
 
 - post_products는 `create_post`가 본인 상품에서 값을 복사한다. 원본 product_id는 저장하지 않는다. 일반글 1~4개, 투표글 정확히 1개.
 - 수정 RPC는 없다(DGL-008). 삭제는 deleted_at, 댓글도 같이 soft delete. 투표글 삭제 시 vote_responses는 실제로 지운다.
+- 커뮤니티 금칙어(#183): `private.contains_community_profanity(text)`가 기존 `nickname_banned_words`의 `profanity` 유형과 `nickname_allowed_words`의 정상 표현 예외를 공유한다. 검사할 때만 NFKC·소문자·공백/제로폭 문자 제거를 적용하고 저장 본문은 기존 NFC를 유지한다. 일반글·투표글 작성과 댓글 작성·수정(작성자 댓글 포함)을 서버에서 `community_profanity`로 거부한다. 댓글 공통 정규화 함수는 사전을 읽으므로 STABLE이다. 사칭용 닉네임 규칙은 본문에 적용하지 않으며 기존 콘텐츠를 소급 삭제하거나 자동 제재하지 않는다. 앱은 거부 사유를 안내하고 초안·첨부 아이템을 유지한다. 별도 대댓글 RPC는 현재 없다. 사전 기반 검사이므로 문맥 판단·모든 우회 표기 차단을 보장하지 않으며, 공백 제거에 따른 오탐은 정상 표현 예외로 보정한다.
 - `set_community_vote`는 upsert. 공통 쓰기 권한·부모 글 잠금 후 투표글·유효 선택·본인 글 제외·서버 `clock_timestamp() < ends_at`을 검사한다. 잠금 대기 중 마감된 요청도 차단한다.
 - 투표 결과는 진행 중 참여자·작성자, 마감 후 미참여 회원에게도 공개한다. 진행 중 미참여자는 buy_count·not_count가 null이고 비회원 미리보기에는 필드 자체가 없다. 퍼센트는 앱이 계산한다.
 - 좋아요는 일반글만(LIKE-001).
