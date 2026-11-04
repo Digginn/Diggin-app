@@ -1,3 +1,4 @@
+import * as MailComposer from "expo-mail-composer";
 import { StatusBar } from "expo-status-bar";
 import { Linking, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +23,19 @@ export function CustomerSupportScreen() {
     } catch {
       showToast(TOAST_MESSAGES.SYS_002);
     }
+  };
+
+  // iOS 기본 메일 앱에 계정이 있으면 앱 안 작성 시트를, 없으면 기본 메일 앱(Gmail 등)을 연다.
+  const sendEmail = async () => {
+    try {
+      if (await MailComposer.isAvailableAsync()) {
+        await MailComposer.composeAsync({ recipients: [SUPPORT_EMAIL] });
+        return;
+      }
+    } catch {
+      // 작성 시트를 못 띄우면 메일 링크로 한 번 더 시도한다.
+    }
+    await open(`mailto:${SUPPORT_EMAIL}`);
   };
 
   return (
@@ -57,7 +71,7 @@ export function CustomerSupportScreen() {
           variant="secondary"
           bgColor={colors.gray[0]}
           className="border-[1.5px] border-gray-900"
-          onPress={() => void open(`mailto:${SUPPORT_EMAIL}`)}
+          onPress={() => void sendEmail()}
         >
           이메일 보내기
         </Button>

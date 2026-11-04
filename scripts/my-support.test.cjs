@@ -31,7 +31,10 @@ function setup(
     opened = [],
     copied = [];
   let hasLinkFailure = false,
-    copyResult = true;
+    copyResult = true,
+    mailAvailable = false,
+    mailFailure = false;
+  const composed = [];
   const states = [],
     refs = [];
   let cursor = 0,
@@ -95,6 +98,15 @@ function setup(
             },
           };
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
+        if (name === "expo-mail-composer")
+          return {
+            isAvailableAsync: async () => mailAvailable,
+            composeAsync: async (options) => {
+              composed.push(options);
+              if (mailFailure) throw new Error("composer failure");
+              return { status: "sent" };
+            },
+          };
         if (name === "expo-router")
           return {
             useIsFocused: () => true,
@@ -162,6 +174,11 @@ function setup(
     routes,
     opened,
     copied,
+    composed,
+    setMail: (available, failure = false) => {
+      mailAvailable = available;
+      mailFailure = failure;
+    },
     failLink: () => {
       hasLinkFailure = true;
     },
@@ -378,6 +395,17 @@ test("고객지원은 카카오톡 채널과 이메일을 열고, 열기 요청�
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(context.opened, [CHANNEL_URL, `mailto:${SUPPORT_EMAIL}`]);
   assert.deepEqual(context.toasts, []);
+  // 기본 메일 계정이 있으면 앱 안 작성 시트, 시트가 실패하면 메일 링크로 연다.
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  context.setMail(true);
+  button("이메일 보내기").props.onPress();
+  await settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(context.composed)), [{ recipients: [SUPPORT_EMAIL] }]);
+  assert.equal(context.opened.length, 2);
+  context.setMail(true, true);
+  button("이메일 보내기").props.onPress();
+  await settle();
+  assert.deepEqual(context.opened.at(-1), `mailto:${SUPPORT_EMAIL}`);
   context.failLink();
   await button("카카오톡 채널 열기").props.onPress();
   await new Promise((resolve) => setImmediate(resolve));
