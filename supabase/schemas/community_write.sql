@@ -39,6 +39,9 @@ begin
      private.char_count(regexp_replace(normalized_content, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]', '', 'g')) not between 5 and 50 then
     raise exception 'invalid_post_content' using errcode = '22023';
   end if;
+  if private.contains_community_profanity(normalized_content) then
+    raise exception 'community_profanity' using errcode = '22023';
+  end if;
   if (post_kind = 'post' and item_count not between 1 and 4) or
      (post_kind = 'vote' and item_count <> 1) or
      item_count <> (select count(distinct id) from unnest(product_ids) as selected(id)) then

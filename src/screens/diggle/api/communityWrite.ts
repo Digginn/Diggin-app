@@ -54,7 +54,19 @@ export async function deleteCommunityPost(id: string) {
   if (error) throw error;
 }
 
-export function communityWriteError(error: unknown) {
+export function isCommunityProfanityError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    error.message === "community_profanity"
+  );
+}
+
+export function communityWriteError(
+  error: unknown,
+  fallbackMessage = "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+) {
   const restricted = restrictionMessage(error);
   if (restricted) return restricted;
   const message =
@@ -63,9 +75,10 @@ export function communityWriteError(error: unknown) {
     return "현재 커뮤니티를 이용할 수 없습니다.";
   if (/community_policy_required/.test(message))
     return "커뮤니티 이용규칙에 동의한 후 다시 시도해 주세요.";
+  if (isCommunityProfanityError(error)) return "사용할 수 없는 표현이 포함되어 있습니다.";
   if (/invalid_post_products/.test(message))
     return "첨부한 아이템을 확인해 주세요. 삭제된 아이템은 다시 선택해 주세요.";
   if (/invalid_post_content/.test(message)) return "본문을 공백 제외 5~50자로 입력해 주세요.";
   if (/network|failed to fetch/i.test(message)) return "연결 상태를 확인한 후 다시 시도해 주세요.";
-  return "요청을 처리하지 못했습니다. 다시 시도해 주세요.";
+  return fallbackMessage;
 }
