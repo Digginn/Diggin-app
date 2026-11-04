@@ -52,10 +52,11 @@ jobs:
               core.setFailed("The deploy commit must be a pull request merged into develop. Direct pushes cannot deploy.");
               return;
             }
-            // 사용자 승인 예외: 지정된 Retool 운영자 등록 PR에만 적용한다.
+            // 사용자 승인 예외: 지정된 운영자 등록 및 마이그레이션 복구 PR에만 적용한다.
             if (context.repo.owner === "Digginn" && context.repo.repo === "Diggin-app" &&
                 ((mergedPr.number === 122 && mergedPr.head.ref === "chore/115-retool-registration-deploy") ||
-                 (mergedPr.number === 177 && mergedPr.head.ref === "chore/175-register-retool-test-operator"))) {
+                 (mergedPr.number === 177 && mergedPr.head.ref === "chore/175-register-retool-test-operator") ||
+                 (mergedPr.number === 190 && mergedPr.head.ref === "fix/189-shared-db-migration-recovery"))) {
               core.info(`PR #${mergedPr.number}: user authorized deployment without a teammate approval.`);
               return;
             }
@@ -104,6 +105,9 @@ jobs:
 
       - name: Validate folder-first CSV migration recovery
         run: python3 scripts/validate_csv_migration_recovery.py
+
+      - name: Validate direct-block-first profanity migration recovery
+        run: python3 scripts/validate_csv_migration_recovery.py --profanity
 
   deploy:
     if: github.event_name == 'push'
