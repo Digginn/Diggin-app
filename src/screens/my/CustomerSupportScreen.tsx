@@ -59,14 +59,7 @@ export function CustomerSupportScreen() {
         </View>
       </View>
       <View className="gap-2 px-margin pt-3" style={{ paddingBottom: Math.max(insets.bottom, 34) }}>
-        <Button
-          variant="secondary"
-          bgColor={colors.gray[0]}
-          className="border-[1.5px] border-gray-900"
-          onPress={() => void open(SUPPORT_CHANNEL_URL)}
-        >
-          카카오톡 채널 열기
-        </Button>
+        <Button onPress={() => void open(SUPPORT_CHANNEL_URL)}>카카오톡 채널 열기</Button>
         <Button
           variant="secondary"
           bgColor={colors.gray[0]}
