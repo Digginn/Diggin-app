@@ -7,7 +7,8 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
-const CHANNEL_URL = "http://pf.kakao.com/_zIxnrX";
+const CHANNEL_URL = "https://pf.kakao.com/_zIxnrX";
+const SUPPORT_EMAIL = "diggin.app@gmail.com";
 
 function loadLoginIntent() {
   const module = { exports: {} };
@@ -121,9 +122,13 @@ function setup(
         if (name === "@/assets/images/my")
           return {
             ImageSupportApp: "ImageSupportApp",
+            IconSupportKakaoBadge: "IconSupportKakaoBadge",
             IconMyChevron: "IconMyChevron",
           };
-        if (name === "./constants/supportChannel") return { SUPPORT_CHANNEL_URL: CHANNEL_URL };
+        if (name === "./constants/supportChannel")
+          return { SUPPORT_CHANNEL_URL: CHANNEL_URL, SUPPORT_EMAIL };
+        if (name === "@/constants/messages")
+          return { TOAST_MESSAGES: { SYS_002: "요청을 처리하지 못했습니다. 다시 시도해 주세요." } };
         if (name === "@/constants/policyDocuments.json")
           return require("../src/constants/policyDocuments.json");
         if (name === "@/components/PolicyDocumentContent") {
@@ -235,8 +240,8 @@ test("비로그인 MY는 로그인과 고객지원만 제공한다", async () =>
     Array.from(supportRows, (row) => row.label),
     ["1:1 문의", "약관 및 정책", "앱 정보"],
   );
-  await supportRows[0].onPress();
-  assert.deepEqual(context.opened, [CHANNEL_URL]);
+  supportRows[0].onPress();
+  assert.equal(context.routes.at(-1), "/customer-support");
   supportRows[1].onPress();
   assert.equal(context.routes.at(-1), "/terms");
   assert.equal(supportRows[2].hasChevron, false);
@@ -262,15 +267,11 @@ test("내 활동은 쓴 글과 좋아요한 글만 표시하고 쓴 글 목록�
   assert.deepEqual(context.toasts, []);
 });
 
-test("MY 문의는 채널로 바로 이동하고 실패할 때만 고객지원 화면을 표시한다", async () => {
+test("MY 1:1 문의는 고객지원 화면으로 이동한다", () => {
   const context = setup("MyScreen");
   const section = descendants(context.Screen()).find((node) => node.props.title === "고객지원");
-  const contact = section.props.rows.find((row) => row.label === "1:1 문의");
-  await contact.onPress();
-  assert.deepEqual(context.opened, [CHANNEL_URL]);
-  assert.deepEqual(context.routes, []);
-  context.failLink();
-  await contact.onPress();
+  section.props.rows.find((row) => row.label === "1:1 문의").onPress();
+  assert.deepEqual(context.opened, []);
   assert.deepEqual(context.routes, ["/customer-support"]);
   section.props.rows.find((row) => row.label === "약관 및 정책").onPress();
   assert.equal(context.routes[1], "/terms");
@@ -363,25 +364,24 @@ test("로그아웃 모달은 공용 ActionModal로 Figma 문구·36% scrim·로�
   assert.deepEqual(confirmed, ["logout", "close"]);
 });
 
-test("고객지원은 원본 로고와 URL을 표시하고 복사·이동 실패를 처리한다", async () => {
+test("고객지원은 카카오톡 채널과 이메일을 열고, 열기 요청이 실패하면 SYS-002를 안내한다", async () => {
   const context = setup("CustomerSupportScreen");
   const nodes = descendants(context.Screen());
-  assert.ok(
-    nodes.some((node) => node.type === "ImageSupportApp" && node.props.width === undefined),
-  );
-  assert.ok(nodes.some((node) => node.props.children === CHANNEL_URL));
-  const copy = nodes.find((node) => node.props.accessibilityLabel === "고객지원 링크 복사");
-  await copy.props.onPress();
-  assert.deepEqual(context.copied, [CHANNEL_URL]);
-  assert.equal(context.toasts.pop(), "링크를 복사했습니다.");
-  for (const failure of [false, new Error("clipboard failure")]) {
-    context.setCopyResult(failure);
-    await copy.props.onPress();
-    assert.equal(context.toasts.pop(), "링크를 복사하지 못했습니다. 다시 시도해 주세요.");
-  }
+  assert.ok(nodes.some((node) => node.type === "ImageSupportApp"));
+  assert.ok(nodes.some((node) => node.type === "IconSupportKakaoBadge"));
+  assert.ok(nodes.some((node) => node.props.children === "@archive_diggin"));
+  const button = (label) =>
+    nodes.find((node) => node.type === "Button" && node.props.children === label);
+  await button("카카오톡 채널 열기").props.onPress();
+  await new Promise((resolve) => setImmediate(resolve));
+  await button("이메일 보내기").props.onPress();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(context.opened, [CHANNEL_URL, `mailto:${SUPPORT_EMAIL}`]);
+  assert.deepEqual(context.toasts, []);
   context.failLink();
-  await nodes.find((node) => node.props.accessibilityRole === "link").props.onPress();
-  assert.equal(context.toasts.pop(), "카카오 채널로 이동하지 못했습니다. 링크를 복사해 주세요.");
+  await button("카카오톡 채널 열기").props.onPress();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(context.toasts.pop(), "요청을 처리하지 못했습니다. 다시 시도해 주세요.");
 });
 
 test("약관 목록은 48px 행·safe area를 적용하고 문서 종류를 사용처에 전달한다", () => {

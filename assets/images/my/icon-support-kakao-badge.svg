@@ -1,0 +1,7 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="32" height="31" viewBox="0 0 32 31" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="KakaoBadge">
+<rect x="1.5" y="1.5" width="29" height="28" rx="5.5" fill="#FBE300"/>
+<rect x="1.5" y="1.5" width="29" height="28" rx="5.5" stroke="white" stroke-width="3"/>
+<path id="Vector" opacity="0.902" d="M16 9C12.075 9 8.5 12.1384 8.5 14.7935C8.5 16.7829 9.79833 18.5378 11.7758 19.5806L10.9442 22.6195C10.87 22.8889 11.1775 23.1028 11.4133 22.9478L15.0608 20.5397C15.3683 20.5695 15.6817 20.5869 16 20.5869C20.1417 20.5869 23.5 17.9932 23.5 14.7935C23.5 12.1384 20.1417 9 16 9Z" fill-rule="evenodd" clip-rule="evenodd" fill="#3B1E1E"/>
+</g>
+</svg>
