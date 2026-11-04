@@ -21,8 +21,8 @@ begin
     values(target,action,'suspended',category,now()-age,case when released then now() end);
 end;
 $$;
-select pg_temp.sanction('16400000-0000-0000-0000-000000000002','underage',interval '1 month 1 day');
-select pg_temp.sanction('16400000-0000-0000-0000-000000000003','underage',interval '10 days');
+select pg_temp.sanction('16400000-0000-0000-0000-000000000002','underage',interval '30 days 1 hour');
+select pg_temp.sanction('16400000-0000-0000-0000-000000000003','underage',interval '29 days 23 hours');
 select pg_temp.sanction('16400000-0000-0000-0000-000000000004','underage',interval '2 months',true);
 select pg_temp.sanction('16400000-0000-0000-0000-000000000005','abuse',interval '2 months');
 
@@ -42,7 +42,7 @@ select lives_ok($$select public.store_apple_refresh_token('16400000-0000-0000-00
 select throws_ok($$select * from private.apple_refresh_tokens$$,'42501',null,'서비스 역할도 토큰 테이블 직접 조회 불가');
 select results_eq($$select user_id, apple_refresh_token from public.due_underage_deletions()$$,
   $$values ('16400000-0000-0000-0000-000000000002'::uuid, 'second-token'::text)$$,
-  '만 14세 미만으로 이용 중단 후 한 달이 지난 계정만 최신 토큰과 함께 조회');
+  '만 14세 미만으로 이용 중단 후 30일이 지난 계정만 최신 토큰과 함께 조회');
 reset role;
 
 select is((select count(*)::int from private.apple_refresh_tokens),1,'계정당 토큰 하나');
@@ -54,7 +54,7 @@ insert into private.moderation_requests(id,admin_id,user_id,action,reason_catego
  ('16400000-0000-0000-0002-000000000001','16400000-0000-0000-0000-000000000001','16400000-0000-0000-0000-000000000002','release','underage','정정 확인');
 set local role service_role;
 select is(public.claim_underage_deletion('16400000-0000-0000-0000-000000000002'),false,'해제 요청이 진행 중이면 삭제를 시작하지 않음');
-select is(public.claim_underage_deletion('16400000-0000-0000-0000-000000000003'),false,'아직 한 달이 안 된 계정은 삭제를 시작하지 않음');
+select is(public.claim_underage_deletion('16400000-0000-0000-0000-000000000003'),false,'아직 30일이 안 된 계정은 삭제를 시작하지 않음');
 select is(public.claim_underage_deletion('16400000-0000-0000-0000-000000000004'),false,'운영자가 해제한 계정은 삭제를 시작하지 않음');
 reset role;
 delete from private.moderation_requests where id='16400000-0000-0000-0002-000000000001';
