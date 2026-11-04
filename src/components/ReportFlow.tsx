@@ -5,7 +5,7 @@ import { Text, View } from "react-native";
 import { Modal } from "@/components/modal/Modal";
 import { ModalButton } from "@/components/modal/ModalButton";
 import { ReportForm } from "@/components/modal/ReportModal";
-import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
+import { DIGGLE_TOAST_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { REPORT_MESSAGES, type ReportReason, type ReportTarget } from "@/constants/report";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
@@ -94,8 +94,28 @@ export function ReportDialog({
         onClose();
       }
     } catch (failure) {
-      if (current.active)
-        setError(phase === "block" ? REPORT_MESSAGES.blockFailed : communityWriteError(failure));
+      if (!current.active) return;
+      if (
+        phase === "block" &&
+        typeof failure === "object" &&
+        failure !== null &&
+        "message" in failure &&
+        failure.message === "report_target_not_found"
+      ) {
+        onClose();
+        showToast(TOAST_MESSAGES.NOTI_004);
+        void queryClient
+          .invalidateQueries(
+            { queryKey: communityKeys.all, refetchType: "all" },
+            { throwOnError: true },
+          )
+          .catch((refreshError: unknown) => {
+            if (current.active) showToast(communityWriteError(refreshError), "error");
+          });
+      } else
+        setError(
+          communityWriteError(failure, phase === "block" ? REPORT_MESSAGES.blockFailed : undefined),
+        );
     } finally {
       if (current.active) {
         busy.current = false;
@@ -134,7 +154,11 @@ export function ReportDialog({
             <View className="w-[140px]">
               <ModalButton
                 variant="secondary"
-                action={{ label: "괜찮아요", onPress: close, isDisabled: isPending }}
+                action={{
+                  label: initialPhase === "block" ? "취소" : "확인",
+                  onPress: close,
+                  isDisabled: isPending,
+                }}
               />
             </View>
             <View className="w-[140px]">
