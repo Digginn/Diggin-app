@@ -2,10 +2,10 @@
 
 ## 최근 빌드
 
-- 버전: `1.0.0 (5)`
-- 소스: develop `a70c74cd549aae8e25027e1842151d89f4500862`
-- [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/12f593e4-376a-4709-bd8d-11c95bf4b742)
-- 본 앱과 공유 확장 서명, 운영용 APNs 권한, App Group, 소셜 로그인 URL 스킴, 공유 Supabase 주소를 IPA에서 확인했다.
+- 버전: `1.0.0 (11)`
+- 소스: develop `dedc97a4af7e9190ec34659056a3bb8fc7373ca2`
+- [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/882a90a1-b9c4-455b-9031-f54c2562ecf0)
+- 본 앱과 공유 확장의 ID·버전·서명, 운영용 APNs 권한, App Group, 소셜 로그인 URL 스킴, 공유 Supabase 주소를 IPA에서 확인했다. iPad 지원·전체 화면 설정과 메일 작성 네이티브 모듈 포함도 확인했다.
 - 빌드 성공과 TestFlight 업로드는 별개다. TestFlight 확인 전에는 App Store Connect 업로드 및 처리가 필요하다.
 
 ## 다음 빌드
