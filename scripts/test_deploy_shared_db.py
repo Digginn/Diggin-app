@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, deploy, deployment_plan, parse_history, run_cli
+from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, PROFANITY_BASELINE, PROFANITY_RECOVERY, deploy, deployment_plan, parse_history, run_cli
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -44,6 +44,36 @@ class DeploymentTests(unittest.TestCase):
 
     def test_completed_recovery_is_a_noop(self):
         self.assertEqual(self.plan(self.local), ([], False))
+
+    def test_direct_block_first_recovers_profanity_and_normal_later_migration(self):
+        remote = {version for version in self.local if version <= PROFANITY_BASELINE}
+        remote -= {name.split("_")[0] for name in PROFANITY_RECOVERY}
+        pending, include_all = self.plan(remote)
+        self.assertEqual(set(pending), set(PROFANITY_RECOVERY) | {"20261104154331_underage_deletion_30_days.sql"})
+        self.assertTrue(include_all)
+
+    def test_partial_profanity_recovery_can_resume(self):
+        for name in PROFANITY_RECOVERY:
+            with self.subTest(name=name):
+                self.assertEqual(self.plan(self.local - {name.split("_")[0]}), ([name], True))
+
+    def test_modified_profanity_migration_is_rejected(self):
+        for name in PROFANITY_RECOVERY:
+            with self.subTest(name=name):
+                with (self.directory / name).open("a", encoding="utf-8") as file:
+                    file.write("\nselect 1;\n")
+                with self.assertRaisesRegex(ValueError, "Unreviewed out-of-order"):
+                    self.plan(self.local - {name.split("_")[0]})
+
+    def test_direct_block_baseline_is_required_for_profanity_recovery(self):
+        missing = {name.split("_")[0] for name in PROFANITY_RECOVERY} | {PROFANITY_BASELINE}
+        with self.assertRaisesRegex(ValueError, "already deployed direct-block"):
+            self.plan(self.local - missing)
+
+    def test_unreviewed_gap_alongside_profanity_is_rejected(self):
+        missing = {name.split("_")[0] for name in PROFANITY_RECOVERY} | {"20261104112539"}
+        with self.assertRaisesRegex(ValueError, "Unreviewed out-of-order"):
+            self.plan(self.local - missing)
 
     def test_normal_future_migration_does_not_use_include_all(self):
         filename = f"{self.future_version}_future.sql"

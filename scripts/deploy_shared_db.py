@@ -1,4 +1,4 @@
-"""Deploy normally, allowing only the reviewed CSV migrations to fill history gaps."""
+"""Deploy normally, allowing only hash-pinned migrations to fill reviewed history gaps."""
 
 import argparse
 import hashlib
@@ -12,6 +12,11 @@ RECOVERY_BASELINE = "20261018114830"
 CSV_RECOVERY = {
     "20261016124751_csv_import.sql": "c9aac0df85c0d69231e3a0a46a398d8cf3c7242498ee53ebe01a8be10162585b",
     "20261017082235_csv_import_review_fixes.sql": "f70f8e61334271aaab2b920e9a30b02d9704173abcff4be27329f4c3fd26887d",
+}
+PROFANITY_BASELINE = "20261104140135"
+PROFANITY_RECOVERY = {
+    "20261104134530_community_profanity_words.sql": "1670e11301b9b54819a266b6060adda8bf7e898582bca96559063a8c84540788",
+    "20261104134619_community_profanity_bypass.sql": "c8bc586cb1a9ddf029a5b8b18e083a61e5b43fd2b05f62de2f6df038075d891d",
 }
 
 
@@ -67,13 +72,17 @@ def deployment_plan(directory, history):
     pending = sorted(local - remote)
     backwards = [version for version in pending if version < max(remote)]
     if backwards:
-        if RECOVERY_BASELINE not in remote:
-            raise ValueError("CSV recovery requires the already deployed folder migration")
         for version in backwards:
             path = files[version]
             digest = hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
-            if CSV_RECOVERY.get(path.name) != digest:
+            if CSV_RECOVERY.get(path.name) == digest:
+                baseline, label = RECOVERY_BASELINE, "folder"
+            elif PROFANITY_RECOVERY.get(path.name) == digest:
+                baseline, label = PROFANITY_BASELINE, "direct-block"
+            else:
                 raise ValueError(f"Unreviewed out-of-order migration: {path.name}")
+            if baseline not in remote:
+                raise ValueError(f"Recovery requires the already deployed {label} migration")
     return [files[version].name for version in pending], bool(backwards)
 
 

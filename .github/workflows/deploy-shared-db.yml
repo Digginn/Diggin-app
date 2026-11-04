@@ -105,6 +105,9 @@ jobs:
       - name: Validate folder-first CSV migration recovery
         run: python3 scripts/validate_csv_migration_recovery.py
 
+      - name: Validate direct-block-first profanity migration recovery
+        run: python3 scripts/validate_csv_migration_recovery.py --profanity
+
   deploy:
     if: github.event_name == 'push'
     needs: [validate, validate_functions]
