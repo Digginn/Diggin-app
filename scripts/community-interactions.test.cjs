@@ -172,7 +172,14 @@ function harness({
     "@/hooks/useToast": { useToast: () => (message) => toasts.push(message) },
     "@/utils/text": text,
     "../api/community": keys,
-    "../api/communityWrite": { communityWriteError: () => "요청 실패" },
+    "../api/communityWrite": {
+      communityWriteError: (error, fallback) =>
+        error?.message === "community_profanity"
+          ? load("src/screens/diggle/api/communityWrite.ts", {
+              "@/lib/supabase": { supabase: {} },
+            }).communityWriteError(error, fallback)
+          : (fallback ?? "요청 실패"),
+    },
     "../api/communityInteractions": {
       createComment: (...args) => {
         calls.push({ type: "create", args });
@@ -271,6 +278,23 @@ test("수정 취소는 작성 초안을 복원하고 실패하면 수정 본문�
   assert.equal(ui.calls.at(-1).args[1], "새 댓글");
   assert.equal(ui.render().editing, null);
   assert.equal(ui.render().body, "원래 초안");
+});
+
+test("금칙어로 거부한 댓글 작성·수정은 안내하고 초안과 수정 대상을 유지한다", async () => {
+  const reject = async () => {
+    throw new Error("community_profanity");
+  };
+  for (const editing of [false, true]) {
+    const ui = harness({ create: reject, update: reject });
+    ui.render().setBody("원래 초안");
+    if (editing) ui.render().startEditing(row());
+    ui.render().setBody("시발 이게 뭐야");
+    await ui.render().send();
+    assert.equal(ui.render().body, "시발 이게 뭐야");
+    assert.equal(ui.render().editing?.id ?? null, editing ? "90" : null);
+    assert.equal(ui.invalidations.length, 0);
+    assert.equal(ui.toasts.at(-1), "사용할 수 없는 표현이 포함되어 있습니다.");
+  }
 });
 
 test("댓글 삭제 실패는 확인창·목록을 유지하고 재시도 성공 후에만 제거한다", async () => {

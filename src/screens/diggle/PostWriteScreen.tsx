@@ -33,6 +33,7 @@ import {
   communityWriteError,
   createCommunityPost,
   fetchCommunityPolicy,
+  isCommunityProfanityError,
 } from "./api/communityWrite";
 import { CommunityBodyField } from "./components/CommunityBodyField";
 import { CommunityPolicySheet } from "./components/CommunityPolicySheet";
@@ -66,6 +67,8 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
   const showToast = useToast();
   const { items, setItems, reset } = usePostDraft();
   const [body, setBody] = useState("");
+  const [bodyError, setBodyError] = useState<{ body: string; message: string } | null>(null);
+  const bodyErrorMessage = bodyError?.body === body ? bodyError.message : undefined;
   const [isExitOpen, setExitOpen] = useState(false);
   const [isLeaving, setLeaving] = useState(false);
   const [isSubmitting, setSubmitting] = useState(false);
@@ -157,8 +160,11 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
       showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글을 등록했습니다.");
     } catch (error) {
       busy.current = false;
-      if (mounted.current)
-        showToast(communityWriteError(error), restrictionMessage(error) ? "notice" : "error");
+      if (mounted.current) {
+        if (isCommunityProfanityError(error))
+          setBodyError({ body: input.body, message: communityWriteError(error) });
+        else showToast(communityWriteError(error), restrictionMessage(error) ? "notice" : "error");
+      }
     } finally {
       if (mounted.current) setSubmitting(false);
     }
@@ -186,10 +192,22 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
           keyboardShouldPersistTaps="handled"
         >
           <View className="gap-2.5">
-            <CommunityBodyField isVote={isVote} value={body} onChangeText={setBody} />
-            {body.length > 0 && count < 5 && (
+            <CommunityBodyField
+              isVote={isVote}
+              value={body}
+              hasError={!!bodyErrorMessage}
+              onChangeText={(next) => {
+                setBody(next);
+                setBodyError(null);
+              }}
+            />
+            {bodyErrorMessage ? (
+              <View accessibilityRole="alert" accessibilityLiveRegion="polite" className="min-h-5">
+                <HelperText status="error" message={bodyErrorMessage} />
+              </View>
+            ) : body.length > 0 && count < 5 ? (
               <HelperText status="error" message="공백을 제외하고 5자 이상 입력해 주세요." />
-            )}
+            ) : null}
           </View>
           <View className="gap-3">
             <View className="flex-row justify-between">

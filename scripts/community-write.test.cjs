@@ -40,7 +40,39 @@ function nodes(node, type) {
   ];
 }
 const body = load("src/screens/diggle/domain/postBody.ts");
+const writeErrors = load("src/screens/diggle/api/communityWrite.ts", {
+  "@/lib/supabase": { supabase: {} },
+});
 const settle = () => new Promise(setImmediate);
+
+test("금칙어 서버 오류는 일반글·투표글 공통 안내로 변환한다", () => {
+  const { communityWriteError } = load("src/screens/diggle/api/communityWrite.ts", {
+    "@/lib/supabase": { supabase: {} },
+  });
+  assert.equal(
+    communityWriteError({ message: "community_profanity" }),
+    "사용할 수 없는 표현이 포함되어 있습니다.",
+  );
+  assert.equal(communityWriteError(null, "댓글 수정 실패"), "댓글 수정 실패");
+});
+
+test("금칙어 오류 입력창은 빨간 테두리와 120 높이를 유지하고 카운터를 숨긴다", () => {
+  const { CommunityBodyField } = load("src/screens/diggle/components/CommunityBodyField.tsx", {
+    "react": { useState: () => [false, () => {}] },
+    "react-native": { View: "View", Text: "Text", TextInput: "TextInput" },
+    "@/theme": { colors: { gray: { 400: "gray" } } },
+    "../domain/postBody": body,
+  });
+  const props = { value: "욕설이 포함된 본문", isVote: false, onChangeText: () => {} };
+  const invalid = CommunityBodyField({ ...props, hasError: true });
+  assert.match(invalid.props.className, /border-semantic-error/);
+  assert.match(invalid.props.className, /h-\[120px\]/);
+  assert.equal(nodes(invalid, "TextInput")[0].props.value, props.value);
+  assert.equal(nodes(invalid, "Text").length, 0);
+  const valid = CommunityBodyField(props);
+  assert.doesNotMatch(valid.props.className, /border-semantic-error/);
+  assert.equal(nodes(valid, "Text").length, 1);
+});
 
 test("본문은 NFC·사용자 인식 문자 기준이며 공백을 제외하고 이모지 중간을 자르지 않는다", () => {
   assert.equal(body.postBodyLength("가 나\n다\t라 👨‍👩‍👧‍👦"), 5);
@@ -174,7 +206,11 @@ function editor({ isVote = false, agreed = true, save, agree } = {}) {
   const api = {
     fetchCommunityPolicy: async () => policy,
     agreeCommunityPolicy: agree ?? (async () => {}),
-    communityWriteError: () => "다시 시도해 주세요.",
+    communityWriteError: (error) =>
+      writeErrors.isCommunityProfanityError(error)
+        ? writeErrors.communityWriteError(error)
+        : "다시 시도해 주세요.",
+    isCommunityProfanityError: writeErrors.isCommunityProfanityError,
     createCommunityPost: async (input) => {
       calls.push(input);
       return save ? save(input) : "12";
@@ -329,6 +365,53 @@ test("연속 등록은 한 번만 요청하고 실패 재시도는 입력과 재
   assert.notEqual(ui.calls[2].requestId, ui.calls[1].requestId);
   reject(new Error("offline"));
   await settle();
+});
+
+test("게시글·투표 금칙어 거부는 입력 아래 안내하고 본문·첨부를 유지하며 수정 시 해제한다", async () => {
+  for (const isVote of [false, true]) {
+    const ui = editor({
+      isVote,
+      save: async () => {
+        throw new Error("community_profanity");
+      },
+    });
+    ui.input("욕설이 포함된 본문");
+    ui.submit();
+    await settle();
+    const tree = ui.render();
+    const field = nodes(tree, "CommunityBodyField")[0];
+    assert.equal(field.props.hasError, true);
+    assert.equal(field.props.value, "욕설이 포함된 본문");
+    const helper = nodes(tree, "HelperText").find((node) => node.props.status === "error");
+    assert.equal(helper.props.message, "사용할 수 없는 표현이 포함되어 있습니다.");
+    assert.equal(nodes(tree, "ProductAttachGrid")[0].props.items.length, 1);
+    assert.equal(ui.toasts.length, 0, "게시글은 토스트 대신 입력창 아래 오류를 표시한다");
+    assert.equal(ui.invalidations.length, 0);
+    ui.input("수정한 정상 본문");
+    assert.equal(nodes(ui.render(), "CommunityBodyField")[0].props.hasError, false);
+    assert.equal(
+      nodes(ui.render(), "HelperText").filter((node) => node.props.status === "error").length,
+      0,
+    );
+  }
+});
+
+test("등록 요청 중 본문을 바꿨다면 이전 본문의 금칙어 오류를 현재 입력에 표시하지 않는다", async () => {
+  let reject;
+  const ui = editor({
+    save: () =>
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      }),
+  });
+  ui.input("욕설이 포함된 본문");
+  ui.submit();
+  ui.input("바꾼 정상 본문이에요");
+  reject(new Error("community_profanity"));
+  await settle();
+  const field = nodes(ui.render(), "CommunityBodyField")[0];
+  assert.equal(field.props.value, "바꾼 정상 본문이에요");
+  assert.equal(field.props.hasError, false);
 });
 
 test("등록 성공 시 서버 목록을 갱신하고 투표 탭으로 복귀한다", async () => {
