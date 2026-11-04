@@ -165,6 +165,11 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                         ? () => setReportTarget({ type: "post", id: post.id })
                         : undefined
                     }
+                    onPressBlock={
+                      !post.isMine
+                        ? () => setReportTarget({ type: "post", id: post.id, action: "block" })
+                        : undefined
+                    }
                     onPress={() => openPost(post)}
                   />
                 ) : post.type === "post" ? (

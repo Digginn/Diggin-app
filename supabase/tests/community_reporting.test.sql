@@ -40,7 +40,7 @@ select throws_ok($$select public.report_community_content('post',current_setting
 select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'invalid')$$,'22023','invalid_report_reason','유효한 사유만 허용');
 select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'spam','상세')$$,'22023','invalid_report_reason','직접 작성 외 상세 거부');
 select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'other',repeat('가',51))$$,'22023','invalid_report_reason','직접 작성 51자 거부');
-select throws_ok($$select public.block_community_author('post',current_setting('test.post')::bigint)$$,'42501','report_target_not_found','본인이 신고한 대상만 차단');
+select throws_ok($$select public.block_community_author('post',9223372036854775807)$$,'42501','report_target_not_found','없는 콘텐츠는 신고 없이 차단할 수 없다');
 reset role;
 update private.posts set hidden_at=now() where id=current_setting('test.other')::bigint;
 set local role authenticated;
@@ -92,7 +92,7 @@ select is((select count(*) from private.user_blocks where blocker_id='11200000-0
 set local request.jwt.claims='{"sub":"11200000-0000-0000-0000-000000000002","role":"authenticated"}';
 set local role authenticated;
 select isnt(public.get_community_post(current_setting('test.own')::bigint),null,'차단당한 사용자에게 상대 글 계속 노출');
-select throws_ok($$select public.block_community_author('comment',current_setting('test.comment')::bigint)$$,'42501','report_target_not_found','다른 계정은 남의 신고를 차단 근거로 사용 불가');
+select throws_ok($$select public.block_community_author('comment',current_setting('test.comment')::bigint)$$,'42501','own_block','다른 계정의 신고로 자기 자신을 차단할 수 없다');
 reset role;
 set local request.jwt.claims='{"sub":"11200000-0000-0000-0000-000000000003","role":"authenticated"}';
 set local role authenticated;

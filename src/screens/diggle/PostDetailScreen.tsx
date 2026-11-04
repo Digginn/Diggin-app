@@ -27,6 +27,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { FloatingToolbar } from "@/components/FloatingToolbar";
 import { Spinner } from "@/components/Loading";
 import { ActionModal, LoginRequiredModal } from "@/components/modal";
+import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
@@ -256,12 +257,12 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               삭제
             </AppBar.TextButton>
           ) : post && !isWrongRoute ? (
-            <AppBar.TextButton
-              disabled={isBusy || infoItem !== null}
-              onPress={() => setReportTarget({ type: "post", id: post.id })}
-            >
-              신고
-            </AppBar.TextButton>
+            <ReportBlockMenu
+              placement="header"
+              isDisabled={isBusy || infoItem !== null}
+              onReport={() => setReportTarget({ type: "post", id: post.id })}
+              onBlock={() => setReportTarget({ type: "post", id: post.id, action: "block" })}
+            />
           ) : null
         }
       />
@@ -374,6 +375,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                       Keyboard.dismiss();
                       setReportTarget({ type: "comment", id: comment.id });
                     }
+                  : undefined
+              }
+              onPressBlock={
+                !comment.isMine && !comment.isWithdrawn && !isBusy
+                  ? () => setReportTarget({ type: "comment", id: comment.id, action: "block" })
                   : undefined
               }
               isHighlighted={actions.editing?.id === comment.id}

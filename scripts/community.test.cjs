@@ -24,13 +24,15 @@ function load(file, mocks = {}, globals = {}) {
       exports: module.exports,
       require: (name) =>
         mocks[name] ??
-        (name === "@/api/accountAccess"
-          ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
-          : name.endsWith(".svg")
-            ? name
-            : LOGIN_SOURCES[name]
-              ? load(LOGIN_SOURCES[name], mocks)
-              : require(name)),
+        (name === "@/components/ReportBlockMenu"
+          ? { ReportBlockMenu: "ReportBlockMenu" }
+          : name === "@/api/accountAccess"
+            ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
+            : name.endsWith(".svg")
+              ? name
+              : LOGIN_SOURCES[name]
+                ? load(LOGIN_SOURCES[name], mocks)
+                : require(name)),
       ...globals,
     },
   );
@@ -601,6 +603,17 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
       { id: "3", isWithdrawn: true, body: null, createdAt: PREVIEW.created_at },
     ],
   });
+  let hookIndex = 0;
+  let reportTarget;
+  state.mocks.react.useState = (initial) => {
+    const current = hookIndex++;
+    return [
+      initial,
+      (value) => {
+        if (current === 0) reportTarget = value;
+      },
+    ];
+  };
   const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
   const screen = PostDetailScreen({});
   const comments = nodes(screen, "Comment");
@@ -611,6 +624,16 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   assert.equal(typeof comments[0].props.onPressReport, "function");
   assert.equal(comments[1].props.onPressReport, undefined);
   assert.equal(comments[2].props.onPressReport, undefined);
+  assert.equal(typeof comments[0].props.onPressBlock, "function");
+  assert.equal(comments[1].props.onPressBlock, undefined);
+  assert.equal(comments[2].props.onPressBlock, undefined);
+  assert.equal(typeof comments[1].props.onPressMenu, "function");
+  assert.equal(comments[0].props.onPressMenu, undefined);
+  assert.equal(comments[2].props.onPressMenu, undefined);
+  comments[0].props.onPressBlock();
+  assert.deepEqual({ ...reportTarget }, { type: "comment", id: "1", action: "block" });
+  comments[0].props.onPressReport();
+  assert.deepEqual({ ...reportTarget }, { type: "comment", id: "1" });
   assert.equal(typeof nodes(screen, "LikeCommentRow")[0].props.onPressLike, "function");
   assert.equal(nodes(screen, "PostItemInfoSheet")[0].props.onSaveToAll, undefined);
 });
@@ -631,6 +654,42 @@ test("서버가 비공개로 내려준 투표 집계는 작성자·마감 화면
     .map((node) => React.Children.toArray(node.props.children).join(""))
     .join(" ");
   assert.ok(!text.includes("0명"));
+});
+
+test("게시글·투표 상세는 타인 글에 신고·차단 메뉴를 제공하고 본인 글은 삭제를 유지한다", async () => {
+  for (const type of ["post", "vote"]) {
+    for (const isMine of [false, true]) {
+      const post = await api({ ...MEMBER, type, is_mine: isMine }).fetchCommunityPost("12");
+      const state = screenMocks({ post });
+      let hookIndex = 0;
+      let selectedTarget;
+      state.mocks.react.useState = (initial) => {
+        const current = hookIndex++;
+        return [
+          initial,
+          (value) => {
+            if (current === 0) selectedTarget = value;
+          },
+        ];
+      };
+      const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+      const tree = PostDetailScreen({ type: type === "vote" ? "vote" : "all" });
+      const bar = React.Children.toArray(tree.props.children)[0];
+      if (isMine) assert.equal(bar.props.right.props.children, "삭제");
+      else {
+        const menu = bar.props.right;
+        assert.equal(menu.type, "ReportBlockMenu");
+        assert.equal(menu.props.placement, "header");
+        assert.equal(menu.props.isDisabled, false);
+        assert.equal(typeof menu.props.onReport, "function");
+        assert.equal(typeof menu.props.onBlock, "function");
+        menu.props.onBlock();
+        assert.deepEqual({ ...selectedTarget }, { type: "post", id: "12", action: "block" });
+        menu.props.onReport();
+        assert.deepEqual({ ...selectedTarget }, { type: "post", id: "12" });
+      }
+    }
+  }
 });
 
 test("상세 URL의 종류가 다르면 실제 글 주소로 교체하며 없는 글 안내를 띄우지 않는다", async () => {
