@@ -23,17 +23,6 @@ async function readNickname(userId: string | undefined) {
   return data?.nickname ?? null;
 }
 
-// 기기 고유 ID를 못 읽어도 메일은 보낸다.
-async function readDeviceId() {
-  try {
-    return Platform.OS === "android"
-      ? Application.getAndroidId()
-      : await Application.getIosIdForVendorAsync();
-  } catch {
-    return null;
-  }
-}
-
 export function CustomerSupportScreen() {
   const insets = useSafeAreaInsets();
   const showToast = useToast();
@@ -50,10 +39,7 @@ export function CustomerSupportScreen() {
 
   // iOS 기본 메일 앱에 계정이 있으면 앱 안 작성 시트를, 없으면 기본 메일 앱(Gmail 등)을 연다.
   const sendEmail = async () => {
-    const [nickname, deviceId] = await Promise.all([
-      readNickname(session?.user.id).catch(() => null),
-      readDeviceId(),
-    ]);
+    const nickname = await readNickname(session?.user.id).catch(() => null);
     const { subject, body } = buildSupportEmail({
       nickname,
       appVersion: Application.nativeApplicationVersion,
@@ -64,7 +50,6 @@ export function CustomerSupportScreen() {
       apiLevel: Device.platformApiLevel,
       model: Device.modelName,
       manufacturer: Device.manufacturer,
-      deviceId,
     });
     try {
       if (await MailComposer.isAvailableAsync()) {

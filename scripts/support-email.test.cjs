@@ -30,12 +30,11 @@ test("Android는 안내 문구 아래 빈 줄 두 개를 두고 ApiLevel을 포�
     apiLevel: 33,
     model: "SM-N981N",
     manufacturer: "samsung",
-    deviceId: "abc123",
   });
   assert.equal(subject, "[DIGGIN] 디기님의 메일입니다.");
   assert.equal(
     body,
-    `${GUIDE}\n\n\nName: 디기\nApp Version: 1.0.0\nBuild Number: 10\nApiLevel: 33\nSystemVersion: Android 13\nModel: SM-N981N (samsung)\nIdentification: abc123`,
+    `${GUIDE}\n\n\nName: 디기\nApp Version: 1.0.0\nBuild Number: 10\nApiLevel: 33\nSystemVersion: Android 13\nModel: SM-N981N (samsung)`,
   );
 });
 
@@ -50,10 +49,10 @@ test("iOS는 ApiLevel을 넣지 않고, 비회원·빠진 값은 추측하지 �
     apiLevel: null,
     model: null,
     manufacturer: "Apple",
-    deviceId: null,
   });
   assert.equal(subject, "[DIGGIN] 비회원님의 메일입니다.");
   assert.ok(!body.includes("ApiLevel"));
-  assert.ok(body.endsWith("SystemVersion: iOS 27.0.1\nModel: (Apple)\nIdentification: -"));
+  assert.ok(body.endsWith("SystemVersion: iOS 27.0.1\nModel: (Apple)"));
+  assert.ok(!body.includes("Identification"), "기기 고유 ID는 넣지 않는다");
   assert.ok(body.includes("App Version: -\nBuild Number: -"));
 });

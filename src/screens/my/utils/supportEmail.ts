@@ -8,7 +8,6 @@ export type SupportEmailInfo = {
   apiLevel: number | null;
   model: string | null;
   manufacturer: string | null;
-  deviceId: string | null;
 };
 
 const GUIDE = [
@@ -31,7 +30,6 @@ export function buildSupportEmail(info: SupportEmailInfo) {
     ...(info.os === "android" ? [`ApiLevel: ${info.apiLevel ?? "-"}`] : []),
     `SystemVersion: ${[info.osName, info.osVersion].filter(Boolean).join(" ") || "-"}`,
     `Model: ${model || "-"}`,
-    `Identification: ${info.deviceId ?? "-"}`,
   ];
   return {
     subject: `[DIGGIN] ${name}님의 메일입니다.`,

@@ -53,8 +53,6 @@ function setup(
         if (name === "expo-application")
           return {
             ...application,
-            getAndroidId: () => "android-id",
-            getIosIdForVendorAsync: async () => "ios-id",
           };
         if (name === "expo-device")
           return {
@@ -436,7 +434,7 @@ test("고객지원은 카카오톡 채널과 이메일을 열고, 열기 요청�
   const body = mail.searchParams.get("body");
   assert.ok(body.startsWith("문의, 피드백, 버그, 제안을 남겨 주세요."));
   assert.ok(body.includes("\n\n\nName: 디기\nApp Version: 1.0.0\nBuild Number: 5\nApiLevel: 33"));
-  assert.ok(body.endsWith("Model: SM-N981N (samsung)\nIdentification: android-id"));
+  assert.ok(body.endsWith("Model: SM-N981N (samsung)"));
   assert.deepEqual(context.toasts, []);
   // 기본 메일 계정이 있으면 앱 안 작성 시트, 시트가 실패하면 메일 링크로 연다.
   context.setMail(true);
