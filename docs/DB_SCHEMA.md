@@ -98,7 +98,7 @@ report_reason의 앞 4개는 `src/components/modal/ReportModal.tsx`의 사유 �
 
 - 가입 트리거 `private.handle_new_user()`: auth.users insert 시 profiles(랜덤 닉네임)와 나의 소장템 폴더를 만든다.
 - 랜덤 닉네임 `private.generate_nickname()`: 형용사 + 디기 + 숫자(예: 느긋한디기12). 형용사 40개(2~4자), 숫자 1~9999라 2~10자 안에 들어간다. 직접 변경과 같은 검사를 통과한 후보만 쓴다(AUTH-005).
-- 닉네임 검사 `private.nickname_error()`: 글자 수 → 공백 → 특수문자·이모지 → 금칙어 → 사칭 → 중복(AUTH-008). 사칭 규칙은 명세 문구대로 함수에 있고, 금칙어는 `private.nickname_banned_words`, 오탐 보정은 `nickname_allowed_words`다. 둘 다 korcen(MIT) 목록 중 닉네임에 쓸 수 있는 형태(한글 완성형·영문 소문자·숫자)만 마이그레이션으로 넣었다(#120).
+- 닉네임 검사 `private.nickname_error()`: 글자 수 → 공백 → 특수문자·이모지 → 금칙어 → 사칭 → 중복(AUTH-008). 사칭 규칙은 명세 문구대로 함수에 있고, 금칙어는 `private.nickname_banned_words`, 오탐 보정은 `nickname_allowed_words`다. 둘 다 korcen(MIT) 목록 중 닉네임에 쓸 수 있는 형태(한글 완성형·영문 소문자·숫자)만 마이그레이션으로 넣었다(#120). 금칙어 단계는 커뮤니티 본문과 같은 `private.contains_community_profanity()`를 쓴다(#182). 사칭·중복 검사는 그대로 닉네임 전용이다.
 - profiles: 앱은 본인 행 select만. 닉네임은 `update_nickname`, 이미지는 `set_avatar`, 제재 상태는 운영 API만 바꾼다.
 - folders: 사용자별 이름 중복 금지, 일반 폴더 최대 50개(프로필 행을 잠근 뒤 센다), 나의 소장템은 만들기·고치기·지우기 불가. `last_added_at`은 상품을 담을 때 트리거로 갱신한다(#78).
 - legal_policies(public, 비회원도 조회) / user_policy_consents(private): `get_pending_policies()`, `accept_policy(policy_id)`.
@@ -268,7 +268,7 @@ post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)
 
 - post_products는 `create_post`가 본인 상품에서 값을 복사한다. 원본 product_id는 저장하지 않는다. 일반글 1~4개, 투표글 정확히 1개.
 - 수정 RPC는 없다(DGL-008). 삭제는 deleted_at, 댓글도 같이 soft delete. 투표글 삭제 시 vote_responses는 실제로 지운다.
-- 커뮤니티 금칙어(#183): `private.contains_community_profanity(text)`가 기존 `nickname_banned_words`의 `profanity` 유형과 `nickname_allowed_words`의 정상 표현 예외를 공유한다. 검사할 때만 NFKC·소문자·공백/제로폭 문자 제거를 적용하고 저장 본문은 기존 NFC를 유지한다. 일반글·투표글 작성과 댓글 작성·수정(작성자 댓글 포함)을 서버에서 `community_profanity`로 거부한다. 댓글 공통 정규화 함수는 사전을 읽으므로 STABLE이다. 사칭용 닉네임 규칙은 본문에 적용하지 않으며 기존 콘텐츠를 소급 삭제하거나 자동 제재하지 않는다. 앱은 거부 사유를 안내하고 초안·첨부 아이템을 유지한다. 별도 대댓글 RPC는 현재 없다. 사전 기반 검사이므로 문맥 판단·모든 우회 표기 차단을 보장하지 않으며, 공백 제거에 따른 오탐은 정상 표현 예외로 보정한다.
+- 커뮤니티 금칙어(#183): `private.contains_community_profanity(text)`가 기존 `nickname_banned_words`의 `profanity` 유형과 `nickname_allowed_words`의 정상 표현 예외를 공유한다. 검사할 때만 NFKC·소문자로 바꾼 뒤 한글 완성형·조합형 자모(U+1100~11FF)·영문·숫자 외의 문자(공백·제로폭·기호)를 지우고, 저장 본문은 기존 NFC를 유지한다(#182). NFKC가 호환 자모(ㅅ)를 조합형 자모로 바꾸므로 사전 단어도 같은 NFKC로 바꿔 비교한다. 숫자를 끼운 우회(시1발)는 숫자까지 지운 값으로 한 번 더 찾고, 숫자가 든 사전 단어(시8)는 숫자를 남긴 값에서만 찾는다. 자모 약어(ㅅㅂ·ㅈㄴ 등)와 흔한 비속어는 `20261104134530_community_profanity_words` 마이그레이션으로 추가했다. 일반글·투표글 작성과 댓글 작성·수정(작성자 댓글 포함)을 서버에서 `community_profanity`로 거부한다. 댓글 공통 정규화 함수는 사전을 읽으므로 STABLE이다. 사칭용 닉네임 규칙은 본문에 적용하지 않으며 기존 콘텐츠를 소급 삭제하거나 자동 제재하지 않는다. 앱은 거부 사유를 안내하고 초안·첨부 아이템을 유지한다. 별도 대댓글 RPC는 현재 없다. 사전 기반 검사이므로 문맥 판단·모든 우회 표기 차단을 보장하지 않으며, 공백 제거에 따른 오탐은 정상 표현 예외로 보정한다.
 - `set_community_vote`는 upsert. 공통 쓰기 권한·부모 글 잠금 후 투표글·유효 선택·본인 글 제외·서버 `clock_timestamp() < ends_at`을 검사한다. 잠금 대기 중 마감된 요청도 차단한다.
 - 투표 결과는 진행 중 참여자·작성자, 마감 후 미참여 회원에게도 공개한다. 진행 중 미참여자는 buy_count·not_count가 null이고 비회원 미리보기에는 필드 자체가 없다. 퍼센트는 앱이 계산한다.
 - 좋아요는 일반글만(LIKE-001).
