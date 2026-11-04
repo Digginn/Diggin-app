@@ -16,26 +16,40 @@ import {
 } from "@/screens/diggle/api/communityReporting";
 import { communityWriteError } from "@/screens/diggle/api/communityWrite";
 
-export type { ReportTarget } from "@/constants/report";
+type ReportActionTarget = ReportTarget & { action?: "report" | "block" };
+export type { ReportActionTarget as ReportTarget };
 
 export function ReportFlow({
   target,
   onClose,
 }: {
-  target: ReportTarget | null;
+  target: ReportActionTarget | null;
   onClose: () => void;
 }) {
   return target ? (
-    <ReportDialog key={`${target.type}:${target.id}`} target={target} onClose={onClose} />
+    <ReportDialog
+      key={`${target.type}:${target.id}:${target.action ?? "report"}`}
+      target={target}
+      onClose={onClose}
+      initialPhase={target.action}
+    />
   ) : null;
 }
 
 // 한 NativeModal에서 신고 → 차단 확인을 전환해 iOS 모달 연속 표시 경합을 피한다.
-export function ReportDialog({ target, onClose }: { target: ReportTarget; onClose: () => void }) {
+export function ReportDialog({
+  target,
+  onClose,
+  initialPhase = "report",
+}: {
+  target: ReportTarget;
+  onClose: () => void;
+  initialPhase?: "report" | "block";
+}) {
   const { session } = useAuth();
   const viewer = session?.user.id ?? null;
   const [owner] = useState(viewer);
-  const [phase, setPhase] = useState<"report" | "block">("report");
+  const [phase, setPhase] = useState<"report" | "block">(initialPhase);
   const [isPending, setPending] = useState(false);
   const [error, setError] = useState("");
   const busy = useRef(false);
@@ -108,8 +122,14 @@ export function ReportDialog({ target, onClose }: { target: ReportTarget; onClos
         />
       ) : (
         <>
-          <Text className="text-gray-900 font-label-16-semibold">{REPORT_MESSAGES.title}</Text>
-          <Text className="text-gray-500 font-b3">{REPORT_MESSAGES.blockDescription}</Text>
+          <Text className="text-gray-900 font-label-16-semibold">
+            {initialPhase === "block" ? REPORT_MESSAGES.directBlockTitle : REPORT_MESSAGES.title}
+          </Text>
+          <Text className="text-gray-500 font-b3">
+            {initialPhase === "block"
+              ? REPORT_MESSAGES.directBlockDescription
+              : REPORT_MESSAGES.blockDescription}
+          </Text>
           <View className="w-[295px] flex-row gap-modal-action">
             <View className="w-[140px]">
               <ModalButton

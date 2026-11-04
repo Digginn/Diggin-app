@@ -42,6 +42,7 @@ function harness({
   refresh = async () => {},
   os = "android",
   target = { type: "post", id: "12" },
+  initialPhase = "report",
 } = {}) {
   const slots = [],
     effects = new Map(),
@@ -113,7 +114,7 @@ function harness({
       viewer = nextViewer;
       index = 0;
       pending = [];
-      const tree = ReportDialog({ target, onClose: close });
+      const tree = ReportDialog({ target, onClose: close, initialPhase });
       for (const { i, callback, deps } of pending) {
         effects.get(i)?.cleanup?.();
         effects.set(i, { deps, cleanup: callback() });
@@ -161,6 +162,38 @@ test("신고·차단 API는 글/댓글 ID만 보내고 작성자 UUID를 받거�
     (error) => error === failure,
   );
   await assert.rejects(api.reportCommunityContent({ type: "post", id: "bad" }, "spam", ""));
+});
+
+test("독립 차단은 신고를 만들지 않고 확인 후 차단·캐시 갱신하며 취소·실패를 처리한다", async () => {
+  const cancelled = harness({ initialPhase: "block" });
+  assert.equal(nodes(cancelled.render(), "ReportForm").length, 0);
+  assert.equal(
+    nodes(cancelled.render(), "Text")[0].props.children,
+    constants.REPORT_MESSAGES.directBlockTitle,
+  );
+  nodes(cancelled.render(), "ModalButton")[0].props.action.onPress();
+  assert.equal(cancelled.closed(), 1);
+  assert.equal(cancelled.calls.length, 0);
+  let fail = true;
+  const ui = harness({
+    initialPhase: "block",
+    block: async () => {
+      if (fail) throw Error("offline");
+    },
+  });
+  nodes(ui.render(), "ModalButton")[1].props.action.onPress();
+  await settle();
+  assert.equal(ui.closed(), 0);
+  assert.equal(ui.render().props.toastMessage, constants.REPORT_MESSAGES.blockFailed);
+  fail = false;
+  nodes(ui.render(), "ModalButton")[1].props.action.onPress();
+  await settle();
+  assert.deepEqual(
+    ui.calls.map((c) => c.type),
+    ["block", "block"],
+  );
+  assert.equal(ui.invalidations(), 1);
+  assert.equal(ui.closed(), 1);
 });
 
 test("신고 성공 뒤 차단 확인을 한 번 표시하고 괜찮아요는 차단을 요청하지 않는다", async () => {

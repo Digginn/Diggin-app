@@ -116,6 +116,11 @@ export function DiggleScreen() {
                   ? () => setReportTarget({ type: "post", id: item.id })
                   : undefined
               }
+              onPressBlock={
+                session && !item.isMine
+                  ? () => setReportTarget({ type: "post", id: item.id, action: "block" })
+                  : undefined
+              }
               onPress={() =>
                 requireLogin(() =>
                   router.push({

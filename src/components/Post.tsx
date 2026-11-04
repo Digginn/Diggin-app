@@ -6,9 +6,9 @@ import { Pressable, Text, View } from "react-native";
 
 import CommentSvg from "@/assets/images/icon-comment.svg";
 import HeartSvg from "@/assets/images/icon-heart.svg";
-import ReportSvg from "@/assets/images/icon-report.svg";
 import { FallbackImg } from "@/components/FallbackImg";
 import { ProductImg } from "@/components/ProductImg";
+import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { colors } from "@/theme";
 
 const StyledImage = cssInterop(Image, { className: "style" });
@@ -36,6 +36,7 @@ type PostProps = {
   commentCount: number;
   onPress?: () => void;
   onPressReport?: () => void;
+  onPressBlock?: () => void;
   onPressItemInfo?: (item: PostItem) => void;
   isPreview?: boolean;
 };
@@ -84,6 +85,7 @@ export function Post({
   commentCount,
   onPress,
   onPressReport,
+  onPressBlock,
   onPressItemInfo,
   isPreview = false,
 }: PostProps) {
@@ -161,18 +163,8 @@ export function Post({
                 </View>
               </View>
             </View>
-            {onPressReport && (
-              <Pressable
-                accessibilityLabel="신고하기"
-                accessibilityRole="button"
-                className="size-12 flex-row items-center justify-end active:opacity-75"
-                onPress={(event) => {
-                  event.stopPropagation();
-                  onPressReport();
-                }}
-              >
-                <ReportSvg width={18} height={18} color={colors.gray[400]} />
-              </Pressable>
+            {onPressReport && onPressBlock && (
+              <ReportBlockMenu onReport={onPressReport} onBlock={onPressBlock} />
             )}
           </View>
         )}
