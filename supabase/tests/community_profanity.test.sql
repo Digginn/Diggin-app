@@ -10,6 +10,13 @@ select ok(private.contains_community_profanity(E'시 \n발'), '공백·줄바꿈
 select ok(private.contains_community_profanity(U&'시\200B발'), '제로폭 문자를 끼운 비속어를 검사한다');
 select ok(private.contains_community_profanity(normalize('시발', NFD)), '분해된 한글을 검사한다');
 select ok(not private.contains_community_profanity('시발점에서 출발해요'), '정상 표현 예외를 유지한다');
+select ok(private.contains_community_profanity('시.발 이게 뭐야'), '기호를 끼운 비속어를 검사한다');
+select ok(private.contains_community_profanity('시1발 이게 뭐야'), '숫자를 끼운 비속어를 검사한다');
+select ok(private.contains_community_profanity('씨8 이게 뭐야'), '숫자가 든 사전 단어를 유지한다');
+select ok(private.contains_community_profanity('ㅅㅂ 이게 뭐야'), '자모 약어를 검사한다');
+select ok(private.contains_community_profanity('씨발 존나 비싸'), '추가한 비속어를 검사한다');
+select ok(not private.contains_community_profanity('가격 10,000원 신발이에요'), '숫자·기호가 든 정상 문장은 허용한다');
+select is(private.nickname_error('시1발', null), 'profanity', '닉네임도 같은 검사를 쓴다');
 select ok(private.contains_community_profanity('시발점인데 시발'), '정상 표현 밖의 비속어는 차단한다');
 select ok(not private.contains_community_profanity('관리자에게 문의했어요'), '닉네임 사칭 규칙은 본문에 적용하지 않는다');
 select ok(not private.contains_community_profanity('오늘 옷 정말 예쁘네요 👍🏽'), '정상 문장과 이모지는 허용한다');
