@@ -50,7 +50,41 @@ function setup(
       exports: screen.exports,
       __DEV__: true,
       require: function mockedRequire(name) {
-        if (name === "expo-application") return application;
+        if (name === "expo-application")
+          return {
+            ...application,
+            getAndroidId: () => "android-id",
+            getIosIdForVendorAsync: async () => "ios-id",
+          };
+        if (name === "expo-device")
+          return {
+            osName: "Android",
+            osVersion: "13",
+            platformApiLevel: 33,
+            modelName: "SM-N981N",
+            manufacturer: "samsung",
+          };
+        if (name === "@/lib/supabase")
+          return {
+            supabase: {
+              from: () => ({
+                select: () => ({
+                  eq: () => ({ single: async () => ({ data: { nickname: "디기" } }) }),
+                }),
+              }),
+            },
+          };
+        if (name === "./utils/supportEmail") {
+          const email = { exports: {} };
+          runInNewContext(
+            ts.transpileModule(
+              readFileSync(path.join(__dirname, "../src/screens/my/utils/supportEmail.ts"), "utf8"),
+              { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+            ).outputText,
+            { module: email, exports: email.exports },
+          );
+          return email.exports;
+        }
         if (name === "react")
           return {
             ...React,
@@ -391,21 +425,33 @@ test("고객지원은 카카오톡 채널과 이메일을 열고, 열기 요청�
     nodes.find((node) => node.type === "Button" && node.props.children === label);
   await button("카카오톡 채널 열기").props.onPress();
   await new Promise((resolve) => setImmediate(resolve));
-  await button("이메일 보내기").props.onPress();
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(context.opened, [CHANNEL_URL, `mailto:${SUPPORT_EMAIL}`]);
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  button("이메일 보내기").props.onPress();
+  await settle();
+  await settle();
+  assert.equal(context.opened[0], CHANNEL_URL);
+  const mail = new URL(context.opened[1]);
+  assert.equal(`${mail.protocol}${mail.pathname}`, `mailto:${SUPPORT_EMAIL}`);
+  assert.equal(mail.searchParams.get("subject"), "[DIGGIN] 디기님의 메일입니다.");
+  const body = mail.searchParams.get("body");
+  assert.ok(body.startsWith("문의, 피드백, 버그, 제안을 남겨 주세요."));
+  assert.ok(body.includes("\n\n\nName: 디기\nApp Version: 1.0.0\nBuild Number: 5\nApiLevel: 33"));
+  assert.ok(body.endsWith("Model: SM-N981N (samsung)\nIdentification: android-id"));
   assert.deepEqual(context.toasts, []);
   // 기본 메일 계정이 있으면 앱 안 작성 시트, 시트가 실패하면 메일 링크로 연다.
-  const settle = () => new Promise((resolve) => setImmediate(resolve));
   context.setMail(true);
   button("이메일 보내기").props.onPress();
   await settle();
-  assert.deepEqual(JSON.parse(JSON.stringify(context.composed)), [{ recipients: [SUPPORT_EMAIL] }]);
+  await settle();
+  assert.deepEqual(Array.from(context.composed[0].recipients), [SUPPORT_EMAIL]);
+  assert.equal(context.composed[0].subject, "[DIGGIN] 디기님의 메일입니다.");
+  assert.equal(context.composed[0].body, body);
   assert.equal(context.opened.length, 2);
   context.setMail(true, true);
   button("이메일 보내기").props.onPress();
   await settle();
-  assert.deepEqual(context.opened.at(-1), `mailto:${SUPPORT_EMAIL}`);
+  await settle();
+  assert.equal(context.opened.at(-1), context.opened[1]);
   context.failLink();
   await button("카카오톡 채널 열기").props.onPress();
   await new Promise((resolve) => setImmediate(resolve));
