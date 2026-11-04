@@ -293,10 +293,7 @@ test("금칙어로 거부한 댓글 작성·수정은 안내하고 초안과 수
     assert.equal(ui.render().body, "시발 이게 뭐야");
     assert.equal(ui.render().editing?.id ?? null, editing ? "90" : null);
     assert.equal(ui.invalidations.length, 0);
-    assert.equal(
-      ui.toasts.at(-1),
-      "사용할 수 없는 표현이 포함되어 있습니다. 내용을 수정해 주세요.",
-    );
+    assert.equal(ui.toasts.at(-1), "사용할 수 없는 표현이 포함되어 있습니다.");
   }
 });
 
