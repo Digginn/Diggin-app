@@ -391,7 +391,7 @@ test("약관 목록은 48px 행·safe area를 적용하고 문서 종류를 사�
   const rows = nodes.filter((node) => node.type === "Pressable");
   assert.deepEqual(
     rows.map((node) => node.props.accessibilityLabel),
-    ["이용약관", "개인정보 처리방침", "커뮤니티 이용정책", "오픈소스 라이센스"],
+    ["이용약관", "개인정보 처리방침", "커뮤니티 이용규칙", "오픈소스 라이센스"],
   );
   assert.ok(rows.every((row) => row.props.className.includes("h-12")));
   assert.equal(
@@ -426,7 +426,7 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
     ["privacy", "개인정보 처리방침", "개인정보 관련 문의처: diggin.app@gmail.com"],
     [
       "community",
-      "커뮤니티 이용정책",
+      "커뮤니티 이용규칙",
       "게시글을 등록하면 Diggin 커뮤니티 이용규칙을 확인하고 준수하는 것으로 안내됩니다.",
     ],
   ]) {

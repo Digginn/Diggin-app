@@ -219,7 +219,7 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
           ) : policy.isError ? (
             <>
               <Text className="text-gray-600 font-b3">
-                이용정책 동의 여부를 확인하지 못했습니다.
+                이용규칙 동의 여부를 확인하지 못했습니다.
               </Text>
               <Button onPress={() => void policy.refetch()}>다시 시도</Button>
             </>
@@ -230,12 +230,12 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
         <View className="px-margin pb-10">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="커뮤니티 이용정책 보기"
+            accessibilityLabel="커뮤니티 이용규칙 보기"
             className="flex-row items-center gap-3 rounded-lg bg-gray-900 px-4 py-1.5"
             onPress={() => setPolicyOpen(true)}
           >
             <Text className="flex-1 text-gray-0 font-b4">
-              게시글을 등록하면 커뮤니티 이용정책에 동의한 것으로 간주됩니다.
+              게시글을 등록하면 커뮤니티 이용규칙에 동의한 것으로 간주됩니다.
             </Text>
             <View className="h-12 min-w-12 items-center justify-center">
               <Text className="text-gray-200 underline font-b3">보기</Text>

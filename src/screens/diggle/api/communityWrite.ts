@@ -62,7 +62,7 @@ export function communityWriteError(error: unknown) {
   if (/community_restricted|not_authorized/.test(message))
     return "현재 커뮤니티를 이용할 수 없습니다.";
   if (/community_policy_required/.test(message))
-    return "커뮤니티 이용정책에 동의한 후 다시 시도해 주세요.";
+    return "커뮤니티 이용규칙에 동의한 후 다시 시도해 주세요.";
   if (/invalid_post_products/.test(message))
     return "첨부한 아이템을 확인해 주세요. 삭제된 아이템은 다시 선택해 주세요.";
   if (/invalid_post_content/.test(message)) return "본문을 공백 제외 5~50자로 입력해 주세요.";

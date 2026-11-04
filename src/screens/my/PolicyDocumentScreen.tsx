@@ -8,7 +8,7 @@ import { PolicyDocumentContent, type PolicyDocument } from "@/components/PolicyD
 const DOCUMENT_TITLES: Record<PolicyDocument, string> = {
   terms: "이용약관",
   privacy: "개인정보 처리방침",
-  community: "커뮤니티 이용정책",
+  community: "커뮤니티 이용규칙",
 };
 
 export function PolicyDocumentScreen({ document }: { document: PolicyDocument }) {
