@@ -14,8 +14,7 @@
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "supportsTablet": true,
-      "requireFullScreen": true,
+      "supportsTablet": false,
       "usesAppleSignIn": true
     },
     "android": {

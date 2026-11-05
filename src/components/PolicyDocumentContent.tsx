@@ -34,7 +34,9 @@ const SPACER_CLASSES: Record<number, string> = { 4: "h-1", 16: "h-4", 24: "h-6",
 function DocumentContent({ block }: { block: ContentBlock }) {
   if (block.children) {
     return (
-      <View className={`${GAP_CLASSES[block.gap ?? 0]}${block.paddingBottom === 8 ? "pb-2" : ""}`}>
+      <View
+        className={[GAP_CLASSES[block.gap ?? 0], block.paddingBottom === 8 ? "pb-2" : ""].join(" ")}
+      >
         {block.children.map((child, index) => (
           <DocumentContent key={index} block={child} />
         ))}
