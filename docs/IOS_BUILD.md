@@ -2,10 +2,13 @@
 
 ## 최근 빌드
 
-- 버전: `1.0.0 (5)`
-- 소스: develop `a70c74cd549aae8e25027e1842151d89f4500862`
-- [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/12f593e4-376a-4709-bd8d-11c95bf4b742)
-- 본 앱과 공유 확장 서명, 운영용 APNs 권한, App Group, 소셜 로그인 URL 스킴, 공유 Supabase 주소를 IPA에서 확인했다.
+- 버전: `1.0.0 (12)`
+- 소스: develop `41b20035f3802c1b3cad656955a5471239c2c372`
+- [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/6d4cfbfb-7dd6-4c32-99ce-616caa85bfa8)
+- iPhone 전용 설정과 Figma 개인정보 처리방침 갱신(PR #192)을 포함한다. 본 앱의 `UIDeviceFamily`가 `[1]`이고 iPad 전체 화면 요구가 제거됐는지 IPA에서 확인했다.
+- 본 앱과 공유 확장 ID·버전·서명, 운영용 APNs 권한, App Group, Apple 로그인, Google·Kakao URL 스킴, 공유 Supabase 주소, 메일 작성·붙여넣기 네이티브 모듈을 IPA에서 확인했다.
+- 보관 파일: `Documents/DigginReleases/ios/Diggin-1.0.0-12.ipa` 및 같은 이름의 JSON 기록.
+- SHA-256: `8db3093bd3dedb4b4fd4b6d8f62b54ddaec496b086ac6b4272adf04fa4e7c01f`
 - 빌드 성공과 TestFlight 업로드는 별개다. TestFlight 확인 전에는 App Store Connect 업로드 및 처리가 필요하다.
 
 ## 다음 빌드
