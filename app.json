@@ -39,9 +39,7 @@
         "expo-build-properties",
         {
           "android": {
-            "extraMavenRepos": [
-              "https://devrepo.kakao.com/nexus/content/groups/public/"
-            ]
+            "extraMavenRepos": ["https://devrepo.kakao.com/nexus/content/groups/public/"]
           }
         }
       ],
@@ -62,17 +60,7 @@
           "resizeMode": "contain"
         }
       ],
-      [
-        "expo-sharing",
-        {
-          "android": {
-            "enabled": true,
-            "singleShareMimeTypes": [
-              "text/plain"
-            ]
-          }
-        }
-      ],
+      ["expo-sharing", { "android": { "enabled": true, "singleShareMimeTypes": ["text/plain"] } }],
       [
         "expo-notifications",
         {
