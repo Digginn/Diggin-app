@@ -9,6 +9,8 @@ type ContentBlock = {
   variant?: string;
   spacer?: number;
   gap?: number;
+  /** 바텀시트에서만 쓰는 간격. DGL-05 시트는 MY-09 전문과 달리 마지막 두 문단을 띄운다(BUG-082). */
+  sheetGap?: number;
   paddingBottom?: number;
   isListItem?: boolean;
   segments?: { text: string; isStrong?: boolean }[];
@@ -31,14 +33,13 @@ const GAP_CLASSES: Record<number, string> = {
 };
 const SPACER_CLASSES: Record<number, string> = { 4: "h-1", 16: "h-4", 24: "h-6", 100: "h-[100px]" };
 
-function DocumentContent({ block }: { block: ContentBlock }) {
+function DocumentContent({ block, isSheet }: { block: ContentBlock; isSheet: boolean }) {
   if (block.children) {
+    const gap = (isSheet ? block.sheetGap : undefined) ?? block.gap ?? 0;
     return (
-      <View
-        className={[GAP_CLASSES[block.gap ?? 0], block.paddingBottom === 8 ? "pb-2" : ""].join(" ")}
-      >
+      <View className={[GAP_CLASSES[gap], block.paddingBottom === 8 ? "pb-2" : ""].join(" ")}>
         {block.children.map((child, index) => (
-          <DocumentContent key={index} block={child} />
+          <DocumentContent key={index} block={child} isSheet={isSheet} />
         ))}
       </View>
     );
@@ -75,6 +76,12 @@ function DocumentContent({ block }: { block: ContentBlock }) {
   );
 }
 
-export function PolicyDocumentContent({ document }: { document: PolicyDocument }) {
-  return <DocumentContent block={documents[document]} />;
+export function PolicyDocumentContent({
+  document,
+  isSheet = false,
+}: {
+  document: PolicyDocument;
+  isSheet?: boolean;
+}) {
+  return <DocumentContent block={documents[document]} isSheet={isSheet} />;
 }
