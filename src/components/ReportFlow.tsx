@@ -136,6 +136,7 @@ export function ReportDialog({
     >
       {phase === "report" ? (
         <ReportForm
+          targetType={target.type}
           onCancel={close}
           onReport={(reason, detail) => void submit(reason, detail)}
           isPending={isPending}

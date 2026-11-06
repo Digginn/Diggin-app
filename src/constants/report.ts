@@ -1,8 +1,13 @@
+// RPT-002 댓글 신고는 '게시글'을 '댓글'로 바꿔 보여준다(BUG-111).
 export const REPORT_REASONS = [
-  { value: "abuse", label: "욕설, 비방, 인신 공격" },
-  { value: "spam", label: "게시글 도배" },
-  { value: "inappropriate", label: "부적절한 게시글 (선정적 / 홍보 / 유언비어 / 초상권 위배 등)" },
-  { value: "other", label: "직접 작성" },
+  { value: "abuse", label: "욕설, 비방, 인신 공격", commentLabel: "욕설, 비방, 인신 공격" },
+  { value: "spam", label: "게시글 도배", commentLabel: "댓글 도배" },
+  {
+    value: "inappropriate",
+    label: "부적절한 게시글 (선정적 / 홍보 / 유언비어 / 초상권 위배 등)",
+    commentLabel: "부적절한 댓글 (선정적 / 홍보 / 유언비어 / 초상권 위배 등)",
+  },
+  { value: "other", label: "직접 작성", commentLabel: "직접 작성" },
 ] as const;
 export type ReportReason = (typeof REPORT_REASONS)[number]["value"];
 export type ReportTarget = { type: "post" | "comment"; id: string };
