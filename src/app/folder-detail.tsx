@@ -141,7 +141,7 @@ function FolderDetailEntry() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"))}
       />
       <ErrorState
-        message={"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요."}
+        message={"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요."}
         onRetry={() => void folders.refetch()}
       />
     </View>

@@ -167,7 +167,7 @@ export function FolderScreen({
               className="text-center text-gray-500 font-b1"
               style={{ includeFontPadding: false }}
             >
-              {"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요."}
+              {"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요."}
             </Text>
             <View className="w-[156px]">
               <Button onPress={() => onRetry?.()} isDisabled={!onRetry}>

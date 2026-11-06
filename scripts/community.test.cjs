@@ -796,6 +796,12 @@ test("피드·상세 첫 조회 실패는 화면 안내만 표시하고 기존 �
     const tree = PostDetailScreen({});
     assert.equal(detail.toasts.length, hasData ? 1 : 0);
     assert.equal(nodes(tree, "ErrorState").length, hasData ? 0 : 1);
+    // BUG-075 상세 조회 실패 문구
+    if (!hasData)
+      assert.equal(
+        nodes(tree, "ErrorState")[0].props.message,
+        "게시글을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.",
+      );
     const feed = screenMocks({
       feed: { data: { pages: [hasData ? [post] : []] }, isError: true, error },
     });
