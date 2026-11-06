@@ -3,7 +3,12 @@ import { Text, TextInput, View } from "react-native";
 
 import { colors } from "@/theme";
 
-import { isSingleGraphemeInsertion, limitPostBody, postBodyLength } from "../domain/postBody";
+import {
+  isSingleGraphemeInsertion,
+  limitBlankLines,
+  limitPostBody,
+  postBodyLength,
+} from "../domain/postBody";
 
 export function CommunityBodyField({
   value,
@@ -43,7 +48,7 @@ export function CommunityBodyField({
             // 상한에서 한 글자를 입력하면 본문을 유지하고, 여러 글자 붙여넣기만 잘라 반영한다.
             if (count === 50 && isSingleGraphemeInsertion(value, next)) return;
           } else if (nextCount < 50) setOverflowed(false);
-          onChangeText(limitPostBody(next));
+          onChangeText(limitPostBody(limitBlankLines(next)));
         }}
       />
       {!hasError && (

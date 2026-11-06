@@ -13,6 +13,11 @@ export function isSingleGraphemeInsertion(previous: string, next: string) {
   return before.slice(start).join("") === after.slice(start + 1).join("");
 }
 
+/** BUG-092 빈 줄은 한 줄까지만 둔다. 공백만 있는 줄도 빈 줄로 본다. 서버 create_post와 같은 기준이다. */
+export function limitBlankLines(value: string) {
+  return value.replace(/\r\n?/g, "\n").replace(/\n(?:[^\S\n]*\n){2,}/g, "\n\n");
+}
+
 export function limitPostBody(value: string) {
   let count = 0;
   let result = "";
