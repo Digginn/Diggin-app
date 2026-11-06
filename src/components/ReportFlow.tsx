@@ -130,6 +130,8 @@ export function ReportDialog({
       isKeyboardAvoiding={phase === "report"}
       keyboardGap={16}
       visible={!!viewer && viewer === owner}
+      // 차단 확인은 위 8·아래 16 여백이다(MSG-REPORT-001). 신고 사유는 기본 여백을 쓴다.
+      className={phase === "block" ? "px-2.5 pb-4 pt-2" : undefined}
       onRequestClose={close}
       toastMessage={error || undefined}
       onToastDismiss={() => setError("")}
@@ -143,14 +145,17 @@ export function ReportDialog({
         />
       ) : (
         <>
-          <Text className="text-gray-900 font-label-16-semibold">
-            {initialPhase === "block" ? REPORT_MESSAGES.directBlockTitle : REPORT_MESSAGES.title}
-          </Text>
-          <Text className="text-gray-500 font-b3">
-            {initialPhase === "block"
-              ? REPORT_MESSAGES.directBlockDescription
-              : REPORT_MESSAGES.blockDescription}
-          </Text>
+          {/* RPT-03 MSG-REPORT-001: 제목과 본문은 4px 간격, 본문은 가운데 정렬 Gray700·B3(BUG-071). */}
+          <View className="w-[295px] items-center gap-1 pt-2.5">
+            <Text className="text-center text-gray-900 font-label-16-semibold">
+              {initialPhase === "block" ? REPORT_MESSAGES.directBlockTitle : REPORT_MESSAGES.title}
+            </Text>
+            <Text className="text-center text-gray-700 font-b3">
+              {initialPhase === "block"
+                ? REPORT_MESSAGES.directBlockDescription
+                : REPORT_MESSAGES.blockDescription}
+            </Text>
+          </View>
           <View className="w-[295px] flex-row gap-modal-action">
             <View className="w-[140px]">
               <ModalButton
