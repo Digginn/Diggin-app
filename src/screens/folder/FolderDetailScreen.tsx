@@ -9,6 +9,7 @@ import SearchIcon from "@/assets/images/folder/icon-detail-search.svg";
 import SortIcon from "@/assets/images/folder/icon-sort.svg";
 import { AppBar, SearchBar } from "@/components/app-bar";
 import { Card } from "@/components/card";
+import { EmptyState } from "@/components/EmptyState";
 import { WishLevel } from "@/components/WishLevel";
 import type { WishLevelKey } from "@/types/wish-item";
 
@@ -31,6 +32,8 @@ type FolderDetailScreenProps = {
   levels?: { high: number; medium: number; low: number };
   /** FLD-004 나의 소장템은 위시레벨 필터와 더보기 메뉴를 숨기고 카드에 Dim을 넣지 않는다. */
   isOwnedFolder?: boolean;
+  /** 위시레벨 필터 없이 저장된 아이템이 0개로 확인된 폴더. */
+  isEmpty?: boolean;
   isOldestFirst?: boolean;
   onToggleSort?: () => void;
   /** 입력이 멈추거나 검색을 누르면 넘긴다. 빈 문자열이면 검색을 푼다. */
@@ -64,6 +67,7 @@ export function FolderDetailScreen({
   savedItemCount = items.length,
   levels = { high: 0, medium: 0, low: 0 },
   isOwnedFolder = false,
+  isEmpty = false,
   isOldestFirst = false,
   onToggleSort,
   onSubmitSearch,
@@ -162,60 +166,65 @@ export function FolderDetailScreen({
           }
         />
       )}
-      <>
-        <View className="gap-2 px-4 pt-4">
-          <Text className="text-gray-1000 font-label-12-semibold">
-            {hasSearchResults ? "검색된 아이템" : "저장한 아이템"}{" "}
-            {(hasSearchResults ? items.length : savedItemCount).toLocaleString("ko-KR")}개
-          </Text>
-          <View className="h-12 flex-row items-center justify-between">
-            <View className="h-12 justify-center">
-              {isOwnedFolder ? null : (
-                <WishLevel
-                  levels={levels}
-                  label="위시레벨"
-                  selected={wishLevel}
-                  onSelect={onSelectWishLevel}
-                />
-              )}
+      {isEmpty ? (
+        // BUG-056 ALL-03 Empty와 같은 구성에 폴더 문구만 바꾼다.
+        <EmptyState message={`아직 ${folderName} 폴더에\n저장된 아이템이 없습니다.`} />
+      ) : (
+        <>
+          <View className="gap-2 px-4 pt-4">
+            <Text className="text-gray-1000 font-label-12-semibold">
+              {hasSearchResults ? "검색된 아이템" : "저장한 아이템"}{" "}
+              {(hasSearchResults ? items.length : savedItemCount).toLocaleString("ko-KR")}개
+            </Text>
+            <View className="h-12 flex-row items-center justify-between">
+              <View className="h-12 justify-center">
+                {isOwnedFolder ? null : (
+                  <WishLevel
+                    levels={levels}
+                    label="위시레벨"
+                    selected={wishLevel}
+                    onSelect={onSelectWishLevel}
+                  />
+                )}
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${isOldestFirst ? "오래된 순" : "최신 순"}, 정렬 변경`}
+                className="h-12 flex-row items-center gap-1 active:opacity-75"
+                onPress={onToggleSort}
+              >
+                <Text className="text-gray-600 font-label-12-semibold">
+                  {isOldestFirst ? "오래된 순" : "최신 순"}
+                </Text>
+                <SortIcon />
+              </Pressable>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${isOldestFirst ? "오래된 순" : "최신 순"}, 정렬 변경`}
-              className="h-12 flex-row items-center gap-1 active:opacity-75"
-              onPress={onToggleSort}
-            >
-              <Text className="text-gray-600 font-label-12-semibold">
-                {isOldestFirst ? "오래된 순" : "최신 순"}
-              </Text>
-              <SortIcon />
-            </Pressable>
           </View>
-        </View>
-        <FlatList
-          className="flex-1"
-          numColumns={3}
-          data={rows}
-          keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
-          columnWrapperClassName="gap-3"
-          contentContainerClassName="gap-5 px-4 pb-6"
-          onEndReached={onEndReached}
-          refreshing={isRefreshing}
-          onRefresh={onRefresh}
-          renderItem={({ item }) =>
-            item ? (
-              <Card
-                {...item}
-                hasOwnedDim={!isOwnedFolder}
-                className="h-40 flex-1"
-                onPress={onOpenItem ? () => onOpenItem(item) : undefined}
-              />
-            ) : (
-              <View className="flex-1" />
-            )
-          }
-        />
-      </>
+          <FlatList
+            className="flex-1"
+            numColumns={3}
+            data={rows}
+            keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
+            columnWrapperClassName="gap-3"
+            contentContainerClassName="gap-5 px-4 pb-6"
+            onEndReached={onEndReached}
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            renderItem={({ item }) =>
+              item ? (
+                <Card
+                  {...item}
+                  hasOwnedDim={!isOwnedFolder}
+                  className="h-40 flex-1"
+                  onPress={onOpenItem ? () => onOpenItem(item) : undefined}
+                />
+              ) : (
+                <View className="flex-1" />
+              )
+            }
+          />
+        </>
+      )}
       {isMenuOpen && (
         <FolderMenu
           placement="header"

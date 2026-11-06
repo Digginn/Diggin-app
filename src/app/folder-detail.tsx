@@ -44,6 +44,8 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
       <FolderDetailScreen
         folderName={name}
         isOwnedFolder={params.owned === "1"}
+        // ALL처럼 개수로 판단해 상단이 잠깐 보였다 사라지지 않게 하고, 필터 결과가 비면 상단을 남긴다.
+        isEmpty={wishLevel === null && counts.data?.total === 0}
         items={items.data?.pages.flat() ?? []}
         savedItemCount={
           wishLevel ? (counts.data?.levels[wishLevel] ?? 0) : (counts.data?.total ?? 0)
