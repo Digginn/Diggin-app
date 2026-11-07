@@ -2,6 +2,8 @@
 
 승인된 PR을 develop에 병합하면 GitHub Actions가 DB 변경을 검증한 뒤 공유 개발 Supabase DB에 적용한다. 앱 코드만 GitHub에 올라가고 DB 적용은 빠지는 상황을 방지하기 위한 설정이다.
 
+운영 배포는 [PRODUCTION_DB_DEPLOYMENT.md](PRODUCTION_DB_DEPLOYMENT.md)의 main·production 승인 경로로 분리한다. DB·함수 검증 단계는 `.github/actions/validate-database`와 `validate-functions`에서 재사용하며 기존 개발 배포의 대상·승인 조건·배포 순서는 유지한다.
+
 ## 동작 순서
 
 1. develop 대상 PR의 승인을 받고 병합한다.
