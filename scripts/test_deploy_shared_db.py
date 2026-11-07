@@ -49,7 +49,8 @@ class DeploymentTests(unittest.TestCase):
         remote = {version for version in self.local if version <= PROFANITY_BASELINE}
         remote -= {name.split("_")[0] for name in PROFANITY_RECOVERY}
         pending, include_all = self.plan(remote)
-        self.assertEqual(set(pending), set(PROFANITY_RECOVERY) | {"20261104154331_underage_deletion_30_days.sql"})
+        later = {path.name for path in self.directory.glob("*.sql") if path.name.split("_")[0] > PROFANITY_BASELINE}
+        self.assertEqual(set(pending), set(PROFANITY_RECOVERY) | later)
         self.assertTrue(include_all)
 
     def test_partial_profanity_recovery_can_resume(self):
