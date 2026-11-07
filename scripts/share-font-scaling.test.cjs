@@ -12,7 +12,7 @@ function readOnlyModule(value) {
   return module;
 }
 
-test("공유 확장은 react-native의 Text·TextInput을 글자 배율을 끈 버전으로 바꾸고 정적 값은 둔다", () => {
+test("앱과 공유 확장은 react-native의 Text·TextInput을 글자 배율을 끈 버전으로 바꾸고 정적 값은 둔다", () => {
   const Text = React.forwardRef(function Text() {
     return null;
   });
@@ -35,7 +35,7 @@ test("공유 확장은 react-native의 Text·TextInput을 글자 배율을 끈 �
     return id === "react-native" ? reactNative : originalRequire.apply(this, arguments);
   };
   try {
-    require(path.join(__dirname, "../src/share/disableFontScaling.js"));
+    require(path.join(__dirname, "../src/lib/disableFontScaling.js"));
   } finally {
     Module.prototype.require = originalRequire;
   }
@@ -50,4 +50,15 @@ test("공유 확장은 react-native의 Text·TextInput을 글자 배율을 끈 �
     assert.equal(element.props.children, "a", "다른 값은 그대로 넘긴다");
   }
   assert.equal(reactNative.TextInput.State, TextInput.State);
+});
+
+test("앱 진입점과 공유 확장 진입점 모두 화면 코드보다 먼저 글자 배율을 끈다", () => {
+  const { readFileSync } = require("node:fs");
+  for (const entry of ["../index.js", "../index.share.js"]) {
+    const source = readFileSync(path.join(__dirname, entry), "utf8");
+    const fontScaling = source.indexOf('import "./src/lib/disableFontScaling";');
+    assert.ok(fontScaling > 0, `${entry}에서 불러온다`);
+    const screens = Math.max(source.indexOf("expo-router/entry"), source.indexOf("ShareExtension"));
+    assert.ok(fontScaling < screens, `${entry}에서 화면 코드보다 먼저 불러온다`);
+  }
 });

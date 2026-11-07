@@ -718,6 +718,56 @@ test("컬리 공유 링크는 앱·App Store로 가기 전에 같은 상품 번�
   assert.equal(hasFailed, true, "못 옮기고 중간 페이지에서 끝나면 그 정보를 쓰지 않는다");
 });
 
+test("BUG-104 쿠팡 공유 짧은 링크 중간 페이지는 타이머를 기다리지 않고 모바일 웹으로 보기를 누른다", () => {
+  for (const readyState of ["loading", "interactive"]) {
+    let clicks = 0;
+    let onReady;
+    let intervals = 0;
+    const sent = [];
+    runInNewContext(PRODUCT_PAGE_SCRIPT, {
+      window: { ReactNativeWebView: { postMessage: (message) => sent.push(message) } },
+      document: {
+        readyState,
+        addEventListener: (type, listener) => {
+          if (type === "DOMContentLoaded") onReady = listener;
+        },
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        getElementById: (id) =>
+          id === "goWeb"
+            ? {
+                click: () => {
+                  clicks += 1;
+                },
+              }
+            : null,
+      },
+      location: {
+        href: "https://link.coupang.com/a/idy7cbBxdY",
+        hostname: "link.coupang.com",
+        pathname: "/a/idy7cbBxdY",
+        search: "",
+        replace: () => {},
+      },
+      URLSearchParams,
+      Date,
+      JSON,
+      setInterval: () => {
+        intervals += 1;
+        return 1;
+      },
+      clearInterval: () => {},
+    });
+    if (readyState === "loading") {
+      assert.equal(clicks, 0, "버튼이 그려지기 전에는 누르지 않는다");
+      onReady();
+    }
+    assert.equal(clicks, 1);
+    assert.equal(intervals, 0, "중간 페이지에서는 상품 정보를 읽지 않는다");
+    assert.deepEqual(sent, []);
+  }
+});
+
 test("에이블리 모바일 공유 중간 페이지는 앱 실행 대신 같은 상품의 웹 페이지를 연다", () => {
   for (const pathname of ["/goods/57476763", "/goods/57476763/"]) {
     let replaced;

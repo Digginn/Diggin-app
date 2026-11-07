@@ -301,6 +301,18 @@ test("신고 성공 뒤 차단 확인을 한 번 표시하고 확인은 차단�
   assert.ok(
     nodes(tree, "Text").some((node) => node.props.children === constants.REPORT_MESSAGES.title),
   );
+  // BUG-071 RPT-03 MSG-REPORT-001 문구·정렬·색·여백
+  const body = nodes(tree, "Text").find(
+    (node) =>
+      node.props.children ===
+      "이 사용자를 차단하면 나에게 해당 사용자의 게시글·투표글·댓글·답글이 보이지 않습니다.",
+  );
+  assert.equal(body.props.className, "text-center text-gray-700 font-b3");
+  assert.equal(tree.props.className, "px-2.5 pb-4 pt-2");
+  assert.deepEqual(
+    nodes(tree, "ModalButton").map((node) => node.props.action.label),
+    ["확인", "차단하기"],
+  );
   nodes(tree, "ModalButton")
     .find((node) => node.props.action.label === "확인")
     .props.action.onPress();
@@ -485,6 +497,12 @@ test("계정 변경·화면 이탈 뒤 응답은 새 계정의 모달·토스트
   }
 });
 
+test("신고 사유 모달에 신고 대상 종류를 넘긴다", () => {
+  assert.equal(nodes(harness().render(), "ReportForm")[0].props.targetType, "post");
+  const comment = harness({ target: { type: "comment", id: "12" } });
+  assert.equal(nodes(comment.render(), "ReportForm")[0].props.targetType, "comment");
+});
+
 test("직접 작성은 0~50 사용자 인식 문자이고 실패·로딩 중 입력이 보존된다", () => {
   const slots = [];
   let index = 0;
@@ -510,6 +528,24 @@ test("직접 작성은 0~50 사용자 인식 문자이고 실패·로딩 중 입
     index = 0;
     return ReportForm({ onCancel() {}, onReport: (...args) => sent.push(args), ...props });
   }
+  const labels = (tree) =>
+    nodes(tree, "Text")
+      .map((node) => node.props.children)
+      .filter((label) => typeof label === "string")
+      .slice(1, 5);
+  // BUG-111 RPT-002 Figma: 댓글 신고는 '게시글'을 '댓글'로 바꿔 보여준다.
+  assert.deepEqual(labels(render()), [
+    "욕설, 비방, 인신 공격",
+    "게시글 도배",
+    "부적절한 게시글 (선정적 / 홍보 / 유언비어 / 초상권 위배 등)",
+    "직접 작성",
+  ]);
+  assert.deepEqual(labels(render({ targetType: "comment" })), [
+    "욕설, 비방, 인신 공격",
+    "댓글 도배",
+    "부적절한 댓글 (선정적 / 홍보 / 유언비어 / 초상권 위배 등)",
+    "직접 작성",
+  ]);
   let tree = render();
   nodes(tree, "Pressable")[3].props.onPress();
   tree = render();

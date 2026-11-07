@@ -276,7 +276,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
       ) : !post ? (
         result.isError ? (
           <ErrorState
-            message={communityErrorMessage(result.error)}
+            // BUG-075 상세 조회 실패는 원인과 관계없이 이 문구로 안내한다.
+            message={"게시글을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요."}
             onRetry={() => void result.refetch()}
           />
         ) : (

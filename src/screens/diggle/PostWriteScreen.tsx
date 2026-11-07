@@ -253,7 +253,7 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
             onPress={() => setPolicyOpen(true)}
           >
             <Text className="flex-1 text-gray-0 font-b4">
-              게시글을 등록하면 커뮤니티 이용규칙에 동의한 것으로 간주됩니다.
+              {"게시글을 등록하면 커뮤니티 이용규칙에\n동의한 것으로 간주됩니다."}
             </Text>
             <View className="h-12 min-w-12 items-center justify-center">
               <Text className="text-gray-200 underline font-b3">보기</Text>

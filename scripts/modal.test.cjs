@@ -120,8 +120,15 @@ test("입력 모달은 iOS와 Android 모두 키보드 유무에 따라 중앙�
         onRequestClose: () => {},
         children: null,
       });
-    const content = (tree) => React.Children.toArray(tree.props.children)[0].props.children;
-    const avoiding = React.Children.toArray(render().props.children)[0];
+    const avoidingOf = (tree) =>
+      React.Children.toArray(tree.props.children).find((child) => child.props.behavior);
+    const content = (tree) => avoidingOf(tree).props.children;
+    const avoiding = avoidingOf(render());
+    // BUG-101 키보드 둥근 모서리 뒤까지 어둡게 덮도록 scrim은 키보드 회피 영역 밖에 둔다.
+    assert.equal(
+      React.Children.toArray(render().props.children)[0].props.className,
+      "absolute inset-0 bg-gray-1000",
+    );
     assert.equal(avoiding.props.behavior, os === "ios" ? "padding" : "height");
     assert.equal(avoiding.props.style.flex, 1);
     assert.ok(content(render()).props.className.includes("justify-center"));

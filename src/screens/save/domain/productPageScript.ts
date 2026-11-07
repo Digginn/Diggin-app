@@ -226,6 +226,17 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
     };
   };
 
+  // 쿠팡 공유 짧은 링크의 중간 페이지는 앱 실행을 시도하고 300ms 타이머로만 웹으로 넘긴다. 앱 복귀 직후처럼
+  // 타이머가 600ms 넘게 늦으면 넘기지 않고 멈춰서, 페이지의 '모바일 웹으로 보기' 버튼을 직접 누른다(BUG-104).
+  if (location.hostname === "link.coupang.com") {
+    const openWeb = () => {
+      const button = document.getElementById("goWeb");
+      if (button) button.click();
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", openWeb);
+    else openWeb();
+    return;
+  }
   const isAppLinkLanding = ${APP_LINK_HOST}.test(location.hostname);
   // 중간 페이지가 웹으로 넘겨 주지 않는 경우(오늘의집)가 있어, 주소에 담긴 웹 대체 주소로 직접 옮긴다.
   if (isAppLinkLanding) {

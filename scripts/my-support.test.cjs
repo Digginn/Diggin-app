@@ -543,6 +543,35 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
   }
 });
 
+test("커뮤니티 이용규칙 마지막 두 문단은 바텀시트에서만 띄운다", () => {
+  const content = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(
+      readFileSync(path.join(__dirname, "../src/components/PolicyDocumentContent.tsx"), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } },
+    ).outputText,
+    {
+      module: content,
+      exports: content.exports,
+      require: (name) =>
+        name === "react-native"
+          ? { View: "View", Text: "Text" }
+          : name === "@/constants/policyDocuments.json"
+            ? require("../src/constants/policyDocuments.json")
+            : require(name),
+    },
+  );
+  const lastGroup = (isSheet) => {
+    const root = content.exports.PolicyDocumentContent({ document: "community", isSheet });
+    const top = root.type(root.props);
+    const children = React.Children.toArray(top.props.children);
+    return children.at(-1).type(children.at(-1).props).props.className.trim();
+  };
+  // BUG-082 DGL-05 시트는 20px 간격, MY-09 전문은 간격 없이 이어진다.
+  assert.equal(lastGroup(true), "gap-5");
+  assert.equal(lastGroup(false), "gap-0");
+});
+
 test("개인정보 목록은 항목명과 설명을 한 문단으로 묶고 항목명만 굵게 표시한다", () => {
   const context = setup("PolicyDocumentScreen");
   const nodes = expand(context.Screen({ document: "privacy" }));
