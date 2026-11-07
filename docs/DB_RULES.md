@@ -177,7 +177,7 @@ Codex와 Claude Code는 동일한 DB 관리 규칙을 따른다.
 **16. 운영 DB 배포 분리**
 
 - 운영 DB는 승인된 main PR의 정확한 병합 커밋을 `.github/workflows/deploy-production-db.yml`로 검증·배포한다. 개발 DB는 기존 develop 경로를 유지한다.
-- 임시 DB·함수 검증이 성공한 후 GitHub Environment `production`의 운영 승인자 `Sonseongoh`가 배포를 승인해야 운영 비밀값을 사용할 수 있다. main만 운영 배포를 허용한다.
+- 임시 DB·함수 검증이 성공한 후 GitHub Environment `production`의 운영 승인자 `Sonseongoh`·`jizerozz` 중 배포 실행자 외 1명이 승인해야 운영 비밀값을 사용할 수 있다. Prevent self-review를 활성화해 본인 배포 승인을 금지하고 main만 운영 배포를 허용한다.
 - main은 PR 승인 1개 및 새 커밋 시 승인 해제를 요구한다. 개발 배포에 명시된 PR별 승인 예외는 운영에 적용하지 않는다.
 - 운영 대상은 Diggin-pro로 검사하며 이력 조회·dry-run·pending migration 적용 후 동일 커밋의 서버 함수를 배포한다. 원격 reset·repair·seed·Vault 변경은 하지 않는다.
 - 로컬 앱의 `.env.development.local`, GitHub 환경, EAS 환경은 별도 설정이다. 개발용 공개 환경변수 파일을 추가하는 것으로 운영 접속 정보가 바뀌지 않는다.
