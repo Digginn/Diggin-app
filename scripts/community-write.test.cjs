@@ -74,6 +74,14 @@ test("금칙어 오류 입력창은 빨간 테두리와 120 높이를 유지하�
   assert.equal(nodes(valid, "Text").length, 1);
 });
 
+test("본문 빈 줄은 한 줄까지만 두고 공백만 있는 줄도 빈 줄로 본다", () => {
+  assert.equal(body.limitBlankLines("첫 줄\n\n둘째"), "첫 줄\n\n둘째");
+  assert.equal(body.limitBlankLines("첫 줄\n\n\n\n둘째"), "첫 줄\n\n둘째");
+  assert.equal(body.limitBlankLines("첫 줄\n \n\u3000\n\t\n둘째"), "첫 줄\n\n둘째");
+  assert.equal(body.limitBlankLines("첫 줄\r\n\r\n\r\n둘째"), "첫 줄\n\n둘째");
+  assert.equal(body.limitBlankLines("한 줄\n두 줄\n세 줄"), "한 줄\n두 줄\n세 줄");
+});
+
 test("본문은 NFC·사용자 인식 문자 기준이며 공백을 제외하고 이모지 중간을 자르지 않는다", () => {
   assert.equal(body.postBodyLength("가 나\n다\t라 👨‍👩‍👧‍👦"), 5);
   assert.equal(body.postBodyLength("👍🏽🇰🇷1️⃣"), 3);

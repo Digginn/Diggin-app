@@ -182,12 +182,25 @@ test("폴더 상세 조회 실패는 기존 데이터를 유지하고 연결 확
     assert.equal(h.screen.props.folderName, "내 폴더");
     assert.equal(h.screen.props.items.length, cached ? 1 : 0);
     assert.equal(h.screen.props.savedItemCount, 5);
+    assert.equal(h.screen.props.isEmpty, false);
     assert.deepEqual(h.calls.toasts, ["연결 상태를 확인한 후 다시 시도해 주세요."]);
     assert.equal(h.screen.props.onRetry, undefined);
     h.screen.props.onRefresh();
     assert.equal(itemRefreshes, 1);
     assert.equal(countRefreshes, 1);
   }
+});
+
+test("필터 없이 0개로 확인된 폴더만 빈 폴더로 넘긴다", () => {
+  const route = (total) =>
+    loadFolderDetailRoute({
+      params: { id: "12", name: "내 폴더" },
+      items: { data: { pages: [[]] }, refetch() {} },
+      counts: { data: total === undefined ? undefined : { total }, refetch() {} },
+    }).screen.props.isEmpty;
+  assert.equal(route(0), true);
+  assert.equal(route(3), false);
+  assert.equal(route(undefined), false);
 });
 
 test("비회원 때 연 나의 소장템은 로그인 후 실제 소장템 폴더 ID로 조회한다", () => {
@@ -406,6 +419,7 @@ test("폴더 상세는 3열·정렬·카드 동작을 유지하고 오류 화면
     },
     "@/components/Button": { Button: "Button" },
     "@/components/card": { Card: "Card" },
+    "@/components/EmptyState": { EmptyState: "EmptyState" },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
   });
   const items = Array.from({ length: 4 }, (_, index) => ({
@@ -434,6 +448,14 @@ test("폴더 상세는 3열·정렬·카드 동작을 유지하고 오류 화면
   list.props.renderItem({ item: items[0] }).props.onPress();
   assert.equal(selected, items[0]);
   assert.equal(list.props.renderItem({ item: null }).type, "View");
+  // BUG-056 빈 폴더는 목록·개수 대신 폴더명을 넣은 Empty State를 보여 준다.
+  const empty = render({ items: [], isEmpty: true });
+  assert.equal(findAll(empty, "FlatList").length, 0);
+  assert.equal(findAll(empty, "WishLevel").length, 0);
+  assert.equal(
+    findAll(empty, "EmptyState")[0].props.message,
+    "아직 나의 폴더 폴더에\n저장된 아이템이 없습니다.",
+  );
   let sortToggled = false;
   tree = render({
     onToggleSort: () => {

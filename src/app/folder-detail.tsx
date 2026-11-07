@@ -44,6 +44,8 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
       <FolderDetailScreen
         folderName={name}
         isOwnedFolder={params.owned === "1"}
+        // ALL처럼 개수로 판단해 상단이 잠깐 보였다 사라지지 않게 하고, 필터 결과가 비면 상단을 남긴다.
+        isEmpty={wishLevel === null && counts.data?.total === 0}
         items={items.data?.pages.flat() ?? []}
         savedItemCount={
           wishLevel ? (counts.data?.levels[wishLevel] ?? 0) : (counts.data?.total ?? 0)
@@ -139,7 +141,7 @@ function FolderDetailEntry() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"))}
       />
       <ErrorState
-        message={"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요."}
+        message={"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요."}
         onRetry={() => void folders.refetch()}
       />
     </View>

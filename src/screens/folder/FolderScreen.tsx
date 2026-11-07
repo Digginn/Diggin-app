@@ -9,7 +9,7 @@ import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
 import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
 import { AppBar } from "@/components/app-bar";
 import { NotificationButton } from "@/components/app-bar/NotificationButton";
-import { Button } from "@/components/Button";
+import { ErrorState } from "@/components/ErrorState";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { ActionModal } from "@/components/modal";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
@@ -157,25 +157,10 @@ export function FolderScreen({
         />
       </View>
       {isError ? (
-        <View
-          pointerEvents="box-none"
-          className="absolute inset-x-0 top-0 items-center justify-center px-margin"
-          style={{ height }}
-        >
-          <View className="items-center gap-margin">
-            <Text
-              className="text-center text-gray-500 font-b1"
-              style={{ includeFontPadding: false }}
-            >
-              {"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요."}
-            </Text>
-            <View className="w-[156px]">
-              <Button onPress={() => onRetry?.()} isDisabled={!onRetry}>
-                다시 시도
-              </Button>
-            </View>
-          </View>
-        </View>
+        <ErrorState
+          message={"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요."}
+          onRetry={onRetry}
+        />
       ) : hasFolders ? (
         <View className="flex-1">
           <View

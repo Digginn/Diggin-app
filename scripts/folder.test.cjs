@@ -72,6 +72,7 @@ runInNewContext(compiled, {
     if (name.endsWith("/modal")) return { ActionModal: "ActionModal" };
     if (name.endsWith("/Chip")) return { Chip: "Chip" };
     if (name.endsWith("/Button")) return { Button: "Button" };
+    if (name.endsWith("/ErrorState")) return { ErrorState: "ErrorState" };
     if (name.endsWith("/app-bar"))
       return { AppBar: Object.assign(() => null, { IconButton: "IconButton" }) };
     if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
@@ -433,15 +434,59 @@ test("조회 오류는 기존 목록과 FAB를 숨기고 재시도 콜백을 호
   assert.equal(findAll(tree, "FolderCard").length, 0);
   assert.equal(findAll(tree, "ScrollView").length, 0);
   assert.equal(findAll(tree, "Pressable").length, 0);
-  const button = findAll(tree, "Button")[0];
-  assert.equal(button.props.children, "다시 시도");
-  assert.equal(button.props.isDisabled, false);
-  button.props.onPress();
+  // BUG-075 ALL·게시글 상세와 같은 공용 오류 화면을 쓴다.
+  const errorState = findAll(tree, "ErrorState")[0];
+  assert.equal(
+    errorState.props.message,
+    "폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.",
+  );
+  errorState.props.onRetry();
   assert.equal(retryCount, 1);
   assert.equal(
-    findAll(screenModule.exports.FolderScreen({ isError: true }), "Button")[0].props.isDisabled,
-    true,
+    findAll(screenModule.exports.FolderScreen({ isError: true }), "ErrorState")[0].props.onRetry,
+    undefined,
   );
+});
+
+test("공용 오류 화면은 남은 영역이 아니라 기기 화면 전체 기준 정중앙으로 옮기고 재시도가 없으면 버튼을 막는다", () => {
+  const module = { exports: {} };
+  let offset = 0;
+  runInNewContext(
+    ts.transpileModule(
+      readFileSync(path.join(__dirname, "../src/components/ErrorState.tsx"), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } },
+    ).outputText,
+    {
+      module,
+      exports: module.exports,
+      require: (name) =>
+        name === "react"
+          ? {
+              ...React,
+              useRef: () => ({
+                // 앱 바(106) 아래부터 탭 바(80) 위까지인 영역
+                current: { measureInWindow: (callback) => callback(0, 106, 375, 626) },
+              }),
+              useState: () => [offset, (value) => (offset = value)],
+            }
+          : name === "react-native"
+            ? { View: "View", Text: "Text", useWindowDimensions: () => ({ height: 812 }) }
+            : name === "@/components/Button"
+              ? { Button: "Button" }
+              : require(name),
+    },
+  );
+  const render = (props) => module.exports.ErrorState({ message: "실패", ...props });
+  render({ onRetry() {} }).props.onLayout();
+  assert.equal(offset, 812 / 2 - (106 + 626 / 2));
+  const content = render({ onRetry() {} }).props.children;
+  assert.equal(
+    content.props.style.transform[0].translateY,
+    -13,
+    "앱 바·탭 바 차이의 절반만큼 올린다",
+  );
+  const button = findAll(render({}), "Button")[0];
+  assert.equal(button.props.isDisabled, true);
 });
 
 function findAll(node, type) {

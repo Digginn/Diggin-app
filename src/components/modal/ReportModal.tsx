@@ -5,7 +5,7 @@ import { graphemeSegments } from "unicode-segmenter/grapheme";
 
 import RadioActiveSvg from "@/assets/images/icon-radio-active.svg";
 import RadioInactiveSvg from "@/assets/images/icon-radio-inactive.svg";
-import { REPORT_REASONS, type ReportReason } from "@/constants/report";
+import { REPORT_REASONS, type ReportReason, type ReportTarget } from "@/constants/report";
 import { colors } from "@/theme";
 import { normalizeText } from "@/utils/text";
 
@@ -17,6 +17,7 @@ type ReportFormProps = {
   onReport: (reason: ReportReason, detail: string) => void;
   isPending?: boolean;
   error?: string;
+  targetType?: ReportTarget["type"];
 };
 type ReportModalProps = Omit<ModalProps, "children"> & ReportFormProps;
 
@@ -41,7 +42,13 @@ export function ReportModal({
   );
 }
 
-export function ReportForm({ onCancel, onReport, isPending = false, error }: ReportFormProps) {
+export function ReportForm({
+  onCancel,
+  onReport,
+  isPending = false,
+  error,
+  targetType = "post",
+}: ReportFormProps) {
   const [reason, setReason] = useState<ReportReason>();
   const [detail, setDetail] = useState("");
   const [isDetailFocused, setIsDetailFocused] = useState(false);
@@ -68,7 +75,9 @@ export function ReportForm({ onCancel, onReport, isPending = false, error }: Rep
             ) : (
               <RadioInactiveIcon className="size-5" />
             )}
-            <Text className="flex-1 text-gray-900 font-label-16-medium">{item.label}</Text>
+            <Text className="flex-1 text-gray-900 font-label-16-medium">
+              {targetType === "comment" ? item.commentLabel : item.label}
+            </Text>
           </Pressable>
         ))}
         {isOther && (

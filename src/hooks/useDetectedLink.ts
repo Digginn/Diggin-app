@@ -35,6 +35,46 @@ function saveHandledChangeCount(changeCount: number) {
   void AsyncStorage.setItem(HANDLED_CHANGE_COUNT_KEY, String(changeCount)).catch(() => {});
 }
 
+// BUG-103 앞서 팝업 없이 바로 읽힌 기기는 '허용'으로 보고, 감지 모달 전에 읽어 https가 아니면 모달을 띄우지 않는다.
+// shortcut: 설정을 조회하는 API가 없어 마지막으로 읽은 결과로 추정한다. 나중에 '묻기'로 바꾸면 복귀 때 한 번은 팝업이 먼저 뜬다.
+const PASTE_ALLOWED_KEY = "link-detection-paste-allowed";
+let isPasteAllowed: boolean | null = null;
+let pasteAllowedLoad: Promise<void> | null = null;
+
+function loadPasteAllowed() {
+  pasteAllowedLoad ??= AsyncStorage.getItem(PASTE_ALLOWED_KEY)
+    .then((value) => {
+      if (isPasteAllowed === null) isPasteAllowed = value === "1";
+    })
+    .catch(() => {});
+  return pasteAllowedLoad;
+}
+
+function savePasteAllowed(allowed: boolean) {
+  isPasteAllowed = allowed;
+  void AsyncStorage.setItem(PASTE_ALLOWED_KEY, allowed ? "1" : "0").catch(() => {});
+}
+
+/** 클립보드를 읽고, 읽는 데 걸린 시간으로 '묻기' 팝업을 거쳤는지 알려 준다. */
+async function readPasteboardText() {
+  const startedAt = Date.now();
+  let text: string | null = null;
+  try {
+    // 메인 스레드에서 읽어야 '묻기' 팝업에 대한 사용자의 답을 기다린다. 모듈이 없는 빌드는 expo-clipboard로 읽는다.
+    // URL 형식으로만 복사되면 문자열이 비어 있어 URL로 한 번 더 읽는다.
+    text = DigginPasteboard?.readLinkTextAsync
+      ? await DigginPasteboard.readLinkTextAsync()
+      : (await Clipboard.getStringAsync()) || (await Clipboard.getUrlAsync());
+  } catch {
+    text = null;
+  }
+  // shortcut: 설정값을 읽는 API가 없어 읽기 시간으로 '묻기' 팝업 여부를 가린다. iOS가 설정 조회 API를 주면 그걸로 바꾼다.
+  const isPrompted = Date.now() - startedAt >= PASTE_PROMPT_MIN_MS;
+  // 비어 있으면 거부한 것이다. 바로 읽혔을 때만 '허용'으로 기억한다.
+  savePasteAllowed(!!text && !isPrompted);
+  return { text, isPrompted };
+}
+
 export function markLinkHandled(url: string) {
   handledLinks.add(url);
   if (DigginPasteboard) saveHandledChangeCount(DigginPasteboard.getChangeCount());
@@ -65,7 +105,25 @@ export function useDetectedLink() {
         if (changeCount === handledChangeCount || changeCount === deniedChangeCount) return;
         if (!(await DigginPasteboard.hasWebUrlAsync())) return;
         if (isLinkDetectionPaused() || isNativeModalBusy()) return;
-        setDetected({ url: null, changeCount });
+        await loadPasteAllowed();
+        if (!isPasteAllowed) {
+          setDetected({ url: null, changeCount });
+          return;
+        }
+        const { text, isPrompted } = await readPasteboardText();
+        if (!text) {
+          deniedChangeCount = changeCount;
+          return;
+        }
+        const url = findItemLink(text);
+        // http 링크는 감지 모달 없이 넘긴다(BUG-103). 같은 복사는 다시 읽지 않는다.
+        if (!url) {
+          saveHandledChangeCount(changeCount);
+          return;
+        }
+        if (isPrompted) setNeedsPasteGuide(true);
+        if (handledLinks.has(url) || isLinkDetectionPaused() || isNativeModalBusy()) return;
+        setDetected({ url, changeCount });
         return;
       }
 
@@ -95,17 +153,7 @@ export function useDetectedLink() {
     if (detected.url) return { link: detected.url };
     const { changeCount } = detected;
     setNeedsPasteGuide(false);
-    const startedAt = Date.now();
-    let text: string | null = null;
-    try {
-      // 메인 스레드에서 읽어야 '묻기' 팝업에 대한 사용자의 답을 기다린다. 모듈이 없는 빌드는 expo-clipboard로 읽는다.
-      // URL 형식으로만 복사되면 문자열이 비어 있어 URL로 한 번 더 읽는다.
-      text = DigginPasteboard?.readLinkTextAsync
-        ? await DigginPasteboard.readLinkTextAsync()
-        : (await Clipboard.getStringAsync()) || (await Clipboard.getUrlAsync());
-    } catch {
-      text = null;
-    }
+    const { text, isPrompted } = await readPasteboardText();
     if (!text) {
       // 거부한 복사는 이번 실행 동안만 다시 묻지 않는다. 앱을 다시 켜면 다시 묻는다.
       if (changeCount != null) deniedChangeCount = changeCount;
@@ -117,8 +165,7 @@ export function useDetectedLink() {
       if (changeCount != null) saveHandledChangeCount(changeCount);
       return { link: null, reason: "not_https" };
     }
-    // shortcut: 설정값을 읽는 API가 없어 읽기 시간으로 '묻기' 팝업 여부를 가린다. iOS가 설정 조회 API를 주면 그걸로 바꾼다.
-    if (Date.now() - startedAt >= PASTE_PROMPT_MIN_MS) setNeedsPasteGuide(true);
+    if (isPrompted) setNeedsPasteGuide(true);
     return { link };
   }, [detected]);
 

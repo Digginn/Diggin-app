@@ -22,7 +22,10 @@ declare
   saved_id bigint;
   owned_count integer;
   item_count integer := coalesce(cardinality(product_ids), 0);
-  normalized_content text := normalize(btrim(post_content), NFC);
+  -- BUG-092 빈 줄은 한 줄까지만 남긴다. 공백만 있는 줄도 빈 줄로 본다.
+  normalized_content text := regexp_replace(
+    normalize(btrim(replace(replace(post_content, E'\r\n', E'\n'), E'\r', E'\n')), NFC),
+    U&'\000A([\0009\000B\000C\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]*\000A){2,}', E'\n\n', 'g');
   saved_at timestamptz := now();
 begin
   perform private.assert_can_write_community();
