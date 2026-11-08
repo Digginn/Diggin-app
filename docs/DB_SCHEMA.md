@@ -145,7 +145,7 @@ products
   brand       text null, NFC·trim 후 0~30자, 빈 값은 null
   price       integer null, >= 0                      null = 정보 없음, 0 = 직접 입력한 0원
   image_url   text null                               null = Placeholder, 저장 후 변경 불가(CSV 상품은 fill_product_image로 한 번 채움)
-  image_checked_at timestamptz null                   이미지를 읽어 본 시각. 링크 저장은 저장 시각, null = 아직 시도하지 않은 CSV 상품
+  image_checked_at timestamptz null                   이미지를 읽어 본 시각. 링크 저장은 저장 시각, null = 아직 시도하지 않은 CSV 상품. 컬럼 추가 전 상품은 saved_at = created_at(링크·직접 입력)이면 created_at으로 채움
   wish_level  wish_level null                         나의 소장템 상품은 null
   saved_at    timestamptz not null default now()      CSV는 등록일
   created_at, updated_at

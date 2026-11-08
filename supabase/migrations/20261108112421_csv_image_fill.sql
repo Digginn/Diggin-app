@@ -3,6 +3,9 @@ SET local check_function_bodies = off;
 ALTER TABLE "public"."products"
   ADD COLUMN "image_checked_at" timestamp WITH time zone;
 
+-- 기존 상품 중 CSV로 가져온 상품만 채우기 대상으로 남긴다. saved_at을 따로 넣는 경로는 import_csv뿐이라 링크·직접 입력 상품은 saved_at과 created_at이 같다.
+UPDATE public.products SET image_checked_at = created_at WHERE saved_at = created_at;
+
 CREATE OR REPLACE FUNCTION private.fill_product_image (
   target_product_id bigint,
   product_image_url text   DEFAULT NULL::text
