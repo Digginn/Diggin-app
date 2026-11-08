@@ -8,7 +8,7 @@
 2. develop에서 main으로 PR을 만들고 팀원 승인을 받아 병합한다. main 보호 규칙은 승인 1개를 요구하고 새 커밋이 추가되면 기존 승인을 해제한다.
 3. `Deploy production database`는 해당 main push의 정확한 병합 커밋과 PR 승인 상태를 확인한다. 직접 push, 미승인 PR, 다른 브랜치의 병합 커밋은 배포하지 않는다. 개발 배포의 특정 PR 승인 예외는 운영에 적용하지 않는다.
 4. 운영 비밀값 없이 임시 DB의 전체 마이그레이션·pgTAP·lint·Advisors·CSV DB 테스트·기존 순서 복구 테스트와 Edge Function 검사를 수행한다. 개발·운영 모두 `.github/actions/validate-database`와 `validate-functions`를 사용한다.
-5. 검증 성공 후 `production` 환경 승인 단계에서 `Sonseongoh`·`jizerozz` 중 해당 배포 실행자 외 1명이 GitHub Actions의 **Review deployments**로 운영 배포를 승인한다. 이 승인은 PR 승인과 별개이며 워크플로를 실행한 사람은 본인 배포를 승인할 수 없다.
+5. 검증 성공 후 `production` 환경 승인 단계에서 `Sonseongoh`·`jizerozz` 중 1명이 GitHub Actions의 **Review deployments**로 운영 배포를 승인한다. 이 승인은 PR 승인과 별개이며 워크플로를 실행한 사람도 본인 배포를 승인할 수 있다.
 6. 승인 후에만 운영 비밀값을 사용한다. IPv4 Session pooler(5432, TLS)로 이력·dry-run을 확인하고, 미적용 마이그레이션만 적용한 뒤 동일 커밋의 서버 함수 7개를 배포한다.
 
 워크플로는 `.github/workflows/deploy-production-db.yml`이다. DB·배포 스크립트·공통 검증 액션·워크플로가 바뀐 main PR/push에서 실행한다. 함수는 DB 적용 성공 후 배포하며 `admin-moderation`, `account-restriction`, `account-withdrawal`, `notification-push`, `csv-import`, `apple-token`, `underage-cleanup`이 대상이다.
@@ -19,8 +19,8 @@
 
 Repository Settings → Environments → `production`:
 
-- Required reviewers: `Sonseongoh`, `jizerozz` (배포 실행자 외 1명 승인)
-- Prevent self-review: 활성화 (본인이 실행한 배포는 승인할 수 없음)
+- Required reviewers: `Sonseongoh`, `jizerozz` (실행자 본인을 포함해 1명 승인)
+- Prevent self-review: 비활성화 (본인이 실행한 배포도 승인 가능)
 - 관리자 보호 규칙 우회: 허용하지 않음
 - Deployment branches and tags: main 브랜치만 허용
 
