@@ -78,9 +78,10 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
                 activity: (viewer, kind) => ["community", viewer, "activity", kind],
               },
             };
+          if (name === "@/screens/diggle/utils/formatCommunityAuthor")
+            return load("../src/screens/diggle/utils/formatCommunityAuthor.ts");
           if (name === "@/screens/diggle/utils/formatCommunityTime")
             return {
-              ...load("../src/screens/diggle/utils/formatCommunityTime.ts"),
               formatCommunityTime: () => "방금 전",
               communityErrorMessage: () => "조회 실패",
             };

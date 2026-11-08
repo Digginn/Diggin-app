@@ -49,11 +49,8 @@ import { useCommunityVote } from "./hooks/useCommunityVote";
 import { useCommunityVoteTiming } from "./hooks/useCommunityVoteTiming";
 import { useCommunityComments, useCommunityPost } from "./queries/useCommunity";
 import type { CommunityComment, CommunityItem } from "./types/community";
-import {
-  communityErrorMessage,
-  formatCommunityAuthor,
-  formatCommunityTime,
-} from "./utils/formatCommunityTime";
+import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
+import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();

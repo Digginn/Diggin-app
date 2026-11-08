@@ -17,7 +17,7 @@ function load(file, mocks = {}) {
   return module.exports;
 }
 
-const { formatCommunityAuthor } = load("src/screens/diggle/utils/formatCommunityTime.ts");
+const { formatCommunityAuthor } = load("src/screens/diggle/utils/formatCommunityAuthor.ts");
 test("닉네임과 본인·글쓴이 라벨을 조합하고 구버전 응답에는 일반 라벨을 사용한다", () => {
   assert.equal(formatCommunityAuthor("느긋한디기12"), "느긋한디기12");
   assert.equal(formatCommunityAuthor("느긋한디기12", true), "느긋한디기12 (나)");

@@ -19,11 +19,8 @@ import { useLoginGate } from "@/hooks/useLoginGate";
 import { useToast } from "@/hooks/useToast";
 
 import { useCommunityFeed } from "./queries/useCommunity";
-import {
-  communityErrorMessage,
-  formatCommunityAuthor,
-  formatCommunityTime,
-} from "./utils/formatCommunityTime";
+import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
+import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 const TABS = [
   { key: "all", label: "전체 게시글" },

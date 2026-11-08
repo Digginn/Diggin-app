@@ -18,9 +18,9 @@ import { useToast } from "@/hooks/useToast";
 import { startLogin } from "@/lib/loginIntent";
 import { communityKeys } from "@/screens/diggle/api/community";
 import type { CommunityPost } from "@/screens/diggle/types/community";
+import { formatCommunityAuthor } from "@/screens/diggle/utils/formatCommunityAuthor";
 import {
   communityErrorMessage,
-  formatCommunityAuthor,
   formatCommunityTime,
 } from "@/screens/diggle/utils/formatCommunityTime";
 

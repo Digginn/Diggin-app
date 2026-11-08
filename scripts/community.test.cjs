@@ -474,11 +474,10 @@ function screenMocks({
     },
     "./utils/formatCommunityTime": {
       formatCommunityTime: () => "방금 전",
-      formatCommunityAuthor: load("src/screens/diggle/utils/formatCommunityTime.ts")
-        .formatCommunityAuthor,
       communityErrorMessage: load("src/screens/diggle/utils/formatCommunityTime.ts")
         .communityErrorMessage,
     },
+    "./utils/formatCommunityAuthor": load("src/screens/diggle/utils/formatCommunityAuthor.ts"),
     "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
     "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
     "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
