@@ -41,6 +41,8 @@ function load(relativePath, mocks = {}) {
         };
       if (name === "@/components/AccountAccessNotice")
         return { AccountAccessNotice: "AccountAccessNotice" };
+      if (name === "@/components/ProductImageFiller")
+        return { ProductImageFiller: "ProductImageFiller" };
       if (name === "@/theme") return load("theme/colors.ts");
       if (name === "@/screens/diggle/components/SanctionNoticeModal")
         return { SanctionNoticeModal: "SanctionNoticeModal" };

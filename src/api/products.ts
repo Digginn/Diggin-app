@@ -20,6 +20,8 @@ type ProductRow = {
   brand: string | null;
   price: number | null;
   image_url: string | null;
+  url: string;
+  image_checked_at: string | null;
   product_folders: { folders: { kind: "custom" | "owned" } | null }[];
 };
 
@@ -30,6 +32,11 @@ function searchFilter(query: string) {
   return `name.ilike.%${keyword}%,brand.ilike.%${keyword}%`;
 }
 
+/** 이미지를 아직 읽어 보지 않은 CSV 상품이다. 링크로 저장한 상품은 저장할 때 이미 읽었다. */
+export function needsImage(row: { image_url: string | null; image_checked_at: string | null }) {
+  return row.image_url === null && row.image_checked_at === null;
+}
+
 function toWishItem(row: ProductRow): WishItem {
   return {
     id: String(row.id),
@@ -37,6 +44,7 @@ function toWishItem(row: ProductRow): WishItem {
     brand: row.brand,
     price: row.price,
     thumbnailUrl: row.image_url,
+    imageSourceUrl: needsImage(row) ? row.url : undefined,
     // 소장 여부는 컬럼이 아니라 나의 소장템 폴더에 담겼는지로 정한다(PDT-008).
     isOwned: row.product_folders.some((relation) => relation.folders?.kind === "owned"),
   };
@@ -56,7 +64,9 @@ export async function fetchProductPage({
 }): Promise<WishItem[]> {
   let request = supabase
     .from("products")
-    .select("id, name, brand, price, image_url, product_folders(folders(kind))");
+    .select(
+      "id, name, brand, price, image_url, url, image_checked_at, product_folders(folders(kind))",
+    );
   // 소장 상품은 위시레벨이 null이라 레벨 필터에서 자연히 빠진다(ALL-008).
   if (wishLevel) request = request.eq("wish_level", wishLevel);
   if (query) request = request.or(searchFilter(query));
@@ -95,24 +105,25 @@ export async function deleteProducts(ids: readonly string[]) {
   if (error) throw error;
 }
 
-export type ProductDetail = { values: ItemSaveValues; isOwned: boolean };
+/** needsImage는 이미지를 아직 읽지 않은 CSV 상품이다. 상세 화면을 열면 이미지를 읽는다. */
+export type ProductDetail = { values: ItemSaveValues; isOwned: boolean; needsImage: boolean };
 
 export async function fetchProduct(id: string): Promise<ProductDetail> {
   const { data, error } = await supabase
     .from("products")
     .select(
-      "name, brand, price, url, image_url, wish_level, restriction_labels, product_folders(folders(kind))",
+      "name, brand, price, url, image_url, image_checked_at, wish_level, restriction_labels, product_folders(folders(kind))",
     )
     .eq("id", Number(id))
     .single();
   if (error) throw error;
   const row = data as Omit<ProductRow, "id"> & {
-    url: string;
     wish_level: WishLevelKey | null;
     restriction_labels: string[];
   };
   return {
     isOwned: row.product_folders.some((relation) => relation.folders?.kind === "owned"),
+    needsImage: needsImage(row),
     values: {
       ...(row.restriction_labels?.length ? { restrictionLabels: row.restriction_labels } : {}),
       name: row.name,
@@ -178,4 +189,14 @@ export async function updateProduct(id: string, patch: ProductPatch) {
     })
     .eq("id", Number(id));
   if (error) throw error;
+}
+
+/** CSV 상품 이미지를 한 번만 채운다. 못 읽었으면 null을 넘겨 다시 열지 않게 한다. 저장된 주소를 돌려받는다. */
+export async function fillProductImage(id: string, imageUrl: string | null) {
+  const { data, error } = await supabase.rpc("fill_product_image", {
+    target_product_id: Number(id),
+    ...(imageUrl && { product_image_url: imageUrl }),
+  });
+  if (error) throw error;
+  return data as string | null;
 }

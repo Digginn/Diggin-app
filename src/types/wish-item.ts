@@ -5,6 +5,8 @@ export type WishItem = {
   price: number | null;
   brand?: string | null;
   thumbnailUrl?: string | null;
+  /** 이미지를 아직 읽지 않은 CSV 상품의 링크. 화면에 보이면 이 페이지에서 이미지를 읽는다. */
+  imageSourceUrl?: string;
   isOwned?: boolean;
 };
 

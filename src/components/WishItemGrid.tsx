@@ -3,6 +3,7 @@ import { useRef, type ReactElement } from "react";
 import { FlatList, View } from "react-native";
 
 import { Card, CardSkeleton } from "@/components/card";
+import { onVisibleItemsChanged } from "@/components/ProductImageFiller";
 import type { WishItem } from "@/types/wish-item";
 
 const COLUMN_COUNT = 3;
@@ -50,6 +51,7 @@ export function WishItemGrid({
       contentContainerStyle={{ paddingHorizontal: SCREEN_PADDING }}
       ListHeaderComponent={header}
       onEndReached={onEndReached}
+      onViewableItemsChanged={onVisibleItemsChanged}
       renderItem={({ item }) =>
         isLoading ? (
           <CardSkeleton className="flex-1" />
