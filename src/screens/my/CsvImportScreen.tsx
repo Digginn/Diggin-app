@@ -282,10 +282,8 @@ export function CsvImportScreen({
       )}
       <ActionModal
         visible={isImageNoticeVisible}
-        title="CSV 파일에서 이미지는 불러오지 않습니다."
-        description={
-          "아이템명, 가격(원화) 등의 정보를 불러와 저장합니다.\n아이템 이미지는 모두 기본으로 표시됩니다."
-        }
+        title="일부 이미지는 불러오지 못할 수 있습니다."
+        description="불러오지 못한 아이템은 기본 이미지로 표시됩니다."
         primaryAction={{ label: "확인", onPress: handleImageNoticeConfirm }}
         isPrimaryDisabled={false}
         scrimOpacity={0.36}
