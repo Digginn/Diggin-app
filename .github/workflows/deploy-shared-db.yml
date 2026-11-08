@@ -9,6 +9,10 @@ on:
       - "scripts/shared-db-approval.test.cjs"
       - "scripts/*migration_recovery*.py"
       - ".github/workflows/deploy-shared-db.yml"
+      - ".github/workflows/deploy-production-db.yml"
+      - ".github/actions/validate-database/**"
+      - ".github/actions/validate-functions/**"
+      - "scripts/production-db-approval.test.cjs"
   push:
     branches: [develop]
     paths:
@@ -17,6 +21,10 @@ on:
       - "scripts/shared-db-approval.test.cjs"
       - "scripts/*migration_recovery*.py"
       - ".github/workflows/deploy-shared-db.yml"
+      - ".github/workflows/deploy-production-db.yml"
+      - ".github/actions/validate-database/**"
+      - ".github/actions/validate-functions/**"
+      - "scripts/production-db-approval.test.cjs"
 
 permissions:
   contents: read
@@ -80,34 +88,8 @@ jobs:
         id: revision
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
-        with:
-          version: 2.120.0
-
-      - name: Validate migrations on a disposable local database
-        id: local_db
-        run: |
-          supabase db start
-          supabase db reset --local --no-seed
-          supabase test db --local
-          supabase db lint --local --schema public,private --fail-on error
-          supabase db advisors --local --level warn --fail-on error
-          CSV_IMPORT_TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm exec --yes --package=deno@2.5.6 -- deno test --allow-env --allow-net --config supabase/functions/deno.json supabase/functions/csv-import/database_test.ts
-
-      - name: Test shared database deployment guards
-        run: |
-          node --test scripts/shared-db-approval.test.cjs
-          python3 -m unittest discover -s scripts -p 'test_deploy_shared_db.py'
-
-      - name: Remove the disposable local database
-        if: always() && steps.local_db.outcome != 'skipped' && steps.local_db.outcome != ''
-        run: supabase stop --no-backup
-
-      - name: Validate folder-first CSV migration recovery
-        run: python3 scripts/validate_csv_migration_recovery.py
-
-      - name: Validate direct-block-first profanity migration recovery
-        run: python3 scripts/validate_csv_migration_recovery.py --profanity
+      - name: Validate database and deployment guards
+        uses: ./.github/actions/validate-database
 
   deploy:
     if: github.event_name == 'push'
@@ -185,10 +167,4 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Check and test Edge Functions
-        run: |
-          npm exec --yes --package=deno@2.5.6 -- deno fmt --config supabase/functions/deno.json --check supabase/functions
-          npm exec --yes --package=deno@2.5.6 -- deno lint --config supabase/functions/deno.json supabase/functions
-          npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/admin-moderation/index.ts supabase/functions/account-restriction/index.ts supabase/functions/account-withdrawal/index.ts supabase/functions/notification-push/index.ts supabase/functions/apple-token/index.ts supabase/functions/underage-cleanup/index.ts
-          npm exec --yes --package=deno@2.5.6 -- deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts supabase/functions/account-withdrawal/handler_test.ts supabase/functions/notification-push/handler_test.ts supabase/functions/apple-token/handler_test.ts supabase/functions/underage-cleanup/handler_test.ts
-          npm exec --yes --package=deno@2.5.6 -- deno check --config supabase/functions/deno.json supabase/functions/csv-import/index.ts
-          npm exec --yes --package=deno@2.5.6 -- deno test --config supabase/functions/deno.json supabase/functions/csv-import/handler_test.ts
+        uses: ./.github/actions/validate-functions
