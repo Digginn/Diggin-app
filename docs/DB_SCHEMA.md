@@ -24,7 +24,7 @@ public   앱이 테이블을 직접 읽는 곳. 본인 데이터만 RLS로 보�
 private  API에 노출하지 않는 곳. 앱은 RPC로만 접근한다.
 ```
 
-커뮤니티는 익명이다. RLS는 행만 가리고 컬럼은 못 가린다. 앱이 posts를 읽을 수 있으면 author_id도 같이 보여서 누가 썼는지 추적된다. 그래서 작성자가 들어 있는 커뮤니티·신고·차단·운영 테이블은 private에 두고, 앱에는 작성자 대신 `is_mine` 같은 값만 돌려주는 RPC를 연다.
+커뮤니티는 회원의 현재 프로필 닉네임을 작성자명으로 표시한다(#195). RLS는 행만 가리고 컬럼은 못 가리므로 작성자가 들어 있는 커뮤니티·신고·차단·운영 테이블은 계속 private에 둔다. 회원용 RPC는 `author_nickname`과 `is_mine` 등을 반환하지만 작성자의 UUID·이메일·프로필 사진은 공개하지 않는다. public.profiles의 본인 행만 조회하는 정책도 유지한다.
 
 `config.toml`의 `[api].schemas`는 public, graphql_public만 노출한다. private은 노출 목록에 넣지 않는다.
 
@@ -194,8 +194,8 @@ import_failures
 `supabase/schemas/community.sql`에 posts, post_products, vote_responses, post_likes, comments, post_anon_numbers와 조회 제외에 필요한 user_blocks, reports를 구현했다. 전부 RLS를 활성화하고 앱 역할의 테이블·시퀀스 직접 접근을 회수한다. 작성·정책 동의·삭제는 아래 #95 구현을 따른다. 투표는 아래 #96, 댓글·좋아요는 #97 구현을 따른다. 운영·제재는 #114, 알림은 후속 작업이다. hidden_at/deleted_at과 운영자 hidden_by FK를 구현했다.
 
 - `get_community_feed(feed_type = 'all', after_created_at?, after_id?)`: 일반글·투표글 통합 또는 투표글만 최신순 20개를 반환한다. `(created_at, id)` 커서로 같은 시각의 글·앞쪽 신규 삽입에도 중복 페이지를 방지한다. 비회원은 첫 줄 본문과 Snapshot 이미지만 받으며 상품명·브랜드·가격·원본 링크·집계·본인 여부는 받지 않는다. 페이지 경계용 id/type/created_at은 포함한다.
-- `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·차단한 작성자의 글 또는 내가 신고한 해당 글은 null이다. 작성자 UUID는 응답에 없고 `is_mine`만 반환한다.
-- `get_community_comments(target_post_id, after_created_at?, after_id?)`: 동일한 게시글 접근 조건을 확인한 뒤 오래된 순 20개를 반환한다. 댓글도 삭제·숨김·작성자 차단과 해당 댓글 신고를 제외한다. UUID 없이 글쓴이/본인/탈퇴 여부와 게시물 단위 익명번호를 반환하며 탈퇴 사용자 본문은 항상 null이다.
+- `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·차단한 작성자의 글 또는 내가 신고한 해당 글은 null이다. 회원 피드·상세·내 활동은 공통 `community_post_json`에서 작성자 UUID 대신 `author_nickname`과 `is_mine`을 반환한다. 비회원 미리보기에는 닉네임을 반환하지 않는다.
+- `get_community_comments(target_post_id, after_created_at?, after_id?)`: 동일한 게시글 접근 조건을 확인한 뒤 오래된 순 20개를 반환한다. 댓글도 삭제·숨김·작성자 차단과 해당 댓글 신고를 제외한다. UUID 없이 `author_nickname`과 글쓴이/본인/탈퇴 여부를 반환한다. 탈퇴 사용자 본문·닉네임은 항상 null이다. `anon_number`는 구버전 앱 호환용으로만 유지한다.
 - 투표 집계는 참여자·작성자에게 공개하고, 마감 후에는 미참여 회원에게도 공개한다(2026-10-20 사용자 확정). 진행 중 미참여 회원의 집계는 null이다. 비회원에게는 항상 집계를 반환하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
 - definer 구현은 private, invoker 래퍼는 public이다. 비회원 피드 래퍼에 필요한 private 스키마 usage와 피드 함수 execute만 anon에 허용하고 원본·내부 helper·상세·댓글 권한은 주지 않는다.
@@ -230,7 +230,7 @@ import_failures
 - `create_comment(target_post_id, comment_content, request_id)` / `update_comment(target_comment_id, comment_content)`는 작성자 UUID 없이 조회와 같은 댓글 JSON을 반환한다. `delete_comment(target_comment_id)`는 본인 댓글을 soft delete한다. 수정은 같은 본문도 허용하며 `updated_at`만 갱신하고 정렬용 `created_at`은 보존한다.
 - 댓글 본문은 NFC·CRLF/CR → LF 정규화 후 사용자 인식 문자 1~30자다. 공백·줄바꿈도 세며 공백만 있는 본문은 거부한다. 앱은 초과 입력을 유지하되 전송을 막고, 조회한 줄바꿈은 개수만큼 공백으로 표시한다. HTTP(S)로 해석 가능한 URL만 외부 링크로 만든다.
 - 모든 댓글·좋아요 쓰기는 `private.lock_community_post_for_write()`로 인증·제재를 확인하고 부모 글 행을 잠근 뒤 변경한다. 글 삭제도 같은 행을 먼저 잠그므로 삭제 후 댓글이나 좋아요가 추가되는 경합을 막는다. 삭제·숨김·차단/신고로 접근할 수 없는 글은 쓰기도 허용하지 않는다. 댓글 수정·삭제는 글쓴이에게도 타인 댓글 권한을 주지 않는다.
-- `post_anon_numbers`는 최초 댓글 때만 할당하고 같은 글에서 유지한다. 부모 글 잠금 안에서 `next_anon_number`를 올리므로 동시 참여에도 중복 번호가 없다. 글쓴이는 번호를 소비하지 않는다. 본인·글쓴이·탈퇴 라벨과 본문 비공개는 조회 계약을 따른다.
+- `post_anon_numbers`는 구버전 앱 호환을 위해 최초 댓글 때 할당하고 같은 글에서 유지한다. 부모 글 잠금 안에서 `next_anon_number`를 올리므로 동시 참여에도 중복 번호가 없다. 글쓴이는 번호를 소비하지 않는다. 새 앱은 이 번호 대신 프로필 닉네임을 표시하며 본인·글쓴이·탈퇴 라벨과 본문 비공개는 조회 계약을 따른다.
 - `comments.creation_request_id`와 `(author_id, creation_request_id)` unique로 응답 유실·동시 재시도에 같은 댓글을 반환한다. 다른 게시글로 키를 재사용하면 거부한다. 앱은 성공한 댓글을 서버 페이지와 중복 없이 합치며 서버 커서를 바꾸지 않는다. 등록 후 새 댓글까지 남은 페이지를 읽고 이동하고, 실패한 조회는 댓글 영역에서 재시도한다.
 - `set_community_like(target_post_id, is_liked)`는 일반글에만 적용하고 `{is_liked, like_count}`를 반환한다. 본인 글 좋아요 등록은 `own_post_like`(42501)로 거부하고, 취소는 예전에 눌러 둔 좋아요를 지울 수 있게 허용한다(BUG-074). 계정당 한 행이며 원하는 상태를 지정하므로 재시도해도 토글되지 않는다. 댓글 작성과 독립적으로 실행하며 앱의 낙관적 아이콘·개수는 실패 시 원상 복구한다.
 - 등록·수정·삭제·좋아요 성공은 `community` 캐시를 갱신한다. 후속 내 활동도 같은 키 아래에 두어 함께 갱신한다. 계정이 바뀌거나 화면을 떠난 후 도착한 응답으로 새 계정의 초안·캐시를 변경하지 않는다.
@@ -274,7 +274,8 @@ post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)
 - `set_community_vote`는 upsert. 공통 쓰기 권한·부모 글 잠금 후 투표글·유효 선택·본인 글 제외·서버 `clock_timestamp() < ends_at`을 검사한다. 잠금 대기 중 마감된 요청도 차단한다.
 - 투표 결과는 진행 중 참여자·작성자, 마감 후 미참여 회원에게도 공개한다. 진행 중 미참여자는 buy_count·not_count가 null이고 비회원 미리보기에는 필드 자체가 없다. 퍼센트는 앱이 계산한다.
 - 좋아요는 일반글만(LIKE-001).
-- 익명 번호는 그 사용자의 첫 댓글일 때 posts.next_anon_number를 올리며 받는다. 글쓴이는 번호를 받지 않는다. 댓글 조회는 author_id 대신 `is_post_author, anon_number, is_mine, is_withdrawn`을 돌려준다.
+- 구버전 호환용 댓글 번호는 첫 댓글일 때 posts.next_anon_number를 올리며 받는다. 글쓴이는 번호를 받지 않는다. 댓글 조회·등록·수정은 author_id 대신 `author_nickname, is_post_author, anon_number, is_mine, is_withdrawn`을 돌려준다.
+- 닉네임 표시(#195): 게시글·투표글·댓글은 public.profiles의 PK 조인으로 현재 닉네임을 읽는다. 프로필에서 닉네임을 변경하면 기존 콘텐츠 조회에도 반영되며 앱은 변경 성공 시 커뮤니티 조회 캐시(피드·상세·댓글·내 활동)를 무효화한다. 새 댓글 알림·푸시 본문은 생성 시점의 닉네임을 저장하며 이미 생성된 알림 본문은 소급 변경하지 않는다. 새 테이블·공개 프로필 조회 권한은 추가하지 않는다.
 - 모든 커뮤니티 조회는 삭제·숨김 콘텐츠와 차단한 작성자의 전체 콘텐츠, 본인이 신고한 해당 콘텐츠만 뺀다.
 
 ### 6-3. 신고·차단 (private)

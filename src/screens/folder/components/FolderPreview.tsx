@@ -18,7 +18,7 @@ type FolderPreviewProps = {
   isCompact: boolean;
 };
 
-function Thumbnail({ source }: { source?: FolderThumbnailSource }) {
+function Thumbnail({ source, isCompact }: { source?: FolderThumbnailSource; isCompact: boolean }) {
   const [failedSource, setFailedSource] = useState<FolderThumbnailSource>();
   return source && source !== failedSource ? (
     <StyledImage
@@ -29,7 +29,7 @@ function Thumbnail({ source }: { source?: FolderThumbnailSource }) {
       onError={() => setFailedSource(source)}
     />
   ) : (
-    <FallbackImg className="h-full" />
+    <FallbackImg size={isCompact ? "folderCompact" : "folder"} className="h-full" />
   );
 }
 
@@ -50,7 +50,7 @@ export function FolderPreview({ itemCount, thumbnails = [], isCompact }: FolderP
                 : "left-[65.46px] top-[11.87px] size-[76px] rotate-[15deg] rounded-[6.135px]",
             )}
           >
-            <Thumbnail source={thumbnails[visibleCount === 3 ? 2 : 1]} />
+            <Thumbnail source={thumbnails[visibleCount === 3 ? 2 : 1]} isCompact={isCompact} />
             <View className="absolute inset-0 bg-black/[0.08]" />
           </View>
           <View
@@ -61,7 +61,7 @@ export function FolderPreview({ itemCount, thumbnails = [], isCompact }: FolderP
                 : "left-[8.54px] top-[11.87px] size-[76px] -rotate-[15deg] rounded-[6.135px]",
             )}
           >
-            <Thumbnail source={thumbnails[visibleCount === 3 ? 1 : 0]} />
+            <Thumbnail source={thumbnails[visibleCount === 3 ? 1 : 0]} isCompact={isCompact} />
             {visibleCount === 3 && <View className="absolute inset-0 bg-black/[0.08]" />}
           </View>
         </>
@@ -75,7 +75,7 @@ export function FolderPreview({ itemCount, thumbnails = [], isCompact }: FolderP
               : "left-9 top-0 size-[76px] rounded-[6.135px] shadow-[0_4px_4px_rgba(0,0,0,0.04)]",
           )}
         >
-          <Thumbnail source={thumbnails[0]} />
+          <Thumbnail source={thumbnails[0]} isCompact={isCompact} />
         </View>
       )}
       <View

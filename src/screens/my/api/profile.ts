@@ -1,6 +1,8 @@
 import { AVATAR_BUCKET } from "@/api/avatar";
 import type { AuthProvider } from "@/components/AuthProviderIcon";
+import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
+import { communityKeys } from "@/screens/diggle/api/community";
 
 export type MyProfile = {
   nickname: string;
@@ -55,6 +57,9 @@ export async function fetchMyProfile(): Promise<MyProfile> {
 export async function saveNickname(nickname: string): Promise<string | undefined> {
   const { data, error } = await supabase.rpc("update_nickname", { new_nickname: nickname });
   if (error) throw error;
-  if (!data) return undefined;
+  if (!data) {
+    void queryClient.invalidateQueries({ queryKey: communityKeys.all }).catch(() => {});
+    return undefined;
+  }
   return NICKNAME_ERROR_MESSAGES[data] ?? NICKNAME_ERROR_MESSAGES.invalid_characters;
 }

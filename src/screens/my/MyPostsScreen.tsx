@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/useToast";
 import { startLogin } from "@/lib/loginIntent";
 import { communityKeys } from "@/screens/diggle/api/community";
 import type { CommunityPost } from "@/screens/diggle/types/community";
+import { formatCommunityAuthor } from "@/screens/diggle/utils/formatCommunityAuthor";
 import {
   communityErrorMessage,
   formatCommunityTime,
@@ -157,7 +158,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                     body={post.body}
                     items={post.items}
                     timeLabel={formatCommunityTime(post.createdAt)}
-                    authorLabel={post.isMine ? "익명(나)" : "익명"}
+                    authorLabel={formatCommunityAuthor(post.authorNickname, post.isMine)}
                     likeCount={post.likeCount ?? 0}
                     commentCount={post.commentCount ?? 0}
                     onPressReport={
@@ -176,7 +177,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                   <PostRow
                     item={{
                       id: post.id,
-                      nickname: "글쓴이 (나)",
+                      nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
                       content: post.body,
                       dateLabel: formatCommunityTime(post.createdAt),
                     }}
@@ -186,7 +187,7 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                   <VoteListItem
                     item={{
                       id: post.id,
-                      nickname: "글쓴이 (나)",
+                      nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
                       content: post.body,
                       timeLabel: formatCommunityTime(post.createdAt),
                       commentCount: post.commentCount ?? 0,
