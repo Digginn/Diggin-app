@@ -109,11 +109,12 @@ report_reason의 앞 4개는 `src/components/modal/ReportModal.tsx`의 사유 �
 
 ## 5-1. 구현된 영역 요약 (#78 아이템)
 
-- products: 앱은 본인 상품 select·delete, update는 name·brand·price·wish_level만. 링크·대표 이미지는 고칠 수 없다(PDT-006). 만들기는 `save_product`로만.
+- products: 앱은 본인 상품 select·delete, update는 name·brand·price·wish_level만. 링크·대표 이미지는 고칠 수 없다(PDT-006). 만들기는 `save_product`로만. CSV 상품의 비어 있는 이미지만 `fill_product_image`로 한 번 채운다.
 - 제한 상품(#157): `restriction_labels text[]`에 확인 가능한 카테고리·연령 표시를 저장하고 앱에는 해당 열의 수정 권한을 주지 않는다. `save_product`의 마지막 선택 인자 `product_restriction_labels`는 기본값 `{}`라 이전 앱 호출과 호환된다. `private.is_restricted_product`가 상품명·표시를 NFKC/소문자/공백 제거 후 출시용 키워드의 부분 문자열로 검사한다. 저장 RPC와 INSERT/UPDATE 트리거가 `restricted_product`로 거부하고 CSV는 `RESTRICTED_PRODUCT` 실패 행만 제외한다. 기존 상품은 소급 삭제하지 않는다. 카테고리·연령 표시는 원문 전체를 먼저 검사한 뒤 최대 10개·각 100자(NFC 코드포인트)만 저장한다. 앱은 상한 밖에서 발견한 금지어도 짧은 키워드로 보존해 이름 수정으로 검사를 우회하지 못하게 하고, DB 트리거는 직접 RPC·CSV 호출에도 같은 저장 상한을 적용한다. PM 확인으로 단독 `19`·`술`은 제외해 `1954`·`2019`·`미술`을 허용하되 `19금`·`19세`·`19+`·`18+`·`주류`·`소주` 등의 구체적 키워드는 유지한다. 표시에 없거나 수집되지 않은 성인 상품을 완전히 판별하지는 못한다.
 - 입력 검사 `private.product_input_error(url, name, brand, price)`: `invalid_url | name_required | name_too_long | brand_too_long | invalid_price` 중 하나 또는 null. 저장과 CSV 가져오기가 같은 함수로 검사한다. 상한을 넘는 자동 추출·CSV 값은 호출하는 쪽이 잘라서 넘긴다.
 - 정규화 트리거: 링크는 앞뒤 공백 제거, 상품명·브랜드는 NFC + 앞뒤 공백 제거, 빈 브랜드는 null.
 - `save_product(url, name, brand?, price?, image_url?, wish_level?, folder_ids?)` → `(product_id, is_duplicate)`. 같은 링크면 저장하지 않고 기존 상품 id와 `is_duplicate = true`를 돌려준다(SAVE-012). 입력 오류는 `22023` 예외(메시지가 위 오류 코드). 나의 소장템을 같이 고르면 위시레벨을 비운다.
+- `fill_product_image(target_product_id, product_image_url?)` → 저장된 image_url (#200): CSV 상품 이미지를 앱이 기기에서 읽어 한 번만 채운다. 본인 상품이고 `image_url`과 `image_checked_at`이 모두 null일 때만 바꾸며, 주소는 https·2048자 이하만 받는다(`invalid_image_url`). 이미지를 못 찾았으면 인자 없이 불러 시도 시각만 남긴다. 이미 채웠거나 시도한 상품은 바꾸지 않고 현재 값을 돌려주며, 남의 상품은 `product_not_found`(42501), 이용 중단 계정은 `assert_account_access`로 막는다.
 - `set_owned(product_id, is_owned, keep_other_folders = true, new_wish_level?)`: 소장 추가 시 위시레벨을 비우고 나의 소장템에 담는다. `keep_other_folders = false`면 다른 폴더에서 뺀다(MSG-PDT-009). 해제할 때 `new_wish_level`을 안 넘기면 위시레벨 미선택(null)으로 둔다(10/17 결정, PDT-008 필수 여부는 PM 확인 중).
 - `set_product_folders(product_id, folder_ids)`: 폴더 관리 시트의 최종 선택을 한 트랜잭션으로 반영한다. 상품 행을 잠그고, 내 폴더가 아니면 `folder_not_found`로 아무것도 바꾸지 않는다. 나의 소장템이 바뀌면 `set_owned` 규칙을 따른다.
 - product_folders: 앱은 일반 폴더만 직접 담기(insert)·빼기(delete). 나의 소장템은 `set_owned`로만. 담으면 `folders.last_added_at`을 담은 시각으로 바꾸고, 빼도 되돌리지 않는다.
@@ -143,7 +144,8 @@ products
   name        text not null, NFC·trim 후 1~100자       SAVE-005·010
   brand       text null, NFC·trim 후 0~30자, 빈 값은 null
   price       integer null, >= 0                      null = 정보 없음, 0 = 직접 입력한 0원
-  image_url   text null                               null = Placeholder, 저장 후 변경 불가
+  image_url   text null                               null = Placeholder, 저장 후 변경 불가(CSV 상품은 fill_product_image로 한 번 채움)
+  image_checked_at timestamptz null                   이미지를 읽어 본 시각. 링크 저장은 저장 시각, null = 아직 시도하지 않은 CSV 상품. 컬럼 추가 전 상품은 saved_at = created_at(링크·직접 입력)이면 created_at으로 채움
   wish_level  wish_level null                         나의 소장템 상품은 null
   saved_at    timestamptz not null default now()      CSV는 등록일
   created_at, updated_at

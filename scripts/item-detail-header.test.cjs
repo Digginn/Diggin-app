@@ -39,7 +39,11 @@ test("상품 상세의 양쪽 48px 터치 영역 밝기를 각각 적용하고 �
     moreDark = true;
   const sampled = [];
   const mocks = {
-    "react": { useRef: () => ({ current: null }), useState: (initial) => [initial, () => {}] },
+    "react": {
+      useEffect: () => {},
+      useRef: () => ({ current: null }),
+      useState: (initial) => [initial, () => {}],
+    },
     "react-native": {
       View: "View",
       Text: "Text",

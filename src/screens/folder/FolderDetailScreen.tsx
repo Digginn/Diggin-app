@@ -10,6 +10,7 @@ import SortIcon from "@/assets/images/folder/icon-sort.svg";
 import { AppBar, SearchBar } from "@/components/app-bar";
 import { Card } from "@/components/card";
 import { EmptyState } from "@/components/EmptyState";
+import { onVisibleItemsChanged } from "@/components/ProductImageFiller";
 import { WishLevel } from "@/components/WishLevel";
 import type { WishLevelKey } from "@/types/wish-item";
 
@@ -208,6 +209,7 @@ export function FolderDetailScreen({
             columnWrapperClassName="gap-3"
             contentContainerClassName="gap-5 px-4 pb-6"
             onEndReached={onEndReached}
+            onViewableItemsChanged={onVisibleItemsChanged}
             refreshing={isRefreshing}
             onRefresh={onRefresh}
             renderItem={({ item }) =>

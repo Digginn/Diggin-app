@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Linking, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,6 +14,7 @@ import { FallbackImg } from "@/components/FallbackImg";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
 import { ActionModal } from "@/components/modal";
+import { requestProductImageNow } from "@/components/ProductImageFiller";
 import { WishLevel } from "@/components/WishLevel";
 import { STATE_MESSAGES, TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
 import { useCreateFolder } from "@/hooks/useCreateFolder";
@@ -73,6 +74,10 @@ export function ItemDetailScreen() {
   const updateProduct = useUpdateProduct(id);
   const item = product.data?.values;
   const isOwned = product.data?.isOwned ?? false;
+  const imageSourceUrl = product.data?.needsImage ? item?.sourceUrl : undefined;
+  useEffect(() => {
+    if (imageSourceUrl) requestProductImageNow(id, imageSourceUrl);
+  }, [id, imageSourceUrl]);
   const [failed, setFailed] = useState(false);
   const [isEditOpen, setEditOpen] = useState(false);
   const [editError, setEditError] = useState<string>();

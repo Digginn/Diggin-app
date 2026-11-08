@@ -232,6 +232,7 @@ export type Database = {
           brand: string | null;
           created_at: string;
           id: number;
+          image_checked_at: string | null;
           image_url: string | null;
           name: string;
           price: number | null;
@@ -247,6 +248,7 @@ export type Database = {
           brand?: string | null;
           created_at?: string;
           id?: never;
+          image_checked_at?: string | null;
           image_url?: string | null;
           name: string;
           price?: number | null;
@@ -261,6 +263,7 @@ export type Database = {
           brand?: string | null;
           created_at?: string;
           id?: never;
+          image_checked_at?: string | null;
           image_url?: string | null;
           name?: string;
           price?: number | null;
@@ -441,6 +444,10 @@ export type Database = {
           apple_refresh_token: string;
           user_id: string;
         }[];
+      };
+      fill_product_image: {
+        Args: { product_image_url?: string; target_product_id: number };
+        Returns: string;
       };
       finish_notification_push: {
         Args: {

@@ -6,8 +6,10 @@ create table public.products (
   brand text,
   -- null은 가격 정보 없음, 0은 사용자가 직접 입력한 0원(SAVE-005).
   price integer,
-  -- null이면 Placeholder. 저장 뒤에는 바꿀 수 없다(PDT-006).
+  -- null이면 Placeholder. 저장 뒤에는 바꿀 수 없다(PDT-006). CSV 상품만 fill_product_image로 한 번 채운다.
   image_url text,
+  -- 이미지를 읽어 본 시각. null이면 아직 시도하지 않은 CSV 상품이다.
+  image_checked_at timestamptz,
   -- 추출된 카테고리·연령 표시. 상품명 수정으로 원래 제한 표시를 지우지 않는다.
   restriction_labels text[] not null default '{}',
   -- 나의 소장템에 든 상품은 null이다(PDT-008).
@@ -248,7 +250,7 @@ begin
     where f.id = any (coalesce(folder_ids, '{}')) and f.user_id = current_user_id and f.kind = 'owned'
   );
 
-  insert into public.products (user_id, url, name, brand, price, image_url, wish_level, restriction_labels)
+  insert into public.products (user_id, url, name, brand, price, image_url, image_checked_at, wish_level, restriction_labels)
   values (
     current_user_id,
     product_url,
@@ -256,6 +258,7 @@ begin
     product_brand,
     product_price,
     product_image_url,
+    now(),
     case when is_owned then null else product_wish_level end,
     coalesce(product_restriction_labels, '{}')
   )
@@ -531,3 +534,46 @@ using (
     where f.id = folder_id and f.user_id = (select auth.uid()) and f.kind = 'custom'
   )
 );
+
+-- CSV 상품 이미지를 기기에서 읽어 한 번만 채운다. 못 읽었으면 null로 시도 시각만 남겨 다시 열지 않는다.
+create or replace function private.fill_product_image(target_product_id bigint, product_image_url text default null)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  viewer_id uuid := (select auth.uid());
+  saved_url text;
+begin
+  perform private.assert_account_access();
+  if viewer_id is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+  if product_image_url !~* '^https://' or char_length(product_image_url) > 2048 then
+    raise exception 'invalid_image_url' using errcode = '22023';
+  end if;
+  update public.products
+  set image_url = product_image_url, image_checked_at = now()
+  where id = target_product_id and user_id = viewer_id and image_url is null and image_checked_at is null
+  returning image_url into saved_url;
+  if found then return saved_url; end if;
+  select image_url into saved_url from public.products where id = target_product_id and user_id = viewer_id;
+  if not found then
+    raise exception 'product_not_found' using errcode = '42501';
+  end if;
+  return saved_url;
+end;
+$$;
+
+create or replace function public.fill_product_image(target_product_id bigint, product_image_url text default null)
+returns text
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.fill_product_image(target_product_id, product_image_url);
+$$;
+
+revoke execute on function private.fill_product_image(bigint, text), public.fill_product_image(bigint, text) from public, anon;
+grant execute on function private.fill_product_image(bigint, text), public.fill_product_image(bigint, text) to authenticated;

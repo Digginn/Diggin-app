@@ -138,11 +138,8 @@ test("불러오기 버튼은 이미지 안내를 먼저 띄우고 확인한 뒤�
   let notice = ui.find(ui.render(), "ActionModal");
   assert.equal(picks, 0);
   assert.equal(notice.props.visible, true);
-  assert.equal(notice.props.title, "CSV 파일에서 이미지는 불러오지 않습니다.");
-  assert.equal(
-    notice.props.description,
-    "아이템명, 가격(원화) 등의 정보를 불러와 저장합니다.\n아이템 이미지는 모두 기본으로 표시됩니다.",
-  );
+  assert.equal(notice.props.title, "일부 이미지는 불러오지 못할 수 있습니다.");
+  assert.equal(notice.props.description, "불러오지 못한 아이템은 기본 이미지로 표시됩니다.");
   assert.equal(notice.props.scrimOpacity, 0.36);
   assert.equal(notice.props.isPrimaryDisabled, false);
   assert.equal(notice.props.onClose, undefined);

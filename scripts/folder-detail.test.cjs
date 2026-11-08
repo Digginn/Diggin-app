@@ -420,6 +420,7 @@ test("폴더 상세는 3열·정렬·카드 동작을 유지하고 오류 화면
     "@/components/Button": { Button: "Button" },
     "@/components/card": { Card: "Card" },
     "@/components/EmptyState": { EmptyState: "EmptyState" },
+    "@/components/ProductImageFiller": { onVisibleItemsChanged: () => {} },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
   });
   const items = Array.from({ length: 4 }, (_, index) => ({
