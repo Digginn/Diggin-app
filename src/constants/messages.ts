@@ -42,7 +42,7 @@ export const selectFolderSavedMessage = (count: number) =>
 export const selectDeletedMessage = (count: number) => `${count}개 아이템을 삭제했습니다.`;
 
 export const STATE_MESSAGES = {
-  allEmpty: "아직 저장된 아이템이 없습니다.\n관심 아이템의 링크를 복사해 보세요.",
+  allEmpty: "아직 저장된 아이템이 없습니다.\n첫 위시 아이템의 링크를 복사해 보세요.",
   searchEmpty: "검색 결과가 없습니다.\n다른 검색어로 다시 찾아보세요.",
   loadFailed: "아이템을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.",
 } as const;

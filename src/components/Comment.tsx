@@ -12,7 +12,7 @@ const KEBAB_SIZE = 16;
 export type MenuAnchor = { x: number; y: number; width: number; height: number };
 
 type CommentProps = {
-  /** 글쓴이는 익명번호를 세지 않음. 익1 - 글쓴이 - 익2 */
+  /** 계정 닉네임과 본인·글쓴이 구분 라벨 */
   author: string;
   body: string;
   timeLabel: string;
@@ -77,8 +77,10 @@ export function Comment({
         <View className="absolute bottom-0 left-0 top-0 w-[3px] bg-gray-900" />
       ) : null}
       <View className="w-full flex-row items-center justify-between pl-margin pr-2">
-        <View className="flex-row items-center gap-1">
-          <Text className="text-gray-600 font-label-14">{author}</Text>
+        <View className="min-w-0 flex-1 flex-row items-center gap-1">
+          <Text numberOfLines={1} className="min-w-0 shrink text-gray-600 font-label-14">
+            {author}
+          </Text>
           <Text className="text-gray-500 font-label-12-regular">·</Text>
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>

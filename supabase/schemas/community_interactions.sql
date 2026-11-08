@@ -22,8 +22,9 @@ returns jsonb language sql stable set search_path = '' as $$
     'content', case when c.author_id is null then null else c.content end,
     'is_post_author', c.author_id = p.author_id,
     'is_mine', c.author_id = (select auth.uid()), 'is_withdrawn', c.author_id is null,
-    'anon_number', a.number
+    'anon_number', a.number, 'author_nickname', author.nickname
   ) from private.comments c join private.posts p on p.id = c.post_id
+  left join public.profiles author on author.id = c.author_id
   left join private.post_anon_numbers a on a.post_id = c.post_id and a.user_id = c.author_id
   where c.id = target_comment_id;
 $$;

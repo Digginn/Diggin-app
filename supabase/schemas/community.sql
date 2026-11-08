@@ -174,6 +174,7 @@ returns jsonb language sql stable set search_path = '' as $$
   ) else jsonb_build_object(
     'id', p.id::text, 'type', p.type, 'created_at', p.created_at, 'ends_at', p.ends_at,
     'server_now', now(), 'content', p.content, 'is_mine', p.author_id = (select auth.uid()),
+    'author_nickname', author.nickname,
     'items', coalesce((select jsonb_agg(jsonb_build_object(
       'position', i.position, 'name', i.name, 'brand', i.brand, 'price', i.price,
       'url', i.url, 'image_url', i.image_url) order by i.position)
@@ -191,7 +192,8 @@ returns jsonb language sql stable set search_path = '' as $$
       exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())))
       then (select count(*) from private.vote_responses v where v.post_id = p.id and v.choice = 'not') else null end
   ) end
-  from private.posts p where p.id = target_post_id;
+  from private.posts p join public.profiles author on author.id = p.author_id
+  where p.id = target_post_id;
 $$;
 
 create or replace function private.get_community_feed(
@@ -260,7 +262,7 @@ begin
       'content', case when c.author_id is null then null else c.content end,
       'is_post_author', c.author_id = p.author_id,
       'is_mine', c.author_id = (select auth.uid()), 'is_withdrawn', c.author_id is null,
-      'anon_number', a.number
+      'anon_number', a.number, 'author_nickname', author.nickname
     ) order by c.created_at, c.id), '[]'::jsonb)
     from (
       select c.* from private.comments c
@@ -271,6 +273,7 @@ begin
       order by c.created_at, c.id limit 20
     ) c
     join private.posts p on p.id = c.post_id
+    left join public.profiles author on author.id = c.author_id
     left join private.post_anon_numbers a on a.post_id = c.post_id and a.user_id = c.author_id
   );
 end;
