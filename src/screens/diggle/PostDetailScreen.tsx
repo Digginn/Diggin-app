@@ -49,7 +49,11 @@ import { useCommunityVote } from "./hooks/useCommunityVote";
 import { useCommunityVoteTiming } from "./hooks/useCommunityVoteTiming";
 import { useCommunityComments, useCommunityPost } from "./queries/useCommunity";
 import type { CommunityComment, CommunityItem } from "./types/community";
-import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
+import {
+  communityErrorMessage,
+  formatCommunityAuthor,
+  formatCommunityTime,
+} from "./utils/formatCommunityTime";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
@@ -317,7 +321,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             <>
               <View className="gap-3 px-margin pb-4">
                 <Text className="text-gray-500 font-b4">
-                  {post.isMine ? "글쓴이 (나)" : "글쓴이"} · {formatCommunityTime(post.createdAt)}
+                  {formatCommunityAuthor(post.authorNickname, post.isMine)} ·{" "}
+                  {formatCommunityTime(post.createdAt)}
                 </Text>
                 <Text className="text-gray-800 font-b3">{post.body}</Text>
                 <ProductImgGrid
@@ -363,9 +368,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               author={
                 comment.isWithdrawn
                   ? "(탈퇴한 사용자)"
-                  : comment.isPostAuthor
-                    ? "글쓴이"
-                    : `디기 ${comment.anonNumber ?? ""}${comment.isMine ? "(나)" : ""}`
+                  : formatCommunityAuthor(
+                      comment.authorNickname,
+                      comment.isMine,
+                      comment.isPostAuthor,
+                    )
               }
               body={normalizeText(comment.body ?? "").replace(/\n/g, " ")}
               timeLabel={formatCommunityTime(comment.createdAt)}

@@ -64,6 +64,7 @@ const PREVIEW = {
 const MEMBER = {
   ...PREVIEW,
   is_mine: false,
+  author_nickname: "느긋한디기12",
   like_count: 0,
   is_liked: false,
   comment_count: 1,
@@ -473,6 +474,8 @@ function screenMocks({
     },
     "./utils/formatCommunityTime": {
       formatCommunityTime: () => "방금 전",
+      formatCommunityAuthor: load("src/screens/diggle/utils/formatCommunityTime.ts")
+        .formatCommunityAuthor,
       communityErrorMessage: load("src/screens/diggle/utils/formatCommunityTime.ts")
         .communityErrorMessage,
     },
@@ -598,8 +601,21 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   const state = screenMocks({
     post,
     comments: [
-      { id: "1", isPostAuthor: true, body: "글쓴이 댓글", createdAt: PREVIEW.created_at },
-      { id: "2", isMine: true, anonNumber: 1, body: "줄바꿈\n댓글", createdAt: PREVIEW.created_at },
+      {
+        id: "1",
+        authorNickname: "느긋한디기12",
+        isPostAuthor: true,
+        body: "글쓴이 댓글",
+        createdAt: PREVIEW.created_at,
+      },
+      {
+        id: "2",
+        authorNickname: "다정한디기34",
+        isMine: true,
+        anonNumber: 1,
+        body: "줄바꿈\n댓글",
+        createdAt: PREVIEW.created_at,
+      },
       { id: "3", isWithdrawn: true, body: null, createdAt: PREVIEW.created_at },
     ],
   });
@@ -617,8 +633,8 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
   const screen = PostDetailScreen({});
   const comments = nodes(screen, "Comment");
-  assert.equal(comments[0].props.author, "글쓴이");
-  assert.equal(comments[1].props.author, "디기 1(나)");
+  assert.equal(comments[0].props.author, "느긋한디기12 (글쓴이)");
+  assert.equal(comments[1].props.author, "다정한디기34 (나)");
   assert.equal(comments[1].props.body, "줄바꿈 댓글");
   assert.equal(comments[2].props.isDeleted, true);
   assert.equal(typeof comments[0].props.onPressReport, "function");

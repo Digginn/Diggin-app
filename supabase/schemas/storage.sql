@@ -1,4 +1,4 @@
--- MY-003 프로필 이미지는 avatars/{user_id}/ 아래에 본인만 올리고 읽는다. 커뮤니티가 익명이라 남에게 보일 일이 없다.
+-- MY-003 프로필 이미지는 avatars/{user_id}/ 아래에 본인만 올리고 읽는다. 커뮤니티에는 닉네임만 표시한다.
 -- 교체 업로드(upsert)는 insert·select·update가 모두 필요하다.
 create policy "avatars_select_own"
 on storage.objects

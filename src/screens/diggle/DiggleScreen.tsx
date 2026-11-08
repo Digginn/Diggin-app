@@ -19,7 +19,11 @@ import { useLoginGate } from "@/hooks/useLoginGate";
 import { useToast } from "@/hooks/useToast";
 
 import { useCommunityFeed } from "./queries/useCommunity";
-import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
+import {
+  communityErrorMessage,
+  formatCommunityAuthor,
+  formatCommunityTime,
+} from "./utils/formatCommunityTime";
 
 const TABS = [
   { key: "all", label: "전체 게시글" },
@@ -109,7 +113,7 @@ export function DiggleScreen() {
               body={item.body}
               items={item.items}
               timeLabel={formatCommunityTime(item.createdAt)}
-              authorLabel={item.isMine ? "익명(나)" : "익명"}
+              authorLabel={formatCommunityAuthor(item.authorNickname, item.isMine)}
               likeCount={item.type === "post" ? (item.likeCount ?? undefined) : undefined}
               commentCount={item.commentCount ?? 0}
               onPressReport={

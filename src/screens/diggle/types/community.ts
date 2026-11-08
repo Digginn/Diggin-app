@@ -14,6 +14,7 @@ export type CommunityPost = CommunityCursor & {
   body: string;
   isPreview: boolean;
   isMine: boolean;
+  authorNickname: string | null;
   items: CommunityItem[];
   likeCount: number | null;
   commentCount: number | null;
@@ -30,5 +31,6 @@ export type CommunityComment = CommunityCursor & {
   isPostAuthor: boolean;
   isMine: boolean;
   isWithdrawn: boolean;
+  authorNickname: string | null;
   anonNumber: number | null;
 };
