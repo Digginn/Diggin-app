@@ -1,6 +1,6 @@
 import { type Tabs } from "expo-router";
 import type { ComponentProps, FC } from "react";
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import type { SvgProps } from "react-native-svg";
 
 import {
@@ -44,7 +44,7 @@ export function NavigationBar({ state, descriptors, navigation, insets }: Naviga
     <View
       className="flex-row items-center justify-center gap-gutter rounded-t-[20px] bg-gray-900 px-margin"
       style={{
-        paddingBottom: insets.bottom,
+        paddingBottom: Platform.OS === "android" ? insets.bottom : 0,
         boxShadow: "0px 0px 6px rgba(0, 0, 0, 0.12)",
       }}
     >

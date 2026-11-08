@@ -6,6 +6,7 @@ const { test } = require("node:test");
 const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
+const platform = { OS: "android" };
 
 const loaded = { exports: {} };
 runInNewContext(
@@ -20,6 +21,7 @@ runInNewContext(
       if (name === "react-native")
         return {
           View: "View",
+          Platform: platform,
           Text: "Text",
           Pressable: "Pressable",
           StyleSheet: { flatten: (s) => s },
@@ -45,22 +47,25 @@ const props = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
 
-test("네 탭 모두 기기의 실제 하단 안전 여백을 탭 버튼 아래에 확보한다", () => {
-  for (const index of [0, 1, 2, 3]) {
-    for (const bottom of [0, 16, 24, 34, 48]) {
-      const tree = NavigationBar({
-        ...props,
-        state: { routes, index },
-        insets: { ...props.insets, bottom },
-      });
-      assert.equal(tree.props.style.paddingBottom, bottom);
-      const buttons = React.Children.toArray(tree.props.children);
-      assert.equal(buttons.length, 4);
-      assert.deepEqual(
-        buttons.map((button) => button.props.accessibilityLabel),
-        ["ALL", "FOLDER", "DIGGLE", "MY"],
-      );
-      assert.ok(buttons.every((button) => button.props.className.includes("h-[80px]")));
+test("Android 네 탭은 하단 안전 여백을 확보하고 iOS는 기존 높이를 유지한다", () => {
+  for (const os of ["android", "ios"]) {
+    platform.OS = os;
+    for (const index of [0, 1, 2, 3]) {
+      for (const bottom of [0, 16, 24, 34, 48]) {
+        const tree = NavigationBar({
+          ...props,
+          state: { routes, index },
+          insets: { ...props.insets, bottom },
+        });
+        assert.equal(tree.props.style.paddingBottom, os === "android" ? bottom : 0);
+        const buttons = React.Children.toArray(tree.props.children);
+        assert.equal(buttons.length, 4);
+        assert.deepEqual(
+          buttons.map((button) => button.props.accessibilityLabel),
+          ["ALL", "FOLDER", "DIGGLE", "MY"],
+        );
+        assert.ok(buttons.every((button) => button.props.className.includes("h-[80px]")));
+      }
     }
   }
 });
