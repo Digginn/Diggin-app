@@ -1,0 +1,118 @@
+import { useRouter } from "expo-router";
+import type { ReactNode } from "react";
+import { Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { IconBack, type SvgIcon } from "@/assets/images/appbar";
+import LogoWordmark from "@/assets/images/logo-black.svg";
+
+import { IconButton } from "./IconButton";
+import { TextButton } from "./TextButton";
+
+const BAR_HEIGHT = 56;
+const SIDE_SLOT = 56;
+const PROGRESS_WIDTH = 200;
+const PROGRESS_MAX = 100;
+const WORDMARK_WIDTH = 81.25;
+const WORDMARK_HEIGHT = 26;
+
+type AppBarProps = {
+  left?: "back" | "logo" | "none";
+  title?: string;
+  titleClassName?: string;
+  progress?: number;
+  right?: ReactNode;
+  logo?: ReactNode;
+  onBack?: () => void;
+  isTitleLeftAligned?: boolean;
+  backIcon?: SvgIcon;
+  backIconSize?: number;
+  colorScheme?: "light" | "dark";
+  /** 바텀시트가 위를 덮는 동안 눌리지 않는 걸 흐린 아이콘으로 알린다. */
+  isDisabled?: boolean;
+};
+
+function AppBarRoot({
+  left = "back",
+  title,
+  titleClassName,
+  progress,
+  right,
+  logo,
+  onBack,
+  isTitleLeftAligned = false,
+  backIcon = IconBack,
+  backIconSize = 48,
+  colorScheme = "light",
+  isDisabled = false,
+}: AppBarProps) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const handleBack = onBack ?? (() => router.back());
+  const isDark = colorScheme === "dark";
+
+  return (
+    <View className={isDark ? "bg-gray-1000" : "bg-gray-0"} style={{ paddingTop: insets.top }}>
+      <View className="relative flex-row items-center" style={{ height: BAR_HEIGHT }}>
+        <View className="absolute left-0 h-full justify-center">
+          {left === "back" && (
+            <IconButton
+              icon={backIcon}
+              iconSize={backIconSize}
+              accessibilityLabel="뒤로 가기"
+              onPress={handleBack}
+              disabled={isDisabled}
+              className={isDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900"}
+            />
+          )}
+          {left === "logo" && (
+            <View className="pl-5">
+              {logo ?? <LogoWordmark width={WORDMARK_WIDTH} height={WORDMARK_HEIGHT} />}
+            </View>
+          )}
+        </View>
+
+        <View
+          pointerEvents="none"
+          className={`absolute h-full justify-center ${isTitleLeftAligned ? "items-start" : "items-center"}`}
+          style={{
+            left: isTitleLeftAligned ? 48 : SIDE_SLOT,
+            right: isTitleLeftAligned ? SIDE_SLOT + 12 : SIDE_SLOT,
+          }}
+        >
+          {progress === undefined ? (
+            title ? (
+              <Text
+                numberOfLines={1}
+                className={`${isDark ? "text-gray-0" : "text-gray-900"} ${titleClassName ?? (isTitleLeftAligned ? "font-h2" : isDark ? "font-label-20-medium" : "font-label-20")}`}
+              >
+                {title}
+              </Text>
+            ) : null
+          ) : (
+            <View
+              className="h-1 overflow-hidden rounded bg-gray-100"
+              style={{ width: PROGRESS_WIDTH }}
+            >
+              <View
+                className="h-full rounded bg-gray-600"
+                style={{
+                  width:
+                    (PROGRESS_WIDTH * Math.min(Math.max(progress, 0), PROGRESS_MAX)) / PROGRESS_MAX,
+                }}
+              />
+            </View>
+          )}
+        </View>
+
+        <View className="absolute right-3 h-full flex-row items-center">{right}</View>
+      </View>
+    </View>
+  );
+}
+
+export const AppBar = Object.assign(AppBarRoot, {
+  IconButton,
+  TextButton,
+});

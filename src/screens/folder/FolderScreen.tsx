@@ -1,0 +1,365 @@
+import { clsx } from "clsx";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useRef, useState } from "react";
+import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+
+import { IconSearch } from "@/assets/images/appbar";
+import EmptyFolderIcon from "@/assets/images/folder/icon-empty-folder.svg";
+import PlusIcon from "@/assets/images/folder/icon-folder-plus.svg";
+import FabGlow from "@/assets/images/folder/image-fab-glow.svg";
+import { AppBar } from "@/components/app-bar";
+import { NotificationButton } from "@/components/app-bar/NotificationButton";
+import { ErrorState } from "@/components/ErrorState";
+import { FirstVisitGuide } from "@/components/FirstVisitGuide";
+import { ActionModal } from "@/components/modal";
+import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
+import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
+
+import { FolderCard, type FolderItem } from "./components/FolderCard";
+import { FolderMenu, type FolderMenuAnchor } from "./components/FolderMenu";
+import { FolderNameModal } from "./components/FolderNameModal";
+import { FolderSortFilter, type FolderSortOrder } from "./components/FolderSortFilter";
+import { FolderToast } from "./components/FolderToast";
+import { FOLDER_MESSAGES } from "./constants/folderMessages";
+
+const INITIAL_FOLDERS: FolderItem[] = [
+  { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
+];
+const TOAST_DURATION_MS = 2000;
+const MAX_CUSTOM_FOLDERS = 50;
+
+type FolderScreenProps = {
+  isError?: boolean;
+  onRetry?: () => void;
+  folders?: FolderItem[];
+  savedItemCount?: number;
+  onOpenFolder?: (folder: FolderItem) => void;
+  onRenameFolder?: (folder: FolderItem, name: string) => void | Promise<void>;
+  onDeleteFolder?: (folder: FolderItem) => void | Promise<void>;
+  onSort?: (order: FolderSortOrder) => void;
+  onCreateFolder?: (name: string) => void | Promise<void>;
+  onSearch?: () => void;
+  onNotifications?: () => void;
+  /** 비회원은 첫 방문 안내 대신 로그인 모달을 본다. */
+  isGuest?: boolean;
+  requireLogin?: (action: () => void) => void;
+};
+
+export function FolderScreen({
+  isError = false,
+  onRetry,
+  folders = INITIAL_FOLDERS,
+  savedItemCount = folders.reduce((count, folder) => count + folder.itemCount, 0),
+  onOpenFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onSort,
+  onCreateFolder,
+  onSearch,
+  onNotifications,
+  isGuest = false,
+  requireLogin = (action) => action(),
+}: FolderScreenProps = {}) {
+  const { height } = useWindowDimensions();
+  const guide = useFirstVisitGuide("folder", !isError && !isGuest);
+  useLinkDetectionPause(guide.isPending, true);
+  const ownedGuideRef = useRef<View>(null);
+  const fabGuideRef = useRef<View>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
+  const [editingFolder, setEditingFolder] = useState<FolderItem | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<FolderItem | null>(null);
+  const [selectedFolderMenu, setSelectedFolderMenu] = useState<{
+    folder: FolderItem;
+    anchor: FolderMenuAnchor;
+  } | null>(null);
+  const hasFolders = folders.length > 0;
+  // 첫 진입 안내 중에는 소장템 한 장만 보여주고, 닫으면 원래 목록/정렬을 복원합니다.
+  const guideFolder = folders.find((folder) => folder.isOwnedItems);
+  const displayedFolders = guide.isVisible && guideFolder ? [guideFolder] : folders;
+  const columnCount = displayedFolders.length >= 7 ? 3 : 2;
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState<FolderSortOrder>("latest");
+  const sortedFolders = [...displayedFolders].sort((left, right) => {
+    const leftRank = Number(Boolean(left.isOwnedItems));
+    const rightRank = Number(Boolean(right.isOwnedItems));
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    if (sortOrder === "item-count") return right.itemCount - left.itemCount;
+    return (
+      (right.lastItemAddedAt ?? right.createdAt ?? 0) -
+      (left.lastItemAddedAt ?? left.createdAt ?? 0)
+    );
+  });
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), TOAST_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  async function submitFolderName(name: string, folder?: FolderItem) {
+    if (!folder && folders.filter((entry) => !entry.isOwnedItems).length >= MAX_CUSTOM_FOLDERS) {
+      Keyboard.dismiss();
+      setToast({ message: FOLDER_MESSAGES.createLimit });
+      return false;
+    }
+    try {
+      if (folder) await onRenameFolder?.(folder, name);
+      else await onCreateFolder?.(name);
+      setToast({ message: folder ? FOLDER_MESSAGES.renameSuccess : FOLDER_MESSAGES.createSuccess });
+      return true;
+    } catch (error) {
+      const reason =
+        typeof error === "object" && error !== null && "reason" in error ? error.reason : null;
+      // 같은 이름은 입력칸 아래에 알리고 입력값을 유지한다(FLD-002).
+      if (reason === "duplicate") return FOLDER_MESSAGES.duplicateName;
+      Keyboard.dismiss();
+      const isLimitError = !folder && reason === "limit";
+      setToast({
+        message: folder
+          ? FOLDER_MESSAGES.renameError
+          : isLimitError
+            ? FOLDER_MESSAGES.createLimit
+            : FOLDER_MESSAGES.createError,
+      });
+      return false;
+    }
+  }
+
+  const modalToast = toast ? (
+    <View pointerEvents="none" className="absolute inset-x-0 bottom-40">
+      <FolderToast message={toast.message} />
+    </View>
+  ) : undefined;
+
+  return (
+    <View className="flex-1 bg-gray-0">
+      <StatusBar style="dark" />
+      <View style={{ opacity: isSortOpen ? 0.12 : 1 }}>
+        <AppBar
+          left="logo"
+          right={
+            !isError &&
+            !hasFolders && (
+              <>
+                <AppBar.IconButton
+                  icon={IconSearch}
+                  accessibilityLabel="아이템 검색"
+                  onPress={onSearch}
+                  disabled={!onSearch}
+                />
+                <NotificationButton onPress={onNotifications} disabled={!onNotifications} />
+              </>
+            )
+          }
+        />
+      </View>
+      {isError ? (
+        <ErrorState
+          message={"폴더를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요."}
+          onRetry={onRetry}
+        />
+      ) : hasFolders ? (
+        <View className="flex-1">
+          <View
+            pointerEvents="box-none"
+            className={clsx(
+              "flex-row justify-between px-margin pt-1.5",
+              isSortOpen ? "absolute inset-0 z-20 items-start" : "h-[54px] items-center",
+            )}
+          >
+            <View className="h-12 justify-center">
+              <Text className="text-gray-1000 font-label-12-semibold">
+                저장한 아이템 {savedItemCount}개
+              </Text>
+            </View>
+            <View
+              pointerEvents="box-none"
+              className={clsx("items-end", isSortOpen && "h-full flex-1")}
+            >
+              <FolderSortFilter
+                isOpen={isSortOpen}
+                value={sortOrder}
+                onToggle={() => setIsSortOpen(!isSortOpen)}
+                onChange={(order) => {
+                  setSortOrder(order);
+                  setIsSortOpen(false);
+                  onSort?.(order);
+                }}
+              />
+            </View>
+          </View>
+          {isSortOpen && <View className="h-[54px]" />}
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName={clsx(
+              "px-margin pb-20",
+              columnCount === 3 ? "gap-margin" : "gap-0",
+            )}
+          >
+            {Array.from({ length: Math.ceil(displayedFolders.length / columnCount) }, (_, row) => (
+              <View
+                key={row}
+                className={clsx("flex-row", columnCount === 3 ? "gap-[13.5px]" : "gap-gutter")}
+              >
+                {sortedFolders.slice(row * columnCount, (row + 1) * columnCount).map((folder) => (
+                  <FolderCard
+                    key={folder.id}
+                    folder={folder}
+                    guideRef={folder.isOwnedItems ? ownedGuideRef : undefined}
+                    isGuidePreview={guide.isVisible}
+                    columnCount={columnCount}
+                    onPress={onOpenFolder ? () => onOpenFolder(folder) : undefined}
+                    onPressMenu={(anchor) => setSelectedFolderMenu({ folder, anchor })}
+                  />
+                ))}
+                {Array.from(
+                  { length: Math.max(0, (row + 1) * columnCount - displayedFolders.length) },
+                  (_, index) => (
+                    <View key={`empty-${index}`} className="flex-1" />
+                  ),
+                )}
+              </View>
+            ))}
+          </ScrollView>
+          {isSortOpen && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="보기 순 필터 닫기"
+              className="absolute inset-0 z-10"
+              style={{
+                experimental_backgroundImage:
+                  "linear-gradient(to bottom, rgba(255,255,255,0.88), rgba(255,255,255,0))",
+              }}
+              onPress={() => setIsSortOpen(false)}
+            />
+          )}
+        </View>
+      ) : (
+        <View
+          pointerEvents="none"
+          className="absolute inset-x-0 top-0 items-center justify-center px-margin"
+          style={{ height }}
+        >
+          <View className="items-center gap-2">
+            <EmptyFolderIcon />
+            <Text
+              className="text-center text-gray-500 font-b1"
+              style={{ includeFontPadding: false }}
+            >
+              {"아직 생성된 폴더가 없습니다.\n저장한 아이템을 폴더에 정리해 보세요."}
+            </Text>
+          </View>
+        </View>
+      )}
+      {!isError && (
+        <View
+          pointerEvents="box-none"
+          className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"
+        >
+          {columnCount === 3 && (
+            <View pointerEvents="none" className="absolute inset-0">
+              <FabGlow />
+            </View>
+          )}
+          <Pressable
+            ref={fabGuideRef}
+            collapsable={false}
+            accessibilityRole="button"
+            accessibilityLabel="폴더 추가"
+            onPress={() =>
+              requireLogin(() => {
+                setToast(null);
+                setIsCreateModalOpen(true);
+              })
+            }
+            className="absolute left-[73px] top-[73px] size-[54px] items-center justify-center rounded-full bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.1)] active:opacity-75"
+          >
+            <PlusIcon />
+          </Pressable>
+        </View>
+      )}
+      {!isError && isCreateModalOpen && (
+        <FolderNameModal
+          overlay={modalToast}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSubmit={onCreateFolder ? (name) => submitFolderName(name) : undefined}
+        />
+      )}
+      {!isError && editingFolder && (
+        <FolderNameModal
+          overlay={modalToast}
+          initialName={editingFolder.name}
+          onClose={() => setEditingFolder(null)}
+          onSubmit={onRenameFolder ? (name) => submitFolderName(name, editingFolder) : undefined}
+        />
+      )}
+      {!isError && !isCreateModalOpen && !editingFolder && !deletingFolder && toast && (
+        <View pointerEvents="none" className="absolute inset-x-0 bottom-20 z-30">
+          <FolderToast message={toast.message} />
+        </View>
+      )}
+      {!isError && selectedFolderMenu && (
+        <FolderMenu
+          anchor={selectedFolderMenu.anchor}
+          onClose={() => setSelectedFolderMenu(null)}
+          onEdit={() => {
+            setToast(null);
+            setEditingFolder(selectedFolderMenu.folder);
+          }}
+          onDelete={() => {
+            setToast(null);
+            setDeletingFolder(selectedFolderMenu.folder);
+          }}
+        />
+      )}
+      {!isError && deletingFolder && (
+        <ActionModal
+          visible
+          overlay={modalToast}
+          type="2Btn"
+          title="폴더 삭제하기"
+          description={"삭제된 폴더는 복구할 수 없으며,\n폴더 내 아이템은 삭제되지 않습니다."}
+          onRequestClose={() => {
+            if (!isDeletingRef.current) setDeletingFolder(null);
+          }}
+          secondaryAction={{
+            label: "삭제하기",
+            isDisabled: !onDeleteFolder || isDeleting,
+            onPress: async () => {
+              if (!onDeleteFolder || isDeletingRef.current) return;
+              isDeletingRef.current = true;
+              setIsDeleting(true);
+              try {
+                await onDeleteFolder(deletingFolder);
+                setDeletingFolder(null);
+                setToast({ message: FOLDER_MESSAGES.deleteSuccess });
+              } catch {
+                setToast({ message: FOLDER_MESSAGES.deleteError });
+              } finally {
+                isDeletingRef.current = false;
+                setIsDeleting(false);
+              }
+            },
+          }}
+          primaryAction={{
+            label: "취소",
+            isDisabled: isDeleting,
+            onPress: () => {
+              if (!isDeletingRef.current) setDeletingFolder(null);
+            },
+          }}
+        />
+      )}
+      {guide.isVisible && !isError && (
+        <FirstVisitGuide
+          kind="folder"
+          targets={{ owned: ownedGuideRef, fab: fabGuideRef }}
+          onClose={guide.dismiss}
+        />
+      )}
+    </View>
+  );
+}

@@ -1,0 +1,15 @@
+import { splitGraphemes } from "unicode-segmenter/grapheme";
+
+export const NICKNAME_HELPER_MESSAGE = "최대 10글자까지 입력 가능합니다.";
+export const MAX_NICKNAME_LENGTH = 10;
+export const NICKNAME_TOO_SHORT_MESSAGE = "닉네임은 2~10자로 입력해 주세요.";
+
+export function validateNickname(value: string): string | undefined {
+  if (Array.from(splitGraphemes(value)).length > MAX_NICKNAME_LENGTH) {
+    return NICKNAME_HELPER_MESSAGE;
+  }
+  if (/[^가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9]/u.test(value)) {
+    return "공백·특수문자는 사용할 수 없습니다.";
+  }
+  return undefined;
+}

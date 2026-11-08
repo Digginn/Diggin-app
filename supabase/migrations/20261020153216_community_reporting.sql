@@ -1,0 +1,157 @@
+SET local check_function_bodies = off;
+
+CREATE OR REPLACE FUNCTION private.assert_can_report_community()
+  RETURNS void
+  LANGUAGE plpgsql
+  SET search_path TO ''
+  AS $function$
+begin
+  if (select auth.uid()) is null then raise exception 'not_authenticated' using errcode = '42501'; end if;
+  if not exists (select 1 from public.profiles where id = (select auth.uid()) and status <> 'suspended') then
+    raise exception 'not_authorized' using errcode = '42501';
+  end if;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION private.block_community_author (
+  content_type text,
+  target_id    bigint
+)
+  RETURNS void
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare
+  viewer uuid := (select auth.uid());
+  author uuid;
+begin
+  perform private.assert_can_report_community();
+  if content_type is null or content_type not in ('post','comment') or target_id is null or target_id <= 0 then
+    raise exception 'invalid_report_target' using errcode = '22023';
+  end if;
+  -- 신고로 이미 숨겨진 대상도 차단 가능하다. 본인의 신고에 저장된 작성자만 사용한다.
+  select r.reported_user_id into author from private.reports r where r.reporter_id = viewer
+    and ((content_type = 'post' and r.post_id = target_id) or (content_type = 'comment' and r.comment_id = target_id));
+  if author is null then raise exception 'report_target_not_found' using errcode = '42501'; end if;
+  if author = viewer then raise exception 'own_block' using errcode = '42501'; end if;
+  insert into private.user_blocks(blocker_id, blocked_id) values (viewer, author) on conflict do nothing;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION private.report_community_content (
+  content_type  text,
+  target_id     bigint,
+  report_reason text,
+  report_detail text   DEFAULT NULL::text
+)
+  RETURNS text
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare
+  viewer uuid := (select auth.uid());
+  parent private.posts%rowtype;
+  comment private.comments%rowtype;
+  author uuid;
+  saved_id bigint;
+  clean_detail text := nullif(normalize(btrim(report_detail), NFC), '');
+  parent_id bigint;
+begin
+  perform private.assert_can_report_community();
+  if content_type is null or content_type not in ('post','comment') or target_id is null or target_id <= 0 then
+    raise exception 'invalid_report_target' using errcode = '22023';
+  end if;
+  if report_reason is null or report_reason not in ('abuse','spam','inappropriate','other') or
+    (report_reason <> 'other' and clean_detail is not null) or private.char_count(clean_detail) > 50 then
+    raise exception 'invalid_report_reason' using errcode = '22023';
+  end if;
+  -- 동일 신고 재시도는 원래 사유·Snapshot을 보존한다. 동시 요청도 한 건만 생성한다.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(viewer::text || ':' || content_type || ':' || target_id::text, 0));
+  select r.id into saved_id from private.reports r where r.reporter_id = viewer
+    and ((content_type = 'post' and r.post_id = target_id) or (content_type = 'comment' and r.comment_id = target_id));
+  if saved_id is not null then return saved_id::text; end if;
+  if content_type = 'post' then parent_id := target_id;
+  else
+    select c.post_id into parent_id from private.comments c where c.id = target_id;
+  end if;
+  -- 기존 댓글 수정·삭제와 같은 부모 → 댓글 잠금 순서로 Snapshot 경합을 막는다.
+  select * into parent from private.posts where id = parent_id for update;
+  if not found or parent.deleted_at is not null or parent.hidden_at is not null or
+    not private.community_author_visible(parent.author_id) then
+    raise exception 'report_target_not_found' using errcode = '42501';
+  end if;
+  if content_type = 'comment' then
+    select * into comment from private.comments where id = target_id for update;
+    if not found or comment.deleted_at is not null or comment.hidden_at is not null or
+      comment.author_id is null or not private.community_author_visible(comment.author_id) then
+      raise exception 'report_target_not_found' using errcode = '42501';
+    end if;
+    author := comment.author_id;
+  else author := parent.author_id;
+  end if;
+  if author = viewer then raise exception 'own_report' using errcode = '42501'; end if;
+  insert into private.reports(reporter_id, target_type, post_id, comment_id, reported_user_id, reason, detail, reported_content)
+  values (viewer, content_type::public.report_target,
+    case when content_type = 'post' then target_id end,
+    case when content_type = 'comment' then target_id end, author, report_reason::public.report_reason,
+    clean_detail, case when content_type = 'comment' then comment.content end)
+  returning id into saved_id;
+  return saved_id::text;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.block_community_author (
+  target_type text,
+  target_id   bigint
+)
+  RETURNS void
+  LANGUAGE sql
+  SET search_path TO ''
+  AS $function$
+  select private.block_community_author(target_type, target_id);
+$function$;
+
+REVOKE ALL ON FUNCTION "public"."block_community_author"(text, bigint) FROM PUBLIC, "anon";
+
+CREATE OR REPLACE FUNCTION public.report_community_content (
+  target_type   text,
+  target_id     bigint,
+  report_reason text,
+  report_detail text   DEFAULT NULL::text
+)
+  RETURNS text
+  LANGUAGE sql
+  SET search_path TO ''
+  AS $function$
+  select private.report_community_content(target_type, target_id, report_reason, report_detail);
+$function$;
+
+REVOKE ALL ON FUNCTION "public"."report_community_content"(text, bigint, text, text) FROM PUBLIC, "anon";
+
+REVOKE ALL ON FUNCTION "private"."assert_can_report_community"() FROM PUBLIC;
+
+REVOKE ALL ON FUNCTION "private"."block_community_author"(text, bigint) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."block_community_author"(text, bigint) TO "authenticated";
+
+REVOKE ALL ON FUNCTION "private"."report_community_content"(text, bigint, text, text) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."report_community_content"(text, bigint, text, text) TO "authenticated";
+
+GRANT EXECUTE ON FUNCTION "public"."block_community_author"(text, bigint) TO "authenticated";
+
+REVOKE ALL ON FUNCTION "public"."block_community_author"(text, bigint) FROM "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."block_community_author"(text, bigint) TO "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."block_community_author"(text, bigint) TO "service_role";
+
+GRANT EXECUTE ON FUNCTION "public"."report_community_content"(text, bigint, text, text) TO "authenticated";
+
+REVOKE ALL ON FUNCTION "public"."report_community_content"(text, bigint, text, text) FROM "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."report_community_content"(text, bigint, text, text) TO "postgres";
+
+GRANT EXECUTE ON FUNCTION "public"."report_community_content"(text, bigint, text, text) TO "service_role";

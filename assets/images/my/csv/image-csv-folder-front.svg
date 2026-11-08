@@ -1,0 +1,15 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="174" height="87.725" viewBox="0 0 174 87.725" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="FolderTop">
+<path id="Rectangle" d="M1.54199 10.3854C0.731202 5.11531 4.80871 0.3625 10.1408 0.3625H99.0063C101.284 0.3625 103.471 1.25562 105.097 2.85007L117.088 14.6057C118.714 16.2002 120.901 17.0933 123.178 17.0933H163.969C169.263 17.0933 173.33 21.7825 172.581 27.0236L165.029 79.8929C164.416 84.1789 160.746 87.3625 156.416 87.3625H20.8485C16.5544 87.3625 12.9026 84.2295 12.2497 79.9854L1.54199 10.3854Z" fill="url(#paint0_linear_0_239)" fill-opacity="0.74" stroke="url(#paint1_linear_0_239)" stroke-width="0.725"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_239" x1="85.0665" y1="0.3625" x2="85.0665" y2="87.3625" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="#848484" stop-opacity="0.5"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_239" x1="55.0999" y1="-0.520094" x2="86.0998" y2="98.3171" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="white" stop-opacity="0.32"/>
+</linearGradient>
+</defs>
+</svg>

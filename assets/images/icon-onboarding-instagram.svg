@@ -1,0 +1,39 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="55" height="55" viewBox="0 0 55 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="AppIcon" filter="url(#filter0_d_0_1537)">
+<rect x="7.5" y="5" width="40" height="40" rx="10" fill="url(#paint0_radial_0_1537)"/>
+<rect x="7.5" y="5" width="40" height="40" rx="10" fill="url(#paint1_radial_0_1537)"/>
+<rect x="7.5" y="5" width="40" height="40" rx="10" fill="url(#paint2_radial_0_1537)"/>
+<rect x="7.5" y="5" width="40" height="40" rx="10" fill="url(#paint3_radial_0_1537)"/>
+<path id="Star" d="M27.5 15.625L29.9797 21.587L36.4162 22.103L31.5123 26.3037L33.0105 32.5845L27.5 29.2188L21.9895 32.5845L23.4877 26.3037L18.5838 22.103L25.0203 21.587L27.5 15.625Z" fill="white"/>
+</g>
+<defs>
+<filter id="filter0_d_0_1537" x="0" y="0" width="55" height="55" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="2.5"/>
+<feGaussianBlur stdDeviation="3.75"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.08 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1537"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1537" result="shape"/>
+</filter>
+<radialGradient id="paint0_radial_0_1537" cx="0" cy="0" r="1" gradientTransform="matrix(-24.5982 6.93727 -4.99804 -17.7218 46.2084 23.7485)" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FF005F"/>
+<stop offset="1" stop-color="#FC01D8"/>
+</radialGradient>
+<radialGradient id="paint1_radial_0_1537" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(18.1247 48.0808) rotate(-90) scale(31.9288 33.8757)">
+<stop stop-color="#FFCC00"/>
+<stop offset="0.1242" stop-color="#FFCC00"/>
+<stop offset="0.5672" stop-color="#FE4A05"/>
+<stop offset="0.6942" stop-color="#FF0F3F"/>
+<stop offset="1" stop-color="#FE0657" stop-opacity="0"/>
+</radialGradient>
+<radialGradient id="paint2_radial_0_1537" cx="0" cy="0" r="1" gradientTransform="matrix(6.62727 -11.419 14.8662 8.628 28.5108 44.4359)" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FFCC00"/>
+<stop offset="1" stop-color="#FFCC00" stop-opacity="0"/>
+</radialGradient>
+<radialGradient id="paint3_radial_0_1537" cx="0" cy="0" r="1" gradientTransform="matrix(-24.3282 6.8504 -2.33333 -8.28875 12.9271 6.62879)" gradientUnits="userSpaceOnUse">
+<stop stop-color="#780CFF"/>
+<stop offset="1" stop-color="#820BFF" stop-opacity="0"/>
+</radialGradient>
+</defs>
+</svg>

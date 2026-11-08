@@ -1,0 +1,127 @@
+/* global __dirname */
+const assert = require("node:assert/strict");
+const { readFileSync } = require("node:fs");
+const path = require("node:path");
+const { test } = require("node:test");
+const { runInNewContext } = require("node:vm");
+const React = require("react");
+const ts = require("typescript");
+
+test("토스트는 하단 160px에 표시되고 새 메시지·자동 닫힘·언마운트에 타이머를 정리한다", () => {
+  let message;
+  let cleanup;
+  let nextTimer = 0;
+  const timerRef = { current: undefined };
+  const timers = new Map();
+  const source = readFileSync(path.join(__dirname, "../src/contexts/ToastContext.tsx"), "utf8");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const toastModule = { exports: {} };
+  runInNewContext(compiled, {
+    exports: toastModule.exports,
+    module: toastModule,
+    setTimeout: (callback, delay) => {
+      timers.set(++nextTimer, { callback, delay });
+      return nextTimer;
+    },
+    clearTimeout: (id) => timers.delete(id),
+    require: (name) => {
+      if (name === "react")
+        return {
+          ...React,
+          createContext: () => ({ Provider: "Provider" }),
+          useState: () => [
+            message,
+            (value) => {
+              message = value;
+            },
+          ],
+          useRef: () => timerRef,
+          useCallback: (callback) => callback,
+          useEffect: (effect) => {
+            cleanup = effect();
+          },
+        };
+      if (name === "react-native") return { View: "View" };
+      if (name === "@/components/ToastText") return { ToastText: "ToastText" };
+      return require(name);
+    },
+  });
+  const render = () => toastModule.exports.ToastProvider({ children: "Screen" });
+  const showToast = render().props.value;
+  showToast("닉네임이 변경되었습니다.");
+  const overlay = React.Children.toArray(render().props.children.props.children)[1];
+  assert.ok(overlay.props.className.includes("bottom-[160px]"));
+  assert.ok(overlay.props.children.props.className.includes("max-w-[327px]"));
+  assert.equal(overlay.props.children.props.children.props.message, "닉네임이 변경되었습니다.");
+  showToast("변경 실패");
+  assert.equal(timers.size, 1);
+  assert.equal(timers.get(timerRef.current).delay, 2000);
+  timers.get(timerRef.current).callback();
+  assert.equal(message, undefined);
+  showToast("파일에서 상품 정보를 찾을 수 없습니다.", "error");
+  assert.equal(timers.get(timerRef.current).delay, 4000);
+  const errorOverlay = React.Children.toArray(render().props.children.props.children)[1];
+  assert.equal(errorOverlay.props.children.props.children.props.variant, "error");
+  showToast("새 메시지");
+  cleanup();
+  assert.equal(timers.size, 0);
+});
+
+test("성공·에러 토스트는 아이콘을 앞에 두고 좌측 정렬, 기본 토스트는 가운데 정렬이다", () => {
+  const toastModule = { exports: {} };
+  const source = readFileSync(path.join(__dirname, "../src/components/ToastText.tsx"), "utf8");
+  runInNewContext(
+    ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText,
+    {
+      module: toastModule,
+      exports: toastModule.exports,
+      require: (name) => {
+        if (name === "react-native") return { View: "View", Text: "Text" };
+        if (name === "@/assets/images/toast")
+          return {
+            IconToastError: "IconToastError",
+            IconToastSuccess: "IconToastSuccess",
+            IconToastNotice: "IconToastNotice",
+          };
+        if (name === "@/theme")
+          return {
+            colors: {
+              gray: { 0: "#FFFFFF", 200: "#ECECEC", 700: "#5D5D5D", 800: "#3F3F3F" },
+              semantic: { "error-on-dark": "#FF7E7E" },
+            },
+          };
+        return require(name);
+      },
+    },
+  );
+  const { ToastText } = toastModule.exports;
+  for (const [variant, icon] of [
+    ["error", "IconToastError"],
+    ["success", "IconToastSuccess"],
+    ["notice", "IconToastNotice"],
+  ]) {
+    const toast = ToastText({ message: "안내", variant });
+    assert.match(toast.props.className, /items-center/);
+    assert.match(toast.props.className, /bg-semantic-toast/);
+    const children = React.Children.toArray(toast.props.children);
+    assert.equal(children[0].props.children.type, icon);
+    assert.match(children[1].props.className, /text-left/);
+    assert.match(children[1].props.className, /text-gray-0/);
+    assert.equal(children[1].props.lineBreakStrategyIOS, "hangul-word");
+  }
+  const defaultToast = ToastText({ message: "완료 안내" });
+  const children = React.Children.toArray(defaultToast.props.children);
+  assert.equal(children.length, 1);
+  assert.match(children[0].props.className, /text-center/);
+  assert.match(children[0].props.className, /text-gray-0/);
+  const message = "투표를 등록했습니다. 24시간 뒤 결과를 알려드립니다. 👟";
+  const text = React.Children.toArray(ToastText({ message, variant: "success" }).props.children)[1];
+  assert.equal(text.props.accessibilityLabel, message);
+  assert.equal(text.props.children.replaceAll("\u2060", ""), message);
+  assert.ok(text.props.children.includes("알\u2060려\u2060드\u2060립\u2060니\u2060다"));
+  assert.ok(text.props.children.endsWith(" 👟"));
+});

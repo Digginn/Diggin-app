@@ -1,0 +1,118 @@
+{
+  "expo": {
+    "name": "Diggin",
+    "owner": "diggin",
+    "slug": "Diggin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon-app.png",
+    "scheme": "diggin",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "buildNumber": "5",
+      "infoPlist": {
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "supportsTablet": false,
+      "usesAppleSignIn": true
+    },
+    "android": {
+      "package": "com.diggin.app",
+      "versionCode": 2,
+      "icon": "./assets/images/icon-app-android.png",
+      "adaptiveIcon": {
+        "backgroundColor": "#1E1E1E",
+        "backgroundImage": "./assets/images/icon-app-adaptive-background.png",
+        "foregroundImage": "./assets/images/icon-app-adaptive-foreground.png",
+        "monochromeImage": "./assets/images/icon-app-adaptive-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": ["https://devrepo.kakao.com/nexus/content/groups/public/"]
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필 사진과 아이템 이미지를 바꾸려면 사진 접근 권한이 필요합니다.",
+          "cameraPermission": "프로필 사진 촬영을 위해 카메라에 접근합니다.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000",
+          "image": "./assets/images/splash-logo.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
+        }
+      ],
+      ["expo-sharing", { "android": { "enabled": true, "singleShareMimeTypes": ["text/plain"] } }],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default",
+          "icon": "./assets/images/icon-notification.png",
+          "color": "#1E1E1E"
+        }
+      ],
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin",
+      "./plugins/withShareExtensionBuild",
+      [
+        "expo-share-extension",
+        {
+          "activationRules": [
+            {
+              "type": "url"
+            },
+            {
+              "type": "text"
+            }
+          ],
+          "backgroundColor": {
+            "red": 0,
+            "green": 0,
+            "blue": 0,
+            "alpha": 0
+          },
+          "excludedPackages": [
+            "expo-sharing",
+            "expo-dev-client",
+            "expo-splash-screen",
+            "expo-updates",
+            "expo-notifications",
+            "expo-image-picker",
+            "expo-apple-authentication",
+            "@react-native-google-signin/google-signin",
+            "@react-native-kakao/core",
+            "@react-native-kakao/user"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a58be392-d642-442d-a55a-bdfaedbcb9eb"
+      }
+    }
+  }
+}

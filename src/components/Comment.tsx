@@ -1,0 +1,126 @@
+import { clsx } from "clsx";
+import { useRef, useState } from "react";
+import { Keyboard, Linking, Pressable, Text, View } from "react-native";
+
+import KebabSvg from "@/assets/images/icon-kebab.svg";
+import { ReportBlockMenu } from "@/components/ReportBlockMenu";
+import { colors } from "@/theme";
+import { httpLinkParts } from "@/utils/httpLinks";
+
+const KEBAB_SIZE = 16;
+
+export type MenuAnchor = { x: number; y: number; width: number; height: number };
+
+type CommentProps = {
+  /** 계정 닉네임과 본인·글쓴이 구분 라벨 */
+  author: string;
+  body: string;
+  timeLabel: string;
+  isHighlighted?: boolean;
+  /** 삭제된 댓글은 본문을 대체하고 메뉴를 막음 */
+  isDeleted?: boolean;
+  /** 케밥의 창 기준 좌표를 같이 넘김 */
+  onPressMenu?: (anchor: MenuAnchor) => void;
+  onPressReport?: () => void;
+  onPressBlock?: () => void;
+  onOpenLink?: (url: string) => void;
+};
+
+function renderBody(body: string, onOpenLink?: (url: string) => void) {
+  return httpLinkParts(body).map((part, index) =>
+    part.url ? (
+      <Text
+        key={index}
+        className="text-semantic-link underline"
+        onPress={(event) => {
+          event.stopPropagation();
+          if (onOpenLink) onOpenLink(part.url!);
+          else void Linking.openURL(part.url!).catch(() => {});
+        }}
+      >
+        {part.text}
+      </Text>
+    ) : (
+      part.text
+    ),
+  );
+}
+
+export function Comment({
+  author,
+  body,
+  timeLabel,
+  isHighlighted = false,
+  isDeleted = false,
+  onPressMenu,
+  onPressReport,
+  onPressBlock,
+  onOpenLink,
+}: CommentProps) {
+  const kebabRef = useRef<View>(null);
+  const [isReportMenuOpen, setReportMenuOpen] = useState(false);
+
+  function handlePressMenu() {
+    kebabRef.current?.measureInWindow((x, y, width, height) =>
+      onPressMenu?.({ x, y, width, height }),
+    );
+  }
+
+  return (
+    <View
+      className={clsx(
+        "w-full items-start pt-0.5",
+        isHighlighted || isReportMenuOpen ? "bg-gray-50" : "bg-gray-0",
+      )}
+    >
+      {isHighlighted ? (
+        <View className="absolute bottom-0 left-0 top-0 w-[3px] bg-gray-900" />
+      ) : null}
+      <View className="w-full flex-row items-center justify-between pl-margin pr-2">
+        <View className="min-w-0 flex-1 flex-row items-center gap-1">
+          <Text numberOfLines={1} className="min-w-0 shrink text-gray-600 font-label-14">
+            {author}
+          </Text>
+          <Text className="text-gray-500 font-label-12-regular">·</Text>
+          <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
+        </View>
+        {/* 케밥(48)이 이 줄의 높이를 만든다. 삭제된 댓글이라 숨겨도 높이는 유지한다. */}
+        <View className="h-12 w-[120px] flex-row items-center justify-end gap-1.5">
+          {!isDeleted && onPressReport && onPressBlock && (
+            <ReportBlockMenu
+              placement="comment"
+              onReport={onPressReport}
+              onBlock={onPressBlock}
+              onOpenChange={(isOpen) => {
+                if (isOpen) Keyboard.dismiss();
+                setReportMenuOpen(isOpen);
+              }}
+            />
+          )}
+          {isDeleted || !onPressMenu ? null : (
+            <Pressable
+              ref={kebabRef}
+              accessibilityLabel="댓글 메뉴"
+              accessibilityRole="button"
+              className="size-12 items-center justify-center active:opacity-75"
+              onPress={handlePressMenu}
+            >
+              <KebabSvg width={KEBAB_SIZE} height={KEBAB_SIZE} color={colors.gray[500]} />
+            </Pressable>
+          )}
+        </View>
+      </View>
+
+      <View className="w-full items-start px-margin">
+        <View className="w-full items-start border-b border-gray-200 pb-4">
+          <Text
+            onPress={!isDeleted && onPressMenu ? handlePressMenu : undefined}
+            className={clsx("w-full font-b3", isDeleted ? "text-gray-500" : "text-gray-800")}
+          >
+            {isDeleted ? "삭제된 댓글입니다." : renderBody(body, onOpenLink)}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}

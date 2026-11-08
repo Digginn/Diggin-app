@@ -1,0 +1,137 @@
+import { type ReactNode, useEffect, useState } from "react";
+import {
+  AppState,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal as NativeModal,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
+
+import { ToastText } from "@/components/ToastText";
+import { useNativeModalVisible } from "@/hooks/useNativeModalVisible";
+
+export type ModalProps = {
+  children: ReactNode;
+  visible: boolean;
+  onRequestClose: () => void;
+  isKeyboardAvoiding?: boolean;
+  keyboardGap?: number;
+  onShow?: () => void;
+  /** iOS 는 닫히는 중에 다른 모달을 띄우면 무시한다. 이어서 띄울 때 이 시점을 쓴다. */
+  onDismiss?: () => void;
+  overlay?: ReactNode;
+  isFullScreen?: boolean;
+  className?: string;
+  contentClassName?: string;
+  scrimOpacity?: number;
+  backdropClassName?: string;
+  toastMessage?: string;
+  onToastDismiss?: () => void;
+};
+
+export function Modal({
+  children,
+  visible,
+  onRequestClose,
+  isKeyboardAvoiding: isKeyboardAvoidingProp = false,
+  keyboardGap = 40,
+  onShow,
+  onDismiss,
+  overlay,
+  isFullScreen = false,
+  className,
+  contentClassName,
+  scrimOpacity = 0.4,
+  backdropClassName,
+  toastMessage,
+  onToastDismiss,
+}: ModalProps) {
+  const isNativeVisible = useNativeModalVisible(visible);
+  // 공유 확장은 키보드 위치·높이를 0으로 받아, 키보드를 피하면 카드가 화면 밖으로 밀린다.
+  const isKeyboardAvoiding = isKeyboardAvoidingProp && AppState.currentState !== "extension";
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(() => Keyboard.isVisible());
+  useEffect(() => {
+    if (!isKeyboardAvoiding) return;
+    const show = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setIsKeyboardVisible(true),
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setIsKeyboardVisible(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [isKeyboardAvoiding]);
+  const isAboveKeyboard = isKeyboardAvoiding && isKeyboardVisible;
+  useEffect(() => {
+    if (!visible || !toastMessage) return;
+    const timer = setTimeout(() => onToastDismiss?.(), 2000);
+    return () => clearTimeout(timer);
+  }, [visible, toastMessage, onToastDismiss]);
+
+  return (
+    <NativeModal
+      animationType="fade"
+      onRequestClose={onRequestClose}
+      onShow={onShow}
+      onDismiss={onDismiss}
+      transparent
+      visible={isNativeVisible}
+      statusBarTranslucent={isFullScreen}
+      navigationBarTranslucent={isFullScreen}
+    >
+      {/* 키보드를 피해 줄어든 영역 밖까지 덮어 iOS 키보드 둥근 모서리 뒤가 하얗게 보이지 않게 한다(BUG-101). */}
+      <View className="absolute inset-0 bg-gray-1000" style={{ opacity: scrimOpacity }} />
+      <KeyboardAvoidingView
+        enabled={isKeyboardAvoiding}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <View
+          className={`flex-1 items-center px-margin ${isAboveKeyboard ? "justify-end" : "justify-center"} ${backdropClassName ?? ""}`}
+          style={isAboveKeyboard ? { paddingBottom: keyboardGap } : undefined}
+        >
+          {/* 카드 바깥을 누르면 키보드만 닫는다. 모달은 닫지 않는다. */}
+          <Pressable accessible={false} className="absolute inset-0" onPress={Keyboard.dismiss} />
+          <View
+            className={`w-full max-w-[327px] items-center rounded-field bg-gray-0 shadow-[0px_4px_20px_rgba(0,0,0,0.1)] ${className ?? "px-2.5 py-4"}`}
+            style={
+              Platform.OS === "android" && isKeyboardAvoiding ? { maxHeight: "100%" } : undefined
+            }
+          >
+            {Platform.OS === "android" && isKeyboardAvoiding ? (
+              <ScrollView
+                className="w-full max-w-[295px]"
+                style={{ flexShrink: 1 }}
+                keyboardShouldPersistTaps="handled"
+                contentContainerClassName={
+                  contentClassName ?? "w-full max-w-[295px] items-center gap-[25px]"
+                }
+              >
+                {children}
+              </ScrollView>
+            ) : (
+              <View className={contentClassName ?? "w-full max-w-[295px] items-center gap-[25px]"}>
+                {children}
+              </View>
+            )}
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+      {overlay}
+      {toastMessage && (
+        <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px] items-center">
+          <View className="w-full max-w-[327px] items-center">
+            <ToastText message={toastMessage} />
+          </View>
+        </View>
+      )}
+    </NativeModal>
+  );
+}

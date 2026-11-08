@@ -1,0 +1,29 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "production": {
+      "distribution": "store",
+      "environment": "production",
+      "autoIncrement": true
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {
+        "ascAppId": "6821486710"
+      }
+    }
+  }
+}

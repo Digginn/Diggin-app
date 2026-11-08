@@ -1,0 +1,176 @@
+import { clsx } from "clsx";
+import { Image } from "expo-image";
+import { cssInterop } from "nativewind";
+import { useState, type ReactNode } from "react";
+import { Pressable, Text, View } from "react-native";
+
+import CommentSvg from "@/assets/images/icon-comment.svg";
+import HeartSvg from "@/assets/images/icon-heart.svg";
+import { FallbackImg } from "@/components/FallbackImg";
+import { ProductImg } from "@/components/ProductImg";
+import { ReportBlockMenu } from "@/components/ReportBlockMenu";
+import { colors } from "@/theme";
+
+const StyledImage = cssInterop(Image, { className: "style" });
+
+// 댓글 아이콘은 24 프레임 기준이라 쓰는 크기에 맞춰 같은 비율로 줄임
+const SCALE = 16 / 24;
+const COMMENT = { width: 19.5 * SCALE, height: 16.93 * SCALE };
+
+const COLUMN_COUNT = 2;
+
+export type PostType = "all" | "vote";
+
+export type PostItem = {
+  id: string;
+  imageUrl?: string | null;
+};
+
+type PostProps = {
+  type?: PostType;
+  body: string;
+  items: PostItem[];
+  timeLabel: string;
+  authorLabel: string;
+  likeCount?: number;
+  commentCount: number;
+  onPress?: () => void;
+  onPressReport?: () => void;
+  onPressBlock?: () => void;
+  onPressItemInfo?: (item: PostItem) => void;
+  isPreview?: boolean;
+};
+
+function Meta({ children }: { children: ReactNode }) {
+  return <Text className="text-right text-gray-500 font-b4">{children}</Text>;
+}
+
+function VoteThumbnail({ url }: { url?: string | null }) {
+  const [isFailed, setIsFailed] = useState(false);
+  if (!url || isFailed) {
+    return (
+      <View className="size-20 overflow-hidden rounded">
+        <FallbackImg size="vote" className="h-full" />
+      </View>
+    );
+  }
+  return (
+    <StyledImage
+      className="size-20 rounded bg-gray-100"
+      contentFit="cover"
+      autoplay={false}
+      onError={() => setIsFailed(true)}
+      source={url}
+    />
+  );
+}
+
+function toRows(items: PostItem[]): (PostItem | null)[][] {
+  const rows: (PostItem | null)[][] = [];
+  for (let index = 0; index < items.length; index += COLUMN_COUNT) {
+    const row: (PostItem | null)[] = items.slice(index, index + COLUMN_COUNT);
+    while (row.length < COLUMN_COUNT) row.push(null);
+    rows.push(row);
+  }
+  return rows;
+}
+
+export function Post({
+  type = "all",
+  body,
+  items,
+  timeLabel,
+  authorLabel,
+  likeCount,
+  commentCount,
+  onPress,
+  onPressReport,
+  onPressBlock,
+  onPressItemInfo,
+  isPreview = false,
+}: PostProps) {
+  const isVote = type === "vote";
+
+  return (
+    <Pressable
+      accessibilityRole={onPress ? "button" : undefined}
+      className={clsx(
+        "w-full border-b border-gray-200 bg-gray-0 px-margin pt-4",
+        // 하단 정보와 구분선 사이를 일반글 기준으로 맞춘다(BUG-028·091).
+        isVote ? "items-start pb-1.5" : "items-center justify-center pb-1.5",
+        onPress && "active:opacity-75",
+      )}
+      disabled={!onPress}
+      onPress={onPress}
+    >
+      <View className="w-full items-start">
+        {isVote ? (
+          <View className="w-full flex-row items-start gap-3">
+            <View className="min-w-0 flex-1 self-stretch">
+              <Text
+                className="h-10 w-full text-gray-1000 font-b3"
+                numberOfLines={isPreview ? 1 : 2}
+              >
+                {body}
+              </Text>
+            </View>
+            <VoteThumbnail url={items[0]?.imageUrl} />
+          </View>
+        ) : (
+          <View className="w-full gap-4">
+            <Text className="w-full text-gray-1000 font-b3" numberOfLines={1}>
+              {body}
+            </Text>
+            <View className="w-full gap-2">
+              {toRows(items).map((row, rowIndex) => (
+                <View key={rowIndex} className="flex-row gap-2">
+                  {row.map((item, columnIndex) =>
+                    item ? (
+                      <ProductImg
+                        key={item.id}
+                        className="flex-1"
+                        url={item.imageUrl}
+                        onPressInfo={onPressItemInfo ? () => onPressItemInfo(item) : undefined}
+                      />
+                    ) : (
+                      <View key={`empty-${columnIndex}`} className="flex-1" />
+                    ),
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {!isPreview && (
+          // 신고 버튼이 없는 본인 글도 같은 간격이 되도록 버튼 높이(48)로 고정한다.
+          <View className="h-12 w-full flex-row items-center justify-between">
+            <View className="min-w-0 flex-1 flex-row items-center gap-1.5">
+              <Meta>{timeLabel}</Meta>
+              <Text className="text-gray-500 font-b1">·</Text>
+              <Text numberOfLines={1} className="min-w-0 shrink text-right text-gray-500 font-b4">
+                {authorLabel}
+              </Text>
+              <Text className="text-gray-500 font-b1">·</Text>
+              <View className="flex-row items-center justify-end gap-2">
+                {likeCount !== undefined ? (
+                  <View className="flex-row items-center justify-center gap-1">
+                    <HeartSvg />
+                    <Meta>{likeCount}</Meta>
+                  </View>
+                ) : null}
+                <View className="flex-row items-center justify-center gap-1">
+                  <CommentSvg {...COMMENT} color={colors.gray[500]} />
+                  <Meta>{commentCount}</Meta>
+                </View>
+              </View>
+            </View>
+            {onPressReport && onPressBlock && (
+              <ReportBlockMenu onReport={onPressReport} onBlock={onPressBlock} />
+            )}
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+}

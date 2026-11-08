@@ -1,0 +1,75 @@
+import { useScrollToTop } from "expo-router";
+import { useRef, type ReactElement } from "react";
+import { FlatList, View } from "react-native";
+
+import { Card, CardSkeleton } from "@/components/card";
+import { onVisibleItemsChanged } from "@/components/ProductImageFiller";
+import type { WishItem } from "@/types/wish-item";
+
+const COLUMN_COUNT = 3;
+const COLUMN_GAP = 12;
+const ROW_GAP = 20;
+const SCREEN_PADDING = 15.75;
+
+const SKELETON_COUNT = 12;
+
+type WishItemGridProps = {
+  items: WishItem[];
+  header?: ReactElement;
+  isLoading?: boolean;
+  onItemPress?: (item: WishItem) => void;
+  /** 선택 모드일 때만 넘긴다. 넘기면 모든 카드에 체크박스가 생긴다. */
+  selectedIds?: ReadonlySet<string>;
+  onEndReached?: () => void;
+};
+
+function padToFullRows(items: WishItem[]): (WishItem | null)[] {
+  const remainder = items.length % COLUMN_COUNT;
+  if (remainder === 0) return items;
+  return [...items, ...Array.from({ length: COLUMN_COUNT - remainder }, () => null)];
+}
+
+export function WishItemGrid({
+  items,
+  header,
+  isLoading = false,
+  onItemPress,
+  selectedIds,
+  onEndReached,
+}: WishItemGridProps) {
+  const listRef = useRef<FlatList<WishItem | null>>(null);
+  // 보고 있는 탭을 다시 누르면 맨 위로 올린다. 다른 탭에 다녀오면 위치는 유지된다.
+  useScrollToTop(listRef);
+
+  return (
+    <FlatList
+      ref={listRef}
+      data={isLoading ? Array.from({ length: SKELETON_COUNT }, () => null) : padToFullRows(items)}
+      numColumns={COLUMN_COUNT}
+      keyExtractor={(item, index) => item?.id ?? `empty-${index}`}
+      columnWrapperStyle={{ gap: COLUMN_GAP, marginBottom: ROW_GAP }}
+      contentContainerStyle={{ paddingHorizontal: SCREEN_PADDING }}
+      ListHeaderComponent={header}
+      onEndReached={onEndReached}
+      onViewableItemsChanged={onVisibleItemsChanged}
+      renderItem={({ item }) =>
+        isLoading ? (
+          <CardSkeleton className="flex-1" />
+        ) : item ? (
+          <Card
+            className="flex-1"
+            name={item.name}
+            price={item.price}
+            brand={item.brand}
+            thumbnailUrl={item.thumbnailUrl}
+            isOwned={item.isOwned}
+            select={selectedIds ? (selectedIds.has(item.id) ? "selected" : "unselected") : "none"}
+            onPress={onItemPress ? () => onItemPress(item) : undefined}
+          />
+        ) : (
+          <View className="flex-1" />
+        )
+      }
+    />
+  );
+}

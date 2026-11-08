@@ -1,0 +1,565 @@
+/* global __dirname */
+const assert = require("node:assert/strict");
+const { readFileSync } = require("node:fs");
+const path = require("node:path");
+const { test } = require("node:test");
+const { runInNewContext } = require("node:vm");
+const React = require("react");
+const ts = require("typescript");
+
+function loadLoginIntent() {
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(readFileSync(path.join(__dirname, "../src/lib/loginIntent.ts"), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText,
+    { module, exports: module.exports },
+  );
+  return module.exports;
+}
+const loginIntent = loadLoginIntent();
+
+test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에셋을 유지한다", () => {
+  const file = "../src/screens/onboarding/components/OnboardingIllustration.tsx";
+  const source = readFileSync(path.join(__dirname, file), "utf8");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const componentModule = { exports: {} };
+  const time = { value: 0 };
+  const timings = [];
+  const repeats = [];
+  const styledAnimatedTargets = [];
+  let isReducedMotion = false;
+  let effect;
+  let cancellations = 0;
+  runInNewContext(
+    compiled +
+      "\nexports.AppCell=AppCell; exports.APP_ICONS=APP_ICONS; exports.PhoneIllustration=PhoneIllustration; exports.ItemTile=ItemTile; exports.ITEMS=ITEMS; exports.VoteResult=VoteResult; exports.FolderIllustration=FolderIllustration; exports.CsvIllustration=CsvIllustration;",
+    {
+      exports: componentModule.exports,
+      module: componentModule,
+      require: (name) => {
+        if (name === "react")
+          return {
+            useEffect: (callback) => {
+              effect = callback;
+            },
+          };
+        if (name === "react-native") return { Image: "Image", Text: "Text", View: "View" };
+        if (name === "expo-linear-gradient") return { LinearGradient: "Gradient" };
+        if (name === "expo-image") return { Image: "Image" };
+        if (name === "nativewind") return { cssInterop: (component) => component };
+        if (name === "react-native-reanimated")
+          return {
+            __esModule: true,
+            default: {
+              View: "Animated.View",
+              Text: "Animated.Text",
+              createAnimatedComponent: (component) => {
+                styledAnimatedTargets.push(component);
+                return `Animated.${component}`;
+              },
+            },
+            Easing: { bezierFn: () => (value) => value, linear: (value) => value },
+            useAnimatedStyle: (callback) => callback(),
+            useSharedValue: () => time,
+            useReducedMotion: () => isReducedMotion,
+            withTiming: (to, options) => {
+              timings.push({ to, options });
+              return to;
+            },
+            withRepeat: (animation, count, reverse) => {
+              repeats.push({ count, reverse });
+              return animation;
+            },
+            cancelAnimation: () => {
+              cancellations++;
+            },
+          };
+        if (name === "@/assets/images/my")
+          return { IconMySupport: "SupportSvg", IconMyChevron: "ChevronSvg" };
+        if (name.startsWith("@/assets/")) {
+          assert.ok(readFileSync(path.join(__dirname, "..", name.slice(2))).length > 0);
+          return name.endsWith(".svg") ? { default: () => React.createElement("Svg") } : name;
+        }
+        if (name === "@/lib/loginIntent") return loginIntent;
+        return require(name);
+      },
+    },
+  );
+  const { OnboardingIllustration, AppCell, ItemTile, ITEMS, VoteResult, FolderIllustration } =
+    componentModule.exports;
+  const initial = OnboardingIllustration({ page: 0 });
+  assert.deepEqual(
+    styledAnimatedTargets,
+    ["View", "Text"],
+    "기본 뷰의 NativeWind 스타일을 처리한 뒤 애니메이션으로 감싸야 실기기 배치가 유지된다.",
+  );
+  assert.ok(initial.props.className.includes("h-[396px]"));
+  assert.ok(initial.props.className.includes("rounded-3xl"));
+  const { APP_ICONS, PhoneIllustration } = componentModule.exports;
+  assert.equal(APP_ICONS.length, 9, "최신 목업은 중복 없는 3×3 앱 아이콘이다");
+  assert.equal(new Set(APP_ICONS).size, 9);
+  const phone = PhoneIllustration({ time });
+  assert.ok(phone.props.className.includes("left-[13px]"));
+  assert.equal(phone.props.style.transformOrigin, "top left");
+  assert.equal(phone.props.style.transform[0].scale, 1.5);
+  const cleanup = effect();
+  assert.equal(timings[0].options.duration, 3600);
+  assert.equal(repeats[0].count, -1);
+  assert.equal(repeats[0].reverse, false);
+  cleanup();
+  assert.equal(cancellations, 1);
+  time.value = 0;
+  let cell = React.Children.toArray(AppCell({ index: 0, time }).props.children);
+  assert.equal(cell[0].props.style.opacity, 0);
+  assert.equal(cell[0].props.style.transform[0].scale, 0.4);
+  time.value = 500;
+  cell = React.Children.toArray(AppCell({ index: 0, time }).props.children);
+  assert.equal(cell[0].props.style.opacity, 1);
+  assert.equal(cell[0].props.style.transform[0].scale, 1);
+  for (const item of ITEMS) {
+    time.value = item.delay;
+    const tile = ItemTile({ item, time });
+    assert.equal(tile.props.style[1].transform[0].translateY, -150);
+    time.value = item.delay + 600;
+    assert.equal(Math.abs(ItemTile({ item, time }).props.style[1].transform[0].translateY), 0);
+  }
+  time.value = 1400;
+  assert.equal(FolderIllustration({ time }).props.style.transform[0].scaleX, 1.04);
+  time.value = 1650;
+  assert.equal(FolderIllustration({ time }).props.style.transform[0].scaleX, 1);
+  for (const [isBuy, width] of [
+    [true, 216],
+    [false, 96],
+  ]) {
+    time.value = 2000;
+    const children = React.Children.toArray(VoteResult({ isBuy, time }).props.children);
+    assert.equal(children[0].props.style.width, width);
+    time.value = 1050;
+    assert.equal(
+      React.Children.toArray(VoteResult({ isBuy, time }).props.children)[0].props.style.width,
+      1,
+    );
+  }
+  isReducedMotion = true;
+  OnboardingIllustration({ page: 2 });
+  effect();
+  assert.equal(time.value, 3600);
+  assert.equal(timings.length, 1, "모션 줄이기에서는 반복 애니메이션을 시작하지 않는다.");
+  OnboardingIllustration({ page: 3 });
+  effect();
+  assert.equal(
+    time.value,
+    1700,
+    "CSV 장은 모션 줄이기에서 파일과 앱 아이콘이 보이는 상태로 유지한다.",
+  );
+  const csv = () =>
+    React.Children.toArray(componentModule.exports.CsvIllustration({ time }).props.children);
+  assert.equal(csv()[0].props.style[1].opacity, 1);
+  assert.equal(csv()[2].props.style[1].opacity, 1);
+  time.value = 2680;
+  assert.equal(csv()[0].props.style[1].opacity, 0);
+  assert.equal(csv()[0].props.style[1].transform[2].scale, 0.12);
+  time.value = 4750;
+  assert.equal(csv()[1].props.style.opacity, 1);
+  isReducedMotion = false;
+  OnboardingIllustration({ page: 3 });
+  effect();
+  assert.equal(timings.at(-1).options.duration, 4750);
+});
+
+test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·접근성 이동을 처리한다", () => {
+  let activeIndex = 0;
+  const scrollCalls = [];
+  const pageChanges = [];
+  const source = readFileSync(
+    path.join(__dirname, "../src/components/carousel/SwipeCarousel.tsx"),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const componentModule = { exports: {} };
+  runInNewContext(compiled, {
+    exports: componentModule.exports,
+    module: componentModule,
+    require: (name) => {
+      if (name === "react") {
+        return {
+          Children: React.Children,
+          isValidElement: React.isValidElement,
+          useState: (initial) =>
+            initial === false ? [false, () => {}] : [activeIndex, (index) => (activeIndex = index)],
+          useCallback: (callback) => callback,
+          useEffect: () => {},
+          useRef: () => ({ current: { scrollTo: (options) => scrollCalls.push(options) } }),
+        };
+      }
+      if (name === "react-native") {
+        return {
+          Pressable: "Pressable",
+          ScrollView: "ScrollView",
+          Text: "Text",
+          View: "View",
+        };
+      }
+      if (name === "react-native-reanimated") return { useReducedMotion: () => false };
+      if (name === "./BtnCarousel") return { BtnCarousel: "BtnCarousel" };
+      if (name === "@/lib/loginIntent") return loginIntent;
+      return require(name);
+    },
+  });
+  function render() {
+    const root = componentModule.exports.SwipeCarousel({
+      children: ["1", "2", "3", "4"].map((key) => React.createElement("CardCarousel", { key })),
+      accessibilityLabel: "서비스 소개",
+      onPageChange: (index) => pageChanges.push(index),
+    });
+    const [scroll, indicators] = React.Children.toArray(root.props.children);
+    return { root, scroll, dots: React.Children.toArray(indicators.props.children) };
+  }
+  let tree = render();
+  assert.ok(tree.root.props.className.includes("w-[295px]"));
+  assert.ok(tree.root.props.className.includes("h-[600px]"));
+  assert.ok(
+    React.Children.toArray(tree.root.props.children)[1].props.className.includes("top-[561px]"),
+  );
+  assert.equal(Array.from(tree.scroll.props.snapToOffsets).join(","), "0,296,592,888");
+  assert.equal(React.Children.count(tree.scroll.props.children), 4);
+  assert.equal(tree.dots.length, 4);
+  assert.equal(tree.dots[0].props.isActive, true);
+  assert.equal(typeof tree.scroll.props.onScroll, "function");
+  assert.equal(tree.scroll.props.scrollEventThrottle, 16);
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 180 } } });
+  assert.equal(pageChanges.at(-1), 1, "스와이프가 끝나기 전에 실제 위치로 페이지를 갱신한다");
+  tree = render();
+  assert.equal(tree.dots[1].props.isActive, true);
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 888 } } });
+  tree = render();
+  assert.equal(tree.dots[3].props.isActive, true);
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 0 } } });
+  tree = render();
+  assert.equal(tree.dots[0].props.isActive, true, "빠른 역방향 이동도 종료 이벤트 없이 반영한다");
+  tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
+  assert.equal(pageChanges.at(-1), 1);
+  tree = render();
+  assert.equal(tree.dots[1].props.isActive, true);
+  tree.dots[2].props.onPress();
+  assert.equal(activeIndex, 1, "점 선택도 화면이 이동하기 전에 다음 장으로 바꾸지 않는다");
+  assert.equal(scrollCalls.at(-1).x, 592);
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 592 } } });
+  assert.equal(pageChanges.at(-1), 2);
+  tree = render();
+  tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 888 } } });
+  assert.equal(activeIndex, 3);
+  tree = render();
+  assert.equal(tree.dots[3].props.isActive, true);
+  tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
+  assert.equal(activeIndex, 3);
+  tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "decrement" } });
+  tree.scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 592 } } });
+  assert.equal(activeIndex, 2);
+  tree = render();
+  tree.scroll.props.onLayout();
+  assert.equal(scrollCalls.at(-1).x, 592);
+  tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: -296 } } });
+  assert.equal(activeIndex, 0);
+  tree.scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 9999 } } });
+  assert.equal(activeIndex, 3);
+  assert.equal(componentModule.exports.SwipeCarousel({ children: null }), null);
+});
+
+test("자동 전환은 마지막에서 멈추고 스와이프·모션 줄이기 시에는 쉬어간다", () => {
+  const source = readFileSync(
+    path.join(__dirname, "../src/components/carousel/SwipeCarousel.tsx"),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const componentModule = { exports: {} };
+  const state = [0, false];
+  const timers = new Map();
+  const scrollCalls = [];
+  let hookIndex = 0;
+  let effect;
+  let cleanup;
+  let isReducedMotion = false;
+  runInNewContext(compiled, {
+    exports: componentModule.exports,
+    module: componentModule,
+    setTimeout: (callback, delay) => {
+      const timer = { callback, delay };
+      timers.set(timer, timer);
+      return timer;
+    },
+    clearTimeout: (timer) => timers.delete(timer),
+    require: (name) => {
+      if (name === "react")
+        return {
+          Children: React.Children,
+          isValidElement: React.isValidElement,
+          useCallback: (callback) => callback,
+          useEffect: (callback) => {
+            effect = callback;
+          },
+          useRef: () => ({ current: { scrollTo: (options) => scrollCalls.push(options) } }),
+          useState: () => {
+            const slot = hookIndex++;
+            return [
+              state[slot],
+              (value) => {
+                state[slot] = value;
+              },
+            ];
+          },
+        };
+      if (name === "react-native") return { View: "View", ScrollView: "ScrollView" };
+      if (name === "react-native-reanimated") return { useReducedMotion: () => isReducedMotion };
+      if (name === "./BtnCarousel") return { BtnCarousel: "BtnCarousel" };
+      if (name === "@/lib/loginIntent") return loginIntent;
+      return require(name);
+    },
+  });
+  function render(autoAdvanceDelays = [2500, 2500]) {
+    cleanup?.();
+    hookIndex = 0;
+    const root = componentModule.exports.SwipeCarousel({
+      children: ["1", "2", "3"].map((key) => React.createElement("CardCarousel", { key })),
+      autoAdvanceDelays,
+    });
+    cleanup = effect();
+    return React.Children.toArray(root.props.children)[0];
+  }
+  render();
+  assert.equal(timers.values().next().value.delay, 2500);
+  timers.values().next().value.callback();
+  assert.equal(state[0], 0, "자동 이동도 실제 스크롤 위치를 기다린다");
+  render().props.onScroll({ nativeEvent: { contentOffset: { x: 296 } } });
+  assert.equal(state[0], 1);
+  assert.equal(scrollCalls.at(-1).x, 296);
+  render();
+  assert.equal(timers.values().next().value.delay, 2500);
+  timers.values().next().value.callback();
+  render().props.onScroll({ nativeEvent: { contentOffset: { x: 592 } } });
+  assert.equal(state[0], 2);
+  assert.equal(scrollCalls.at(-1).x, 592);
+  render();
+  assert.equal(timers.size, 0);
+
+  state[0] = 0;
+  render().props.onScrollBeginDrag();
+  render();
+  assert.equal(timers.size, 0);
+  render().props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
+  render();
+  assert.equal(timers.values().next().value.delay, 2500);
+
+  isReducedMotion = true;
+  render();
+  assert.equal(timers.size, 0);
+  isReducedMotion = false;
+  render([]);
+  assert.equal(timers.size, 0);
+  render();
+  cleanup();
+  assert.equal(timers.size, 0);
+});
+
+test("카드 문구·이미지를 사용처에서 받고, 페이지 버튼의 터치 영역은 겹치지 않는다", () => {
+  function load(name) {
+    const source = readFileSync(
+      path.join(__dirname, `../src/components/carousel/${name}.tsx`),
+      "utf8",
+    );
+    const compiled = ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText;
+    const componentModule = { exports: {} };
+    runInNewContext(compiled, {
+      exports: componentModule.exports,
+      module: componentModule,
+      require: (moduleName) => {
+        if (moduleName === "react-native")
+          return { View: "View", Text: "Text", Pressable: "Pressable" };
+        if (moduleName.endsWith(".svg")) return { default: moduleName };
+        return require(moduleName);
+      },
+    });
+    return componentModule.exports;
+  }
+  const { CardCarousel, EmptyCarousel } = load("CardCarousel");
+  const image = React.createElement("Image");
+  const props = { mainCopy: "제목", subCopy: "설명", children: image };
+  const card = CardCarousel(props);
+  assert.ok(card.props.className.includes("w-[296px]"));
+  assert.ok(card.props.className.includes("h-[600px]"));
+  const content = EmptyCarousel(card.props.children.props);
+  const [imageSlot, textWrap] = React.Children.toArray(content.props.children);
+  assert.ok(imageSlot.props.className.includes("h-[396px]"));
+  assert.equal(imageSlot.props.children, image);
+  const copy = React.Children.toArray(textWrap.props.children);
+  assert.equal(copy[0].props.children, props.mainCopy);
+  assert.equal(copy[1].props.children, props.subCopy);
+  const { BtnCarousel } = load("BtnCarousel");
+  const onPress = () => {};
+  const dot = BtnCarousel({ isActive: true, onPress, accessibilityLabel: "1페이지" });
+  assert.equal(dot.props.onPress, onPress);
+  assert.equal(dot.props.accessibilityState.selected, true);
+  assert.equal(dot.props.hitSlop, undefined);
+  assert.ok(dot.props.className.includes("h-12 w-4"));
+});
+
+test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그인으로 이동한다", () => {
+  let activeIndex = 0;
+  const routes = [];
+  const source = readFileSync(
+    path.join(__dirname, "../src/screens/onboarding/OnboardingScreen.tsx"),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const componentModule = { exports: {} };
+  runInNewContext(compiled, {
+    exports: componentModule.exports,
+    module: componentModule,
+    require: (name) => {
+      if (name === "react")
+        return { useState: () => [activeIndex, (index) => (activeIndex = index)] };
+      if (name === "expo-router")
+        return { useRouter: () => ({ replace: (route) => routes.push(route) }) };
+      if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
+      if (name === "react-native-safe-area-context")
+        return { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) };
+      if (name === "react-native")
+        return {
+          ScrollView: "ScrollView",
+          View: "View",
+          useWindowDimensions: () => ({ height: 812 }),
+        };
+      if (name === "@/components/Button") return { Button: "Button" };
+      if (name === "@/components/carousel")
+        return { CardCarousel: "CardCarousel", SwipeCarousel: "SwipeCarousel" };
+      if (name === "@/theme") return { baseFrame: { height: 812 } };
+      if (name === "./components/OnboardingIllustration")
+        return { OnboardingIllustration: "OnboardingIllustration" };
+      if (name === "@/lib/loginIntent") return loginIntent;
+      return require(name);
+    },
+  });
+
+  function render() {
+    const root = componentModule.exports.OnboardingScreen();
+    const scroll = React.Children.toArray(root.props.children)[1];
+    return React.Children.toArray(scroll.props.children);
+  }
+
+  const firstPage = render();
+  assert.equal(firstPage.length, 1);
+  assert.equal(Array.from(firstPage[0].props.autoAdvanceDelays).join(","), "2500,2500,2500");
+  const cards = React.Children.toArray(firstPage[0].props.children);
+  assert.equal(cards.length, 4);
+  assert.equal(cards[3].props.mainCopy, "기존에 모아둔 아이템,\n그대로 옮겨 오세요.");
+  assert.equal(firstPage[0].props.media, undefined);
+  for (const [index, card] of cards.entries()) {
+    assert.equal(card.props.children.type, "OnboardingIllustration");
+    assert.equal(
+      card.props.children.props.page,
+      index,
+      "이미지는 해당 문구와 같은 슬라이드 안에 둔다",
+    );
+  }
+  firstPage[0].props.onPageChange(2);
+  assert.equal(render().length, 1, "세 번째 장에는 시작하기 버튼이 없다.");
+  firstPage[0].props.onPageChange(3);
+  const lastPage = render();
+  assert.equal(lastPage.length, 2);
+  assert.equal(React.Children.toArray(lastPage[0].props.children)[3].props.children.props.page, 3);
+  const button = lastPage[1].props.children;
+  assert.equal(button.props.children, "시작하기");
+  button.props.onPress();
+  assert.equal(routes.at(-1), "/login");
+});
+
+test("둘러보기 안내와 가입 완료 화면은 같은 아트워크를 쓰고 각 버튼이 올바르게 이동한다", () => {
+  const routes = [];
+  const browsingModes = [];
+  const source = readFileSync(
+    path.join(__dirname, "../src/screens/onboarding/OnboardingFinishScreen.tsx"),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const componentModule = { exports: {} };
+  runInNewContext(compiled, {
+    exports: componentModule.exports,
+    module: componentModule,
+    require: (name) => {
+      if (name === "expo-router")
+        return { useRouter: () => ({ replace: (route) => routes.push(route) }) };
+      if (name === "@/contexts/BrowsingModeContext")
+        return {
+          useBrowsingMode: () => ({ setIsGuest: (isGuest) => browsingModes.push(isGuest) }),
+        };
+      if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
+      if (name === "react-native-safe-area-context")
+        return { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) };
+      if (name === "react-native")
+        return {
+          Image: "Image",
+          Pressable: "Pressable",
+          ScrollView: "ScrollView",
+          Text: "Text",
+          View: "View",
+          useWindowDimensions: () => ({ height: 812 }),
+        };
+      if (name === "@/components/Button") return { Button: "Button" };
+      if (name === "@/lib/loginIntent") return loginIntent;
+      return require(name);
+    },
+  });
+  const { OnboardingFinishScreen } = componentModule.exports;
+  function descendants(root) {
+    const result = [];
+    function visit(node) {
+      if (!React.isValidElement(node)) return;
+      result.push(node);
+      React.Children.forEach(node.props.children, visit);
+    }
+    visit(root);
+    return result;
+  }
+
+  const guest = descendants(OnboardingFinishScreen({ mode: "guest" }));
+  assert.ok(
+    guest.some(
+      (node) => node.type === "Text" && node.props.children === "마음껏 Diggin을\n둘러보세요.",
+    ),
+  );
+  const guestButton = guest.find((node) => node.type === "Button");
+  assert.equal(guestButton.props.children, "둘러보기");
+  guestButton.props.onPress();
+  assert.equal(browsingModes.at(-1), true);
+  assert.equal(routes.at(-1), "/(tabs)/all");
+  guest.find((node) => node.type === "Pressable").props.onPress();
+  assert.equal(routes.at(-1), "/login");
+
+  const complete = descendants(OnboardingFinishScreen({ mode: "signed-up" }));
+  assert.ok(
+    complete.some(
+      (node) =>
+        node.type === "Text" && node.props.children === "Diggin을 사용할\n준비가 완료되었어요.",
+    ),
+  );
+  assert.equal(complete.find((node) => node.type === "Button").props.children, "시작하기");
+  complete.find((node) => node.type === "Button").props.onPress();
+  assert.equal(browsingModes.at(-1), false);
+  assert.equal(complete.filter((node) => node.type === "Pressable").length, 0);
+  complete.find((node) => node.type === "Button").props.onPress();
+  assert.equal(routes.at(-1), "/(tabs)/all");
+});
