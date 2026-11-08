@@ -43,8 +43,18 @@ export async function fetchProductMeta(
     if ([403, 429].includes(response.status)) return "blocked";
     if (!response.ok) return null;
     const meta = readMeta(await response.text());
+    // productPageScript와 같은 meta에서 제한 표시를 읽는다.
+    const age = meta("age-restriction") ?? meta("product:age_restriction");
+    const restrictionLabels = [
+      meta("product:category"),
+      meta("category"),
+      meta("rating"),
+      age,
+      age && /^(18|19)$/.test(age) ? "18+" : null,
+    ].filter((label): label is string => label !== null);
     return {
       finalUrl: response.url || url,
+      ...(restrictionLabels.length ? { restrictionLabels } : {}),
       og: {
         title: meta("og:title"),
         image: meta("og:image"),

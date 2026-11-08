@@ -66,8 +66,18 @@ function setup(htmlImage = null, FakeDate = Date) {
         },
       },
       "@/screens/save/domain/normalizeProductPage": {
-        normalizeProductPage: (raw) => ({ values: { thumbnailUrl: raw.og.image } }),
+        normalizeProductPage: (raw) => ({
+          values: {
+            name: raw.og.title ?? "상품",
+            thumbnailUrl: raw.og.image,
+            restrictionLabels: raw.restrictionLabels,
+          },
+        }),
       },
+      "@/screens/save/domain/restrictedProduct": load(
+        "../src/screens/save/domain/restrictedProduct.ts",
+        {},
+      ),
     },
     FakeDate,
   );
@@ -123,11 +133,13 @@ test("HTML 메타는 속성 순서·따옴표와 관계없이 읽고, 실패 응
     url: "https://d.shop/final",
     text: async () =>
       "<meta content='https://img/a.png?w=1&amp;h=2' property='og:image'>" +
-      '<meta property="og:title" content="코트 &quot;블랙&quot;">',
+      '<meta property="og:title" content="코트 &quot;블랙&quot;">' +
+      '<meta name="age-restriction" content="19">',
   });
   const { fetchProductMeta } = load("../src/screens/save/api/fetchProductMeta.ts", {});
   const raw = await fetchProductMeta("https://d.shop/5");
   assert.equal(raw.finalUrl, "https://d.shop/final");
+  assert.deepEqual([...raw.restrictionLabels], ["19", "18+"]);
   assert.equal(raw.og.image, "https://img/a.png?w=1&h=2");
   assert.equal(raw.og.title, '코트 "블랙"');
   globalThis.fetchMock = async () => ({ ok: false });
@@ -201,4 +213,40 @@ test("쇼핑몰별 하루 100개를 넘으면 그 쇼핑몰만 멈추고, 상세
   await flush();
   await flush();
   assert.equal(ProductImageFiller().props.url, "https://bulk.shop/tap");
+});
+
+test("페이지의 상품명·제한 표시가 제한 상품이면 이미지를 저장하지 않고 이미지 없음으로 끝낸다", async () => {
+  const pages = {
+    "https://e.shop/1": { og: { title: "19금 상품", image: "https://img/1.png" } },
+    "https://f.shop/2": { og: { image: "https://img/2.png" }, restrictionLabels: ["18+"] },
+  };
+  const { requestProductImages, fills, flush } = setup((url) => pages[url]);
+  requestProductImages([
+    { id: "1", imageSourceUrl: "https://e.shop/1" },
+    { id: "2", imageSourceUrl: "https://f.shop/2" },
+  ]);
+  for (let i = 0; i < 4; i++) await flush();
+  assert.deepEqual(fills, [
+    ["1", null],
+    ["2", null],
+  ]);
+});
+
+test("목록에서 기다리던 상품을 상세에서 먼저 읽으면 목록에서 다시 읽지 않는다", async () => {
+  const { requestProductImages, requestProductImageNow, ProductImageFiller, flush } = setup();
+  requestProductImages([
+    { id: "A", imageSourceUrl: "https://g.shop/A" },
+    { id: "B", imageSourceUrl: "https://h.shop/B" },
+  ]);
+  await flush();
+  assert.equal(ProductImageFiller().props.url, "https://g.shop/A");
+  requestProductImageNow("B", "https://h.shop/B");
+  ProductImageFiller().props.onDone(null);
+  await flush();
+  await flush();
+  assert.equal(ProductImageFiller().props.url, "https://h.shop/B");
+  ProductImageFiller().props.onDone(null);
+  await flush();
+  await flush();
+  assert.equal(ProductImageFiller(), null);
 });

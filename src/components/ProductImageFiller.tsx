@@ -10,6 +10,7 @@ import { fetchProductMeta } from "@/screens/save/api/fetchProductMeta";
 import { ProductPageReader } from "@/screens/save/components/ProductPageReader";
 import { normalizeProductPage } from "@/screens/save/domain/normalizeProductPage";
 import type { ProductPageRaw } from "@/screens/save/domain/productPageScript";
+import { isRestrictedProduct } from "@/screens/save/domain/restrictedProduct";
 import type { WishItem } from "@/types/wish-item";
 
 // shortcut: 쇼핑몰별 하루 한도·간격은 실측 전 임시값이다. 쇼핑몰별 차단 기준을 재 보고 정한다.
@@ -95,7 +96,7 @@ function next() {
   }
   const job = jobs[index];
   if (job === tapped) tapped = null;
-  else queue.splice(queue.indexOf(job), 1);
+  queue = queue.filter((queued) => queued.id !== job.id);
   attempted.add(job.id);
   lastOpenedAt.set(hostOf(job.url), now);
   updateDaily((value) => {
@@ -105,14 +106,18 @@ function next() {
   void readFast(job);
 }
 
-const imageOf = (raw: ProductPageRaw, url: string) =>
-  normalizeProductPage(raw, url).values.thumbnailUrl;
+/** 이미지를 못 찾으면 undefined, 링크 저장처럼 상품명·제한 표시가 제한 상품이면 이미지 없음(null)이다. */
+function imageOf(raw: ProductPageRaw, url: string) {
+  const { values } = normalizeProductPage(raw, url);
+  if (isRestrictedProduct(values.name, values.restrictionLabels)) return null;
+  return values.thumbnailUrl ?? undefined;
+}
 
 // HTML만으로 이미지를 찾으면 웹뷰를 띄우지 않는다. 못 찾으면 같은 상품을 웹뷰로 다시 읽는다.
 async function readFast(job: Job) {
   const host = hostOf(job.url);
   const result = TAP_ONLY_HOST.test(host) ? null : await fetchProductMeta(job.url);
-  const image = typeof result === "object" && result ? imageOf(result, job.url) : null;
+  const image = typeof result === "object" && result ? imageOf(result, job.url) : undefined;
   if (result === "gone") return finish(job, null);
   if (result === "blocked") {
     updateDaily((value) => {
@@ -124,7 +129,7 @@ async function readFast(job: Job) {
     unreachable.add(host);
     return finish(job, undefined);
   }
-  if (image) return finish(job, image);
+  if (image !== undefined) return finish(job, image);
   setCurrent(job);
 }
 
@@ -214,7 +219,7 @@ export function ProductImageFiller() {
     <ProductPageReader
       key={job.id}
       url={job.url}
-      onDone={(raw) => void finish(job, raw ? imageOf(raw, job.url) : undefined)}
+      onDone={(raw) => void finish(job, raw ? (imageOf(raw, job.url) ?? null) : undefined)}
     />
   );
 }
