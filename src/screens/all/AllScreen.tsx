@@ -239,8 +239,9 @@ export function AllScreen() {
         primaryAction={{ label: "선택 취소", onPress: exitSelectMode }}
       />
 
-      {/* FOLDER 탭처럼 오류 화면에서는 FAB를 숨겨 오프라인에서 저장을 시작하지 못하게 한다(BUG-116). */}
-      {!isSelectMode && !isError ? (
+      {/* FOLDER 탭처럼 오류 화면에서는 FAB를 숨겨 오프라인에서 저장을 시작하지 못하게 한다(BUG-116).
+          TUT-01 시안에는 FAB가 없어 안내 중에도 숨긴다. */}
+      {!isSelectMode && !isError && !guide.isVisible ? (
         <View
           pointerEvents="box-none"
           className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"

@@ -391,6 +391,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   let cursor = 0;
   let params = {};
   let isListError = false;
+  let isGuideVisible = false;
   const listArgs = [];
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", {
     "react": {
@@ -429,7 +430,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
       STATE_MESSAGES: {},
       TOAST_MESSAGES: {},
     },
-    "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: false }) },
+    "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: isGuideVisible }) },
     "@/hooks/useItemSave": { useItemSave: () => ({ start: () => {} }) },
     "@/hooks/useLinkDetectionPause": { useLinkDetectionPause: () => {} },
     "@/hooks/useProductCounts": {
@@ -486,6 +487,10 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
 
   const fab = () => nodes(tree).find((node) => node.props.accessibilityLabel === "아이템 추가");
   assert.ok(fab());
+  isGuideVisible = true;
+  render();
+  assert.equal(fab(), undefined, "TUT-01 안내 중에는 FAB를 숨긴다");
+  isGuideVisible = false;
   isListError = true;
   render();
   assert.ok(nodes(tree).some((node) => node.type === "ErrorState"));
