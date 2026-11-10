@@ -171,6 +171,10 @@ test("조회 훅은 인증 복원을 기다리고 20개 미만이면 커서 요�
   auth = { session: null, isRestoring: false };
   hooks.useCommunityFeed("all");
   assert.equal(options.enabled, true);
+  hooks.useCommunityFeed("all", false);
+  assert.equal(options.enabled, false, "오프라인·연결 확인 중에는 첫 조회를 시작하지 않는다");
+  hooks.useCommunityFeed("all", true);
+  assert.equal(options.enabled, true, "연결이 복구되면 목록 조회를 다시 활성화한다");
   assert.equal(options.getNextPageParam([]), undefined);
   const page = Array.from({ length: 20 }, (_, index) => ({
     id: String(index + 1),
@@ -371,6 +375,7 @@ function screenMocks({
   let destination;
   const toasts = [];
   const mocks = {
+    "expo-network": { useNetworkState: () => ({ isConnected: true, isInternetReachable: true }) },
     "react": {
       ...React,
       useEffect: () => {},
@@ -463,7 +468,13 @@ function screenMocks({
     "@/components/Post": { Post: "Post" },
     "@/components/TopTab": { TopTab: "TopTab" },
     "@/components/Comment": { Comment: "Comment" },
-    "@/constants/messages": { DIGGLE_EMPTY_MESSAGES: { all: "empty", vote: "empty" } },
+    "@/constants/messages": {
+      DIGGLE_EMPTY_MESSAGES: { all: "empty", vote: "empty" },
+      TOAST_MESSAGES: {
+        SYS_001: "연결 상태를 확인한 후 다시 시도해 주세요.",
+        SYS_002: "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+      },
+    },
     "@/contexts/AuthContext": { useAuth: () => ({ session, isRestoring: false }) },
     "@/hooks/useToast": { useToast: () => (message) => toasts.push(message) },
     "@/utils/text": load("src/utils/text.ts"),
@@ -495,6 +506,79 @@ function screenMocks({
   };
   return { mocks, toasts, destination: () => destination };
 }
+
+test("오프라인 첫 진입과 FAB 재시도는 스켈레톤·권한 요청 없이 연결 안내를 표시한다", () => {
+  for (const tab of ["all", "vote"]) {
+    const state = screenMocks({ feed: { isPending: true }, params: { tab } });
+    state.mocks["expo-network"].useNetworkState = () => ({ isConnected: false });
+    let checks = 0;
+    state.mocks["@/api/accountAccess"] = {
+      ensureCommunityWriteAllowed: async () => {
+        checks++;
+      },
+      restrictionMessage: () => null,
+    };
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+    const tree = DiggleScreen();
+    assert.equal(
+      nodes(tree, "View").some((node) => node.props.accessibilityLabel === "게시글 불러오는 중"),
+      false,
+    );
+    assert.equal(nodes(tree, "ErrorState").length, 1);
+    const fab = nodes(tree, "Fab")[0];
+    fab.props.onPress();
+    fab.props.onPress();
+    assert.deepEqual(state.toasts, Array(2).fill("연결 상태를 확인한 후 다시 시도해 주세요."));
+    assert.equal(checks, 0);
+    assert.equal(state.destination(), undefined);
+    nodes(tree, "ErrorState")[0].props.onRetry();
+    assert.equal(state.toasts.length, 3);
+  }
+});
+
+test("작성 권한 확인 도중 끊긴 연결과 서버 오류는 서로 다른 Toast를 표시한다", async () => {
+  for (const [message, expected] of [
+    ["TypeError: Network request failed", "연결 상태를 확인한 후 다시 시도해 주세요."],
+    ["HTTP 500", "요청을 처리하지 못했습니다. 다시 시도해 주세요."],
+  ]) {
+    const state = screenMocks();
+    state.mocks["@/api/accountAccess"] = {
+      ensureCommunityWriteAllowed: async () => {
+        throw { message };
+      },
+      restrictionMessage: () => null,
+    };
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+    nodes(DiggleScreen(), "Fab")[0].props.onPress();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(state.toasts, [expected]);
+    assert.equal(state.destination(), undefined);
+  }
+});
+
+test("연결 확인 중에는 스켈레톤을 표시하지 않고 오프라인 전환 시 기존 게시글을 유지한다", async () => {
+  const state = screenMocks({ feed: { isPending: true } });
+  state.mocks["expo-network"].useNetworkState = () => ({});
+  let { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const tree = DiggleScreen();
+  assert.equal(nodes(tree, "ErrorState").length, 0, "미확정 상태를 오프라인으로 오인하지 않는다");
+  assert.equal(
+    nodes(tree, "View").some((node) => node.props.accessibilityLabel === "게시글 불러오는 중"),
+    false,
+  );
+  assert.equal(nodes(tree, "Fab")[0].props.isDisabled, true);
+
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const cached = screenMocks({ feed: { data: { pages: [[post]] } } });
+  cached.mocks["expo-network"].useNetworkState = () => ({
+    isConnected: true,
+    isInternetReachable: false,
+  });
+  ({ DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", cached.mocks));
+  const cachedTree = DiggleScreen();
+  assert.equal(nodes(cachedTree, "ErrorState").length, 0);
+  assert.equal(nodes(cachedTree, "Post").length, 1);
+});
 
 test("비회원 상세 직접 진입은 로그인 안내로 차단하고 없는 글에 목업을 보여주지 않는다", () => {
   let state = screenMocks({ session: null });
