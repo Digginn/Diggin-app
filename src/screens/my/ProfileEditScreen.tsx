@@ -201,12 +201,17 @@ export function ProfileEditScreen({
                   : ImageProfilePlaceholder
               }
               contentFit="cover"
-              className="h-full w-full"
+              className="h-full w-full rounded-[4px]"
               onError={() => {
                 if (!profileImageUri) return;
                 setProfileImageUri(undefined);
                 showToast(PROFILE_MESSAGES.photoUnreadable);
               }}
+            />
+            {/* Figma 외곽선은 안쪽 1.5px이라 사진을 줄이지 않고 위에 겹친다(BUG-114). */}
+            <View
+              pointerEvents="none"
+              className="absolute inset-0 rounded-[4px] border-[1.5px] border-gray-300"
             />
             <View pointerEvents="none" className="absolute left-[72px] top-[73px] h-6 w-6">
               <View pointerEvents="none" className="absolute -left-5 -top-4">
