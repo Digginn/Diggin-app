@@ -18,7 +18,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLoginGate } from "@/hooks/useLoginGate";
 import { useToast } from "@/hooks/useToast";
 
-import { communityWriteError } from "./api/communityWrite";
 import { useCommunityFeed } from "./queries/useCommunity";
 import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
@@ -148,9 +147,8 @@ export function DiggleScreen() {
                 .then(() => router.navigate(tab === "vote" ? "/votes/write" : "/posts/write"))
                 .catch((error) => {
                   isOpeningWriter.current = false;
-                  // 오프라인이면 MSG-SYS-001 연결 확인 문구를 띄운다(BUG-119).
                   showToast(
-                    communityWriteError(error),
+                    restrictionMessage(error) ?? "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
                     restrictionMessage(error) ? "notice" : "error",
                   );
                 });
