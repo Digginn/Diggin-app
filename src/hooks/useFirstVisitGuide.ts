@@ -35,8 +35,9 @@ export function useFirstVisitGuide(kind: FirstVisitGuideKind, isEnabled = true) 
             for (const dismissedKind of kinds) DISMISSED_GUIDES.add(`${userId}:${dismissedKind}`);
             setChecked({ key: guideKey, isVisible: !kinds.includes(kind) });
           })
+          // 오프라인 등으로 기록을 못 읽으면 이미 본 안내일 수 있어 띄우지 않고 다음 진입 때 다시 확인한다(BUG-116·117).
           .catch(() => {
-            if (isActive) setChecked({ key: guideKey, isVisible: true });
+            if (isActive) setChecked({ key: guideKey, isVisible: false });
           });
       }
       return () => {
