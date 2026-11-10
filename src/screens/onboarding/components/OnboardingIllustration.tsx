@@ -503,7 +503,7 @@ export function OnboardingIllustration({ page }: { page: number }) {
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      className="h-[396px] w-[295px] overflow-hidden rounded-3xl bg-gray-100"
+      className="h-[396px] w-[295px] overflow-hidden rounded-3xl"
     >
       {page === 0 ? (
         <PhoneIllustration time={time} />
