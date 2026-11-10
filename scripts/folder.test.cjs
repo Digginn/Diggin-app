@@ -481,12 +481,22 @@ test("공용 오류 화면은 남은 영역이 아니라 기기 화면 전체 �
   assert.equal(offset, 812 / 2 - (106 + 626 / 2));
   const content = render({ onRetry() {} }).props.children;
   assert.equal(
+    content.props.pointerEvents,
+    "box-none",
+    "위로 옮긴 빈 영역이 상단 컨트롤의 터치를 막지 않는다",
+  );
+  assert.equal(
     content.props.style.transform[0].translateY,
     -13,
     "앱 바·탭 바 차이의 절반만큼 올린다",
   );
   const button = findAll(render({}), "Button")[0];
   assert.equal(button.props.isDisabled, true);
+  let retries = 0;
+  const retryButton = findAll(render({ onRetry: () => retries++ }), "Button")[0];
+  assert.equal(retryButton.props.isDisabled, false);
+  retryButton.props.onPress();
+  assert.equal(retries, 1, "빈 영역은 통과시키되 다시 시도 버튼은 동작한다");
 });
 
 function findAll(node, type) {

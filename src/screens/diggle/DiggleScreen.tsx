@@ -71,8 +71,8 @@ export function DiggleScreen() {
         </View>
       ) : feed.isError && posts.length === 0 ? (
         <ErrorState
-          // BUG-075 상세와 같은 두 줄 문구로 안내한다.
-          message={"게시글을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요."}
+          // MSG-DIGGLE-012 목록 조회 실패 안내.
+          message={"게시글을 불러올 수 없습니다.\n다시 시도해 주세요."}
           onRetry={() => void feed.refetch()}
         />
       ) : (
