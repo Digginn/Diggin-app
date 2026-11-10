@@ -90,38 +90,36 @@ function AppCell({ index, time }: { index: number; time: SharedValue<number> }) 
   }));
   const labelStyle = useAnimatedStyle(() => ({ opacity: progress(time.value, delay + 100, 250) }));
   return (
-    <View className="w-10 items-center gap-1.5">
-      <AnimatedView className="size-10" style={iconStyle}>
+    <View className="w-[60px] items-center gap-[9px]">
+      <AnimatedView className="size-[60px]" style={iconStyle}>
         {typeof Icon === "string" ? (
           <View
-            className={`size-10 items-center justify-center rounded-[10px] shadow-sm ${Icon === "pink" ? "bg-[#F868E0]" : Icon === "black" ? "bg-gray-900" : "border-[0.625px] border-gray-200 bg-gray-0"}`}
+            className={`size-[60px] items-center justify-center rounded-[15px] shadow-sm ${Icon === "pink" ? "bg-[#F868E0]" : Icon === "black" ? "bg-gray-900" : "border-[0.9375px] border-gray-200 bg-gray-0"}`}
           >
             {Icon === "photo" ? (
-              <PhotoIcon />
+              <PhotoIcon width={30} height={24.375} />
             ) : (
-              <View className="size-[15px] rounded-[3.75px] bg-gray-0" />
+              <View className="size-[22.5px] rounded-[5.625px] bg-gray-0" />
             )}
           </View>
         ) : (
-          <View className="absolute left-[-7.5px] top-[-5px]">
-            <Icon />
+          <View className="absolute left-[-11.25px] top-[-7.5px]">
+            <Icon width={82.5} height={82.5} />
           </View>
         )}
       </AnimatedView>
-      <AnimatedView className="h-1 w-6 rounded-sm bg-gray-300" style={labelStyle} />
+      <AnimatedView className="h-1.5 w-9 rounded-[3px] bg-gray-300" style={labelStyle} />
     </View>
   );
 }
 
 function PhoneIllustration({ time }: { time: SharedValue<number> }) {
   return (
-    <View
-      className="absolute left-[13px] top-11 h-[400px] w-[180px] overflow-hidden rounded-[32px] bg-gray-900"
-      style={{ transform: [{ scale: 1.5 }], transformOrigin: "top left" }}
-    >
-      <View className="absolute left-[5px] top-[5px] h-[390px] w-[170px] overflow-hidden rounded-[27px] bg-gray-50">
-        <View className="absolute left-[59px] top-[9px] h-[14px] w-[52px] rounded-[7px] bg-gray-900" />
-        <View className="absolute left-[11px] top-10 w-[148px] flex-row flex-wrap gap-[14px]">
+    // 최종 표시 크기로 그려 SVG와 그림자 필터를 포함한 목업 전체의 1.5배 확대를 피한다.
+    <View className="absolute left-[13px] top-11 h-[600px] w-[270px] overflow-hidden rounded-[48px] bg-gray-900">
+      <View className="absolute left-[7.5px] top-[7.5px] h-[585px] w-[255px] overflow-hidden rounded-[40.5px] bg-gray-50">
+        <View className="absolute left-[88.5px] top-[13.5px] h-[21px] w-[78px] rounded-[10.5px] bg-gray-900" />
+        <View className="absolute left-[16.5px] top-[60px] w-[222px] flex-row flex-wrap gap-[21px]">
           {APP_ICONS.map((_, index) => (
             <AppCell key={index} index={index} time={time} />
           ))}

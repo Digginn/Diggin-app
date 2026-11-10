@@ -108,8 +108,9 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   assert.equal(new Set(APP_ICONS).size, 9);
   const phone = PhoneIllustration({ time });
   assert.ok(phone.props.className.includes("left-[13px]"));
-  assert.equal(phone.props.style.transformOrigin, "top left");
-  assert.equal(phone.props.style.transform[0].scale, 1.5);
+  assert.equal(phone.props.style?.transform, undefined, "목업을 비트맵 크기보다 확대하지 않는다");
+  assert.ok(phone.props.className.includes("w-[270px]"));
+  assert.ok(phone.props.className.includes("h-[600px]"));
   const cleanup = effect();
   assert.equal(timings[0].options.duration, 3600);
   assert.equal(repeats[0].count, -1);
@@ -124,6 +125,13 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   cell = React.Children.toArray(AppCell({ index: 0, time }).props.children);
   assert.equal(cell[0].props.style.opacity, 1);
   assert.equal(cell[0].props.style.transform[0].scale, 1);
+  const svg = cell[0].props.children.props.children;
+  assert.equal(
+    svg.props.width,
+    82.5,
+    "SVG는 최종 표시 크기로 렌더링한 뒤 축소 애니메이션만 적용한다",
+  );
+  assert.equal(svg.props.height, 82.5);
   for (const item of ITEMS) {
     time.value = item.delay;
     const tile = ItemTile({ item, time });
