@@ -62,6 +62,7 @@ export function AllScreen() {
   // 빈 화면 시안에는 상단 영역이 없다. 개수로 먼저 판단해야 상단이 잠깐 보였다 사라지지 않는다.
   // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
   const isEmpty = isGuest || (wishLevel === null && totalCount === 0);
+  const isError = list.isError || counts.isError;
 
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -143,7 +144,7 @@ export function AllScreen() {
         <View className="flex-1" />
       ) : isGuest ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
-      ) : list.isError || counts.isError ? (
+      ) : isError ? (
         <ErrorState
           message={STATE_MESSAGES.loadFailed}
           onRetry={() => {
@@ -238,7 +239,8 @@ export function AllScreen() {
         primaryAction={{ label: "선택 취소", onPress: exitSelectMode }}
       />
 
-      {!isSelectMode ? (
+      {/* FOLDER 탭처럼 오류 화면에서는 FAB를 숨겨 오프라인에서 저장을 시작하지 못하게 한다(BUG-116). */}
+      {!isSelectMode && !isError ? (
         <View
           pointerEvents="box-none"
           className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"

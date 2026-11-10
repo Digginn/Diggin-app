@@ -390,6 +390,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   const state = [];
   let cursor = 0;
   let params = {};
+  let isListError = false;
   const listArgs = [];
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", {
     "react": {
@@ -440,7 +441,11 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "@/hooks/useProductList": {
       useProductList: (sortOrder, wishLevel) => {
         listArgs.push([sortOrder, wishLevel]);
-        return { isPending: false, data: { pages: [[{ id: "1", name: "아이템", price: 0 }]] } };
+        return {
+          isPending: false,
+          isError: isListError,
+          data: { pages: [[{ id: "1", name: "아이템", price: 0 }]] },
+        };
       },
     },
     "@/hooks/useToast": { useToast: () => () => {} },
@@ -478,6 +483,13 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   header(grid, "SortLabel").props.onChange("oldest");
   render();
   assert.deepEqual(listArgs.at(-1), ["oldest", null], "같은 저장 신호로는 다시 되돌리지 않는다");
+
+  const fab = () => nodes(tree).find((node) => node.props.accessibilityLabel === "아이템 추가");
+  assert.ok(fab());
+  isListError = true;
+  render();
+  assert.ok(nodes(tree).some((node) => node.type === "ErrorState"));
+  assert.equal(fab(), undefined, "오프라인 오류 화면에서는 아이템 추가 FAB를 숨긴다");
 });
 
 test("비회원 ALL은 개인 목록을 조회하지 않고 빈 상태를 보이며, 아이템 추가는 로그인 후 이어 연다", () => {
