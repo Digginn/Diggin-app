@@ -63,6 +63,7 @@ export function AllScreen() {
   // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
   const isEmpty = isGuest || (wishLevel === null && totalCount === 0);
   const isError = list.isError || counts.isError;
+  const isLoading = !isGuest && counts.isPending;
 
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -152,7 +153,7 @@ export function AllScreen() {
             void counts.refetch();
           }}
         />
-      ) : counts.isPending ? (
+      ) : isLoading ? (
         <View className="flex-1" />
       ) : isEmpty ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
@@ -240,8 +241,8 @@ export function AllScreen() {
       />
 
       {/* FOLDER 탭처럼 오류 화면에서는 FAB를 숨겨 오프라인에서 저장을 시작하지 못하게 한다(BUG-116).
-          TUT-01 시안에는 FAB가 없어 안내 중에도 숨긴다. */}
-      {!isSelectMode && !isError && !guide.isVisible ? (
+          첫 조회 중에도 숨겨 오류 화면이 뜨기 전 재시도 동안 보이지 않게 하고, TUT-01 시안에는 FAB가 없어 안내 중에도 숨긴다. */}
+      {!isSelectMode && !isError && !isLoading && !guide.isVisible ? (
         <View
           pointerEvents="box-none"
           className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"

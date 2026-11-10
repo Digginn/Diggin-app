@@ -423,6 +423,15 @@ test("6개까지 2열, 7개부터 3열이며 마지막 행의 빈 칸을 유지�
   }
 });
 
+test("첫 조회 중에는 오프라인 오류 화면이 뜨기 전이라도 FAB를 숨긴다", () => {
+  const tree = screenModule.exports.FolderScreen({ isLoading: true });
+  assert.equal(
+    findAll(tree, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+      .length,
+    0,
+  );
+});
+
 test("조회 오류는 기존 목록과 FAB를 숨기고 재시도 콜백을 호출한다", () => {
   let retryCount = 0;
   const tree = screenModule.exports.FolderScreen({

@@ -392,6 +392,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   let params = {};
   let isListError = false;
   let isGuideVisible = false;
+  let isCountsPending = false;
   const listArgs = [];
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", {
     "react": {
@@ -435,7 +436,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "@/hooks/useLinkDetectionPause": { useLinkDetectionPause: () => {} },
     "@/hooks/useProductCounts": {
       useProductCounts: () => ({
-        isPending: false,
+        isPending: isCountsPending,
         data: { total: 1, levels: { high: 0, medium: 0, low: 0 } },
       }),
     },
@@ -491,6 +492,10 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   render();
   assert.equal(fab(), undefined, "TUT-01 안내 중에는 FAB를 숨긴다");
   isGuideVisible = false;
+  isCountsPending = true;
+  render();
+  assert.equal(fab(), undefined, "오프라인 오류 화면이 뜨기 전 첫 조회 중에도 FAB를 숨긴다");
+  isCountsPending = false;
   isListError = true;
   render();
   assert.ok(nodes(tree).some((node) => node.type === "ErrorState"));
