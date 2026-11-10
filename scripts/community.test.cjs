@@ -324,6 +324,8 @@ test("작성 권한 확인 중 연타해도 작성 화면을 한 번만 열고 �
     },
     restrictionMessage: () => null,
   };
+  state.mocks["./api/communityWrite"].communityWriteError = (error) =>
+    `write-error:${error.message}`;
   state.mocks["expo-router"].useRouter = () => ({
     push: (route) => routes.push(route),
     navigate: (route) => routes.push(route),
@@ -350,8 +352,13 @@ test("작성 권한 확인 중 연타해도 작성 화면을 한 번만 열고 �
   assert.equal(routes.length, 2);
   focus();
   fab.props.onPress();
-  reject(new Error("offline"));
+  reject(new TypeError("Network request failed"));
   await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(
+    state.toasts,
+    ["write-error:Network request failed"],
+    "작성 오류 문구 규칙을 따른다",
+  );
   fab.props.onPress();
   assert.equal(checks, 4, "권한 확인 실패 후에는 재시도할 수 있다");
   complete();
