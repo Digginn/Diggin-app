@@ -1,4 +1,4 @@
-import { PRODUCT_PAGE_SIZE, type ProductSort } from "@/api/products";
+import { PRODUCT_PAGE_SIZE, needsImage, type ProductSort } from "@/api/products";
 import { supabase } from "@/lib/supabase";
 import type { FolderItem } from "@/screens/folder/components/FolderCard";
 import type { WishItem, WishLevelCounts, WishLevelKey } from "@/types/wish-item";
@@ -91,6 +91,8 @@ type FolderProductRow = {
     brand: string | null;
     price: number | null;
     image_url: string | null;
+    url: string;
+    image_checked_at: string | null;
     product_folders: { folders: { kind: "custom" | "owned" } | null }[];
   };
 };
@@ -110,7 +112,9 @@ export async function fetchFolderItems({
 }): Promise<WishItem[]> {
   let request = supabase
     .from("product_folders")
-    .select("products!inner(id, name, brand, price, image_url, product_folders(folders(kind)))")
+    .select(
+      "products!inner(id, name, brand, price, image_url, url, image_checked_at, product_folders(folders(kind)))",
+    )
     .eq("folder_id", Number(folderId));
   if (wishLevel) request = request.eq("products.wish_level", wishLevel);
   if (query) {
@@ -132,6 +136,7 @@ export async function fetchFolderItems({
     brand: row.brand,
     price: row.price,
     thumbnailUrl: row.image_url,
+    imageSourceUrl: needsImage(row) ? row.url : undefined,
     isOwned: row.product_folders.some((relation) => relation.folders?.kind === "owned"),
   }));
 }

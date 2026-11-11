@@ -11,14 +11,14 @@ import {
 } from "../api/community";
 import type { CommunityCursor } from "../types/community";
 
-export function useCommunityFeed(tab: "all" | "vote") {
+export function useCommunityFeed(tab: "all" | "vote", isEnabled = true) {
   const { session, isRestoring } = useAuth();
   return useInfiniteQuery({
     queryKey: communityKeys.feed(session?.user.id ?? null, tab),
     queryFn: ({ pageParam }) => fetchCommunityFeed(tab, pageParam),
     initialPageParam: null as CommunityCursor | null,
     getNextPageParam: (page) => (page.length === COMMUNITY_PAGE_SIZE ? page.at(-1) : undefined),
-    enabled: !isRestoring,
+    enabled: !isRestoring && isEnabled,
   });
 }
 

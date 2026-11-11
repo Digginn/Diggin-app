@@ -1,3 +1,4 @@
+import { useNetworkState } from "expo-network";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, View } from "react-native";
@@ -13,13 +14,14 @@ import { Spinner } from "@/components/Loading";
 import { Post } from "@/components/Post";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
-import { DIGGLE_EMPTY_MESSAGES } from "@/constants/messages";
+import { DIGGLE_EMPTY_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLoginGate } from "@/hooks/useLoginGate";
 import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
 
 import { useCommunityFeed } from "./queries/useCommunity";
+import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 const TABS = [
@@ -35,7 +37,10 @@ export function DiggleScreen() {
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const { requireLogin, loginModal } = useLoginGate();
   const showToast = useToast();
-  const feed = useCommunityFeed(tab);
+  const network = useNetworkState();
+  const isOffline = network.isConnected === false || network.isInternetReachable === false;
+  const isCheckingConnection = network.isConnected === undefined;
+  const feed = useCommunityFeed(tab, !isCheckingConnection && !isOffline);
   const posts = feed.data?.pages.flat() ?? [];
   const isOpeningWriter = useRef(false);
   const isFeedLoaded = feed.isSuccess;
@@ -46,6 +51,14 @@ export function DiggleScreen() {
       if (isFeedLoaded) trackEvent("community_view", { view_type: "feed" });
     }, [isFeedLoaded]),
   );
+
+  const refreshFeed = () => {
+    if (isOffline) {
+      showToast(TOAST_MESSAGES.SYS_001);
+      return;
+    }
+    void feed.refetch();
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -64,7 +77,14 @@ export function DiggleScreen() {
         right={<NotificationButton onPress={() => router.push("/notifications")} />}
       />
       <TopTab items={TABS} activeKey={tab} onChange={(key) => router.setParams({ tab: key })} />
-      {isRestoring || feed.isPending ? (
+      {isCheckingConnection && posts.length === 0 ? null : (isOffline || feed.isError) &&
+        posts.length === 0 ? (
+        <ErrorState
+          // MSG-DIGGLE-012 목록 조회 실패 안내.
+          message={"게시글을 불러올 수 없습니다.\n다시 시도해 주세요."}
+          onRetry={refreshFeed}
+        />
+      ) : isRestoring || (feed.isPending && !isOffline) ? (
         <View
           accessibilityLabel="게시글 불러오는 중"
           accessibilityState={{ busy: true }}
@@ -77,19 +97,14 @@ export function DiggleScreen() {
             </View>
           ))}
         </View>
-      ) : feed.isError && posts.length === 0 ? (
-        <ErrorState
-          message={communityErrorMessage(feed.error)}
-          onRetry={() => void feed.refetch()}
-        />
       ) : (
         <FlatList
           data={posts}
           keyExtractor={(post) => post.id}
           refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-          onRefresh={() => void feed.refetch()}
+          onRefresh={refreshFeed}
           onEndReached={() => {
-            if (feed.hasNextPage && !feed.isFetching && !feed.isFetchNextPageError)
+            if (!isOffline && feed.hasNextPage && !feed.isFetching && !feed.isFetchNextPageError)
               void feed.fetchNextPage();
           }}
           onEndReachedThreshold={0.4}
@@ -117,12 +132,17 @@ export function DiggleScreen() {
               body={item.body}
               items={item.items}
               timeLabel={formatCommunityTime(item.createdAt)}
-              authorLabel={item.isMine ? "익명(나)" : "익명"}
+              authorLabel={formatCommunityAuthor(item.authorNickname, item.isMine)}
               likeCount={item.type === "post" ? (item.likeCount ?? undefined) : undefined}
               commentCount={item.commentCount ?? 0}
               onPressReport={
                 session && !item.isMine
                   ? () => setReportTarget({ type: "post", id: item.id })
+                  : undefined
+              }
+              onPressBlock={
+                session && !item.isMine
+                  ? () => setReportTarget({ type: "post", id: item.id, action: "block" })
                   : undefined
               }
               onPress={() =>
@@ -140,9 +160,13 @@ export function DiggleScreen() {
       <View className="absolute bottom-6 right-[27px]">
         <Fab
           accessibilityLabel={tab === "vote" ? "투표글 작성" : "게시글 작성"}
-          isDisabled={isRestoring}
+          isDisabled={isRestoring || isCheckingConnection}
           onPress={() =>
             requireLogin(() => {
+              if (isOffline) {
+                showToast(TOAST_MESSAGES.SYS_001);
+                return;
+              }
               if (isOpeningWriter.current) return;
               isOpeningWriter.current = true;
               void ensureCommunityWriteAllowed()
@@ -150,7 +174,8 @@ export function DiggleScreen() {
                 .catch((error) => {
                   isOpeningWriter.current = false;
                   showToast(
-                    restrictionMessage(error) ?? "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+                    restrictionMessage(error) ??
+                      communityErrorMessage(error, "게시글", TOAST_MESSAGES.SYS_002),
                     restrictionMessage(error) ? "notice" : "error",
                   );
                 });

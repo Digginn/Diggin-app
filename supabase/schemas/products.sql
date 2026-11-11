@@ -6,8 +6,12 @@ create table public.products (
   brand text,
   -- null은 가격 정보 없음, 0은 사용자가 직접 입력한 0원(SAVE-005).
   price integer,
-  -- null이면 Placeholder. 저장 뒤에는 바꿀 수 없다(PDT-006).
+  -- null이면 Placeholder. 저장 뒤에는 바꿀 수 없다(PDT-006). CSV 상품만 fill_product_image로 한 번 채운다.
   image_url text,
+  -- 이미지를 읽어 본 시각. null이면 아직 시도하지 않은 CSV 상품이다.
+  image_checked_at timestamptz,
+  -- 추출된 카테고리·연령 표시. 상품명 수정으로 원래 제한 표시를 지우지 않는다.
+  restriction_labels text[] not null default '{}',
   -- 나의 소장템에 든 상품은 null이다(PDT-008).
   wish_level public.wish_level,
   -- CSV로 가져온 상품은 원래 등록일을 넣는다.
@@ -47,6 +51,25 @@ create trigger products_set_updated_at
 before update on public.products
 for each row execute function private.set_updated_at();
 
+create or replace function private.is_restricted_product(product_name text, labels text[] default '{}')
+returns boolean language sql immutable set search_path = '' as $$
+  select exists (
+    select 1
+    from unnest(array[coalesce(product_name, '')] || coalesce(labels, '{}')) as source(value)
+    cross join unnest(array[
+      '성인','19금','19세','19+','18+','성인인증','청소년유해','청소년 구매불가','미성년자 구매불가',
+      '주류','소주','맥주','와인','위스키','보드카','막걸리','사케','리큐르','칵테일',
+      '담배','전자담배','니코틴','궐련','시가','vape','cigarette',
+      '성인용품','섹스토이','섹스 토이','딜도','바이브레이터','자위기구','애널플러그',
+      '성인영상','성인만화','성인잡지','adult','sex toy'
+    ]) as keyword(value)
+    where strpos(
+      regexp_replace(lower(normalize(source.value, NFKC)), '[[:space:]]+', '', 'g'),
+      regexp_replace(lower(normalize(keyword.value, NFKC)), '[[:space:]]+', '', 'g')
+    ) > 0
+  );
+$$;
+
 create or replace function private.normalize_product()
 returns trigger
 language plpgsql
@@ -56,12 +79,23 @@ begin
   new.url := btrim(new.url);
   new.name := normalize(btrim(new.name), NFC);
   new.brand := nullif(normalize(btrim(new.brand), NFC), '');
+  if private.is_restricted_product(new.name, new.restriction_labels) then
+    raise exception 'restricted_product' using errcode = '22023';
+  end if;
+  -- 원문 전체를 검사한 뒤에만 저장 크기를 줄여 뒤쪽의 제한 키워드를 놓치지 않는다.
+  new.restriction_labels := array(
+    select left(normalize(btrim(label), NFC), 100)
+    from unnest(new.restriction_labels) with ordinality as source(label, position)
+    where btrim(label) <> ''
+    order by position
+    limit 10
+  );
   return new;
 end;
 $$;
 
 create trigger products_normalize
-before insert or update of url, name, brand on public.products
+before insert or update of url, name, brand, restriction_labels on public.products
 for each row execute function private.normalize_product();
 
 -- 저장(save_product)과 CSV 가져오기가 같은 기준으로 검사하도록 한곳에 둔다.
@@ -86,6 +120,9 @@ begin
   end if;
   if clean_name = '' then
     return 'name_required';
+  end if;
+  if private.is_restricted_product(clean_name) then
+    return 'restricted_product';
   end if;
   if char_length(clean_name) > 100 then
     return 'name_too_long';
@@ -173,7 +210,8 @@ create or replace function private.save_product(
   product_price integer default null,
   product_image_url text default null,
   product_wish_level public.wish_level default null,
-  folder_ids bigint[] default null
+  folder_ids bigint[] default null,
+  product_restriction_labels text[] default '{}'
 )
 returns table (product_id bigint, is_duplicate boolean)
 language plpgsql
@@ -192,6 +230,9 @@ begin
   end if;
 
   input_error := private.product_input_error(product_url, product_name, product_brand, product_price);
+  if private.is_restricted_product(product_name, product_restriction_labels) then
+    input_error := 'restricted_product';
+  end if;
   if input_error is not null then
     raise exception '%', input_error using errcode = '22023';
   end if;
@@ -209,7 +250,7 @@ begin
     where f.id = any (coalesce(folder_ids, '{}')) and f.user_id = current_user_id and f.kind = 'owned'
   );
 
-  insert into public.products (user_id, url, name, brand, price, image_url, wish_level)
+  insert into public.products (user_id, url, name, brand, price, image_url, image_checked_at, wish_level, restriction_labels)
   values (
     current_user_id,
     product_url,
@@ -217,7 +258,9 @@ begin
     product_brand,
     product_price,
     product_image_url,
-    case when is_owned then null else product_wish_level end
+    now(),
+    case when is_owned then null else product_wish_level end,
+    coalesce(product_restriction_labels, '{}')
   )
   on conflict on constraint products_user_id_url_key do nothing
   returning id into saved_id;
@@ -296,7 +339,8 @@ create or replace function public.save_product(
   product_price integer default null,
   product_image_url text default null,
   product_wish_level public.wish_level default null,
-  folder_ids bigint[] default null
+  folder_ids bigint[] default null,
+  product_restriction_labels text[] default '{}'
 )
 returns table (product_id bigint, is_duplicate boolean)
 language sql
@@ -310,7 +354,8 @@ as $$
     product_price,
     product_image_url,
     product_wish_level,
-    folder_ids
+    folder_ids,
+    product_restriction_labels
   );
 $$;
 
@@ -409,22 +454,24 @@ as $$
 $$;
 
 revoke execute on function private.normalize_product() from public, anon, authenticated;
+revoke execute on function private.is_restricted_product(text, text[]) from public, anon;
+grant execute on function private.is_restricted_product(text, text[]) to authenticated;
 revoke execute on function private.touch_folder_last_added() from public, anon, authenticated;
 revoke execute on function private.reject_owned_product_wish_level() from public, anon, authenticated;
 revoke execute on function private.reject_wish_level_in_owned_folder() from public, anon, authenticated;
 revoke execute on function private.product_input_error(text, text, text, integer) from public, anon, authenticated;
-revoke execute on function private.save_product(text, text, text, integer, text, public.wish_level, bigint[]) from public, anon;
+revoke execute on function private.save_product(text, text, text, integer, text, public.wish_level, bigint[], text[]) from public, anon;
 revoke execute on function private.set_owned(bigint, boolean, boolean, public.wish_level) from public, anon;
 revoke execute on function private.set_product_folders(bigint, bigint[]) from public, anon;
 grant execute on function private.set_product_folders(bigint, bigint[]) to authenticated;
-grant execute on function private.save_product(text, text, text, integer, text, public.wish_level, bigint[]) to authenticated;
+grant execute on function private.save_product(text, text, text, integer, text, public.wish_level, bigint[], text[]) to authenticated;
 grant execute on function private.set_owned(bigint, boolean, boolean, public.wish_level) to authenticated;
 
-revoke execute on function public.save_product(text, text, text, integer, text, public.wish_level, bigint[]) from public, anon;
+revoke execute on function public.save_product(text, text, text, integer, text, public.wish_level, bigint[], text[]) from public, anon;
 revoke execute on function public.set_owned(bigint, boolean, boolean, public.wish_level) from public, anon;
 revoke execute on function public.set_product_folders(bigint, bigint[]) from public, anon;
 grant execute on function public.set_product_folders(bigint, bigint[]) to authenticated;
-grant execute on function public.save_product(text, text, text, integer, text, public.wish_level, bigint[]) to authenticated;
+grant execute on function public.save_product(text, text, text, integer, text, public.wish_level, bigint[], text[]) to authenticated;
 grant execute on function public.set_owned(bigint, boolean, boolean, public.wish_level) to authenticated;
 
 alter table public.products enable row level security;
@@ -487,3 +534,46 @@ using (
     where f.id = folder_id and f.user_id = (select auth.uid()) and f.kind = 'custom'
   )
 );
+
+-- CSV 상품 이미지를 기기에서 읽어 한 번만 채운다. 못 읽었으면 null로 시도 시각만 남겨 다시 열지 않는다.
+create or replace function private.fill_product_image(target_product_id bigint, product_image_url text default null)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  viewer_id uuid := (select auth.uid());
+  saved_url text;
+begin
+  perform private.assert_account_access();
+  if viewer_id is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+  if product_image_url !~* '^https://' or char_length(product_image_url) > 2048 then
+    raise exception 'invalid_image_url' using errcode = '22023';
+  end if;
+  update public.products
+  set image_url = product_image_url, image_checked_at = now()
+  where id = target_product_id and user_id = viewer_id and image_url is null and image_checked_at is null
+  returning image_url into saved_url;
+  if found then return saved_url; end if;
+  select image_url into saved_url from public.products where id = target_product_id and user_id = viewer_id;
+  if not found then
+    raise exception 'product_not_found' using errcode = '42501';
+  end if;
+  return saved_url;
+end;
+$$;
+
+create or replace function public.fill_product_image(target_product_id bigint, product_image_url text default null)
+returns text
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.fill_product_image(target_product_id, product_image_url);
+$$;
+
+revoke execute on function private.fill_product_image(bigint, text), public.fill_product_image(bigint, text) from public, anon;
+grant execute on function private.fill_product_image(bigint, text), public.fill_product_image(bigint, text) to authenticated;

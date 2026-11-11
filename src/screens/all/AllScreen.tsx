@@ -32,8 +32,9 @@ import { useDeleteProducts } from "./mutations/useDeleteProducts";
 
 const EMPTY_LEVELS = { high: 0, medium: 0, low: 0 };
 
+// ALL-08 Figma 줄바꿈 위치를 그대로 쓴다(BUG-088).
 const WISH_LEVEL_HINT =
-  "아이템 상세 화면에서 얼마나 사고 싶은지를 3단계로 기록해두어 구매 고민을 빠르게 마칠 수 있습니다.";
+  "아이템 상세 화면에서\n얼마나 사고 싶은지를\n3단계로 기록해두어\n구매 고민을 빠르게\n마칠 수 있습니다.";
 
 export function AllScreen() {
   const router = useRouter();
@@ -61,6 +62,8 @@ export function AllScreen() {
   // 빈 화면 시안에는 상단 영역이 없다. 개수로 먼저 판단해야 상단이 잠깐 보였다 사라지지 않는다.
   // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
   const isEmpty = isGuest || (wishLevel === null && totalCount === 0);
+  const isError = list.isError || counts.isError;
+  const isLoading = !isGuest && (counts.isPending || list.isPending);
 
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -72,6 +75,8 @@ export function AllScreen() {
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const itemSave = useItemSave();
   useLinkDetectionPause(isLinkSheetOpen || itemSave.isBusy);
+  // 첫 진입 안내보다 감지 모달이 먼저 뜨면 안내가 가려져 빈 화면만 남는다.
+  useLinkDetectionPause(guide.isPending, true);
 
   const selectedCount = selectedIds.size;
 
@@ -140,7 +145,7 @@ export function AllScreen() {
         <View className="flex-1" />
       ) : isGuest ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
-      ) : list.isError || counts.isError ? (
+      ) : isError ? (
         <ErrorState
           message={STATE_MESSAGES.loadFailed}
           onRetry={() => {
@@ -148,55 +153,57 @@ export function AllScreen() {
             void counts.refetch();
           }}
         />
-      ) : counts.isPending ? (
+      ) : isLoading ? (
         <View className="flex-1" />
       ) : isEmpty ? (
         <EmptyState message={STATE_MESSAGES.allEmpty} />
       ) : (
-        <WishItemGrid
-          key={savedAt}
-          items={items}
-          isLoading={list.isPending}
-          onEndReached={() => {
-            if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
-          }}
-          selectedIds={isSelectMode ? selectedIds : undefined}
-          onItemPress={(item) =>
-            isSelectMode ? toggleItem(item) : router.push(`/items/${item.id}?from=all`)
-          }
-          header={
-            <View className="gap-2 pt-4">
-              <View className="h-[21px] flex-row items-center justify-between">
-                <Text className="text-gray-1000 font-label-12-semibold">
-                  저장한 아이템 {shownCount}개
-                </Text>
-                {/* 선택 모드에서는 상단 바가 취소를 맡으므로 숨긴다. */}
-                {!isSelectMode && items.length > 0 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    className="active:opacity-75"
-                    hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-                    onPress={() => setSelectMode(true)}
-                  >
-                    <Text className="text-gray-900 font-label-14">선택</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-              <View className="h-12 flex-row items-center justify-between">
-                <View>
-                  <WishLevel
-                    hasScrim
-                    levels={counts.data?.levels ?? EMPTY_LEVELS}
-                    hint={WISH_LEVEL_HINT}
-                    selected={wishLevel}
-                    onSelect={(level) => setWishLevel((prev) => (prev === level ? null : level))}
-                  />
-                </View>
-                <SortLabel value={sortOrder} onChange={setSortOrder} />
-              </View>
+        <>
+          {/* FOLDER 상세처럼 개수·위시레벨·정렬은 고정하고 목록만 스크롤한다. */}
+          <View className="gap-2 px-[15.75px] pt-4">
+            <View className="h-[21px] flex-row items-center justify-between">
+              <Text className="text-gray-1000 font-label-12-semibold">
+                저장한 아이템 {shownCount}개
+              </Text>
+              {/* 선택 모드에서는 상단 바가 취소를 맡으므로 숨긴다. */}
+              {!isSelectMode && items.length > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  className="active:opacity-75"
+                  hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                  onPress={() => setSelectMode(true)}
+                >
+                  <Text className="text-gray-900 font-label-14">선택</Text>
+                </Pressable>
+              ) : null}
             </View>
-          }
-        />
+            <View className="h-12 flex-row items-center justify-between">
+              <View>
+                <WishLevel
+                  hasScrim
+                  levels={counts.data?.levels ?? EMPTY_LEVELS}
+                  hint={WISH_LEVEL_HINT}
+                  selected={wishLevel}
+                  onSelect={(level) => setWishLevel((prev) => (prev === level ? null : level))}
+                />
+              </View>
+              <SortLabel value={sortOrder} onChange={setSortOrder} />
+            </View>
+          </View>
+
+          <WishItemGrid
+            key={savedAt}
+            items={items}
+            isLoading={list.isPending}
+            onEndReached={() => {
+              if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
+            }}
+            selectedIds={isSelectMode ? selectedIds : undefined}
+            onItemPress={(item) =>
+              isSelectMode ? toggleItem(item) : router.push(`/items/${item.id}?from=all`)
+            }
+          />
+        </>
       )}
 
       {isSelectMode ? (
@@ -233,7 +240,9 @@ export function AllScreen() {
         primaryAction={{ label: "선택 취소", onPress: exitSelectMode }}
       />
 
-      {!isSelectMode ? (
+      {/* FOLDER 탭처럼 오류 화면에서는 FAB를 숨겨 오프라인에서 저장을 시작하지 못하게 한다(BUG-116).
+          첫 조회 중에도 숨겨 오류 화면이 뜨기 전 재시도 동안 보이지 않게 하고, TUT-01 시안에는 FAB가 없어 안내 중에도 숨긴다. */}
+      {!isSelectMode && !isError && !isLoading && !guide.isVisible ? (
         <View
           pointerEvents="box-none"
           className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"

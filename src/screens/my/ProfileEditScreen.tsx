@@ -27,7 +27,11 @@ import { useToast } from "@/hooks/useToast";
 import { textLength } from "@/utils/text";
 
 import { PROFILE_MESSAGES } from "./constants/profileMessages";
-import { MAX_NICKNAME_LENGTH, validateNickname } from "./utils/validateNickname";
+import {
+  MAX_NICKNAME_LENGTH,
+  NICKNAME_TOO_SHORT_MESSAGE,
+  validateNickname,
+} from "./utils/validateNickname";
 import { validateProfileImage } from "./utils/validateProfileImage";
 
 const Image = cssInterop(ExpoImage, { className: "style" });
@@ -60,7 +64,7 @@ export function ProfileEditScreen({
   const isNicknameError = helperStatus === "error";
   const [helperMessage, setHelperMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  // MY-02 1자는 문구 없이 테두리·카운터만 빨갛게 하고 저장을 막는다.
+  // MY-02 1자는 테두리·카운터를 빨갛게 하고 MSG-MY-001 문구를 보이며 저장을 막는다(BUG-076).
   const isNicknameTooShort = textLength(nickname) === 1;
   const isSaveDisabled =
     isSaving || isNicknameError || isNicknameTooShort || (!nickname && !profileImageUri);
@@ -197,12 +201,17 @@ export function ProfileEditScreen({
                   : ImageProfilePlaceholder
               }
               contentFit="cover"
-              className="h-full w-full"
+              className="h-full w-full rounded-[4px]"
               onError={() => {
                 if (!profileImageUri) return;
                 setProfileImageUri(undefined);
                 showToast(PROFILE_MESSAGES.photoUnreadable);
               }}
+            />
+            {/* Figma 외곽선은 안쪽 1.5px이라 사진을 줄이지 않고 위에 겹친다(BUG-114). */}
+            <View
+              pointerEvents="none"
+              className="absolute inset-0 rounded-[4px] border-[1.5px] border-gray-300"
             />
             <View pointerEvents="none" className="absolute left-[72px] top-[73px] h-6 w-6">
               <View pointerEvents="none" className="absolute -left-5 -top-4">
@@ -238,7 +247,11 @@ export function ProfileEditScreen({
               {textLength(nickname)}/{MAX_NICKNAME_LENGTH}
             </Text>
           </View>
-          <HelperText className="mt-2.5 h-5" message={helperMessage} status={helperStatus} />
+          <HelperText
+            className="mt-2.5 h-5"
+            message={helperMessage || (isNicknameTooShort ? NICKNAME_TOO_SHORT_MESSAGE : "")}
+            status={isNicknameTooShort ? "error" : helperStatus}
+          />
         </View>
 
         <View className="mt-5 h-12 flex-row items-center justify-between border-b border-gray-300">

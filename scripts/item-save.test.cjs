@@ -41,6 +41,10 @@ test("아이템 저장은 통신 오류만 연결 확인 토스트로 구분한�
     [{ message: "Failed to fetch" }, TOAST_MESSAGES.SYS_001],
     [{ message: "permission denied", code: "42501" }, TOAST_MESSAGES.SAVE_012],
     [new Error("invalid_name"), TOAST_MESSAGES.SAVE_012],
+    [
+      { message: "restricted_product", code: "22023" },
+      "이용정책에 따라 저장할 수 없는 상품입니다.",
+    ],
     [null, TOAST_MESSAGES.SAVE_012],
   ]) {
     const page = nodes(ItemSaveFlow({ itemSave: { save: { isError: true, error } } })).find(
@@ -124,11 +128,13 @@ function load(file, mocks) {
       exports: module.exports,
       require: (name) =>
         mocks[name] ??
-        (name.startsWith("@/assets/")
-          ? name
-          : LOGIN_SOURCES[name]
-            ? load(LOGIN_SOURCES[name], mocks)
-            : require(name)),
+        (name === "../domain/restrictedProduct"
+          ? load("../src/screens/save/domain/restrictedProduct.ts", mocks)
+          : name.startsWith("@/assets/")
+            ? name
+            : LOGIN_SOURCES[name]
+              ? load(LOGIN_SOURCES[name], mocks)
+              : require(name)),
     },
   );
   return module.exports;
@@ -384,6 +390,10 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   const state = [];
   let cursor = 0;
   let params = {};
+  let isListError = false;
+  let isListPending = false;
+  let isGuideVisible = false;
+  let isCountsPending = false;
   const listArgs = [];
   const { AllScreen } = load("../src/screens/all/AllScreen.tsx", {
     "react": {
@@ -422,19 +432,23 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
       STATE_MESSAGES: {},
       TOAST_MESSAGES: {},
     },
-    "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: false }) },
+    "@/hooks/useFirstVisitGuide": { useFirstVisitGuide: () => ({ isVisible: isGuideVisible }) },
     "@/hooks/useItemSave": { useItemSave: () => ({ start: () => {} }) },
     "@/hooks/useLinkDetectionPause": { useLinkDetectionPause: () => {} },
     "@/hooks/useProductCounts": {
       useProductCounts: () => ({
-        isPending: false,
+        isPending: isCountsPending,
         data: { total: 1, levels: { high: 0, medium: 0, low: 0 } },
       }),
     },
     "@/hooks/useProductList": {
       useProductList: (sortOrder, wishLevel) => {
         listArgs.push([sortOrder, wishLevel]);
-        return { isPending: false, data: { pages: [[{ id: "1", name: "아이템", price: 0 }]] } };
+        return {
+          isPending: isListPending,
+          isError: isListError,
+          data: isListPending ? undefined : { pages: [[{ id: "1", name: "아이템", price: 0 }]] },
+        };
       },
     },
     "@/hooks/useToast": { useToast: () => () => {} },
@@ -444,11 +458,17 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "./components/SortLabel": { SortLabel: "SortLabel" },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
   });
+  let tree;
   const render = () => {
     cursor = 0;
-    return nodes(AllScreen()).find((node) => node.type === "WishItemGrid");
+    tree = AllScreen();
+    return nodes(tree).find((node) => node.type === "WishItemGrid");
   };
-  const header = (grid, type) => nodes(grid.props.header).find((node) => node.type === type);
+  // 개수·위시레벨·정렬은 목록 밖에 고정돼 있다.
+  const header = (grid, type) => {
+    assert.equal(grid.props.header, undefined, "목록 머리말로 넣으면 같이 스크롤된다");
+    return nodes(tree).find((node) => node.type === type);
+  };
 
   let grid = render();
   header(grid, "SortLabel").props.onChange("oldest");
@@ -466,6 +486,27 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   header(grid, "SortLabel").props.onChange("oldest");
   render();
   assert.deepEqual(listArgs.at(-1), ["oldest", null], "같은 저장 신호로는 다시 되돌리지 않는다");
+
+  const fab = () => nodes(tree).find((node) => node.props.accessibilityLabel === "아이템 추가");
+  assert.ok(fab());
+  isGuideVisible = true;
+  render();
+  assert.equal(fab(), undefined, "TUT-01 안내 중에는 FAB를 숨긴다");
+  isGuideVisible = false;
+  isCountsPending = true;
+  render();
+  assert.equal(fab(), undefined, "오프라인 오류 화면이 뜨기 전 첫 조회 중에도 FAB를 숨긴다");
+  isCountsPending = false;
+  isListPending = true;
+  render();
+  assert.equal(fab(), undefined, "개수 조회가 먼저 끝나도 목록의 첫 조회 중에는 FAB를 숨긴다");
+  isListPending = false;
+  render();
+  assert.ok(fab(), "개수와 목록 조회가 모두 완료되면 FAB를 복원한다");
+  isListError = true;
+  render();
+  assert.ok(nodes(tree).some((node) => node.type === "ErrorState"));
+  assert.equal(fab(), undefined, "오프라인 오류 화면에서는 아이템 추가 FAB를 숨긴다");
 });
 
 test("비회원 ALL은 개인 목록을 조회하지 않고 빈 상태를 보이며, 아이템 추가는 로그인 후 이어 연다", () => {

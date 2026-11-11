@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 
 import {
@@ -16,7 +16,9 @@ const DISMISSED_GUIDES = new Set<string>();
 export function useFirstVisitGuide(kind: FirstVisitGuideKind, isEnabled = true) {
   const { session, isRestoring } = useAuth();
   const userId = isRestoring ? null : (session?.user.id ?? null);
-  const [visibleKey, setVisibleKey] = useState<string | null>(null);
+  // 서버 기록을 확인한 안내와 그 결과. 확인 전에는 null이다.
+  const [checked, setChecked] = useState<{ key: string; isVisible: boolean } | null>(null);
+  const isFocused = useIsFocused();
   const { guide } = useLocalSearchParams<{ guide?: string }>();
   const isPreview = __DEV__ && guide === kind;
   const guideKey = isPreview ? `preview:${kind}` : userId ? `${userId}:${kind}` : null;
@@ -24,32 +26,44 @@ export function useFirstVisitGuide(kind: FirstVisitGuideKind, isEnabled = true) 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
-      if (isEnabled && isPreview) {
-        setVisibleKey(guideKey);
+      if (isEnabled && isPreview && guideKey) {
+        setChecked({ key: guideKey, isVisible: true });
       } else if (isEnabled && userId && guideKey && !DISMISSED_GUIDES.has(guideKey)) {
         fetchDismissedFirstVisitGuides(userId)
           .then((kinds) => {
             if (!isActive) return;
             for (const dismissedKind of kinds) DISMISSED_GUIDES.add(`${userId}:${dismissedKind}`);
-            setVisibleKey(kinds.includes(kind) ? null : guideKey);
+            setChecked({ key: guideKey, isVisible: !kinds.includes(kind) });
           })
+          // 오프라인 등으로 기록을 못 읽으면 이미 본 안내일 수 있어 띄우지 않고 다음 진입 때 다시 확인한다(BUG-116·117).
           .catch(() => {
-            if (isActive) setVisibleKey(guideKey);
+            if (isActive) setChecked({ key: guideKey, isVisible: false });
           });
       }
       return () => {
         isActive = false;
-        setVisibleKey(null);
+        setChecked(null);
       };
     }, [isEnabled, isPreview, kind, guideKey, userId]),
   );
 
   function dismiss() {
-    setVisibleKey(null);
+    setChecked(null);
     if (isPreview || !userId || !guideKey) return;
     DISMISSED_GUIDES.add(guideKey);
     void dismissFirstVisitGuide(userId, kind).catch(() => {});
   }
 
-  return { isVisible: isEnabled && guideKey !== null && visibleKey === guideKey, dismiss };
+  const isVisible = isEnabled && guideKey !== null && checked?.key === guideKey && checked.isVisible;
+  // 안내를 띄울지 확인하는 중이거나 떠 있는 동안. 이때 다른 모달이 먼저 뜨면 iOS가 안내를 띄우지 못한다.
+  const isPending =
+    isVisible ||
+    (isFocused &&
+      isEnabled &&
+      !isPreview &&
+      guideKey !== null &&
+      !DISMISSED_GUIDES.has(guideKey) &&
+      checked?.key !== guideKey);
+
+  return { isVisible, isPending, dismiss };
 }

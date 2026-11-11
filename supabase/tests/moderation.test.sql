@@ -42,6 +42,9 @@ select throws_ok($$select public.admin_report_groups('11400000-0000-0000-0000-00
 select is((public.admin_report_groups('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001')->0->>'report_count')::int,1,'최신 댓글 그룹 신고 수');
 select is((public.admin_report_groups('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001')->1->>'report_count')::int,2,'같은 게시글 신고를 묶음');
 select is(public.admin_report_detail('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001',current_setting('test.comment_report')::bigint)->'report'->>'reported_content','신고 당시 댓글','댓글 신고 Snapshot 보존');
+reset role;
+select is((select admin_id from private.admin_access_logs where report_id=current_setting('test.comment_report')::bigint order by id desc limit 1),'11400000-0000-0000-0000-000000000001'::uuid,'신고 상세를 본 운영자 UUID를 조회 기록에 남김');
+set local role service_role;
 select is(public.admin_report_detail('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001',current_setting('test.report')::bigint)->'author'->>'id','11400000-0000-0000-0000-000000000002','운영자에게만 실제 작성자 UUID');
 select is(jsonb_array_length(public.admin_report_detail('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001',current_setting('test.report')::bigint)->'related_reports'),2,'그룹 안의 개별 신고 사유·상태 조회');
 select throws_ok($$select public.admin_content_action('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001',gen_random_uuid(),current_setting('test.report')::bigint,'report_status','resolved','spam','확인')$$,'22023','invalid_report_transition','검토 전 바로 처리 완료 불가');
@@ -63,6 +66,15 @@ select throws_ok($$select public.admin_content_action('11400000-0000-0000-0000-0
 select ok(public.admin_report_detail('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001',current_setting('test.report')::bigint)->'post'->>'deleted_at' is not null,'soft delete 원문 운영 조회');
 select throws_ok($$select public.admin_prepare_sanction('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001',gen_random_uuid(),'11400000-0000-0000-0000-000000000001','warning','abuse','자기 제재')$$,'22023','invalid_sanction','관리자 자기 제재 거부');
 reset role;
+select throws_ok($$select public.admin_content_action('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001',gen_random_uuid(),current_setting('test.report')::bigint,'hide',null,'underage','만 14세 미만')$$,'22023','invalid_moderation_reason','만 14세 미만 사유는 콘텐츠 조치에 쓰지 않음');
+select throws_ok($$select public.admin_prepare_sanction('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001',gen_random_uuid(),'11400000-0000-0000-0000-000000000004','warning','underage','만 14세 미만')$$,'22023','invalid_moderation_reason','만 14세 미만 사유는 경고에 쓰지 않음');
+select is(public.admin_prepare_sanction('11400000-0000-0000-0000-000000000001','11400000-0000-0000-0001-000000000001','11400000-0000-0000-0003-000000000140','11400000-0000-0000-0000-000000000004','suspended','underage','만 14세 미만 확인')->>'reason_category','underage','만 14세 미만 사유로 이용 중단 준비');
+delete from private.moderation_requests where id='11400000-0000-0000-0003-000000000140';
+select set_config('request.jwt.claims','{"sub":"11400000-0000-0000-0000-000000000003","role":"authenticated"}',true);
+set local role authenticated;
+select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'underage',null)$$,'22023','invalid_report_reason','사용자 신고 사유로는 고를 수 없음');
+reset role;
+select set_config('request.jwt.claims','{"sub":"11400000-0000-0000-0000-000000000002","role":"authenticated","session_id":"11400000-0000-0000-0001-000000000002"}',true);
 
 create function pg_temp.apply_sanction(operation text, request_id uuid) returns jsonb language plpgsql as $$
 declare prepared jsonb;

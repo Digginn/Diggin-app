@@ -27,7 +27,11 @@ function load(relativePath, overrides = {}) {
       TextDecoder,
       URL,
       require: (name) =>
-        overrides[name] ?? (name === "@/lib/analytics" ? analytics : undefined) ?? require(name),
+        overrides[name] ??
+        (name === "@/lib/analytics" ? analytics : undefined) ??
+        (name === "../../save/domain/restrictedProduct"
+          ? load("../src/screens/save/domain/restrictedProduct.ts")
+          : require(name)),
     },
   );
   return module.exports;
@@ -226,7 +230,7 @@ test("IMP-005 승인 판매처 가격을 실제 가져오기 RPC에 전달하고
     Papa.unparse([
       domain.CSV_REQUIRED_HEADERS,
       ...cases.map(([store, url, regular, sale], index) => [
-        `상품${index}`,
+        `상품${String.fromCharCode(0xac00 + index)}`,
         store,
         "",
         regular,
@@ -398,7 +402,11 @@ test("충돌 재시도 중 처음 한도를 넘으면 저장 전에 한 번만 �
 
 test("가져오기 시작·완료 이벤트를 같은 작업 ID로 보내고 결과 수를 나눠 담는다", async () => {
   analyticsEvents.length = 0;
-  const excluded = (kind, reason = "INVALID_PRODUCT_URL") => ({ productName: "상품", reason, kind });
+  const excluded = (kind, reason = "INVALID_PRODUCT_URL") => ({
+    productName: "상품",
+    reason,
+    kind,
+  });
   const { run, calls } = setup({
     folders: ["abcdefg"],
     rpc: async () => ({

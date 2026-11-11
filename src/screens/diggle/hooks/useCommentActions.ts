@@ -75,9 +75,10 @@ export function useCommentActions(postId: string, viewer: string | null) {
       if (current.active)
         showToast(
           restrictionMessage(error) ??
-            (editing
-              ? "댓글을 수정하지 못했습니다. 다시 시도해 주세요."
-              : communityWriteError(error)),
+            communityWriteError(
+              error,
+              editing ? "댓글을 수정하지 못했습니다. 다시 시도해 주세요." : undefined,
+            ),
           restrictionMessage(error) ? "notice" : "error",
         );
       return null;

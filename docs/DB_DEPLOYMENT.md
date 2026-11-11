@@ -2,6 +2,8 @@
 
 승인된 PR을 develop에 병합하면 GitHub Actions가 DB 변경을 검증한 뒤 공유 개발 Supabase DB에 적용한다. 앱 코드만 GitHub에 올라가고 DB 적용은 빠지는 상황을 방지하기 위한 설정이다.
 
+운영 배포는 [PRODUCTION_DB_DEPLOYMENT.md](PRODUCTION_DB_DEPLOYMENT.md)의 main·production 승인 경로로 분리한다. DB·함수 검증 단계는 `.github/actions/validate-database`와 `validate-functions`에서 재사용하며 기존 개발 배포의 대상·승인 조건·배포 순서는 유지한다.
+
 ## 동작 순서
 
 1. develop 대상 PR의 승인을 받고 병합한다.
@@ -60,6 +62,19 @@ GitHub Actions의 IPv4 환경에서 IPv6 직접 DB 연결을 시도하면 `IPv6 
 알 수 없는 과거 누락·중복 버전·원격에만 있는 버전·빈 원격 이력·복구 SQL 변경·dry-run 중 이력 변경은 배포 전에 중단한다. 일반적인 후속 마이그레이션은 기존 방식으로 적용한다. 원격 reset·repair·seed·Vault 변경은 수행하지 않는다.
 
 복구 PR 승인·병합으로 새 push 실행을 생성하고, 완료 후 원격 이력에서 두 CSV 버전이 적용됐는지 확인한다. 예전 실패 실행을 재실행하면 수정 전 워크플로가 사용되므로 복구되지 않는다.
+
+### PR #185의 비속어 마이그레이션 누락 복구
+
+PR #187의 `20261104140135_community_direct_block.sql`이 먼저 적용되어 PR #185의 다음 원본 두 파일이 과거 순서로 남았다.
+
+- `20261104134530_community_profanity_words.sql`
+- `20261104134619_community_profanity_bypass.sql`
+
+두 파일은 비속어 사전과 `contains_community_profanity`·`nickname_error`를 변경한다. 이미 적용된 차단 파일은 `block_community_author`만 교체하므로 서로의 정의를 덮어쓰지 않는다. 배포 스크립트는 위 파일의 정규화된 SHA-256과 차단 마이그레이션의 적용 여부가 일치할 때만 역순 복구를 허용한다. 알 수 없는 누락이나 SQL 변경은 계속 거부한다.
+
+CI의 `validate_csv_migration_recovery.py --profanity`는 차단 우선 이력을 임시 DB에 재현하고 비속어 두 파일을 실제 배포 스크립트로 복구한다. 이후 `20261104154331_underage_deletion_30_days.sql`을 일반 경로로 적용한 뒤 전체 pgTAP·lint·Advisors를 검증한다. 정상 시간순 전체 재적용 및 기존 CSV 복구도 유지한다.
+
+사용자 요청으로 복구 PR #190 (`fix/189-shared-db-migration-recovery`)에 한해서 팀원 승인 없이 병합·Actions 배포한다. 저장소·브랜치·PR 번호·정확한 병합 커밋 검사와 모든 검증 단계는 유지한다. 기존 SQL·원격 이력은 수정하지 않으며 reset·repair·seed는 실행하지 않는다. 완료 후 비속어 두 버전 및 30일 보류 버전의 원격 적용 이력을 확인한다.
 
 ## 실패했을 때
 

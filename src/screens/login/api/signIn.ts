@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  GoogleSignin,
   isCancelledResponse,
   isErrorWithCode,
   statusCodes,
@@ -12,6 +11,7 @@ import { Platform } from "react-native";
 
 import { fetchAccountAccess, parseAccountAccess, type AccountAccess } from "@/api/accountAccess";
 import { saveAvatar } from "@/api/avatar";
+import { GoogleSignin } from "@/lib/googleSignIn";
 import { supabase } from "@/lib/supabase";
 
 import type { LoginProvider } from "../components/SocialLoginButton";
@@ -53,11 +53,6 @@ async function signInWithIdentity(
 const NEW_USER_WINDOW_MS = 60_000;
 const SIGNUP_COMPLETE_SHOWN_KEY = "signup-complete-shown";
 
-GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-});
-
 const kakaoNativeAppKey = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY;
 if (kakaoNativeAppKey) void initializeKakaoSDK(kakaoNativeAppKey);
 
@@ -92,7 +87,13 @@ async function signInWithAppleNative(onAuthorized: () => void): Promise<SignInRe
   try {
     const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
     if (!credential.identityToken) throw new Error("apple_identity_token_missing");
-    return signInWithIdentity("apple", credential.identityToken, onAuthorized);
+    const result = await signInWithIdentity("apple", credential.identityToken, onAuthorized);
+    // 자동 삭제 때 재인증 없이 애플 연결을 끊으려고 맡긴다. 실패해도 로그인은 이어 간다.
+    if (result.status === "success" && credential.authorizationCode)
+      void supabase.functions
+        .invoke("apple-token", { body: { authorization_code: credential.authorizationCode } })
+        .catch(() => {});
+    return result;
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ERR_REQUEST_CANCELED") {
       return { status: "cancelled" };

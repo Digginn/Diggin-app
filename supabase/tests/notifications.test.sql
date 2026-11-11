@@ -45,7 +45,7 @@ select lives_ok($$ select public.create_comment(current_setting('test.post')::bi
 select lives_ok($$ select public.create_comment(current_setting('test.open_vote')::bigint, '투표글 댓글', 'a0000000-0000-0000-0000-000000000002') $$, '투표글에 댓글을 단다');
 reset role;
 select is((select count(*) from pg_temp.notifications_for('post_commented')), 1::bigint, '재시도해도 댓글 알림은 하나고 투표글 댓글은 알리지 않는다');
-select is((select body from pg_temp.notifications_for('post_commented')), '디기 1: 좋아 보여요', '익명번호와 한 줄로 바꾼 댓글을 본문에 담는다');
+select is((select body from pg_temp.notifications_for('post_commented')), (select nickname from public.profiles where id='10400000-0000-0000-0000-00000000000b') || ': 좋아 보여요', '닉네임과 한 줄로 바꾼 댓글을 본문에 담는다');
 select is((select event_key from pg_temp.notifications_for('post_commented')),
   'comment:' || (select id from private.comments where creation_request_id = 'a0000000-0000-0000-0000-000000000001'), '댓글 id로 이벤트 키를 만든다');
 

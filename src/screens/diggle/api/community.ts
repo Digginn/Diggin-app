@@ -79,6 +79,7 @@ export function parsePost(value: unknown): CommunityPost {
     body: text(row.content),
     isPreview: row.is_mine === undefined,
     isMine: row.is_mine === true,
+    authorNickname: row.is_mine === undefined ? null : optionalText(row.author_nickname),
     items: rows(row.items).map(parseItem),
     likeCount: count(row.like_count),
     commentCount: count(row.comment_count),
@@ -139,6 +140,7 @@ export function parseCommunityComment(value: unknown): CommunityComment {
     isPostAuthor: row.is_post_author === true,
     isMine: row.is_mine === true,
     isWithdrawn: row.is_withdrawn === true,
+    authorNickname: row.is_withdrawn === true ? null : optionalText(row.author_nickname),
     anonNumber: count(row.anon_number),
   };
 }

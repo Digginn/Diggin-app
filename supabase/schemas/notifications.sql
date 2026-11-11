@@ -73,7 +73,7 @@ create or replace function private.notify_post_commented()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
   target private.posts%rowtype;
-  anon_number integer;
+  actor_nickname text;
 begin
   select * into target from private.posts where id = new.post_id;
   if target.type <> 'post' or target.deleted_at is not null or target.hidden_at is not null or
@@ -81,11 +81,10 @@ begin
      not private.notification_actor_visible(target.author_id, new.author_id) then
     return new;
   end if;
-  select number into anon_number from private.post_anon_numbers
-  where post_id = new.post_id and user_id = new.author_id;
+  select nickname into actor_nickname from public.profiles where id = new.author_id;
   insert into private.notifications(recipient_id, type, post_id, actor_id, title, body, event_key)
   values (target.author_id, 'post_commented', target.id, new.author_id, '내 게시글에 댓글이 달렸어요.',
-          '디기 ' || coalesce(anon_number::text, '') || ': ' || private.notification_text(new.content),
+          coalesce(actor_nickname, '사용자') || ': ' || private.notification_text(new.content),
           'comment:' || new.id)
   on conflict (event_key) do nothing;
   return new;

@@ -65,7 +65,13 @@ function loadDetectedLink(
       },
     },
     "@/hooks/useLinkDetectionPause": pause,
-    "@/hooks/useNativeModalVisible": { isNativeModalBusy: () => isModalBusy() },
+    "@/hooks/useNativeModalVisible": {
+      isNativeModalBusy: () => isModalBusy(),
+      whenNativeModalIdle: (callback) => {
+        callback();
+        return () => {};
+      },
+    },
     "@/utils/itemLink": { findItemLink: (text) => (text.startsWith("https://") ? text : null) },
     "../../modules/diggin-pasteboard": { DigginPasteboard: pasteboard },
   });
@@ -212,7 +218,11 @@ test("iOS 붙여넣기를 거부하면 안내 없이 닫고, 이번 실행 동�
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), false, "같은 실행에서는 다시 묻지 않는다");
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.deepEqual(storage, {}, "거부는 기기에 남기지 않는다");
+  assert.deepEqual(
+    storage,
+    { "link-detection-paste-allowed": "0" },
+    "거부한 복사는 남기지 않고, 허용 상태가 아니라는 것만 남긴다",
+  );
 
   pasteboard.value = url;
   const relaunched = loadDetectedLink(pauseNone(), "", { pasteboard, storage });
@@ -272,4 +282,64 @@ test("iOS도 다른 모달이 떠 있으면 감지 모달을 띄우지 않는다
   busy = false;
   await linkDetection.check();
   assert.equal(linkDetection.isDetected(), true);
+});
+
+test("첫 진입 안내를 확인하는 동안 막은 링크는 안내가 끝나면 앱 복귀 없이 바로 묻는다", async () => {
+  let effect;
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", {
+    react: { useEffect: (callback) => (effect = callback) },
+  });
+  pause.useLinkDetectionPause(true, true);
+  const release = effect();
+  const pasteboard = fakePasteboard("https://zigzag.kr/catalog/products/20");
+  pasteboard.changeCount = 90;
+  const linkDetection = loadDetectedLink(pause, "", { pasteboard });
+  await linkDetection.check();
+  assert.equal(linkDetection.isDetected(), false, "안내보다 감지 모달이 먼저 뜨지 않는다");
+  release();
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(linkDetection.isDetected(), true, "안내가 끝나면 바로 다시 본다");
+});
+
+test("다시 보기를 요청하지 않은 멈춤은 풀려도 앱 복귀 전까지 묻지 않는다", async () => {
+  let effect;
+  const pause = load("../src/hooks/useLinkDetectionPause.ts", {
+    react: { useEffect: (callback) => (effect = callback) },
+  });
+  pause.useLinkDetectionPause(true);
+  const release = effect();
+  const pasteboard = fakePasteboard("https://zigzag.kr/catalog/products/21");
+  pasteboard.changeCount = 91;
+  const linkDetection = loadDetectedLink(pause, "", { pasteboard });
+  await linkDetection.check();
+  release();
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(linkDetection.isDetected(), false);
+});
+
+test("BUG-103 붙여넣기 허용으로 확인된 기기는 모달 전에 읽어 http 링크면 감지 모달을 띄우지 않는다", async () => {
+  const storage = { "link-detection-paste-allowed": "1" };
+  const pasteboard = fakePasteboard("http://example.com/item2");
+  const http = loadDetectedLink(pauseNone(), "", { pasteboard, storage });
+  await http.check();
+  assert.equal(http.isDetected(), false);
+  assert.equal(pasteboard.reads, 1);
+  await http.check();
+  assert.equal(pasteboard.reads, 1, "같은 복사는 다시 읽지 않는다");
+
+  const url = "https://zigzag.kr/catalog/products/10";
+  pasteboard.value = url;
+  pasteboard.changeCount = 2;
+  const https = loadDetectedLink(pauseNone(), "", { pasteboard, storage });
+  await https.check();
+  assert.equal(https.isDetected(), true);
+  assert.deepEqual({ ...(await https.render().readLink()) }, { link: url });
+  assert.equal(pasteboard.reads, 2, "불러오기 때 다시 읽지 않는다");
+
+  const unknown = loadDetectedLink(pauseNone(), "", {
+    pasteboard: fakePasteboard("http://example.com/item2"),
+    storage: {},
+  });
+  await unknown.check();
+  assert.equal(unknown.isDetected(), true, "허용인지 모르면 읽지 않고 모달부터 띄운다");
 });

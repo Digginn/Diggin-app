@@ -59,6 +59,7 @@ test("그리드는 소장 여부를 카드에 전달하고, 탭을 다시 누르
     "react-native": { FlatList: "FlatList", View: "View" },
     "expo-router": { useScrollToTop: (ref) => scrollTargets.push(ref) },
     "@/components/card": { Card: "Card", CardSkeleton: "CardSkeleton" },
+    "@/components/ProductImageFiller": { onVisibleItemsChanged: () => {} },
   });
   const item = { id: "owned", name: "코트", price: 1, isOwned: true };
   const tree = WishItemGrid({ items: [item] });

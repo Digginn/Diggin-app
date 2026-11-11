@@ -40,6 +40,7 @@ function load(relativePath, mocks = {}) {
     require: (name) => {
       if (name in mocks) return mocks[name];
       if (name === "@/lib/analytics") return analytics;
+      if (name === "@/lib/googleSignIn") return load("lib/googleSignIn.ts", mocks);
       if (name === "@/api/accountAccess")
         return {
           ensureCommunityWriteAllowed: async () => undefined,
@@ -48,6 +49,8 @@ function load(relativePath, mocks = {}) {
         };
       if (name === "@/components/AccountAccessNotice")
         return { AccountAccessNotice: "AccountAccessNotice" };
+      if (name === "@/components/ProductImageFiller")
+        return { ProductImageFiller: "ProductImageFiller" };
       if (name === "@/theme") return load("theme/colors.ts");
       if (name === "@/screens/diggle/components/SanctionNoticeModal")
         return { SanctionNoticeModal: "SanctionNoticeModal" };
@@ -69,6 +72,39 @@ function nodes(root) {
   }
   visit(root);
   return result;
+}
+
+function stateHooks() {
+  const states = [];
+  let cursor = 0;
+  return {
+    useState(initial) {
+      const index = cursor++;
+      if (!(index in states)) states[index] = initial;
+      return [
+        states[index],
+        (next) => (states[index] = typeof next === "function" ? next(states[index]) : next),
+      ];
+    },
+    render(screen) {
+      cursor = 0;
+      return nodes(screen());
+    },
+    reset() {
+      states.length = 0;
+    },
+  };
+}
+
+function pressSocialAfterConsent(hooks, screen) {
+  hooks
+    .render(screen)
+    .find((node) => node.props.accessibilityRole === "checkbox")
+    .props.onPress();
+  return hooks
+    .render(screen)
+    .find((node) => node.type === "SocialLoginButton")
+    .props.onPress();
 }
 
 test("소셜 버튼이 공통 Button과 지정 로고·색상·콜백을 사용한다", () => {
@@ -168,9 +204,10 @@ for (const os of ["ios", "android"]) {
     const alerts = [];
     const signIns = [];
     let canGoBack = false;
+    const hooks = stateHooks();
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
       "react": {
-        useState: (initial) => [initial, () => {}],
+        useState: hooks.useState,
         useRef: (current) => ({ current }),
         useEffect: () => {},
       },
@@ -203,11 +240,13 @@ for (const os of ["ios", "android"]) {
       },
       "@/components/app-bar": { AppBar: "AppBar" },
       "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/modal": { ActionModal: "ActionModal" },
+      "@/components/UnderageNoticeModal": { UnderageNoticeModal: "UnderageNoticeModal" },
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
       "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
     });
-    const tree = nodes(LoginScreen());
+    const tree = hooks.render(LoginScreen);
     const bar = tree.find((node) => node.type === "AppBar");
     assert.equal(bar.props.backIconSize, 24);
     assert.equal(bar.props.left, "back");
@@ -222,18 +261,58 @@ for (const os of ["ios", "android"]) {
     assert.equal(scroll.props.contentContainerStyle.paddingBottom, 36);
     const providers = tree.filter((node) => node.type === "SocialLoginButton");
     assert.equal(providers.map((node) => node.props.provider).join(","), expectedProviders);
+    const checkbox = tree.find((node) => node.props.accessibilityRole === "checkbox");
+    assert.equal(checkbox.props.accessibilityState.checked, false);
     for (const button of providers) await button.props.onPress();
+    assert.equal(signIns.length, 0, "만 14세 확인 전에는 SDK 인증을 시작하지 않는다");
+    const notice = hooks.render(LoginScreen).find((node) => node.type === "ActionModal");
+    assert.equal(notice.props.visible, true, "체크 전에 누르면 약관 동의 안내를 띄운다");
+    assert.equal(notice.props.title, "약관 동의가 필요합니다.");
+    assert.equal(notice.props.description, "필수 항목에 동의한 후 다시 로그인해 주세요.");
+    notice.props.primaryAction.onPress();
+    assert.equal(
+      hooks.render(LoginScreen).find((node) => node.type === "ActionModal").props.visible,
+      false,
+    );
+    checkbox.props.onPress();
+    const consented = hooks.render(LoginScreen);
+    assert.equal(
+      consented.find((node) => node.props.accessibilityRole === "checkbox").props.accessibilityState
+        .checked,
+      true,
+    );
+    for (const button of consented.filter((node) => node.type === "SocialLoginButton"))
+      await button.props.onPress();
     assert.equal(signIns.join(","), expectedProviders);
     assert.equal(alerts.length, 0);
-    const buttons = tree.filter((node) => node.type === "Pressable");
-    buttons[0].props.onPress();
-    assert.equal(routes.at(-1), "/browse");
-    buttons[1].props.onPress();
+    const links = consented.filter((node) => node.props.accessibilityRole === "link");
+    assert.equal(links.length, 2);
+    for (const link of links) {
+      assert.equal(link.type, "Pressable", "약관 링크는 독립적인 터치 영역을 사용한다");
+      assert.ok(link.props.className.includes("min-h-12"));
+      const label = nodes(link).find((node) => node.type === "Text");
+      assert.ok(label.props.className.includes("underline"));
+    }
+    // Figma처럼 이용약관은 글자 너비, 개인정보 처리방침만 최소 너비 48px이다.
+    assert.ok(!links[0].props.className.includes("min-w-12"));
+    assert.ok(links[1].props.className.includes("min-w-12"));
+    links[0].props.onPress();
     assert.equal(routes.at(-1), "/policies/terms");
-    buttons[2].props.onPress();
+    links[1].props.onPress();
     assert.equal(routes.at(-1), "/policies/privacy");
+    assert.equal(
+      hooks.render(LoginScreen).find((node) => node.props.accessibilityRole === "checkbox").props
+        .accessibilityState.checked,
+      true,
+      "정책 링크를 눌러도 필수 동의 체크는 바뀌지 않는다",
+    );
+    consented
+      .find((node) => node.type === "Pressable" && node.props.accessibilityRole === "button")
+      .props.onPress();
+    assert.equal(routes.at(-1), "/browse");
     assert.equal(alerts.length, 0);
-    const errorTree = nodes(LoginScreen({ isLoginError: true }));
+    hooks.reset();
+    const errorTree = hooks.render(() => LoginScreen({ isLoginError: true }));
     const toast = errorTree.find((node) => node.type === "ToastText");
     assert.equal(toast.props.message, "로그인에 실패했습니다. 다시 시도해 주세요.");
     assert.equal(errorTree.find((node) => node.type === "AppBar").props.left, "none");
@@ -242,7 +321,8 @@ for (const os of ["ios", "android"]) {
       os === "ios" ? 3 : 2,
     );
     assert.ok(errorTree.some((node) => node.props.className?.includes("top-[-54px]")));
-    const loadingTree = nodes(LoginScreen({ isLoginLoading: true }));
+    hooks.reset();
+    const loadingTree = hooks.render(() => LoginScreen({ isLoginLoading: true }));
     const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
     assert.equal(loadingDialog.props.message, "로그인 중입니다.");
   });
@@ -307,9 +387,10 @@ test("로그인 화면은 주소로 온 공유 링크를 받지 않고, 로그�
   const LINK = "https://www.musinsa.com/products/1";
   const render = (signIn, pending) => {
     let cleanup;
+    const hooks = stateHooks();
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
       "react": {
-        useState: (initial) => [initial, () => {}],
+        useState: hooks.useState,
         useRef: (current) => ({ current }),
         useEffect: (effect) => {
           cleanup = effect();
@@ -335,14 +416,13 @@ test("로그인 화면은 주소로 온 공유 링크를 받지 않고, 로그�
       },
       "@/components/app-bar": { AppBar: "AppBar" },
       "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/modal": { ActionModal: "ActionModal" },
+      "@/components/UnderageNoticeModal": { UnderageNoticeModal: "UnderageNoticeModal" },
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
       "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
     });
-    const press = () =>
-      nodes(LoginScreen())
-        .find((node) => node.type === "SocialLoginButton")
-        .props.onPress();
+    const press = () => pressSocialAfterConsent(hooks, LoginScreen);
     return { press, leave: () => cleanup?.() };
   };
 
@@ -402,6 +482,8 @@ test("이미 로그인한 사람의 자동 이동은 공유 링크를 보존하�
       },
       "@/components/app-bar": { AppBar: "AppBar" },
       "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/modal": { ActionModal: "ActionModal" },
+      "@/components/UnderageNoticeModal": { UnderageNoticeModal: "UnderageNoticeModal" },
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
       "@/contexts/AuthContext": { useAuth: () => ({ session }) },
@@ -622,6 +704,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const order = [];
   const cacheClears = [];
   const analyticsUsers = [];
+  let googleSignOutFails = false;
   const supabase = {
     auth: {
       getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
@@ -640,6 +723,17 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const refs = [];
   let refCursor = 0;
   const { AuthProvider } = load("contexts/AuthContext.tsx", {
+    "@react-native-google-signin/google-signin": {
+      GoogleSignin: {
+        configure() {
+          order.push("configureGoogle");
+        },
+        async signOut() {
+          order.push("signOutGoogle");
+          if (googleSignOutFails) throw new Error("google_signout_failed");
+        },
+      },
+    },
     "react": {
       ...React,
       createContext: () => ({ Provider: "Provider" }),
@@ -675,14 +769,17 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.equal(signOutOptions[0].scope, "local", "이 기기 세션만 끊는다");
   assert.deepEqual(
     order,
-    ["unregisterPush", "signOut", "finishPush"],
-    "세션을 끊기 전에 이 기기 Push 토큰을 지우고, 세션을 끊은 뒤에야 등록 막기를 푼다",
+    ["configureGoogle", "unregisterPush", "signOutGoogle", "signOut", "finishPush"],
+    "SDK 초기화 후 Push·Google 로그인 상태를 비우고 앱 세션을 끊는다",
   );
   assert.equal(render().isSessionExpired, false);
+  order.length = 0;
   emit("TOKEN_REFRESHED", { id: "s2", user: { id: "u2" } });
   assert.equal(render().isSessionExpired, false);
+  assert.deepEqual(order, [], "세션 갱신 시 Google 상태를 해제하지 않는다");
   emit("SIGNED_OUT", null);
   await Promise.resolve();
+  assert.deepEqual(order, ["signOutGoogle"], "세션 만료 시에도 Google 상태를 해제한다");
   assert.equal(render().isSessionExpired, true);
   assert.equal(cacheClears.length, 2, "로그아웃·만료 모두 상품 캐시를 비운다");
   assert.deepEqual(
@@ -692,6 +789,17 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   );
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);
+  googleSignOutFails = true;
+  order.length = 0;
+  await render().signOut();
+  assert.deepEqual(order, ["unregisterPush", "signOutGoogle", "signOut", "finishPush"]);
+  assert.equal(signOutOptions.length, 2, "Google SDK 오류가 앱 로그아웃을 막지 않는다");
+  assert.equal(render().isSessionExpired, false);
+  order.length = 0;
+  emit("SIGNED_OUT", null);
+  await Promise.resolve();
+  assert.deepEqual(order, ["signOutGoogle"], "이전 세션 정보가 없어도 Google 상태를 해제한다");
+  assert.equal(render().isSessionExpired, true, "Google SDK 오류가 세션 만료 안내를 막지 않는다");
 });
 
 function loadSignIn({
@@ -701,6 +809,8 @@ function loadSignIn({
   authError = null,
   restrictionNotice = null,
   os = "ios",
+  apple = {},
+  invoked = [],
 }) {
   const storage = new Map();
   return load("screens/login/api/signIn.ts", {
@@ -727,7 +837,7 @@ function loadSignIn({
       me: async () => ({ profileImageUrl: "" }),
       ...kakao,
     },
-    "expo-apple-authentication": {},
+    "expo-apple-authentication": apple,
     "expo-linking": {},
     "expo-web-browser": {},
     "react-native": { Platform: { OS: os } },
@@ -743,6 +853,8 @@ function loadSignIn({
       supabase: {
         functions: {
           invoke: async (name, input) => {
+            invoked.push([name, input.body]);
+            if (name === "apple-token") return { data: null, error: new Error("offline") };
             assert.equal(name, "account-restriction");
             assert.equal(input.body.provider, "google");
             assert.equal(input.body.id_token, "token");
@@ -850,6 +962,26 @@ test("제재 상세를 조회하지 못해도 로그인 성공이나 임의 위�
   assert.equal(result.access.reasonCategory, null);
 });
 
+test("애플 로그인에 성공하면 인증 코드를 서버에 맡기고, 맡기지 못해도 로그인은 이어 간다", async () => {
+  const invoked = [];
+  const now = new Date().toISOString();
+  const { signIn } = loadSignIn({
+    getUser: () => ({ id: "apple-user", created_at: now, last_sign_in_at: now }),
+    apple: {
+      signInAsync: async () => ({
+        identityToken: "apple-id-token",
+        authorizationCode: "apple-code",
+      }),
+    },
+    invoked,
+  });
+  const result = await signIn("apple", () => {});
+  assert.equal(result.status, "success");
+  assert.deepEqual(JSON.parse(JSON.stringify(invoked)), [
+    ["apple-token", { authorization_code: "apple-code" }],
+  ]);
+});
+
 test("Android에서는 Apple 인증을 직접 호출해도 실행하지 않는다", async () => {
   const { signIn } = loadSignIn({
     os: "android",
@@ -862,9 +994,10 @@ test("로그인 필요 모달에서 온 로그인은 성공하면 원래 화면�
   const render = (result) => {
     const routes = [];
     let cleanup;
+    const hooks = stateHooks();
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
       "react": {
-        useState: (initial) => [initial, () => {}],
+        useState: hooks.useState,
         useRef: (current) => ({ current }),
         useEffect: (effect) => {
           cleanup = effect();
@@ -894,13 +1027,12 @@ test("로그인 필요 모달에서 온 로그인은 성공하면 원래 화면�
       },
       "@/components/app-bar": { AppBar: "AppBar" },
       "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+      "@/components/modal": { ActionModal: "ActionModal" },
+      "@/components/UnderageNoticeModal": { UnderageNoticeModal: "UnderageNoticeModal" },
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
     });
-    const press = () =>
-      nodes(LoginScreen())
-        .find((node) => node.type === "SocialLoginButton")
-        .props.onPress();
+    const press = () => pressSocialAfterConsent(hooks, LoginScreen);
     return { routes, press, unmount: () => cleanup?.() };
   };
   const resumed = [];
@@ -931,6 +1063,49 @@ test("로그인 필요 모달에서 온 로그인은 성공하면 원래 화면�
   const direct = render({ status: "success", isNewUser: false });
   await direct.press();
   assert.deepEqual(direct.routes, ["/(tabs)/all"], "모달 없이 온 로그인은 ALL로 간다");
+});
+
+test("만 14세 미만으로 이용 중단된 계정이 로그인하면 이용 중단 안내를 띄운다", async () => {
+  const hooks = stateHooks();
+  const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+    "react": { useState: hooks.useState, useRef: (current) => ({ current }), useEffect: () => {} },
+    "./api/signIn": {
+      signIn: async () => ({
+        status: "suspended",
+        access: { status: "suspended", reasonCategory: "underage" },
+      }),
+    },
+    "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
+    "@/lib/pendingShareLink": { discardShareLink: () => {} },
+    "expo-router": {
+      useRouter: () => ({
+        replace: () => {},
+        back: () => {},
+        canGoBack: () => false,
+        push: () => {},
+      }),
+    },
+    "expo-status-bar": { StatusBar: "StatusBar" },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+    "react-native": {
+      Platform: { OS: "ios" },
+      View: "View",
+      Text: "Text",
+      Pressable: "Pressable",
+      ScrollView: "ScrollView",
+      useWindowDimensions: () => ({ height: 812 }),
+    },
+    "@/components/app-bar": { AppBar: "AppBar" },
+    "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+    "@/components/ToastText": { ToastText: "ToastText" },
+    "@/components/modal": { ActionModal: "ActionModal" },
+    "@/components/UnderageNoticeModal": { UnderageNoticeModal: "UnderageNoticeModal" },
+    "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+  });
+  await pressSocialAfterConsent(hooks, LoginScreen);
+  const tree = hooks.render(LoginScreen);
+  assert.ok(tree.some((node) => node.type === "UnderageNoticeModal"));
+  assert.ok(!tree.some((node) => node.type === "SanctionNoticeModal"));
 });
 
 test("회원 전용 화면은 비회원에게 화면 위 로그인 모달을 보이고, 로그인하면 이 화면으로 돌아오게 한다", () => {

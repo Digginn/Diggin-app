@@ -1,3 +1,6 @@
+import * as AppleAuthentication from "expo-apple-authentication";
+import { Platform } from "react-native";
+
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/types/database.types";
 
@@ -14,17 +17,37 @@ const REASON_CODES: Record<string, WithdrawalReason> = {
   "오류가 자주 생겨요.": "frequent_error",
 };
 
+/** 애플 가입자는 탈퇴 직전에 다시 인증해 서버가 애플 연결을 해지할 코드를 받는다. 취소하면 null이다. */
+async function readAppleCode() {
+  const { data } = await supabase.auth.getUser();
+  if (!data.user?.identities?.some((identity) => identity.provider === "apple")) return undefined;
+  if (Platform.OS !== "ios") throw new Error("apple_reauth_not_supported");
+  try {
+    const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
+    if (!credential.authorizationCode) throw new Error("apple_authorization_code_missing");
+    return credential.authorizationCode;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ERR_REQUEST_CANCELED") {
+      return null;
+    }
+    throw error;
+  }
+}
+
 /** MY-007 계정과 개인정보를 지운다. 세션은 서버에서 함께 사라지니 이 기기 로그아웃은 부른 쪽이 한다. */
 export async function withdrawAccount({ reasons, detail }: WithdrawalSurvey) {
+  const appleCode = await readAppleCode();
+  if (appleCode === null) return "cancelled";
   const { error } = await supabase.functions.invoke("account-withdrawal", {
     body: {
       reasons: reasons.flatMap((reason) => REASON_CODES[reason] ?? []),
       custom_text: detail || null,
+      apple_authorization_code: appleCode,
     },
   });
-  if (!error) return;
+  if (!error) return "withdrawn";
   // 지운 뒤 응답만 끊겼을 수 있다. 다시 요청하면 인증부터 실패하니 계정이 남았는지로 가린다.
   const { error: userError } = await supabase.auth.getUser();
-  if (userError?.code === "user_not_found") return;
+  if (userError?.code === "user_not_found") return "withdrawn";
   throw error;
 }

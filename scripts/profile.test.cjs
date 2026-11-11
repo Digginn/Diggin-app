@@ -257,7 +257,9 @@ test("프로필 영역 전체가 터치 가능하며 카메라 SVG 크기와 위
   const button = renderProfile().button("프로필 사진 변경");
   assert.equal(button.type, "Pressable");
   assert.ok(button.props.className.includes("h-[93px] w-[93px]"));
-  const cameraSlot = React.Children.toArray(button.props.children)[1];
+  const [photo, frame, cameraSlot] = React.Children.toArray(button.props.children);
+  assert.ok(photo.props.className.includes("rounded-[4px]"));
+  assert.ok(frame.props.className.includes("rounded-[4px] border-[1.5px] border-gray-300"));
   assert.equal(cameraSlot.props.pointerEvents, "none");
   assert.ok(cameraSlot.props.className.includes("left-[72px] top-[73px] h-6 w-6"));
   const cameraAsset = cameraSlot.props.children;
@@ -493,16 +495,19 @@ test("닉네임 입력칸 오른쪽에 글자 수를 보여 준다", () => {
   assert.equal(counter(), "3/10", "이모지 조합은 서버처럼 1자로 센다");
 });
 
-test("닉네임 0자·1자는 저장을 막고, 1자는 문구 없이 테두리·카운터만 빨갛게 한다", () => {
+test("닉네임 0자·1자는 저장을 막고, 1자는 테두리·카운터와 MSG-MY-001 문구로 알린다", () => {
   const { button, saveButton, helper } = renderProfile("ios", true, {});
-    assert.equal(saveButton().props.isDisabled, true, "0자는 저장 버튼이 비활성이다");
+  assert.equal(saveButton().props.isDisabled, true, "0자는 저장 버튼이 비활성이다");
   button("닉네임").props.onChangeText("디");
   assert.equal(saveButton().props.isDisabled, true);
   assert.equal(button("닉네임").props.isError, true);
-  assert.equal(helper().props.message, "", "길이 오류 문구는 보여 주지 않는다");
+  // BUG-076 1.0.0(5)처럼 Inline Error를 보인다.
+  assert.equal(helper().props.message, "닉네임은 2~10자로 입력해 주세요.");
+  assert.equal(helper().props.status, "error");
   button("닉네임").props.onChangeText("디기");
   assert.equal(saveButton().props.isDisabled, false);
   assert.equal(button("닉네임").props.isError, false);
+  assert.equal(helper().props.message, "");
 });
 
 test("닉네임은 타이핑·붙여넣기 모두 10글자로 제한하고 카운터와 저장 값도 일치한다", async () => {

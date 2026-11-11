@@ -14,6 +14,7 @@ import { FallbackImg } from "@/components/FallbackImg";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { LoadingDialog } from "@/components/Loading";
 import { ActionModal } from "@/components/modal";
+import { requestProductImageNow } from "@/components/ProductImageFiller";
 import { WishLevel } from "@/components/WishLevel";
 import { STATE_MESSAGES, TOAST_MESSAGES, selectFolderSavedMessage } from "@/constants/messages";
 import { useCreateFolder } from "@/hooks/useCreateFolder";
@@ -25,6 +26,7 @@ import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
 import { useDeleteProducts } from "@/screens/all/mutations/useDeleteProducts";
 import { FolderMenu } from "@/screens/folder/components/FolderMenu";
+import { itemSaveErrorMessage } from "@/screens/save/domain/itemSaveError";
 import type { WishItem, WishLevelCounts } from "@/types/wish-item";
 
 import { FolderManageButton } from "./components/FolderManageButton";
@@ -79,6 +81,10 @@ export function ItemDetailScreen() {
   const updateProduct = useUpdateProduct(id);
   const item = product.data?.values;
   const isOwned = product.data?.isOwned ?? false;
+  const imageSourceUrl = product.data?.needsImage ? item?.sourceUrl : undefined;
+  useEffect(() => {
+    if (imageSourceUrl) requestProductImageNow(id, imageSourceUrl);
+  }, [id, imageSourceUrl]);
   const [failed, setFailed] = useState(false);
   const [isEditOpen, setEditOpen] = useState(false);
   const [editError, setEditError] = useState<string>();
@@ -108,6 +114,7 @@ export function ItemDetailScreen() {
   const isDeletingRef = useRef(false);
   // 시트·모달 위에 클립보드 감지 모달이 겹치면 iOS가 무시하고 투명한 창만 남아 화면이 멈춘다.
   useLinkDetectionPause(isEditOpen || isFolderOpen || isMenuOpen || isDeleteOpen);
+  useLinkDetectionPause(guide.isPending, true);
   const isHeaderDisabled = isEditOpen || isFolderOpen;
   const headerIconColor = (isDark: boolean) =>
     isHeaderDisabled ? "text-gray-400" : isDark ? "text-gray-0" : "text-gray-900";
@@ -274,7 +281,12 @@ export function ItemDetailScreen() {
                 setEditOpen(false);
                 showToast(TOAST_MESSAGES.ALL_004);
               },
-              onError: () => setEditError(TOAST_MESSAGES.ALL_005),
+              onError: (error) =>
+                setEditError(
+                  error.message.includes("restricted_product")
+                    ? itemSaveErrorMessage(error)
+                    : TOAST_MESSAGES.ALL_005,
+                ),
             },
           )
         }

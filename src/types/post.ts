@@ -7,7 +7,7 @@ export type PostItem = {
 
 export type FeedPost = {
   id: string;
-  /** 익명 글도 작성자는 따로 있다. 차단은 이 값으로 가린다. */
+  /** UI 목업의 차단 확인용 내부 작성자 값. 서버 응답에는 포함하지 않는다. */
   authorId: string;
   body: string;
   items: PostItem[];

@@ -32,13 +32,15 @@ function load(file, mocks = {}, globals = {}) {
       require: (name) =>
         mocks[name] ??
         (name === "@/lib/analytics" ? analytics : undefined) ??
-        (name === "@/api/accountAccess"
-          ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
-          : name.endsWith(".svg")
-            ? name
-            : LOGIN_SOURCES[name]
-              ? load(LOGIN_SOURCES[name], mocks)
-              : require(name)),
+        (name === "@/components/ReportBlockMenu"
+          ? { ReportBlockMenu: "ReportBlockMenu" }
+          : name === "@/api/accountAccess"
+            ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
+            : name.endsWith(".svg")
+              ? name
+              : LOGIN_SOURCES[name]
+                ? load(LOGIN_SOURCES[name], mocks)
+                : require(name)),
       ...globals,
     },
   );
@@ -70,6 +72,7 @@ const PREVIEW = {
 const MEMBER = {
   ...PREVIEW,
   is_mine: false,
+  author_nickname: "느긋한디기12",
   like_count: 0,
   is_liked: false,
   comment_count: 1,
@@ -176,6 +179,10 @@ test("조회 훅은 인증 복원을 기다리고 20개 미만이면 커서 요�
   auth = { session: null, isRestoring: false };
   hooks.useCommunityFeed("all");
   assert.equal(options.enabled, true);
+  hooks.useCommunityFeed("all", false);
+  assert.equal(options.enabled, false, "오프라인·연결 확인 중에는 첫 조회를 시작하지 않는다");
+  hooks.useCommunityFeed("all", true);
+  assert.equal(options.enabled, true, "연결이 복구되면 목록 조회를 다시 활성화한다");
   assert.equal(options.getNextPageParam([]), undefined);
   const page = Array.from({ length: 20 }, (_, index) => ({
     id: String(index + 1),
@@ -397,6 +404,7 @@ function screenMocks({
   let destination;
   const toasts = [];
   const mocks = {
+    "expo-network": { useNetworkState: () => ({ isConnected: true, isInternetReachable: true }) },
     "react": {
       ...React,
       useEffect: () => {},
@@ -489,7 +497,13 @@ function screenMocks({
     "@/components/Post": { Post: "Post" },
     "@/components/TopTab": { TopTab: "TopTab" },
     "@/components/Comment": { Comment: "Comment" },
-    "@/constants/messages": { DIGGLE_EMPTY_MESSAGES: { all: "empty", vote: "empty" } },
+    "@/constants/messages": {
+      DIGGLE_EMPTY_MESSAGES: { all: "empty", vote: "empty" },
+      TOAST_MESSAGES: {
+        SYS_001: "연결 상태를 확인한 후 다시 시도해 주세요.",
+        SYS_002: "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+      },
+    },
     "@/contexts/AuthContext": { useAuth: () => ({ session, isRestoring: false }) },
     "@/hooks/useToast": { useToast: () => (message) => toasts.push(message) },
     "@/utils/text": load("src/utils/text.ts"),
@@ -503,6 +517,7 @@ function screenMocks({
       communityErrorMessage: load("src/screens/diggle/utils/formatCommunityTime.ts")
         .communityErrorMessage,
     },
+    "./utils/formatCommunityAuthor": load("src/screens/diggle/utils/formatCommunityAuthor.ts"),
     "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
     "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
     "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
@@ -520,6 +535,79 @@ function screenMocks({
   };
   return { mocks, toasts, destination: () => destination };
 }
+
+test("오프라인 첫 진입과 FAB 재시도는 스켈레톤·권한 요청 없이 연결 안내를 표시한다", () => {
+  for (const tab of ["all", "vote"]) {
+    const state = screenMocks({ feed: { isPending: true }, params: { tab } });
+    state.mocks["expo-network"].useNetworkState = () => ({ isConnected: false });
+    let checks = 0;
+    state.mocks["@/api/accountAccess"] = {
+      ensureCommunityWriteAllowed: async () => {
+        checks++;
+      },
+      restrictionMessage: () => null,
+    };
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+    const tree = DiggleScreen();
+    assert.equal(
+      nodes(tree, "View").some((node) => node.props.accessibilityLabel === "게시글 불러오는 중"),
+      false,
+    );
+    assert.equal(nodes(tree, "ErrorState").length, 1);
+    const fab = nodes(tree, "Fab")[0];
+    fab.props.onPress();
+    fab.props.onPress();
+    assert.deepEqual(state.toasts, Array(2).fill("연결 상태를 확인한 후 다시 시도해 주세요."));
+    assert.equal(checks, 0);
+    assert.equal(state.destination(), undefined);
+    nodes(tree, "ErrorState")[0].props.onRetry();
+    assert.equal(state.toasts.length, 3);
+  }
+});
+
+test("작성 권한 확인 도중 끊긴 연결과 서버 오류는 서로 다른 Toast를 표시한다", async () => {
+  for (const [message, expected] of [
+    ["TypeError: Network request failed", "연결 상태를 확인한 후 다시 시도해 주세요."],
+    ["HTTP 500", "요청을 처리하지 못했습니다. 다시 시도해 주세요."],
+  ]) {
+    const state = screenMocks();
+    state.mocks["@/api/accountAccess"] = {
+      ensureCommunityWriteAllowed: async () => {
+        throw { message };
+      },
+      restrictionMessage: () => null,
+    };
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+    nodes(DiggleScreen(), "Fab")[0].props.onPress();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(state.toasts, [expected]);
+    assert.equal(state.destination(), undefined);
+  }
+});
+
+test("연결 확인 중에는 스켈레톤을 표시하지 않고 오프라인 전환 시 기존 게시글을 유지한다", async () => {
+  const state = screenMocks({ feed: { isPending: true } });
+  state.mocks["expo-network"].useNetworkState = () => ({});
+  let { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const tree = DiggleScreen();
+  assert.equal(nodes(tree, "ErrorState").length, 0, "미확정 상태를 오프라인으로 오인하지 않는다");
+  assert.equal(
+    nodes(tree, "View").some((node) => node.props.accessibilityLabel === "게시글 불러오는 중"),
+    false,
+  );
+  assert.equal(nodes(tree, "Fab")[0].props.isDisabled, true);
+
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const cached = screenMocks({ feed: { data: { pages: [[post]] } } });
+  cached.mocks["expo-network"].useNetworkState = () => ({
+    isConnected: true,
+    isInternetReachable: false,
+  });
+  ({ DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", cached.mocks));
+  const cachedTree = DiggleScreen();
+  assert.equal(nodes(cachedTree, "ErrorState").length, 0);
+  assert.equal(nodes(cachedTree, "Post").length, 1);
+});
 
 test("비회원 상세 직접 진입은 로그인 안내로 차단하고 없는 글에 목업을 보여주지 않는다", () => {
   let state = screenMocks({ session: null });
@@ -625,21 +713,55 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   const state = screenMocks({
     post,
     comments: [
-      { id: "1", isPostAuthor: true, body: "글쓴이 댓글", createdAt: PREVIEW.created_at },
-      { id: "2", isMine: true, anonNumber: 1, body: "줄바꿈\n댓글", createdAt: PREVIEW.created_at },
+      {
+        id: "1",
+        authorNickname: "느긋한디기12",
+        isPostAuthor: true,
+        body: "글쓴이 댓글",
+        createdAt: PREVIEW.created_at,
+      },
+      {
+        id: "2",
+        authorNickname: "다정한디기34",
+        isMine: true,
+        anonNumber: 1,
+        body: "줄바꿈\n댓글",
+        createdAt: PREVIEW.created_at,
+      },
       { id: "3", isWithdrawn: true, body: null, createdAt: PREVIEW.created_at },
     ],
   });
+  let hookIndex = 0;
+  let reportTarget;
+  state.mocks.react.useState = (initial) => {
+    const current = hookIndex++;
+    return [
+      initial,
+      (value) => {
+        if (current === 0) reportTarget = value;
+      },
+    ];
+  };
   const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
   const screen = PostDetailScreen({});
   const comments = nodes(screen, "Comment");
-  assert.equal(comments[0].props.author, "글쓴이");
-  assert.equal(comments[1].props.author, "디기 1(나)");
+  assert.equal(comments[0].props.author, "느긋한디기12 (글쓴이)");
+  assert.equal(comments[1].props.author, "다정한디기34 (나)");
   assert.equal(comments[1].props.body, "줄바꿈 댓글");
   assert.equal(comments[2].props.isDeleted, true);
   assert.equal(typeof comments[0].props.onPressReport, "function");
   assert.equal(comments[1].props.onPressReport, undefined);
   assert.equal(comments[2].props.onPressReport, undefined);
+  assert.equal(typeof comments[0].props.onPressBlock, "function");
+  assert.equal(comments[1].props.onPressBlock, undefined);
+  assert.equal(comments[2].props.onPressBlock, undefined);
+  assert.equal(typeof comments[1].props.onPressMenu, "function");
+  assert.equal(comments[0].props.onPressMenu, undefined);
+  assert.equal(comments[2].props.onPressMenu, undefined);
+  comments[0].props.onPressBlock();
+  assert.deepEqual({ ...reportTarget }, { type: "comment", id: "1", action: "block" });
+  comments[0].props.onPressReport();
+  assert.deepEqual({ ...reportTarget }, { type: "comment", id: "1" });
   assert.equal(typeof nodes(screen, "LikeCommentRow")[0].props.onPressLike, "function");
   assert.equal(nodes(screen, "PostItemInfoSheet")[0].props.onSaveToAll, undefined);
 });
@@ -660,6 +782,42 @@ test("서버가 비공개로 내려준 투표 집계는 작성자·마감 화면
     .map((node) => React.Children.toArray(node.props.children).join(""))
     .join(" ");
   assert.ok(!text.includes("0명"));
+});
+
+test("게시글·투표 상세는 타인 글에 신고·차단 메뉴를 제공하고 본인 글은 삭제를 유지한다", async () => {
+  for (const type of ["post", "vote"]) {
+    for (const isMine of [false, true]) {
+      const post = await api({ ...MEMBER, type, is_mine: isMine }).fetchCommunityPost("12");
+      const state = screenMocks({ post });
+      let hookIndex = 0;
+      let selectedTarget;
+      state.mocks.react.useState = (initial) => {
+        const current = hookIndex++;
+        return [
+          initial,
+          (value) => {
+            if (current === 0) selectedTarget = value;
+          },
+        ];
+      };
+      const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+      const tree = PostDetailScreen({ type: type === "vote" ? "vote" : "all" });
+      const bar = React.Children.toArray(tree.props.children)[0];
+      if (isMine) assert.equal(bar.props.right.props.children, "삭제");
+      else {
+        const menu = bar.props.right;
+        assert.equal(menu.type, "ReportBlockMenu");
+        assert.equal(menu.props.placement, "header");
+        assert.equal(menu.props.isDisabled, false);
+        assert.equal(typeof menu.props.onReport, "function");
+        assert.equal(typeof menu.props.onBlock, "function");
+        menu.props.onBlock();
+        assert.deepEqual({ ...selectedTarget }, { type: "post", id: "12", action: "block" });
+        menu.props.onReport();
+        assert.deepEqual({ ...selectedTarget }, { type: "post", id: "12" });
+      }
+    }
+  }
 });
 
 test("상세 URL의 종류가 다르면 실제 글 주소로 교체하며 없는 글 안내를 띄우지 않는다", async () => {
@@ -766,6 +924,12 @@ test("피드·상세 첫 조회 실패는 화면 안내만 표시하고 기존 �
     const tree = PostDetailScreen({});
     assert.equal(detail.toasts.length, hasData ? 1 : 0);
     assert.equal(nodes(tree, "ErrorState").length, hasData ? 0 : 1);
+    // BUG-075 상세 조회 실패 문구
+    if (!hasData)
+      assert.equal(
+        nodes(tree, "ErrorState")[0].props.message,
+        "게시글을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.",
+      );
     const feed = screenMocks({
       feed: { data: { pages: [hasData ? [post] : []] }, isError: true, error },
     });
@@ -778,7 +942,7 @@ test("피드·상세 첫 조회 실패는 화면 안내만 표시하고 기존 �
     if (!hasData)
       assert.equal(
         errorStates[0].props.message,
-        "게시글을 불러오지 못했습니다. 다시 시도해 주세요.",
+        "게시글을 불러올 수 없습니다.\n다시 시도해 주세요.",
       );
   }
 });

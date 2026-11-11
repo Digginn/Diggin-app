@@ -180,6 +180,12 @@ test("저장은 빈 가격·이미지·위시레벨을 보내지 않아 null로 
   assert.equal(calls[1].args.product_price, 0, "직접 입력한 0원은 0으로 보낸다");
   assert.equal(calls[1].args.product_wish_level, "high");
   assert.deepEqual([...calls[1].args.folder_ids], [3, 5]);
+  await api.saveProduct({ ...values, restrictionLabels: ["신발", "전체이용가"] });
+  assert.deepEqual(
+    [...calls[2].args.product_restriction_labels],
+    ["신발", "전체이용가"],
+    "추출한 카테고리·연령 표시를 서버 검사에 전달한다",
+  );
 });
 
 test("같은 링크면 저장하지 않았다는 표시와 기존 상품 id를 돌려준다(SAVE-012)", async () => {

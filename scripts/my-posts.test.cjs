@@ -78,6 +78,8 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
                 activity: (viewer, kind) => ["community", viewer, "activity", kind],
               },
             };
+          if (name === "@/screens/diggle/utils/formatCommunityAuthor")
+            return load("../src/screens/diggle/utils/formatCommunityAuthor.ts");
           if (name === "@/screens/diggle/utils/formatCommunityTime")
             return {
               formatCommunityTime: () => "방금 전",

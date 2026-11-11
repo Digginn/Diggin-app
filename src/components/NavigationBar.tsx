@@ -1,6 +1,6 @@
 import { type Tabs } from "expo-router";
 import type { ComponentProps, FC } from "react";
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import type { SvgProps } from "react-native-svg";
 
 import {
@@ -33,7 +33,7 @@ const TABS: Record<string, TabConfig> = {
   my: { label: "MY", ActiveIcon: IconMyActive, InactiveIcon: IconMyInactive },
 };
 
-export function NavigationBar({ state, descriptors, navigation }: NavigationBarProps) {
+export function NavigationBar({ state, descriptors, navigation, insets }: NavigationBarProps) {
   // 화면이 tabBarStyle에 display: "none"을 주면 탭바를 감춘다. (ALL 탭 선택 모드 등)
   // tabBarStyle 타입이 Animated까지 품고 있어, 우리가 넘기는 평범한 객체로 좁혀서 읽는다.
   const tabBarStyle = descriptors[state.routes[state.index].key]?.options.tabBarStyle as
@@ -44,6 +44,7 @@ export function NavigationBar({ state, descriptors, navigation }: NavigationBarP
     <View
       className="flex-row items-center justify-center gap-gutter rounded-t-[20px] bg-gray-900 px-margin"
       style={{
+        paddingBottom: Platform.OS === "android" ? insets.bottom : 0,
         boxShadow: "0px 0px 6px rgba(0, 0, 0, 0.12)",
       }}
     >

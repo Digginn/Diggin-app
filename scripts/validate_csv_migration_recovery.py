@@ -1,16 +1,19 @@
-"""Reproduce the shared DB's folder-first history on a disposable local DB."""
+"""Reproduce the shared DB's reviewed migration gaps on a disposable local DB."""
 
+import argparse
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 
-from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, deployment_plan, migration_files
+from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, PROFANITY_BASELINE, PROFANITY_RECOVERY, deployment_plan, migration_files
 
 
-def validate():
+def validate(profanity=False):
     root = Path(__file__).resolve().parent.parent
+    baseline = PROFANITY_BASELINE if profanity else RECOVERY_BASELINE
+    recovery = PROFANITY_RECOVERY if profanity else CSV_RECOVERY
     with tempfile.TemporaryDirectory(prefix="diggin-csv-recovery-") as temporary:
         workdir = Path(temporary)
         project = workdir / "supabase"
@@ -20,10 +23,9 @@ def validate():
         (project / "config.toml").write_text(config, encoding="utf-8")
         migrations = migration_files(root / "supabase/migrations")
         (project / "migrations").mkdir()
-        # Reproduce the history at the folder deployment, before later features
-        # started depending on the missing CSV tables.
+        # Reproduce the exact baseline before restoring the missing original files.
         for version, path in migrations.items():
-            if version <= RECOVERY_BASELINE and path.name not in CSV_RECOVERY:
+            if version <= baseline and path.name not in recovery:
                 shutil.copy2(path, project / "migrations" / path.name)
         shutil.copytree(root / "supabase/tests", project / "tests")
 
@@ -33,22 +35,21 @@ def validate():
         try:
             cli("db", "start")
             cli("db", "reset", "--local", "--no-seed")
-            # Restore only the two original files after the folder migrations are applied.
-            for name in CSV_RECOVERY:
+            for name in recovery:
                 shutil.copy2(root / "supabase/migrations" / name, project / "migrations" / name)
             history = subprocess.run(
                 ["supabase", "migration", "list", "--local", "--output-format", "text"],
                 cwd=workdir, text=True, capture_output=True, check=True,
             ).stdout
             pending, include_all = deployment_plan(project / "migrations", history)
-            if set(pending) != set(CSV_RECOVERY) or not include_all:
-                raise ValueError("Disposable DB did not reproduce the expected CSV recovery state")
+            if set(pending) != set(recovery) or not include_all:
+                raise ValueError("Disposable DB did not reproduce the expected recovery state")
             subprocess.run(
                 [sys.executable, str(root / "scripts/deploy_shared_db.py"), "--local"],
                 cwd=workdir, check=True,
             )
             # Only after recovery, apply later migrations through the normal path.
-            later = [path for version, path in migrations.items() if version > RECOVERY_BASELINE]
+            later = [path for version, path in migrations.items() if version > baseline]
             for path in later:
                 shutil.copy2(path, project / "migrations" / path.name)
             history = subprocess.run(
@@ -70,4 +71,6 @@ def validate():
 
 
 if __name__ == "__main__":
-    validate()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profanity", action="store_true", help="Reproduce the direct-block-first history")
+    validate(parser.parse_args().profanity)

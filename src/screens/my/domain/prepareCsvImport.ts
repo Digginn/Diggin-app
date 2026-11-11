@@ -1,6 +1,10 @@
 import Papa from "papaparse";
 import { splitGraphemes } from "unicode-segmenter/grapheme";
 
+import {
+  isRestrictedProduct,
+  normalizeRestrictionLabels,
+} from "../../save/domain/restrictedProduct";
 import type {
   CsvDuplicateRow,
   CsvExistingProduct,
@@ -217,8 +221,7 @@ export function prepareCsvImport(
 
       totalCount++;
       const rowHeaders = headers;
-      const cell = (header: (typeof CSV_REQUIRED_HEADERS)[number]) =>
-        data[rowHeaders.indexOf(header)] ?? "";
+      const cell = (header: string) => data[rowHeaders.indexOf(header)] ?? "";
       const name = normalizeProductText(cell("상품명"), MAX_PRODUCT_NAME_LENGTH);
       const url = cell("상품 링크");
       const fail = (reason: CsvRowFailureReason) => {
@@ -230,6 +233,18 @@ export function prepareCsvImport(
       }
       if (!name) {
         fail("EMPTY_PRODUCT_NAME");
+        return;
+      }
+      // 이름을 100자로 자르기 전에 원문과 선택 열을 검사한다. 없는 열은 빈 값이다.
+      const restrictionLabels = ["상품 카테고리", "카테고리", "연령 제한", "연령제한", "성인인증"]
+        .map(cell)
+        .filter(Boolean);
+      if (/^(?:y|true|1)$/i.test(cell("성인인증").trim())) restrictionLabels.push("성인인증");
+      if ([cell("연령 제한"), cell("연령제한")].some((value) => /^(?:18|19)$/.test(value.trim()))) {
+        restrictionLabels.push("18+");
+      }
+      if (isRestrictedProduct(cell("상품명"), restrictionLabels)) {
+        fail("RESTRICTED_PRODUCT");
         return;
       }
       if (!url.trim()) {
@@ -260,6 +275,9 @@ export function prepareCsvImport(
         rowNumber,
         savedAtTime,
         product: {
+          ...(restrictionLabels.length
+            ? { restrictionLabels: normalizeRestrictionLabels(restrictionLabels) }
+            : {}),
           rowNumber,
           name,
           url,

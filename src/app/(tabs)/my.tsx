@@ -17,7 +17,7 @@ export default function MyRoute() {
         router.replace("/");
       }}
       onWithdraw={async (survey) => {
-        await withdrawAccount(survey);
+        if ((await withdrawAccount(survey)) === "cancelled") return "cancelled";
         // 계정이 지워져 세션 갱신이 실패하면 로그인 만료 안내가 완료 창을 덮는다. 바로 이 기기에서 로그아웃한다.
         await signOut().catch(() => undefined);
       }}

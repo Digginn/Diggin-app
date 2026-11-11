@@ -22,7 +22,10 @@ declare
   saved_id bigint;
   owned_count integer;
   item_count integer := coalesce(cardinality(product_ids), 0);
-  normalized_content text := normalize(btrim(post_content), NFC);
+  -- BUG-092 빈 줄은 한 줄까지만 남긴다. 공백만 있는 줄도 빈 줄로 본다.
+  normalized_content text := regexp_replace(
+    normalize(btrim(replace(replace(post_content, E'\r\n', E'\n'), E'\r', E'\n')), NFC),
+    U&'\000A([\0009\000B\000C\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]*\000A){2,}', E'\n\n', 'g');
   saved_at timestamptz := now();
 begin
   perform private.assert_can_write_community();
@@ -38,6 +41,9 @@ begin
   if post_kind is null or normalized_content is null or
      private.char_count(regexp_replace(normalized_content, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]', '', 'g')) not between 5 and 50 then
     raise exception 'invalid_post_content' using errcode = '22023';
+  end if;
+  if private.contains_community_profanity(normalized_content) then
+    raise exception 'community_profanity' using errcode = '22023';
   end if;
   if (post_kind = 'post' and item_count not between 1 and 4) or
      (post_kind = 'vote' and item_count <> 1) or

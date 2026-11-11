@@ -1,4 +1,4 @@
-// 공유 확장에서는 글자 크기 배율이 켜져 있으면 Pretendard 글자가 그려지지 않는다(expo-share-extension 안내, #91).
+// MVP는 기기 글자 크기와 관계없이 1.0배로 고정한다(BUG-105, ISS-062). 공유 확장은 배율이 켜져 있으면 Pretendard 글자가 그려지지 않는다(#91).
 // 각 컴포넌트 모듈은 읽기 전용으로 내보내져 바꿀 수 없어서, 앱 코드가 쓰는 react-native 입구의 getter를 다시 정의한다.
 const { createElement, forwardRef } = require("react");
 const ReactNative = require("react-native");

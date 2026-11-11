@@ -1,5 +1,6 @@
 /** 상품 페이지 안에서 모은 재료. 무엇을 쓸지는 normalizeProductPage가 정한다. */
 export type ProductPageRaw = {
+  restrictionLabels?: string[];
   finalUrl: string;
   og: {
     title: string | null;
@@ -14,6 +15,7 @@ export type ProductPageRaw = {
     saleCurrency: string | null;
   };
   ld: {
+    restrictionLabels?: string[];
     name: string | null;
     brand: string | null;
     image: string | null;
@@ -74,6 +76,11 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
         const spec = [].concat(offer.priceSpecification || [])[0] || {};
         const brand = [].concat(product.brand || [])[0];
         return {
+          restrictionLabels: [
+            product.category,
+            product.audience && product.audience.suggestedMinAge >= 18 ? "18+" : null,
+            product.isFamilyFriendly === false ? "성인" : null,
+          ].flat().filter((value) => typeof value === "string"),
           name: product.name || null,
           brand: (brand && (brand.name || brand)) || null,
           image: ((image) => (image && (image.url || image.contentUrl)) || image || null)(
@@ -188,8 +195,18 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
 
   const read = () => {
     const currency = meta("product:price:currency") || meta("og:price:currency");
+    const ld = readLd();
+    const restrictionLabels = [
+      ...((ld && ld.restrictionLabels) || []),
+      meta("product:category"), meta("category"), meta("rating"),
+      meta("product:age_restriction"), meta("age-restriction"),
+      /^(18|19)$/.test(meta("age-restriction") || meta("product:age_restriction") || "") ? "18+" : null,
+      ...Array.from(document.querySelectorAll('[itemprop="category"], [data-age-restriction]'))
+        .map((element) => element.getAttribute("content") || element.getAttribute("data-age-restriction") || element.textContent),
+    ].filter((value) => typeof value === "string" && value.trim());
     return {
       finalUrl: location.href,
+      ...(restrictionLabels.length ? { restrictionLabels } : {}),
       og: {
         title: meta("og:title"),
         image: meta("og:image"),
@@ -202,13 +219,24 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
         // 할인가 통화를 따로 안 적는 쇼핑몰은 정가 통화를 쓴다.
         saleCurrency: meta("product:sale_price:currency") || currency,
       },
-      ld: readLd(),
+      ld,
       shop: readShop(),
       md: readMicrodata(),
       eg: readEg(),
     };
   };
 
+  // 쿠팡 공유 짧은 링크의 중간 페이지는 앱 실행을 시도하고 300ms 타이머로만 웹으로 넘긴다. 앱 복귀 직후처럼
+  // 타이머가 600ms 넘게 늦으면 넘기지 않고 멈춰서, 페이지의 '모바일 웹으로 보기' 버튼을 직접 누른다(BUG-104).
+  if (location.hostname === "link.coupang.com") {
+    const openWeb = () => {
+      const button = document.getElementById("goWeb");
+      if (button) button.click();
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", openWeb);
+    else openWeb();
+    return;
+  }
   const isAppLinkLanding = ${APP_LINK_HOST}.test(location.hostname);
   // 중간 페이지가 웹으로 넘겨 주지 않는 경우(오늘의집)가 있어, 주소에 담긴 웹 대체 주소로 직접 옮긴다.
   if (isAppLinkLanding) {

@@ -14,11 +14,26 @@ function request(payload: unknown, token: string | null = "valid") {
     body: JSON.stringify(payload),
   });
 }
-function setup(fail: Partial<Record<"avatars" | "user" | "survey", boolean>> = {}) {
+function setup(
+  fail: Partial<Record<"avatars" | "user" | "survey" | "appleToken" | "appleRevoke", boolean>> = {},
+  apple: { subject: string | null; codeSubject?: string } = { subject: null },
+) {
   const calls: string[] = [];
   const handler = createWithdrawalHandler({
     authenticate: (token) =>
       token === "valid" ? Promise.resolve(userId) : Promise.reject(new Error("bad_token")),
+    appleSubject: () => Promise.resolve(apple.subject),
+    exchangeAppleCode: (code) => {
+      calls.push("apple-token:" + code);
+      return fail.appleToken ? Promise.reject(new Error("x")) : Promise.resolve({
+        subject: apple.codeSubject ?? apple.subject ?? "",
+        refreshToken: "refresh-" + code,
+      });
+    },
+    revokeAppleToken: (token) => {
+      calls.push("apple-revoke:" + token);
+      return fail.appleRevoke ? Promise.reject(new Error("x")) : Promise.resolve();
+    },
     removeAvatars: (id) => {
       calls.push("avatars:" + id);
       return fail.avatars ? Promise.reject(new Error("x")) : Promise.resolve();
@@ -61,8 +76,6 @@ Deno.test("사진 → 계정 → 설문 순서로 지우고, 본문의 사용자
 Deno.test("잘못된 설문은 지우기 전에 거부한다", async () => {
   for (
     const payload of [
-      { reasons: [] },
-      { reasons: [], custom_text: "   " },
       { reasons: ["unknown"] },
       { reasons: ["rarely_used", "rarely_used"] },
       { reasons: ["rarely_used"], custom_text: "가".repeat(101) },
@@ -104,4 +117,76 @@ Deno.test("사진이나 계정 삭제에 실패하면 실패로 알리고 설문
 Deno.test("계정을 지운 뒤 설문 저장이 실패해도 탈퇴는 성공이다", async () => {
   const { handler } = setup({ survey: true });
   assert((await handler(request({ reasons: ["rarely_used"] }))).status === 200);
+});
+
+Deno.test("애플 가입자는 재인증 코드로 토큰을 해지한 뒤에 지운다", async () => {
+  const { handler, calls } = setup({}, { subject: "apple-sub" });
+  const response = await handler(
+    request({ reasons: ["rarely_used"], apple_authorization_code: "code-1" }),
+  );
+  assert(response.status === 200);
+  assert(
+    JSON.stringify(calls.slice(0, 4)) === JSON.stringify([
+      "apple-token:code-1",
+      "apple-revoke:refresh-code-1",
+      "avatars:" + userId,
+      "user:" + userId,
+    ]),
+  );
+});
+
+Deno.test("애플 가입자가 코드 없이 오거나 다른 애플 계정으로 재인증하면 지우지 않는다", async () => {
+  const missing = setup({}, { subject: "apple-sub" });
+  const noCode = await missing.handler(request({ reasons: ["rarely_used"] }));
+  assert(noCode.status === 400);
+  assert((await noCode.json()).error === "apple_reauth_required");
+  assert(missing.calls.length === 0);
+
+  const other = setup({}, { subject: "apple-sub", codeSubject: "someone-else" });
+  const mismatch = await other.handler(
+    request({ reasons: ["rarely_used"], apple_authorization_code: "code-2" }),
+  );
+  assert(mismatch.status === 403);
+  assert(!other.calls.some((call) => call.startsWith("apple-revoke:")));
+  assert(!other.calls.some((call) => call.startsWith("user:")));
+});
+
+Deno.test("애플 토큰 발급이나 해지에 실패하면 계정을 남기고 실패로 알린다", async () => {
+  for (const fail of [{ appleToken: true }, { appleRevoke: true }]) {
+    const { handler, calls } = setup(fail, { subject: "apple-sub" });
+    const response = await handler(
+      request({ reasons: ["rarely_used"], apple_authorization_code: "code-3" }),
+    );
+    assert(response.status === 503);
+    assert((await response.json()).error === "apple_revoke_failed");
+    assert(!calls.some((call) => call.startsWith("avatars:") || call.startsWith("user:")));
+  }
+});
+
+Deno.test("애플 가입자가 아니면 코드를 보내도 애플을 부르지 않는다", async () => {
+  const { handler, calls } = setup();
+  const response = await handler(
+    request({ reasons: ["rarely_used"], apple_authorization_code: "code-4" }),
+  );
+  assert(response.status === 200);
+  assert(!calls.some((call) => call.startsWith("apple-")));
+});
+
+Deno.test("잘못된 애플 코드 형식은 지우기 전에 거부한다", async () => {
+  for (const code of ["", 1, "a".repeat(1025)]) {
+    const { handler, calls } = setup({}, { subject: "apple-sub" });
+    const payload = { reasons: ["rarely_used"], apple_authorization_code: code };
+    assert((await handler(request(payload))).status === 400);
+    assert(calls.length === 0);
+  }
+});
+
+Deno.test("설문을 고르지 않아도 탈퇴하고 빈 설문은 남기지 않는다", async () => {
+  for (const payload of [{ reasons: [] }, { reasons: [], custom_text: "   " }]) {
+    const { handler, calls } = setup();
+    const response = await handler(request(payload));
+    assert(response.status === 200);
+    assert(calls.some((call) => call.startsWith("user:")));
+    assert(!calls.some((call) => call.startsWith("survey:")));
+  }
 });

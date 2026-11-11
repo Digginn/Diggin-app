@@ -55,6 +55,11 @@ select is((select name from private.post_products where post_id=current_setting(
 select is((select count(*) from private.post_products where post_id=current_setting('test.post')::bigint),4::bigint,'원본 삭제 후 Snapshot 유지');
 set local role authenticated;
 select lives_ok($$select public.create_post('post',repeat('👍🏽',50),(current_setting('test.products')::bigint[])[3:3],gen_random_uuid())$$,'피부색 이모지 50자 허용');
+select set_config('test.blank',public.create_post('post',E'첫 줄입니다\n\n\n\n \n　\n둘째\r\n\r\n\r\n셋째\n\n넷째',(current_setting('test.products')::bigint[])[3:3],gen_random_uuid()),true);
+reset role;
+-- BUG-092 연속 빈 줄은 한 줄로 줄이고 공백만 있는 줄도 빈 줄로 보며, 빈 줄 하나는 그대로 둔다.
+select is((select content from private.posts where id=current_setting('test.blank')::bigint),E'첫 줄입니다\n\n둘째\n\n셋째\n\n넷째','빈 줄은 한 줄까지만 저장');
+set local role authenticated;
 select set_config('test.vote',public.create_post('vote','정상 투표 본문',(current_setting('test.products')::bigint[])[3:3],gen_random_uuid()),true);
 reset role;
 select is((select ends_at-created_at from private.posts where id=current_setting('test.vote')::bigint),interval '24 hours','투표 종료 서버 생성 시각+24시간');

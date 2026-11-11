@@ -63,6 +63,7 @@ function guideHarness({ records = new Map(), storageFailure = false } = {}) {
           focus = fn;
         },
         useLocalSearchParams: () => params,
+        useIsFocused: () => true,
       },
       "@/contexts/AuthContext": { useAuth: () => auth },
       "@/api/firstVisitGuides": mockApi,
@@ -174,12 +175,19 @@ test("복원 중·비회원·비활성 화면에는 표시하지 않고 계정 �
   assert.equal(visible.render().isVisible, false, "새 계정 첫 렌더에 이전 안내가 남지 않는다");
 });
 
-test("서버 실패에도 안내를 닫을 수 있고 개발 미리보기는 서버 기록을 변경하지 않는다", async () => {
+test("기록을 못 읽으면 안내를 띄우지 않고, 저장 실패에도 닫을 수 있으며 개발 미리보기는 서버 기록을 변경하지 않는다", async () => {
   const h = guideHarness({ storageFailure: true });
+  h.render();
+  const blur = h.focus();
+  await settleGuide();
+  assert.equal(h.render().isVisible, false, "오프라인에서는 이미 본 안내일 수 있어 띄우지 않는다");
+  assert.equal(h.render().isPending, false, "다른 모달을 막지 않는다");
+  blur();
+  h.deferRead(async () => []);
   h.render();
   h.focus();
   await settleGuide();
-  assert.equal(h.render().isVisible, true);
+  assert.equal(h.render().isVisible, true, "다음 진입 때 다시 확인한다");
   h.render().dismiss();
   await settleGuide();
   h.render();
@@ -190,10 +198,10 @@ test("서버 실패에도 안내를 닫을 수 있고 개발 미리보기는 서
   preview.params.guide = "all";
   preview.auth.session = null;
   preview.render();
-  const blur = preview.focus();
+  const previewBlur = preview.focus();
   assert.equal(preview.render().isVisible, true);
   preview.render().dismiss();
-  blur();
+  previewBlur();
   assert.equal(preview.reads.length, 0);
   assert.equal(preview.writes.length, 0);
 });
@@ -284,3 +292,25 @@ for (const os of ["android", "ios"]) {
     assert.equal(closeCount, 2);
   });
 }
+
+test("안내를 띄울지 확인하는 동안과 떠 있는 동안만 다른 모달을 막는다", async () => {
+  const h = guideHarness();
+  let resolveRead;
+  h.deferRead(() => new Promise((resolve) => (resolveRead = resolve)));
+  h.render();
+  h.focus();
+  assert.equal(h.render().isPending, true, "서버 기록 확인 중");
+  resolveRead([]);
+  await settleGuide();
+  assert.equal(h.render().isVisible, true);
+  assert.equal(h.render().isPending, true, "안내가 떠 있는 동안");
+  h.render().dismiss();
+  await settleGuide();
+  assert.equal(h.render().isPending, false, "닫은 뒤");
+
+  const seen = guideHarness({ records: new Map([["user-a", new Set(["all"])]]) });
+  seen.render();
+  seen.focus();
+  await settleGuide();
+  assert.equal(seen.render().isPending, false, "이미 본 안내는 확인이 끝나면 막지 않는다");
+});

@@ -4,18 +4,13 @@ import { cssInterop } from "nativewind";
 import { useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import CommentSvg from "@/assets/images/icon-comment.svg";
+import CommentSvg from "@/assets/images/icon-comment-small.svg";
 import HeartSvg from "@/assets/images/icon-heart.svg";
-import ReportSvg from "@/assets/images/icon-report.svg";
 import { FallbackImg } from "@/components/FallbackImg";
 import { ProductImg } from "@/components/ProductImg";
-import { colors } from "@/theme";
+import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 
 const StyledImage = cssInterop(Image, { className: "style" });
-
-// 댓글 아이콘은 24 프레임 기준이라 쓰는 크기에 맞춰 같은 비율로 줄임
-const SCALE = 16 / 24;
-const COMMENT = { width: 19.5 * SCALE, height: 16.93 * SCALE };
 
 const COLUMN_COUNT = 2;
 
@@ -36,12 +31,18 @@ type PostProps = {
   commentCount: number;
   onPress?: () => void;
   onPressReport?: () => void;
+  onPressBlock?: () => void;
   onPressItemInfo?: (item: PostItem) => void;
   isPreview?: boolean;
 };
 
 function Meta({ children }: { children: ReactNode }) {
   return <Text className="text-right text-gray-500 font-b4">{children}</Text>;
+}
+
+// DGL-02 좋아요·댓글 숫자는 시간·작성자와 달리 B3이다(BUG-113).
+function Count({ children }: { children: number }) {
+  return <Text className="text-gray-500 font-b3">{children}</Text>;
 }
 
 function VoteThumbnail({ url }: { url?: string | null }) {
@@ -84,6 +85,7 @@ export function Post({
   commentCount,
   onPress,
   onPressReport,
+  onPressBlock,
   onPressItemInfo,
   isPreview = false,
 }: PostProps) {
@@ -143,36 +145,28 @@ export function Post({
         {!isPreview && (
           // 신고 버튼이 없는 본인 글도 같은 간격이 되도록 버튼 높이(48)로 고정한다.
           <View className="h-12 w-full flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1.5">
+            <View className="min-w-0 flex-1 flex-row items-center gap-1.5">
               <Meta>{timeLabel}</Meta>
               <Text className="text-gray-500 font-b1">·</Text>
-              <Meta>{authorLabel}</Meta>
+              <Text numberOfLines={1} className="min-w-0 shrink text-right text-gray-500 font-b4">
+                {authorLabel}
+              </Text>
               <Text className="text-gray-500 font-b1">·</Text>
               <View className="flex-row items-center justify-end gap-2">
                 {likeCount !== undefined ? (
                   <View className="flex-row items-center justify-center gap-1">
                     <HeartSvg />
-                    <Meta>{likeCount}</Meta>
+                    <Count>{likeCount}</Count>
                   </View>
                 ) : null}
                 <View className="flex-row items-center justify-center gap-1">
-                  <CommentSvg {...COMMENT} color={colors.gray[500]} />
-                  <Meta>{commentCount}</Meta>
+                  <CommentSvg />
+                  <Count>{commentCount}</Count>
                 </View>
               </View>
             </View>
-            {onPressReport && (
-              <Pressable
-                accessibilityLabel="신고하기"
-                accessibilityRole="button"
-                className="size-12 flex-row items-center justify-end active:opacity-75"
-                onPress={(event) => {
-                  event.stopPropagation();
-                  onPressReport();
-                }}
-              >
-                <ReportSvg width={18} height={18} color={colors.gray[400]} />
-              </Pressable>
+            {onPressReport && onPressBlock && (
+              <ReportBlockMenu onReport={onPressReport} onBlock={onPressBlock} />
             )}
           </View>
         )}

@@ -8,6 +8,7 @@ import {
   fetchAccountAccess,
   SANCTION_REASON_LABELS,
 } from "@/api/accountAccess";
+import { UnderageNoticeModal } from "@/components/UnderageNoticeModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBrowsingMode } from "@/contexts/BrowsingModeContext";
 import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeModal";
@@ -75,9 +76,10 @@ export function AccountAccessNotice() {
   const isSuspended = !!suspension;
   const shouldShow =
     isSuspended || (pathname === "/diggle" && !state?.noticeSeenAt && !!state?.sanctionId);
-  const reasonLabel = state?.reasonCategory
-    ? SANCTION_REASON_LABELS[state.reasonCategory]
-    : "1:1 문의로 확인해 주세요.";
+  const reasonLabel =
+    state?.reasonCategory && state.reasonCategory !== "underage"
+      ? SANCTION_REASON_LABELS[state.reasonCategory]
+      : "1:1 문의로 확인해 주세요.";
   const notice: SanctionNotice | null =
     state?.status === "warning"
       ? { type: "warning" }
@@ -109,6 +111,8 @@ export function AccountAccessNotice() {
       }
     }
   }
+  if (isSuspended && state?.reasonCategory === "underage")
+    return <UnderageNoticeModal onConfirm={() => void confirm()} />;
   return notice && shouldShow ? (
     <SanctionNoticeModal
       visible

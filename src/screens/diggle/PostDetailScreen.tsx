@@ -27,6 +27,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { FloatingToolbar } from "@/components/FloatingToolbar";
 import { Spinner } from "@/components/Loading";
 import { ActionModal, LoginRequiredModal } from "@/components/modal";
+import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +50,7 @@ import { useCommunityVote } from "./hooks/useCommunityVote";
 import { useCommunityVoteTiming } from "./hooks/useCommunityVoteTiming";
 import { useCommunityComments, useCommunityPost } from "./queries/useCommunity";
 import type { CommunityComment, CommunityItem } from "./types/community";
+import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
@@ -262,12 +264,12 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               삭제
             </AppBar.TextButton>
           ) : post && !isWrongRoute ? (
-            <AppBar.TextButton
-              disabled={isBusy || infoItem !== null}
-              onPress={() => setReportTarget({ type: "post", id: post.id })}
-            >
-              신고
-            </AppBar.TextButton>
+            <ReportBlockMenu
+              placement="header"
+              isDisabled={isBusy || infoItem !== null}
+              onReport={() => setReportTarget({ type: "post", id: post.id })}
+              onBlock={() => setReportTarget({ type: "post", id: post.id, action: "block" })}
+            />
           ) : null
         }
       />
@@ -281,7 +283,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
       ) : !post ? (
         result.isError ? (
           <ErrorState
-            message={communityErrorMessage(result.error)}
+            // BUG-075 상세 조회 실패는 원인과 관계없이 이 문구로 안내한다.
+            message={"게시글을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요."}
             onRetry={() => void result.refetch()}
           />
         ) : (
@@ -321,7 +324,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             <>
               <View className="gap-3 px-margin pb-4">
                 <Text className="text-gray-500 font-b4">
-                  {post.isMine ? "글쓴이 (나)" : "글쓴이"} · {formatCommunityTime(post.createdAt)}
+                  {formatCommunityAuthor(post.authorNickname, post.isMine)} ·{" "}
+                  {formatCommunityTime(post.createdAt)}
                 </Text>
                 <Text className="text-gray-800 font-b3">{post.body}</Text>
                 <ProductImgGrid
@@ -367,9 +371,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               author={
                 comment.isWithdrawn
                   ? "(탈퇴한 사용자)"
-                  : comment.isPostAuthor
-                    ? "글쓴이"
-                    : `디기 ${comment.anonNumber ?? ""}${comment.isMine ? "(나)" : ""}`
+                  : formatCommunityAuthor(
+                      comment.authorNickname,
+                      comment.isMine,
+                      comment.isPostAuthor,
+                    )
               }
               body={normalizeText(comment.body ?? "").replace(/\n/g, " ")}
               timeLabel={formatCommunityTime(comment.createdAt)}
@@ -380,6 +386,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                       Keyboard.dismiss();
                       setReportTarget({ type: "comment", id: comment.id });
                     }
+                  : undefined
+              }
+              onPressBlock={
+                !comment.isMine && !comment.isWithdrawn && !isBusy
+                  ? () => setReportTarget({ type: "comment", id: comment.id, action: "block" })
                   : undefined
               }
               isHighlighted={actions.editing?.id === comment.id}

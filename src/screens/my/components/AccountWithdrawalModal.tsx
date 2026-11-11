@@ -10,7 +10,8 @@ type AccountWithdrawalModalProps = {
   isVisible: boolean;
   onClose: () => void;
   // 실제 탈퇴 요청은 설문 제출 시 실행하며, 성공한 뒤에만 완료 창을 표시합니다.
-  onWithdraw?: (survey: WithdrawalSurvey) => Promise<void>;
+  /** 애플 재인증을 취소하면 "cancelled"를 돌려준다. 실패 안내 없이 설문 화면에 머문다. */
+  onWithdraw?: (survey: WithdrawalSurvey) => Promise<"cancelled" | void>;
   /** MY-007 완료 확인. 계정이 이미 없어 앱 처음으로 보낸다. */
   onComplete?: () => void;
 };
@@ -57,7 +58,7 @@ export function AccountWithdrawalModal({
     isWithdrawingRef.current = true;
     setIsWithdrawing(true);
     try {
-      await onWithdraw(survey);
+      if ((await onWithdraw(survey)) === "cancelled") return;
       setIsSurveyOpen(false);
       setIsCompletionOpen(true);
       setModalToast(undefined);

@@ -21,7 +21,10 @@ export function PolicyDocumentScreen({ document }: { document: PolicyDocument })
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-margin pt-6"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        // 이용약관·개인정보 시안의 하단 여백은 문서 마지막 Spacer에 포함돼 있다.
+        contentContainerStyle={{
+          paddingBottom: insets.bottom + (document === "community" ? 24 : 0),
+        }}
       >
         <PolicyDocumentContent document={document} />
       </ScrollView>
