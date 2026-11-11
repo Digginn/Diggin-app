@@ -39,7 +39,7 @@ export function CommunityPolicySheet({
     >
       {/* 본문만 스크롤하고 버튼은 시트 아래에 고정한다. */}
       <View className="flex-1 gap-4 px-margin">
-        <Text className="text-gray-1000 font-label-18-semibold">커뮤니티 이용규칙</Text>
+        <Text className="text-gray-1000 font-label-18-semibold">커뮤니티 이용정책</Text>
         {/* 스크롤 영역을 시트 끝까지 넓혀 스크롤바가 본문과 겹치지 않게 한다(BUG-082). */}
         <View className="-mx-margin flex-1">
           <ScrollView

@@ -28,7 +28,11 @@ runInNewContext(compiled, {
   clearTimeout: () => {},
   require: (name) => {
     if (name.endsWith("useFirstVisitGuide"))
-      return { useFirstVisitGuide: () => ({ isVisible: isGuideVisible }) };
+      return {
+        useFirstVisitGuide: (_kind, isEnabled = true) => ({
+          isVisible: isGuideVisible && isEnabled,
+        }),
+      };
     if (name.endsWith("FirstVisitGuide")) return { FirstVisitGuide: "FirstVisitGuide" };
     if (name.endsWith("useLinkDetectionPause")) return { useLinkDetectionPause: () => {} };
     if (name === "react-native") {
@@ -423,6 +427,42 @@ test("6개까지 2열, 7개부터 3열이며 마지막 행의 빈 칸을 유지�
   }
 });
 
+test("첫 조회 중에는 오프라인 오류 화면이 뜨기 전이라도 FAB를 숨긴다", () => {
+  const tree = screenModule.exports.FolderScreen({ isLoading: true });
+  assert.equal(
+    findAll(tree, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+      .length,
+    0,
+  );
+});
+
+test("폴더 목록이 준비되기 전에는 첫 방문 안내를 보류하고 완료 후 안내와 FAB를 함께 표시한다", () => {
+  try {
+    isGuideVisible = true;
+    const loading = screenModule.exports.FolderScreen({ isLoading: true, folders: [] });
+    assert.equal(findAll(loading, "FirstVisitGuide").length, 0);
+    assert.equal(
+      findAll(loading, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+        .length,
+      0,
+    );
+
+    const ready = screenModule.exports.FolderScreen({
+      isLoading: false,
+      folders: [{ id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true }],
+    });
+    assert.equal(findAll(ready, "FirstVisitGuide").length, 1);
+    assert.equal(findAll(ready, "FolderCard").length, 1);
+    assert.equal(
+      findAll(ready, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+        .length,
+      1,
+    );
+  } finally {
+    isGuideVisible = false;
+  }
+});
+
 test("조회 오류는 기존 목록과 FAB를 숨기고 재시도 콜백을 호출한다", () => {
   let retryCount = 0;
   const tree = screenModule.exports.FolderScreen({
@@ -481,12 +521,22 @@ test("공용 오류 화면은 남은 영역이 아니라 기기 화면 전체 �
   assert.equal(offset, 812 / 2 - (106 + 626 / 2));
   const content = render({ onRetry() {} }).props.children;
   assert.equal(
+    content.props.pointerEvents,
+    "box-none",
+    "위로 옮긴 빈 영역이 상단 컨트롤의 터치를 막지 않는다",
+  );
+  assert.equal(
     content.props.style.transform[0].translateY,
     -13,
     "앱 바·탭 바 차이의 절반만큼 올린다",
   );
   const button = findAll(render({}), "Button")[0];
   assert.equal(button.props.isDisabled, true);
+  let retries = 0;
+  const retryButton = findAll(render({ onRetry: () => retries++ }), "Button")[0];
+  assert.equal(retryButton.props.isDisabled, false);
+  retryButton.props.onPress();
+  assert.equal(retries, 1, "빈 영역은 통과시키되 다시 시도 버튼은 동작한다");
 });
 
 function findAll(node, type) {

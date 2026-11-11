@@ -12,7 +12,7 @@ export const SANCTION_REASON_LABELS = {
   abuse: "욕설, 비방, 인신 공격",
   spam: "스팸, 광고",
   inappropriate: "부적절한 콘텐츠",
-  other: "기타 커뮤니티 이용규칙 위반",
+  other: "기타 커뮤니티 이용정책 위반",
 };
 
 export function parseAccountAccess(value: unknown): AccountAccess {
