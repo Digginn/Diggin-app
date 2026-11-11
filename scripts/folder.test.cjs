@@ -28,7 +28,11 @@ runInNewContext(compiled, {
   clearTimeout: () => {},
   require: (name) => {
     if (name.endsWith("useFirstVisitGuide"))
-      return { useFirstVisitGuide: () => ({ isVisible: isGuideVisible }) };
+      return {
+        useFirstVisitGuide: (_kind, isEnabled = true) => ({
+          isVisible: isGuideVisible && isEnabled,
+        }),
+      };
     if (name.endsWith("FirstVisitGuide")) return { FirstVisitGuide: "FirstVisitGuide" };
     if (name.endsWith("useLinkDetectionPause")) return { useLinkDetectionPause: () => {} };
     if (name === "react-native") {
@@ -430,6 +434,33 @@ test("첫 조회 중에는 오프라인 오류 화면이 뜨기 전이라도 FAB
       .length,
     0,
   );
+});
+
+test("폴더 목록이 준비되기 전에는 첫 방문 안내를 보류하고 완료 후 안내와 FAB를 함께 표시한다", () => {
+  try {
+    isGuideVisible = true;
+    const loading = screenModule.exports.FolderScreen({ isLoading: true, folders: [] });
+    assert.equal(findAll(loading, "FirstVisitGuide").length, 0);
+    assert.equal(
+      findAll(loading, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+        .length,
+      0,
+    );
+
+    const ready = screenModule.exports.FolderScreen({
+      isLoading: false,
+      folders: [{ id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true }],
+    });
+    assert.equal(findAll(ready, "FirstVisitGuide").length, 1);
+    assert.equal(findAll(ready, "FolderCard").length, 1);
+    assert.equal(
+      findAll(ready, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+        .length,
+      1,
+    );
+  } finally {
+    isGuideVisible = false;
+  }
 });
 
 test("조회 오류는 기존 목록과 FAB를 숨기고 재시도 콜백을 호출한다", () => {

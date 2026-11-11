@@ -391,6 +391,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   let cursor = 0;
   let params = {};
   let isListError = false;
+  let isListPending = false;
   let isGuideVisible = false;
   let isCountsPending = false;
   const listArgs = [];
@@ -444,9 +445,9 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
       useProductList: (sortOrder, wishLevel) => {
         listArgs.push([sortOrder, wishLevel]);
         return {
-          isPending: false,
+          isPending: isListPending,
           isError: isListError,
-          data: { pages: [[{ id: "1", name: "아이템", price: 0 }]] },
+          data: isListPending ? undefined : { pages: [[{ id: "1", name: "아이템", price: 0 }]] },
         };
       },
     },
@@ -496,6 +497,12 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
   render();
   assert.equal(fab(), undefined, "오프라인 오류 화면이 뜨기 전 첫 조회 중에도 FAB를 숨긴다");
   isCountsPending = false;
+  isListPending = true;
+  render();
+  assert.equal(fab(), undefined, "개수 조회가 먼저 끝나도 목록의 첫 조회 중에는 FAB를 숨긴다");
+  isListPending = false;
+  render();
+  assert.ok(fab(), "개수와 목록 조회가 모두 완료되면 FAB를 복원한다");
   isListError = true;
   render();
   assert.ok(nodes(tree).some((node) => node.type === "ErrorState"));

@@ -63,7 +63,7 @@ export function AllScreen() {
   // 필터 결과가 비었을 때는 필터를 풀 수 있게 상단을 남긴다.
   const isEmpty = isGuest || (wishLevel === null && totalCount === 0);
   const isError = list.isError || counts.isError;
-  const isLoading = !isGuest && counts.isPending;
+  const isLoading = !isGuest && (counts.isPending || list.isPending);
 
   const [isSelectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());

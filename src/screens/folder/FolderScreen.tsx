@@ -64,7 +64,7 @@ export function FolderScreen({
   requireLogin = (action) => action(),
 }: FolderScreenProps = {}) {
   const { height } = useWindowDimensions();
-  const guide = useFirstVisitGuide("folder", !isError && !isGuest);
+  const guide = useFirstVisitGuide("folder", !isError && !isLoading && !isGuest);
   useLinkDetectionPause(guide.isPending, true);
   const ownedGuideRef = useRef<View>(null);
   const fabGuideRef = useRef<View>(null);
