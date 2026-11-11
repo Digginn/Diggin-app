@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { cssInterop } from "nativewind";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Linking, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -67,8 +67,14 @@ export function ItemDetailScreen() {
   const showToast = useToast();
   const wishGuideRef = useRef<View>(null);
   const voteGuideRef = useRef<View>(null);
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const product = useProduct(id);
+  const viewedId = product.isSuccess ? id : null;
+  useEffect(() => {
+    // shortcut: 검색·중복 안내로 연 상세는 entry_point 값이 정해지지 않아 보내지 않는다, 기획 확정 후 값을 추가한다.
+    if (viewedId && (from === "all" || from === "folder"))
+      trackEvent("saved_product_view", { product_id: viewedId, entry_point: from });
+  }, [viewedId, from]);
   const counts = useProductCounts();
   const updateProduct = useUpdateProduct(id);
   const item = product.data?.values;

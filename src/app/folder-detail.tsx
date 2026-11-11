@@ -62,7 +62,9 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
           void Promise.all([items.refetch(), counts.refetch()]);
         }}
         onBack={goBack}
-        onOpenItem={(item) => router.push({ pathname: "/items/[id]", params: { id: item.id } })}
+        onOpenItem={(item) =>
+          router.push({ pathname: "/items/[id]", params: { id: item.id, from: "folder" } })
+        }
         onEditFolder={() => setIsRenaming(true)}
         onDeleteFolder={() => setIsDeleteConfirmOpen(true)}
       />

@@ -150,6 +150,7 @@ test("폴더 상세 경로는 누른 아이템 ID로 기존 상세 화면을 연
   screen.props.onOpenItem({ id: "selected-item", name: "선택한 아이템", price: 0 });
   assert.equal(calls.destination.pathname, "/items/[id]");
   assert.equal(calls.destination.params.id, "selected-item");
+  assert.equal(calls.destination.params.from, "folder");
 });
 
 test("폴더 상세 조회 실패는 기존 데이터를 유지하고 연결 확인 토스트만 표시한다", () => {

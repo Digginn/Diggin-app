@@ -162,7 +162,7 @@ export function AllScreen() {
           }}
           selectedIds={isSelectMode ? selectedIds : undefined}
           onItemPress={(item) =>
-            isSelectMode ? toggleItem(item) : router.push(`/items/${item.id}`)
+            isSelectMode ? toggleItem(item) : router.push(`/items/${item.id}?from=all`)
           }
           header={
             <View className="gap-2 pt-4">
