@@ -32,6 +32,7 @@ export default function FolderRoute() {
         isGuest={isGuest}
         requireLogin={requireLogin}
         isError={!isGuest && folders.isError}
+        isLoading={!isGuest && folders.isPending}
         onRetry={() => void folders.refetch()}
         folders={isGuest ? undefined : (folders.data ?? [])}
         savedItemCount={counts.data?.total ?? 0}

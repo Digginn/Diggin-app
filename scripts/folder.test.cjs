@@ -28,7 +28,11 @@ runInNewContext(compiled, {
   clearTimeout: () => {},
   require: (name) => {
     if (name.endsWith("useFirstVisitGuide"))
-      return { useFirstVisitGuide: () => ({ isVisible: isGuideVisible }) };
+      return {
+        useFirstVisitGuide: (_kind, isEnabled = true) => ({
+          isVisible: isGuideVisible && isEnabled,
+        }),
+      };
     if (name.endsWith("FirstVisitGuide")) return { FirstVisitGuide: "FirstVisitGuide" };
     if (name.endsWith("useLinkDetectionPause")) return { useLinkDetectionPause: () => {} };
     if (name === "react-native") {
@@ -420,6 +424,42 @@ test("6개까지 2열, 7개부터 3열이며 마지막 행의 빈 칸을 유지�
     assert.ok(findAll(tree, "FolderCard").every((card) => card.props.columnCount === columnCount));
     for (const row of rows)
       assert.equal(React.Children.toArray(row.props.children).length, columnCount);
+  }
+});
+
+test("첫 조회 중에는 오프라인 오류 화면이 뜨기 전이라도 FAB를 숨긴다", () => {
+  const tree = screenModule.exports.FolderScreen({ isLoading: true });
+  assert.equal(
+    findAll(tree, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+      .length,
+    0,
+  );
+});
+
+test("폴더 목록이 준비되기 전에는 첫 방문 안내를 보류하고 완료 후 안내와 FAB를 함께 표시한다", () => {
+  try {
+    isGuideVisible = true;
+    const loading = screenModule.exports.FolderScreen({ isLoading: true, folders: [] });
+    assert.equal(findAll(loading, "FirstVisitGuide").length, 0);
+    assert.equal(
+      findAll(loading, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+        .length,
+      0,
+    );
+
+    const ready = screenModule.exports.FolderScreen({
+      isLoading: false,
+      folders: [{ id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true }],
+    });
+    assert.equal(findAll(ready, "FirstVisitGuide").length, 1);
+    assert.equal(findAll(ready, "FolderCard").length, 1);
+    assert.equal(
+      findAll(ready, "Pressable").filter((node) => node.props.accessibilityLabel === "폴더 추가")
+        .length,
+      1,
+    );
+  } finally {
+    isGuideVisible = false;
   }
 });
 
