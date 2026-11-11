@@ -1091,3 +1091,98 @@ test("사이트 이름으로 시작하는 상품명은 지우지 않고, 뒤에 
   assert.equal(name("Nike Air Force 1 - Nike"), "Nike Air Force 1");
   assert.equal(name("Nike"), "", "제목이 사이트 이름뿐이면 상품명이 아니다");
 });
+
+test("알리익스프레스는 상품 API(JSONP) 응답에서 원화 판매가를 읽고, 신규 회원 혜택가면 원가를 쓴다", () => {
+  const run = ({ sellPriceLocal, originalPrice, atmosphereCode, currencyCode = "KRW" }) => {
+    const sent = [];
+    const window = {
+      ReactNativeWebView: { postMessage: (message) => sent.push(JSON.parse(message)) },
+    };
+    let ld = null;
+    let tick;
+    let now = 0;
+    runInNewContext(PRODUCT_PAGE_SCRIPT, {
+      window,
+      Object,
+      document: {
+        readyState: "complete",
+        querySelector: (selector) =>
+          selector.includes("og:image")
+            ? { getAttribute: () => "https://ae-pic-a1.aliexpress-media.com/kf/logo.png" }
+            : null,
+        querySelectorAll: (selector) =>
+          selector.includes("ld+json") && ld ? [{ textContent: JSON.stringify(ld) }] : [],
+        getElementById: () => null,
+      },
+      location: {
+        href: "https://ko.aliexpress.com/item/1005006862248805.html",
+        hostname: "ko.aliexpress.com",
+        search: "",
+      },
+      URLSearchParams,
+      Date: { now: () => now },
+      JSON,
+      setInterval: (callback) => {
+        tick = callback;
+        return 1;
+      },
+      clearInterval: () => {},
+    });
+    // 페이지의 mtop 라이브러리처럼 콜백을 등록하고, JSONP 응답으로 부른다.
+    let pageReceived = null;
+    window.mtopjsonp1 = (response) => (pageReceived = response);
+    const response = {
+      api: "mtop.aliexpress.pdp.msite.query",
+      data: {
+        result: {
+          global: { bizContext: { currencyCode, subject: "3D 미끄럼 방지 욕실 매트" } },
+          data: {
+            msite_galaxy_kr_price_banner: {
+              fields: { bannerInfo: { atmosphereCode }, price: { sellPriceLocal, originalPrice } },
+            },
+          },
+        },
+      },
+    };
+    window.mtopjsonp1(response);
+    assert.equal(pageReceived, response, "페이지 콜백은 응답을 그대로 받는다");
+    tick();
+    assert.equal(sent.length, 0, "상품 이미지가 든 JSON-LD가 생기기 전에는 보내지 않는다");
+    ld = {
+      "@type": "Product",
+      "name": "3D 미끄럼 방지 욕실 매트",
+      "image": ["https://ae-pic-a1.aliexpress-media.com/kf/item.jpg"],
+      "offers": { "@type": "Offer", "priceCurrency": "KRW" },
+    };
+    tick();
+    // 가격을 못 읽은 경우는 가격 대기 시간이 지나야 보낸다.
+    now = 3000;
+    if (sent.length === 0) tick();
+    assert.equal(sent.length, 1);
+    return normalizeProductPage(sent[0], "https://ko.aliexpress.com/item/1005006862248805.html")
+      .values;
+  };
+
+  const sale = run({
+    sellPriceLocal: "₩2,580|2580|",
+    originalPrice: "₩5,598",
+    atmosphereCode: "girdle_aplus_sd_pop",
+  });
+  assert.equal(sale.name, "3D 미끄럼 방지 욕실 매트");
+  assert.equal(sale.price, "2580", "누구나 받는 할인가를 쓴다");
+  assert.equal(sale.thumbnailUrl, "https://ae-pic-a1.aliexpress-media.com/kf/item.jpg");
+  assert.equal(
+    run({
+      sellPriceLocal: "₩1,502|1502|",
+      originalPrice: "₩3,094",
+      atmosphereCode: "new_user_platform_allowance_atm",
+    }).price,
+    "3094",
+    "신규 회원 전용 혜택가는 쓰지 않는다",
+  );
+  assert.equal(
+    run({ sellPriceLocal: "$1.50|1.5|", originalPrice: "$3.00", currencyCode: "USD" }).price,
+    "",
+    "원화가 아니면 가격을 비운다",
+  );
+});
