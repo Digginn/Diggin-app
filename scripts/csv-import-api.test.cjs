@@ -266,6 +266,7 @@ test("IMP-005 승인 판매처 가격을 실제 가져오기 RPC에 전달하고
 
 test("서버 응답을 받지 못하면 완료로 표시하지 않고 같은 파일 재시도에 요청 ID를 유지한다", async () => {
   const storage = new Map();
+  analyticsEvents.length = 0;
   const first = setup({
     storage,
     rpc: () => ({ data: null, error: { code: "NETWORK", message: "응답 유실" } }),
@@ -276,6 +277,11 @@ test("서버 응답을 받지 못하면 완료로 표시하지 않고 같은 파
   const retry = setup({ storage });
   await retry.run();
   assert.equal(retry.calls[0].request_id, first.calls[0].request_id);
+  assert.deepEqual(
+    analyticsEvents.map(([name]) => name),
+    ["wishlist_import_start", "wishlist_import_complete"],
+    "같은 작업을 다시 시도해도 시작 이벤트는 한 번만 보낸다",
+  );
   assert.equal(
     retry.calls[0].import_plan.products[0].savedAt,
     first.calls[0].import_plan.products[0].savedAt,

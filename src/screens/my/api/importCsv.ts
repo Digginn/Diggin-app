@@ -132,9 +132,12 @@ export async function importCsv(
       /* 읽을 수 없는 이전 기록은 새 요청으로 바꾼다. */
     }
   }
-  pending ??= { fingerprint, requestId: Crypto.randomUUID(), importedAt: options.importedAt };
-  // 앱은 서버의 import_jobs.id를 받지 않는다. 같은 작업을 가리키는 request_id를 작업 ID로 쓴다.
-  trackEvent("wishlist_import_start", { import_job_id: pending.requestId });
+  if (!pending) {
+    pending = { fingerprint, requestId: Crypto.randomUUID(), importedAt: options.importedAt };
+    // 앱은 서버의 import_jobs.id를 받지 않는다. 같은 작업을 가리키는 request_id를 작업 ID로 쓴다.
+    // 실패한 파일을 다시 가져오면 같은 작업을 이어 가므로 시작 이벤트를 다시 보내지 않는다.
+    trackEvent("wishlist_import_start", { import_job_id: pending.requestId });
+  }
   let isFolderLimitConfirmed = false;
 
   // 폴더 이름이 조회 이후 바뀌면 전체 트랜잭션이 취소된다. 최신 목록으로 최대 두 번 재계산한다.
