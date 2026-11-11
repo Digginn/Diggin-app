@@ -98,13 +98,19 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   );
   assert.ok(initial.props.className.includes("h-[396px]"));
   assert.ok(initial.props.className.includes("rounded-3xl"));
+  assert.equal(
+    initial.props.className.includes("bg-gray-100"),
+    false,
+    "스와이프하는 일러스트에 회색 배경을 포함하지 않는다",
+  );
   const { APP_ICONS, PhoneIllustration } = componentModule.exports;
   assert.equal(APP_ICONS.length, 9, "최신 목업은 중복 없는 3×3 앱 아이콘이다");
   assert.equal(new Set(APP_ICONS).size, 9);
   const phone = PhoneIllustration({ time });
   assert.ok(phone.props.className.includes("left-[13px]"));
-  assert.equal(phone.props.style.transformOrigin, "top left");
-  assert.equal(phone.props.style.transform[0].scale, 1.5);
+  assert.equal(phone.props.style?.transform, undefined, "목업을 비트맵 크기보다 확대하지 않는다");
+  assert.ok(phone.props.className.includes("w-[270px]"));
+  assert.ok(phone.props.className.includes("h-[600px]"));
   const cleanup = effect();
   assert.equal(timings[0].options.duration, 3600);
   assert.equal(repeats[0].count, -1);
@@ -119,6 +125,13 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   cell = React.Children.toArray(AppCell({ index: 0, time }).props.children);
   assert.equal(cell[0].props.style.opacity, 1);
   assert.equal(cell[0].props.style.transform[0].scale, 1);
+  const svg = cell[0].props.children.props.children;
+  assert.equal(
+    svg.props.width,
+    82.5,
+    "SVG는 최종 표시 크기로 렌더링한 뒤 축소 애니메이션만 적용한다",
+  );
+  assert.equal(svg.props.height, 82.5);
   for (const item of ITEMS) {
     time.value = item.delay;
     const tile = ItemTile({ item, time });
@@ -460,11 +473,24 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
 
   const firstPage = render();
   assert.equal(firstPage.length, 1);
-  assert.equal(Array.from(firstPage[0].props.autoAdvanceDelays).join(","), "2500,2500,2500");
-  const cards = React.Children.toArray(firstPage[0].props.children);
+  const [background, carousel] = React.Children.toArray(firstPage[0].props.children);
+  assert.equal(background.type, "View", "배경은 가로 스크롤의 바깥 형제에 고정한다");
+  assert.equal(background.props.pointerEvents, "none", "고정 배경은 스와이프 터치를 막지 않는다");
+  for (const className of [
+    "absolute",
+    "top-0",
+    "h-[396px]",
+    "w-[295px]",
+    "rounded-3xl",
+    "bg-gray-100",
+  ])
+    assert.ok(background.props.className.includes(className));
+  assert.equal(carousel.type, "SwipeCarousel");
+  assert.equal(Array.from(carousel.props.autoAdvanceDelays).join(","), "2500,2500,2500");
+  const cards = React.Children.toArray(carousel.props.children);
   assert.equal(cards.length, 4);
   assert.equal(cards[3].props.mainCopy, "기존에 모아둔 아이템,\n그대로 옮겨 오세요.");
-  assert.equal(firstPage[0].props.media, undefined);
+  assert.equal(carousel.props.media, undefined);
   for (const [index, card] of cards.entries()) {
     assert.equal(card.props.children.type, "OnboardingIllustration");
     assert.equal(
@@ -473,12 +499,13 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
       "이미지는 해당 문구와 같은 슬라이드 안에 둔다",
     );
   }
-  firstPage[0].props.onPageChange(2);
+  carousel.props.onPageChange(2);
   assert.equal(render().length, 1, "세 번째 장에는 시작하기 버튼이 없다.");
-  firstPage[0].props.onPageChange(3);
+  carousel.props.onPageChange(3);
   const lastPage = render();
   assert.equal(lastPage.length, 2);
-  assert.equal(React.Children.toArray(lastPage[0].props.children)[3].props.children.props.page, 3);
+  const lastCarousel = React.Children.toArray(lastPage[0].props.children)[1];
+  assert.equal(React.Children.toArray(lastCarousel.props.children)[3].props.children.props.page, 3);
   const button = lastPage[1].props.children;
   assert.equal(button.props.children, "시작하기");
   button.props.onPress();
