@@ -53,17 +53,23 @@ export function OnboardingScreen() {
           paddingBottom: Math.max(insets.bottom + 10, 44),
         }}
       >
-        <SwipeCarousel
-          accessibilityLabel="서비스 소개"
-          onPageChange={setActiveIndex}
-          autoAdvanceDelays={AUTO_ADVANCE_DELAYS_MS}
-        >
-          {PAGES.map((page, index) => (
-            <CardCarousel key={page.mainCopy} mainCopy={page.mainCopy} subCopy={page.subCopy}>
-              <OnboardingIllustration page={index} />
-            </CardCarousel>
-          ))}
-        </SwipeCarousel>
+        <View>
+          <View
+            pointerEvents="none"
+            className="absolute left-0 top-0 h-[396px] w-[295px] rounded-3xl bg-gray-100"
+          />
+          <SwipeCarousel
+            accessibilityLabel="서비스 소개"
+            onPageChange={setActiveIndex}
+            autoAdvanceDelays={AUTO_ADVANCE_DELAYS_MS}
+          >
+            {PAGES.map((page, index) => (
+              <CardCarousel key={page.mainCopy} mainCopy={page.mainCopy} subCopy={page.subCopy}>
+                <OnboardingIllustration page={index} />
+              </CardCarousel>
+            ))}
+          </SwipeCarousel>
+        </View>
         {activeIndex === PAGES.length - 1 && (
           <View className="w-[295px] pt-9">
             <Button onPress={() => router.replace("/login")}>시작하기</Button>
