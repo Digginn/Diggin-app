@@ -1,5 +1,5 @@
 import { useNetworkState } from "expo-network";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, View } from "react-native";
 
@@ -44,11 +44,33 @@ export function DiggleScreen() {
   const posts = feed.data?.pages.flat() ?? [];
   const isOpeningWriter = useRef(false);
   const isFeedLoaded = feed.isSuccess;
+  const navigation = useNavigation();
+  const isReturning = useRef(false);
+  const isViewPending = useRef(false);
 
-  // 탭에 들어와 조회에 성공한 뒤 1회 보낸다. 새로고침·추가 로드 중에는 isSuccess가 그대로라 다시 보내지 않는다.
+  // 탭은 그대로인데 가려졌으면 게시글 상세처럼 위에 쌓인 화면이다. 거기서 돌아올 때는 탭에 새로 들어온 것으로 보지 않는다.
+  useEffect(
+    () =>
+      navigation.addListener("blur", () => {
+        const state = navigation.getState();
+        isReturning.current = state?.routes[state.index]?.name === "diggle";
+      }),
+    [navigation],
+  );
+
   useFocusEffect(
     useCallback(() => {
-      if (isFeedLoaded) trackEvent("community_view", { view_type: "feed" });
+      if (!isReturning.current) isViewPending.current = true;
+      isReturning.current = false;
+    }, []),
+  );
+
+  // 탭에 들어와 조회에 성공한 뒤 1회 보낸다. 새로고침·추가 로드 중에는 다시 보내지 않는다.
+  useFocusEffect(
+    useCallback(() => {
+      if (!isFeedLoaded || !isViewPending.current) return;
+      isViewPending.current = false;
+      trackEvent("community_view", { view_type: "feed" });
     }, [isFeedLoaded]),
   );
 
