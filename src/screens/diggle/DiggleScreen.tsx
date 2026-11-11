@@ -38,11 +38,18 @@ export function DiggleScreen() {
   const feed = useCommunityFeed(tab);
   const posts = feed.data?.pages.flat() ?? [];
   const isOpeningWriter = useRef(false);
+  const isFeedLoaded = feed.isSuccess;
+
+  // 탭에 들어와 조회에 성공한 뒤 1회 보낸다. 새로고침·추가 로드 중에는 isSuccess가 그대로라 다시 보내지 않는다.
+  useFocusEffect(
+    useCallback(() => {
+      if (isFeedLoaded) trackEvent("community_view", { view_type: "feed" });
+    }, [isFeedLoaded]),
+  );
 
   useFocusEffect(
     useCallback(() => {
       isOpeningWriter.current = false;
-      trackEvent("community_view", { view_type: "feed" });
     }, []),
   );
 

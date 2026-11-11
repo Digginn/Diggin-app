@@ -364,6 +364,27 @@ test("작성 권한 확인 중 연타해도 작성 화면을 한 번만 열고 �
   assert.equal(routes.length, 3);
 });
 
+test("DIGGLE 피드는 조회에 성공한 뒤에만 community_view를 보낸다", () => {
+  for (const [feed, expected] of [
+    [{ isPending: true, isSuccess: false }, 0],
+    [{ isError: true, isSuccess: false }, 0],
+    [{ isSuccess: true, data: { pages: [[]] } }, 1],
+  ]) {
+    const state = screenMocks({ feed });
+    const focusEffects = [];
+    state.mocks["expo-router"].useFocusEffect = (callback) => focusEffects.push(callback);
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+    analyticsEvents.length = 0;
+    DiggleScreen();
+    focusEffects.forEach((effect) => effect());
+    assert.equal(
+      analyticsEvents.filter(([name]) => name === "community_view").length,
+      expected,
+      JSON.stringify(feed),
+    );
+  }
+});
+
 function screenMocks({
   session = { user: { id: "viewer" } },
   post = null,
