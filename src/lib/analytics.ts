@@ -45,7 +45,7 @@ type AnalyticsEvents = {
   vote_create: { post_id: string };
   vote_participate: { post_id: string; vote_option: "buy" | "not" };
   comment_create: { post_id: string };
-  community_product_save: { product_id: string };
+  community_product_save: { post_id: string; product_id: string };
   external_product_click: {
     product_id: string;
     click_source: "my_product" | "community_product";

@@ -225,7 +225,7 @@ function formHarness({
   });
   const render = (item = SNAPSHOT) => {
     cursor = 0;
-    return CommunitySaveForm({ item, onBack: () => returned++ });
+    return CommunitySaveForm({ postId: "post-1", item, onBack: () => returned++ });
   };
   const field = (label) =>
     nodes(render(), "TextField").find((node) => node.props.accessibilityLabel === label).props;
@@ -297,7 +297,8 @@ test("폴더 무선택은 ALL에만 저장하고 성공 시 목록을 갱신해 
   assert.deepEqual(h.destinations, []);
   const [name, properties] = analyticsEvents.at(-1);
   assert.equal(name, "community_product_save");
-  assert.deepEqual(Object.keys(properties), ["product_id"], "시트대로 저장된 상품 ID만 보낸다");
+  assert.deepEqual(Object.keys(properties), ["post_id", "product_id"]);
+  assert.equal(properties.post_id, "post-1", "상품을 저장한 게시글 ID를 함께 보낸다");
   assert.equal(
     domain.takeCommunityItemSaved(SNAPSHOT.id),
     true,
