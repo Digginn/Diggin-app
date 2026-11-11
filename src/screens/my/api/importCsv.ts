@@ -198,6 +198,14 @@ export async function importCsv(
       success_count: result.importedCount,
       duplicate_count: result.excludedProducts.filter((entry) => entry.kind === "duplicate").length,
       fail_count: result.excludedProducts.filter((entry) => entry.kind === "failed").length,
+      // readResult가 사유를 화면 문구로 바꾸므로 응답의 사유 코드에서 종류별로 한 번씩 담는다.
+      fail_reasons: [
+        ...new Set(
+          (data as { excludedProducts: { kind: string; reason: string }[] }).excludedProducts
+            .filter((entry) => entry.kind === "failed")
+            .map((entry) => entry.reason),
+        ),
+      ],
     });
     onProgress({ completed: plan.totalCount, total: plan.totalCount });
     // 저장된 결과를 받았으므로 로컬 기록 삭제 실패 때문에 완료를 실패로 바꾸지 않는다.

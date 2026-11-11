@@ -392,13 +392,18 @@ test("충돌 재시도 중 처음 한도를 넘으면 저장 전에 한 번만 �
 
 test("가져오기 시작·완료 이벤트를 같은 작업 ID로 보내고 결과 수를 나눠 담는다", async () => {
   analyticsEvents.length = 0;
-  const excluded = (kind) => ({ productName: "상품", reason: "INVALID_PRODUCT_DATA", kind });
+  const excluded = (kind, reason = "INVALID_PRODUCT_URL") => ({ productName: "상품", reason, kind });
   const { run, calls } = setup({
     folders: ["abcdefg"],
     rpc: async () => ({
       data: {
         importedCount: 1,
-        excludedProducts: [excluded("duplicate"), excluded("failed"), excluded("failed")],
+        excludedProducts: [
+          excluded("duplicate", "DUPLICATE"),
+          excluded("failed"),
+          excluded("failed"),
+          excluded("failed", "EMPTY_PRODUCT_NAME"),
+        ],
         folderFailures: [],
       },
       error: null,
@@ -415,7 +420,8 @@ test("가져오기 시작·완료 이벤트를 같은 작업 ID로 보내고 결
         total_count: 1,
         success_count: 1,
         duplicate_count: 1,
-        fail_count: 2,
+        fail_count: 3,
+        fail_reasons: ["INVALID_PRODUCT_URL", "EMPTY_PRODUCT_NAME"],
       },
     ],
   ]);
