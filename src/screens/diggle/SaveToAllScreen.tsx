@@ -304,7 +304,7 @@ export function CommunitySaveForm({
                 secondaryAction={{ label: "괜찮아요", onPress: onBack }}
                 primaryAction={{
                   label: "확인하기",
-                  onPress: () => router.replace(`/items/${duplicateId}`),
+                  onPress: () => router.replace(`/items/${duplicateId}?from=already_saved`),
                 }}
                 onRequestClose={onBack}
               />

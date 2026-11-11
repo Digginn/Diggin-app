@@ -30,7 +30,7 @@ export default function ShareExtension({ url, text }: InitialProps) {
               keepShareLink(link);
               openHostApp("login");
             }}
-            onOpenItem={(id) => openHostApp(`items/${id}`)}
+            onOpenItem={(id) => openHostApp(`items/${id}?from=already_saved`)}
           />
         </ToastProvider>
       </QueryClientProvider>

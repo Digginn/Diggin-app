@@ -62,6 +62,10 @@ const MOCK_RECOMMENDS: WishItem[] = Array.from({ length: 9 }, (_, index) => ({
   thumbnailUrl: null,
 }));
 
+const ENTRY_POINTS = ["all", "folder", "search", "already_saved"] as const;
+const isEntryPoint = (value: unknown): value is (typeof ENTRY_POINTS)[number] =>
+  ENTRY_POINTS.includes(value as (typeof ENTRY_POINTS)[number]);
+
 export function ItemDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -73,8 +77,8 @@ export function ItemDetailScreen() {
   const product = useProduct(id);
   const viewedId = product.isSuccess ? id : null;
   useEffect(() => {
-    // shortcut: 검색·중복 안내로 연 상세는 entry_point 값이 정해지지 않아 보내지 않는다, 기획 확정 후 값을 추가한다.
-    if (viewedId && (from === "all" || from === "folder"))
+    // 추천 상품처럼 entry_point가 정해지지 않은 경로로 연 상세는 보내지 않는다.
+    if (viewedId && isEntryPoint(from))
       trackEvent("saved_product_view", { product_id: viewedId, entry_point: from });
   }, [viewedId, from]);
   const counts = useProductCounts();

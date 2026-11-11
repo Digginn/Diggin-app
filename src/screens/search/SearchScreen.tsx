@@ -115,7 +115,7 @@ export function SearchScreen() {
           onEndReached={() => {
             if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
           }}
-          onItemPress={(item) => router.push(`/items/${item.id}`)}
+          onItemPress={(item) => router.push(`/items/${item.id}?from=search`)}
           header={
             <View className="gap-2 pt-4">
               <Text className="text-gray-1000 font-label-12-semibold">

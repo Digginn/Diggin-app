@@ -122,8 +122,8 @@ test("상품 상세의 양쪽 48px 터치 영역 밝기를 각각 적용하고 �
   }
 });
 
-test("ALL·폴더에서 연 상품 상세는 조회에 성공하면 saved_product_view를 보낸다", () => {
-  for (const from of ["all", "folder"]) {
+test("ALL·폴더·검색·이미 저장된 상품 안내에서 연 상품 상세는 조회에 성공하면 saved_product_view를 보낸다", () => {
+  for (const from of ["all", "folder", "search", "already_saved"]) {
     const { ItemDetailScreen, events } = setup({ id: "7", from });
     ItemDetailScreen();
     assert.deepEqual(JSON.parse(JSON.stringify(events)), [

@@ -369,7 +369,7 @@ test("중복은 새 저장 성공으로 알리지 않고 기존 상품 확인 �
   assert.deepEqual(h.toasts, []);
   const modal = h.sheet().overlay;
   modal.props.primaryAction.onPress();
-  assert.deepEqual(h.destinations, ["/items/50"]);
+  assert.deepEqual(h.destinations, ["/items/50?from=already_saved"]);
 });
 
 test("방금 만든 폴더는 목록에 반영하고 조회 실패 시 폴더 선택 진입을 막는다", async () => {

@@ -32,7 +32,10 @@ type AnalyticsEvents = {
   product_edit: { product_id: string };
   product_delete: { product_id: string; delete_batch_id: string };
   folder_create: { folder_id: string };
-  saved_product_view: { product_id: string; entry_point: "all" | "folder" };
+  saved_product_view: {
+    product_id: string;
+    entry_point: "all" | "folder" | "search" | "already_saved";
+  };
   wishlist_import_start: { import_job_id: string };
   wishlist_import_complete: {
     import_job_id: string;
