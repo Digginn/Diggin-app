@@ -115,7 +115,8 @@ export async function importCsv(
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
   const storageKey = `csv-import-pending:${auth.user.id}`;
-  let pending: { fingerprint: string; requestId: string; importedAt: string } | undefined;
+  let pending:
+    { fingerprint: string; requestId: string; importedAt: string; retryCount: number } | undefined;
   const stored = await AsyncStorage.getItem(storageKey);
   if (stored) {
     try {
@@ -127,14 +128,26 @@ export async function importCsv(
         typeof parsed.importedAt === "string" &&
         Number.isFinite(Date.parse(parsed.importedAt))
       ) {
-        pending = { fingerprint, requestId: parsed.requestId, importedAt: parsed.importedAt };
+        // 끝나지 않은 같은 파일을 다시 가져오는 것이라 다시 시도한 횟수를 하나 올린다.
+        const retryCount = typeof parsed.retryCount === "number" ? parsed.retryCount + 1 : 1;
+        pending = {
+          fingerprint,
+          requestId: parsed.requestId,
+          importedAt: parsed.importedAt,
+          retryCount,
+        };
       }
     } catch {
       /* 읽을 수 없는 이전 기록은 새 요청으로 바꾼다. */
     }
   }
   if (!pending) {
-    pending = { fingerprint, requestId: Crypto.randomUUID(), importedAt: options.importedAt };
+    pending = {
+      fingerprint,
+      requestId: Crypto.randomUUID(),
+      importedAt: options.importedAt,
+      retryCount: 0,
+    };
     // 앱은 서버의 import_jobs.id를 받지 않는다. 같은 작업을 가리키는 request_id를 작업 ID로 쓴다.
     // 실패한 파일을 다시 가져오면 같은 작업을 이어 가므로 시작 이벤트를 다시 보내지 않는다.
     trackEvent("wishlist_import_start", { import_job_id: pending.requestId });
@@ -202,6 +215,7 @@ export async function importCsv(
       success_count: result.importedCount,
       duplicate_count: result.excludedProducts.filter((entry) => entry.kind === "duplicate").length,
       fail_count: result.excludedProducts.filter((entry) => entry.kind === "failed").length,
+      retry_count: pending.retryCount,
       // readResult가 사유를 화면 문구로 바꾸므로 응답의 사유 코드에서 종류별로 한 번씩 담는다.
       fail_reasons: [
         ...new Set(

@@ -44,6 +44,7 @@ type AnalyticsEvents = {
     duplicate_count: number;
     fail_count: number;
     fail_reasons: string[];
+    retry_count: number;
   };
   community_view: { view_type: "feed" } | { view_type: "post_detail"; post_id: string };
   post_create: { post_id: string };

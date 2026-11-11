@@ -286,6 +286,7 @@ test("서버 응답을 받지 못하면 완료로 표시하지 않고 같은 파
     ["wishlist_import_start", "wishlist_import_complete"],
     "같은 작업을 다시 시도해도 시작 이벤트는 한 번만 보낸다",
   );
+  assert.equal(analyticsEvents.at(-1)[1].retry_count, 1, "다시 시도한 횟수를 함께 보낸다");
   assert.equal(
     retry.calls[0].import_plan.products[0].savedAt,
     first.calls[0].import_plan.products[0].savedAt,
@@ -436,6 +437,7 @@ test("가져오기 시작·완료 이벤트를 같은 작업 ID로 보내고 결
         duplicate_count: 1,
         fail_count: 3,
         fail_reasons: ["INVALID_PRODUCT_URL", "EMPTY_PRODUCT_NAME"],
+        retry_count: 0,
       },
     ],
   ]);
