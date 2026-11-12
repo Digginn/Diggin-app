@@ -43,7 +43,7 @@ export function DiggleScreen() {
   const feed = useCommunityFeed(tab, !isCheckingConnection && !isOffline);
   const posts = feed.data?.pages.flat() ?? [];
   const isOpeningWriter = useRef(false);
-  const isFeedLoaded = feed.isSuccess;
+  const isFeedLoaded = !isCheckingConnection && !isOffline && feed.isSuccess;
   const navigation = useNavigation();
   const isReturning = useRef(false);
   const isViewPending = useRef(false);

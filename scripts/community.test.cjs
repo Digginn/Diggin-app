@@ -392,6 +392,24 @@ test("DIGGLE 피드는 조회에 성공한 뒤에만 community_view를 보낸다
   }
 });
 
+test("오프라인·연결 확인 중에는 캐시가 성공 상태여도 피드 조회 이벤트를 보내지 않는다", () => {
+  for (const network of [
+    { isConnected: false, isInternetReachable: false },
+    { isConnected: true, isInternetReachable: false },
+    {},
+  ]) {
+    const state = screenMocks({ feed: { isSuccess: true, data: { pages: [[]] } } });
+    state.mocks["expo-network"].useNetworkState = () => network;
+    const focusEffects = [];
+    state.mocks["expo-router"].useFocusEffect = (callback) => focusEffects.push(callback);
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+    analyticsEvents.length = 0;
+    DiggleScreen();
+    focusEffects.forEach((effect) => effect());
+    assert.equal(analyticsEvents.length, 0, JSON.stringify(network));
+  }
+});
+
 test("DIGGLE 피드는 게시글 상세에서 돌아올 때는 보내지 않고, 다른 탭에서 들어올 때는 다시 보낸다", () => {
   const state = screenMocks({ feed: { isSuccess: true, data: { pages: [[]] } } });
   const refs = [];
