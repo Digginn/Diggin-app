@@ -486,16 +486,22 @@ function CsvIllustration({ time }: { time: SharedValue<number> }) {
   );
 }
 
-export function OnboardingIllustration({ page }: { page: number }) {
+export function OnboardingIllustration({
+  page,
+  isActive = true,
+}: {
+  page: number;
+  isActive?: boolean;
+}) {
   const time = useSharedValue(0);
   const isReducedMotion = useReducedMotion();
   const duration = page === 3 ? 4750 : DURATION_MS;
   useEffect(() => {
     time.value = isReducedMotion ? (page === 3 ? 1700 : DURATION_MS) : 0;
-    if (!isReducedMotion)
+    if (isActive && !isReducedMotion)
       time.value = withRepeat(withTiming(duration, { duration, easing: Easing.linear }), -1, false);
     return () => cancelAnimation(time);
-  }, [page, duration, isReducedMotion, time]);
+  }, [page, duration, isActive, isReducedMotion, time]);
   return (
     <View
       accessible={false}
