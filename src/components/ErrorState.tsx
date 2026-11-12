@@ -25,6 +25,8 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
       }
     >
       <View
+        // 화면 중앙 정렬로 위에 겹친 빈 영역은 터치를 통과시키고 재시도 버튼만 받는다.
+        pointerEvents="box-none"
         className="flex-1 items-center justify-center gap-6 px-margin"
         style={{ transform: [{ translateY: offset }] }}
       >

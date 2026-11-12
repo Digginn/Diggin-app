@@ -4,18 +4,13 @@ import { cssInterop } from "nativewind";
 import { useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import CommentSvg from "@/assets/images/icon-comment.svg";
+import CommentSvg from "@/assets/images/icon-comment-small.svg";
 import HeartSvg from "@/assets/images/icon-heart.svg";
 import { FallbackImg } from "@/components/FallbackImg";
 import { ProductImg } from "@/components/ProductImg";
 import { ReportBlockMenu } from "@/components/ReportBlockMenu";
-import { colors } from "@/theme";
 
 const StyledImage = cssInterop(Image, { className: "style" });
-
-// 댓글 아이콘은 24 프레임 기준이라 쓰는 크기에 맞춰 같은 비율로 줄임
-const SCALE = 16 / 24;
-const COMMENT = { width: 19.5 * SCALE, height: 16.93 * SCALE };
 
 const COLUMN_COUNT = 2;
 
@@ -43,6 +38,11 @@ type PostProps = {
 
 function Meta({ children }: { children: ReactNode }) {
   return <Text className="text-right text-gray-500 font-b4">{children}</Text>;
+}
+
+// DGL-02 좋아요·댓글 숫자는 시간·작성자와 달리 B3이다(BUG-113).
+function Count({ children }: { children: number }) {
+  return <Text className="text-gray-500 font-b3">{children}</Text>;
 }
 
 function VoteThumbnail({ url }: { url?: string | null }) {
@@ -156,12 +156,12 @@ export function Post({
                 {likeCount !== undefined ? (
                   <View className="flex-row items-center justify-center gap-1">
                     <HeartSvg />
-                    <Meta>{likeCount}</Meta>
+                    <Count>{likeCount}</Count>
                   </View>
                 ) : null}
                 <View className="flex-row items-center justify-center gap-1">
-                  <CommentSvg {...COMMENT} color={colors.gray[500]} />
-                  <Meta>{commentCount}</Meta>
+                  <CommentSvg />
+                  <Count>{commentCount}</Count>
                 </View>
               </View>
             </View>

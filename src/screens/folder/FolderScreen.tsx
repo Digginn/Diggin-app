@@ -30,6 +30,8 @@ const MAX_CUSTOM_FOLDERS = 50;
 
 type FolderScreenProps = {
   isError?: boolean;
+  /** 첫 조회 중. 오프라인이면 오류 화면이 뜨기 전까지 FAB가 보이지 않게 한다. */
+  isLoading?: boolean;
   onRetry?: () => void;
   folders?: FolderItem[];
   savedItemCount?: number;
@@ -47,6 +49,7 @@ type FolderScreenProps = {
 
 export function FolderScreen({
   isError = false,
+  isLoading = false,
   onRetry,
   folders = INITIAL_FOLDERS,
   savedItemCount = folders.reduce((count, folder) => count + folder.itemCount, 0),
@@ -61,7 +64,7 @@ export function FolderScreen({
   requireLogin = (action) => action(),
 }: FolderScreenProps = {}) {
   const { height } = useWindowDimensions();
-  const guide = useFirstVisitGuide("folder", !isError && !isGuest);
+  const guide = useFirstVisitGuide("folder", !isError && !isLoading && !isGuest);
   useLinkDetectionPause(guide.isPending, true);
   const ownedGuideRef = useRef<View>(null);
   const fabGuideRef = useRef<View>(null);
@@ -254,7 +257,7 @@ export function FolderScreen({
           </View>
         </View>
       )}
-      {!isError && (
+      {!isError && !isLoading && (
         <View
           pointerEvents="box-none"
           className="absolute -bottom-[49px] -right-[49px] z-20 size-[200px]"
