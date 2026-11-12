@@ -76,10 +76,13 @@ export function ItemDetailScreen() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const product = useProduct(id);
   const viewedId = product.isSuccess ? id : null;
+  const sentViewId = useRef<string | null>(null);
+  // 상세를 새로 열 때만 1회 보낸다. 수정 시트·백그라운드 복귀 뒤 다시 조회해도 같은 화면에서는 보내지 않는다.
+  // 추천 상품처럼 entry_point가 정해지지 않은 경로로 연 상세는 보내지 않는다.
   useEffect(() => {
-    // 추천 상품처럼 entry_point가 정해지지 않은 경로로 연 상세는 보내지 않는다.
-    if (viewedId && isEntryPoint(from))
-      trackEvent("saved_product_view", { product_id: viewedId, entry_point: from });
+    if (!viewedId || sentViewId.current === viewedId || !isEntryPoint(from)) return;
+    sentViewId.current = viewedId;
+    trackEvent("saved_product_view", { product_id: viewedId, entry_point: from });
   }, [viewedId, from]);
   const counts = useProductCounts();
   const updateProduct = useUpdateProduct(id);

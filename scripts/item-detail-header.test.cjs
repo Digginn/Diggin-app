@@ -37,10 +37,17 @@ function setup(params = { id: "1" }) {
   const state = { thumbnailUrl: "https://shop.test/dark.jpg", backDark: true, moreDark: true };
   const sampled = [];
   const events = [];
+  const refs = [];
+  let refCursor = 0;
+  const product = { isSuccess: true };
   const mocks = {
     "react": {
       useEffect: (effect) => void effect(),
-      useRef: () => ({ current: null }),
+      useRef: (initial) => {
+        const index = refCursor++;
+        if (!(index in refs)) refs[index] = { current: initial };
+        return refs[index];
+      },
       useState: (initial) => [initial, () => {}],
     },
     "react-native": {
@@ -76,7 +83,7 @@ function setup(params = { id: "1" }) {
     "@/screens/all/mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
     "./queries/useProduct": {
       useProduct: () => ({
-        isSuccess: true,
+        isSuccess: product.isSuccess,
         data: { values: { thumbnailUrl: state.thumbnailUrl, brand: "" } },
       }),
     },
@@ -93,7 +100,11 @@ function setup(params = { id: "1" }) {
   mocks["@/components/app-bar"] = { AppBar: { IconButton: "IconButton" } };
   const { IconButton } = load("src/components/app-bar/IconButton.tsx", mocks);
   const { ItemDetailScreen } = load("src/screens/item-detail/ItemDetailScreen.tsx", mocks);
-  return { ItemDetailScreen, IconButton, state, sampled, events };
+  const render = () => {
+    refCursor = 0;
+    return ItemDetailScreen();
+  };
+  return { ItemDetailScreen: render, IconButton, state, sampled, events, product };
 }
 
 test("상품 상세의 양쪽 48px 터치 영역 밝기를 각각 적용하고 케밥 SVG에 색을 전달한다", () => {
@@ -133,4 +144,14 @@ test("ALL·폴더·검색·이미 저장된 상품 안내에서 연 상품 상�
   const { ItemDetailScreen, events } = setup({ id: "7" });
   ItemDetailScreen();
   assert.deepEqual(events, [], "진입 경로 값이 정해지지 않은 상세는 보내지 않는다");
+});
+
+test("상품 상세는 다시 조회가 실패했다가 성공해도 같은 화면에서는 saved_product_view를 한 번만 보낸다", () => {
+  const { ItemDetailScreen, events, product } = setup({ id: "7", from: "all" });
+  ItemDetailScreen();
+  product.isSuccess = false;
+  ItemDetailScreen();
+  product.isSuccess = true;
+  ItemDetailScreen();
+  assert.equal(events.length, 1);
 });
