@@ -8,6 +8,13 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 const LOGIN_SOURCES = {
   "@/lib/loginIntent": "src/lib/loginIntent.ts",
   "@/hooks/useLoginGate": "src/hooks/useLoginGate.tsx",
@@ -24,6 +31,7 @@ function load(file, mocks = {}, globals = {}) {
       exports: module.exports,
       require: (name) =>
         mocks[name] ??
+        (name === "@/lib/analytics" ? analytics : undefined) ??
         (name === "@/components/ReportBlockMenu"
           ? { ReportBlockMenu: "ReportBlockMenu" }
           : name === "@/api/accountAccess"
@@ -363,6 +371,90 @@ test("작성 권한 확인 중 연타해도 작성 화면을 한 번만 열고 �
   assert.equal(routes.length, 3);
 });
 
+test("DIGGLE 피드는 조회에 성공한 뒤에만 community_view를 보낸다", () => {
+  for (const [feed, expected] of [
+    [{ isPending: true, isSuccess: false }, 0],
+    [{ isError: true, isSuccess: false }, 0],
+    [{ isSuccess: true, data: { pages: [[]] } }, 1],
+  ]) {
+    const state = screenMocks({ feed });
+    const focusEffects = [];
+    state.mocks["expo-router"].useFocusEffect = (callback) => focusEffects.push(callback);
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+    analyticsEvents.length = 0;
+    DiggleScreen();
+    focusEffects.forEach((effect) => effect());
+    assert.equal(
+      analyticsEvents.filter(([name]) => name === "community_view").length,
+      expected,
+      JSON.stringify(feed),
+    );
+  }
+});
+
+test("오프라인·연결 확인 중에는 캐시가 성공 상태여도 피드 조회 이벤트를 보내지 않는다", () => {
+  for (const network of [
+    { isConnected: false, isInternetReachable: false },
+    { isConnected: true, isInternetReachable: false },
+    {},
+  ]) {
+    const state = screenMocks({ feed: { isSuccess: true, data: { pages: [[]] } } });
+    state.mocks["expo-network"].useNetworkState = () => network;
+    const focusEffects = [];
+    state.mocks["expo-router"].useFocusEffect = (callback) => focusEffects.push(callback);
+    const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+    analyticsEvents.length = 0;
+    DiggleScreen();
+    focusEffects.forEach((effect) => effect());
+    assert.equal(analyticsEvents.length, 0, JSON.stringify(network));
+  }
+});
+
+test("DIGGLE 피드는 게시글 상세에서 돌아올 때는 보내지 않고, 다른 탭에서 들어올 때는 다시 보낸다", () => {
+  const state = screenMocks({ feed: { isSuccess: true, data: { pages: [[]] } } });
+  const refs = [];
+  let refCursor = 0;
+  let onBlur;
+  let activeTab = "diggle";
+  let focusEffects = [];
+  state.mocks.react = {
+    ...state.mocks.react,
+    useEffect: (effect) => void effect(),
+    useRef: (initial) => {
+      const index = refCursor++;
+      if (!(index in refs)) refs[index] = { current: initial };
+      return refs[index];
+    },
+  };
+  state.mocks["expo-router"].useNavigation = () => ({
+    addListener: (event, listener) => {
+      if (event === "blur") onBlur = listener;
+      return () => {};
+    },
+    getState: () => ({ index: 0, routes: [{ name: activeTab }] }),
+  });
+  state.mocks["expo-router"].useFocusEffect = (callback) => focusEffects.push(callback);
+  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const focus = () => {
+    refCursor = 0;
+    focusEffects = [];
+    DiggleScreen();
+    focusEffects.forEach((effect) => effect());
+  };
+  const views = () => analyticsEvents.filter(([name]) => name === "community_view").length;
+  analyticsEvents.length = 0;
+  focus();
+  assert.equal(views(), 1, "탭에 들어와 조회에 성공하면 보낸다");
+  activeTab = "diggle";
+  onBlur();
+  focus();
+  assert.equal(views(), 1, "게시글 상세처럼 위에 쌓인 화면에서 돌아오면 보내지 않는다");
+  activeTab = "all";
+  onBlur();
+  focus();
+  assert.equal(views(), 2, "다른 탭으로 갔다가 다시 들어오면 보낸다");
+});
+
 function screenMocks({
   session = { user: { id: "viewer" } },
   post = null,
@@ -402,6 +494,7 @@ function screenMocks({
     },
     "expo-router": {
       useFocusEffect: () => {},
+      useNavigation: () => ({ addListener: () => () => {}, getState: () => undefined }),
       useLocalSearchParams: () => params,
       useRouter: () => ({
         dismissTo: (value) => {

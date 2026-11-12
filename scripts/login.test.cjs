@@ -7,6 +7,13 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 function loadLoginIntent() {
   const module = { exports: {} };
   runInNewContext(
@@ -32,6 +39,7 @@ function load(relativePath, mocks = {}) {
     module: componentModule,
     require: (name) => {
       if (name in mocks) return mocks[name];
+      if (name === "@/lib/analytics") return analytics;
       if (name === "@/lib/googleSignIn") return load("lib/googleSignIn.ts", mocks);
       if (name === "@/api/accountAccess")
         return {
@@ -695,6 +703,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const signOutOptions = [];
   const order = [];
   const cacheClears = [];
+  const analyticsUsers = [];
   let googleSignOutFails = false;
   const supabase = {
     auth: {
@@ -742,6 +751,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     },
     "@/lib/supabase": { supabase },
     "@/lib/queryClient": { queryClient: { clear: () => cacheClears.push(true) } },
+    "@/lib/analytics": { setAnalyticsUser: (userId) => analyticsUsers.push(userId) },
     "@/lib/pushNotifications": {
       unregisterDevicePush: async () => {
         order.push("unregisterPush");
@@ -764,7 +774,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   );
   assert.equal(render().isSessionExpired, false);
   order.length = 0;
-  emit("TOKEN_REFRESHED", { id: "s2" });
+  emit("TOKEN_REFRESHED", { id: "s2", user: { id: "u2" } });
   assert.equal(render().isSessionExpired, false);
   assert.deepEqual(order, [], "세션 갱신 시 Google 상태를 해제하지 않는다");
   emit("SIGNED_OUT", null);
@@ -772,6 +782,11 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.deepEqual(order, ["signOutGoogle"], "세션 만료 시에도 Google 상태를 해제한다");
   assert.equal(render().isSessionExpired, true);
   assert.equal(cacheClears.length, 2, "로그아웃·만료 모두 상품 캐시를 비운다");
+  assert.deepEqual(
+    analyticsUsers,
+    [null, "u2", null],
+    "로그인하면 회원을 연결하고 로그아웃·만료하면 끊는다",
+  );
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);
   googleSignOutFails = true;

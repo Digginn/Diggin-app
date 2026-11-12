@@ -6,6 +6,13 @@ const { test } = require("node:test");
 const { runInNewContext } = require("node:vm");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 function load(file, mocks = {}) {
   const module = { exports: {} };
   runInNewContext(
@@ -17,6 +24,7 @@ function load(file, mocks = {}) {
       exports: module.exports,
       require: (name) =>
         mocks[name] ??
+        (name === "@/lib/analytics" ? analytics : undefined) ??
         (name === "@/api/accountAccess"
           ? { ensureCommunityWriteAllowed: async () => undefined, restrictionMessage: () => null }
           : require(name)),
@@ -265,6 +273,7 @@ test("서버 마감 거절은 기존 결과를 보존하고 안내 후 최종 �
 
 test("이전 계정·화면에서 늦게 도착한 투표 응답은 새 캐시에 적용하지 않는다", async () => {
   for (const unmount of [false, true]) {
+    analyticsEvents.length = 0;
     const work = deferred();
     const ui = harness(() => work.promise);
     const sending = ui.render().choose("BUY");
@@ -275,6 +284,7 @@ test("이전 계정·화면에서 늦게 도착한 투표 응답은 새 캐시�
     }
     work.resolve(saved());
     await sending;
+    assert.equal(analyticsEvents.length, 0, "이전 요청의 이벤트를 새 사용자에게 보내지 않는다");
     assert.equal(ui.post().myChoice, null);
     assert.equal(ui.invalidations.length, 0);
     if (!unmount) assert.equal(ui.render("viewer").isPending, false);

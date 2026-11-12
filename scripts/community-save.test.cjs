@@ -7,6 +7,13 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 const LOGIN_SOURCES = {
   "@/lib/loginIntent": "src/lib/loginIntent.ts",
   "@/hooks/useLoginGate": "src/hooks/useLoginGate.tsx",
@@ -26,6 +33,7 @@ function load(file, mocks = {}) {
       exports: module.exports,
       require: (name) =>
         mocks[name] ??
+        (name === "@/lib/analytics" ? analytics : undefined) ??
         (name.endsWith(".svg")
           ? name
           : LOGIN_SOURCES[name]
@@ -88,6 +96,7 @@ function formHarness({
   saveError = new Error("offline"),
 } = {}) {
   const state = [],
+    cleanups = [],
     calls = [],
     invalidated = [],
     destinations = [],
@@ -127,7 +136,10 @@ function formHarness({
   };
   const { CommunitySaveForm, SaveToAllScreen } = load("src/screens/diggle/SaveToAllScreen.tsx", {
     "react": {
-      useEffect: () => {},
+      useEffect: (effect) => {
+        const cleanup = effect();
+        if (typeof cleanup === "function") cleanups.push(cleanup);
+      },
       useRef: (initial) => ({ current: initial }),
       useState: (initial) => {
         const index = cursor++;
@@ -217,7 +229,7 @@ function formHarness({
   });
   const render = (item = SNAPSHOT) => {
     cursor = 0;
-    return CommunitySaveForm({ item, onBack: () => returned++ });
+    return CommunitySaveForm({ postId: "post-1", item, onBack: () => returned++ });
   };
   const field = (label) =>
     nodes(render(), "TextField").find((node) => node.props.accessibilityLabel === label).props;
@@ -228,6 +240,7 @@ function formHarness({
       .props.onPress();
   return {
     render,
+    unmount: () => cleanups.forEach((cleanup) => cleanup()),
     field,
     sheet,
     open,
@@ -242,6 +255,18 @@ function formHarness({
     SaveToAllScreen,
   };
 }
+
+test("계정 변경으로 닫힌 상품 저장의 늦은 완료 이벤트를 보내지 않는다", async () => {
+  const h = formHarness();
+  h.open();
+  const pending = h.sheet().onComplete([]);
+  h.unmount();
+  analyticsEvents.length = 0;
+  await pending;
+  assert.equal(analyticsEvents.length, 0);
+  assert.equal(h.invalidated.length, 0);
+  assert.equal(h.returned, 0);
+});
 
 test("수정 가능한 초안에서 이미지·원본 링크는 고정하고 폴더 취소와 Snapshot 재조회에도 편집을 유지한다", () => {
   const h = formHarness();
@@ -287,6 +312,10 @@ test("폴더 무선택은 ALL에만 저장하고 성공 시 목록을 갱신해 
   assert.equal(h.returned, 1);
   assert.deepEqual(h.invalidated, [["products"], ["folders"]]);
   assert.deepEqual(h.destinations, []);
+  const [name, properties] = analyticsEvents.at(-1);
+  assert.equal(name, "community_product_save");
+  assert.deepEqual(Object.keys(properties), ["post_id", "product_id"]);
+  assert.equal(properties.post_id, "post-1", "상품을 저장한 게시글 ID를 함께 보낸다");
   assert.equal(
     domain.takeCommunityItemSaved(SNAPSHOT.id),
     true,
@@ -348,14 +377,16 @@ test("중복은 새 저장 성공으로 알리지 않고 기존 상품 확인 �
   domain.takeCommunityItemSaved(SNAPSHOT.id); // 앞선 저장 테스트가 남긴 표시를 지운다
   const h = formHarness({ duplicate: true });
   h.open();
+  const eventCount = analyticsEvents.length;
   await h.sheet().onComplete(["2"]);
+  assert.equal(analyticsEvents.length, eventCount, "중복은 저장 이벤트를 보내지 않는다");
   assert.equal(h.returned, 0);
   assert.equal(domain.takeCommunityItemSaved(SNAPSHOT.id), false, "중복은 저장 성공이 아니다");
   assert.deepEqual(h.invalidated, []);
   assert.deepEqual(h.toasts, []);
   const modal = h.sheet().overlay;
   modal.props.primaryAction.onPress();
-  assert.deepEqual(h.destinations, ["/items/50"]);
+  assert.deepEqual(h.destinations, ["/items/50?from=already_saved"]);
 });
 
 test("방금 만든 폴더는 목록에 반영하고 조회 실패 시 폴더 선택 진입을 막는다", async () => {
