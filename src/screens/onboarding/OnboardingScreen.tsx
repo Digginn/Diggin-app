@@ -10,7 +10,7 @@ import { baseFrame } from "@/theme";
 
 import { OnboardingIllustration } from "./components/OnboardingIllustration";
 
-const AUTO_ADVANCE_DELAYS_MS = [2500, 2500, 2500] as const;
+const AUTO_ADVANCE_DELAYS_MS = [3000, 3000, 3000] as const;
 
 const PAGES = [
   {
@@ -65,7 +65,7 @@ export function OnboardingScreen() {
           >
             {PAGES.map((page, index) => (
               <CardCarousel key={page.mainCopy} mainCopy={page.mainCopy} subCopy={page.subCopy}>
-                <OnboardingIllustration page={index} />
+                <OnboardingIllustration page={index} isActive={index === activeIndex} />
               </CardCarousel>
             ))}
           </SwipeCarousel>

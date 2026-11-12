@@ -31,6 +31,8 @@ export function SwipeCarousel({
   const scrollRef = useRef<ScrollView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
+  const hasManualNavigation = useRef(false);
+  const autoAdvanceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isReducedMotion = useReducedMotion();
 
   const updatePage = useCallback(
@@ -54,13 +56,32 @@ export function SwipeCarousel({
     if (index !== activeIndex) updatePage(index);
   }
 
+  function stopAutoAdvance() {
+    hasManualNavigation.current = true;
+    if (autoAdvanceTimer.current !== undefined) clearTimeout(autoAdvanceTimer.current);
+  }
+
+  function goToPageManually(index: number) {
+    stopAutoAdvance();
+    goToPage(index);
+  }
+
   useEffect(() => {
     const delay = autoAdvanceDelays?.[activeIndex];
-    if (delay === undefined || activeIndex >= pages.length - 1 || isScrolling || isReducedMotion) {
+    if (
+      hasManualNavigation.current ||
+      delay === undefined ||
+      activeIndex >= pages.length - 1 ||
+      isScrolling ||
+      isReducedMotion
+    ) {
       return;
     }
 
-    const timer = setTimeout(() => goToPage(activeIndex + 1), delay);
+    const timer = setTimeout(() => {
+      if (!hasManualNavigation.current) goToPage(activeIndex + 1);
+    }, delay);
+    autoAdvanceTimer.current = timer;
     return () => clearTimeout(timer);
   }, [activeIndex, autoAdvanceDelays, goToPage, isScrolling, isReducedMotion, pages.length]);
 
@@ -82,7 +103,10 @@ export function SwipeCarousel({
         onLayout={() =>
           scrollRef.current?.scrollTo({ x: activeIndex * CARD_WIDTH, animated: false })
         }
-        onScrollBeginDrag={() => setIsScrolling(true)}
+        onScrollBeginDrag={() => {
+          stopAutoAdvance();
+          setIsScrolling(true);
+        }}
         onScrollEndDrag={() => setIsScrolling(false)}
         onMomentumScrollBegin={() => setIsScrolling(true)}
         onMomentumScrollEnd={({ nativeEvent }) => {
@@ -94,8 +118,8 @@ export function SwipeCarousel({
         accessibilityValue={{ min: 1, max: pages.length, now: activeIndex + 1 }}
         accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
         onAccessibilityAction={({ nativeEvent }) => {
-          if (nativeEvent.actionName === "increment") goToPage(activeIndex + 1);
-          if (nativeEvent.actionName === "decrement") goToPage(activeIndex - 1);
+          if (nativeEvent.actionName === "increment") goToPageManually(activeIndex + 1);
+          if (nativeEvent.actionName === "decrement") goToPageManually(activeIndex - 1);
         }}
       >
         {pages.map((page) => (
@@ -109,7 +133,7 @@ export function SwipeCarousel({
           <BtnCarousel
             key={page.key}
             isActive={index === activeIndex}
-            onPress={() => goToPage(index)}
+            onPress={() => goToPageManually(index)}
             accessibilityLabel={`${accessibilityLabel} ${index + 1}페이지`}
           />
         ))}
