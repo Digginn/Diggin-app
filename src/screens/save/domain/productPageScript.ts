@@ -118,7 +118,45 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
 
   // 올리브영은 공개 메타에 가격·브랜드가 없고 eg: 메타를 페이지가 뜬 뒤 늦게 붙인다.
   const isOliveYoung = location.hostname.endsWith("oliveyoung.co.kr");
+
+  // 알리익스프레스 모바일 페이지는 상품 정보를 JS로 그리고, 그린 뒤 생기는 JSON-LD에도 가격이 없다.
+  // 가격은 상품 API(JSONP) 응답에만 있어, 페이지가 응답을 받을 콜백(mtopjsonp1…)을 등록할 때 감싸서 응답을 한 번 엿본다.
+  const isAliExpress = /(^|\.)aliexpress\.com$/.test(location.hostname);
+  let aliProduct = null;
+  const readAliProduct = (response) => {
+    const result = response && response.api === "mtop.aliexpress.pdp.msite.query" && response.data && response.data.result;
+    const context = (result && result.global && result.global.bizContext) || {};
+    if (!result || context.currencyCode !== "KRW") return;
+    const fields = Object.values(result.data || {})
+      .map((component) => component && component.fields)
+      .find((item) => item && item.price && item.price.sellPriceLocal);
+    if (!fields) return;
+    // 판매가는 "₩2,580|2580|" 형태다. 쿠키 없이 열어 늘 신규 방문자라, 신규 회원 전용 혜택가가 보이면 원가를 쓴다.
+    const isNewUserPrice = /new_user/.test((fields.bannerInfo && fields.bannerInfo.atmosphereCode) || "");
+    const text = isNewUserPrice ? fields.price.originalPrice : fields.price.sellPriceLocal.split("|")[1];
+    const price = Number(String(text || "").replace(/[^0-9]/g, ""));
+    aliProduct = { name: context.subject || null, brand: null, price: price > 0 ? price : null };
+  };
+  if (isAliExpress) {
+    for (let index = 1; index <= 30; index++) {
+      let callback;
+      Object.defineProperty(window, "mtopjsonp" + index, {
+        configurable: true,
+        get: () => callback,
+        set: (value) => {
+          callback = typeof value === "function"
+            ? (response) => {
+                try { readAliProduct(response); } catch (error) {}
+                return value(response);
+              }
+            : value;
+        },
+      });
+    }
+  }
+
   const readShop = () => {
+    if (aliProduct) return aliProduct;
     const naver = window.__PRELOADED_STATE__ && window.__PRELOADED_STATE__.simpleProductForDetailPage;
     if (naver && naver.name) {
       return {
@@ -276,7 +314,8 @@ export const PRODUCT_PAGE_SCRIPT = `(() => {
       (raw.md && raw.md.price);
     const now = Date.now();
     // 올리브영은 eg: 메타가 붙기 전에 찾았다고 보면 가격 대기 시간이 먼저 끝나 버린다.
-    const isShopDataPending = isOliveYoung && !raw.eg;
+    // 알리는 처음 HTML의 og:image가 사이트 기본 이미지라, 상품 이미지가 든 JSON-LD가 생길 때까지 기다린다.
+    const isShopDataPending = (isOliveYoung && !raw.eg) || (isAliExpress && !raw.ld);
     if (name && image && !isAppLinkLanding && !isShopDataPending && foundAt === null) foundAt = now;
     const isComplete = foundAt !== null && (price !== null && price !== undefined || now - foundAt >= ${PRODUCT_PAGE_PRICE_GRACE_MS});
     // __NEXT_DATA__ 같은 페이지 데이터는 문서 끝에 있어 문서를 다 읽기 전에는 끝내지 않는다.

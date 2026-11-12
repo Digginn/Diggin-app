@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { restrictionMessage } from "@/api/accountAccess";
 import { useToast } from "@/hooks/useToast";
+import { trackEvent } from "@/lib/analytics";
 import { normalizeText, textLength } from "@/utils/text";
 
 import { communityKeys } from "../api/community";
@@ -59,6 +60,7 @@ export function useCommentActions(postId: string, viewer: string | null) {
         ? await updateComment(editing.id, body)
         : await createComment(postId, body, request.current.id);
       if (!current.active) return null;
+      if (!editing) trackEvent("comment_create", { post_id: postId });
       setState((prev) => ({
         ...prev,
         draft: editing ? prev.draft : "",

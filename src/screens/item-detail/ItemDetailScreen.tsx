@@ -23,6 +23,7 @@ import { useFolders } from "@/hooks/useFolders";
 import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useToast } from "@/hooks/useToast";
+import { trackEvent } from "@/lib/analytics";
 import { useDeleteProducts } from "@/screens/all/mutations/useDeleteProducts";
 import { FolderMenu } from "@/screens/folder/components/FolderMenu";
 import { itemSaveErrorMessage } from "@/screens/save/domain/itemSaveError";
@@ -61,6 +62,10 @@ const MOCK_RECOMMENDS: WishItem[] = Array.from({ length: 9 }, (_, index) => ({
   thumbnailUrl: null,
 }));
 
+const ENTRY_POINTS = ["all", "folder", "search", "already_saved"] as const;
+const isEntryPoint = (value: unknown): value is (typeof ENTRY_POINTS)[number] =>
+  ENTRY_POINTS.includes(value as (typeof ENTRY_POINTS)[number]);
+
 export function ItemDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -68,8 +73,17 @@ export function ItemDetailScreen() {
   const showToast = useToast();
   const wishGuideRef = useRef<View>(null);
   const voteGuideRef = useRef<View>(null);
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const product = useProduct(id);
+  const viewedId = product.isSuccess ? id : null;
+  const sentViewId = useRef<string | null>(null);
+  // 상세를 새로 열 때만 1회 보낸다. 수정 시트·백그라운드 복귀 뒤 다시 조회해도 같은 화면에서는 보내지 않는다.
+  // 추천 상품처럼 entry_point가 정해지지 않은 경로로 연 상세는 보내지 않는다.
+  useEffect(() => {
+    if (!viewedId || sentViewId.current === viewedId || !isEntryPoint(from)) return;
+    sentViewId.current = viewedId;
+    trackEvent("saved_product_view", { product_id: viewedId, entry_point: from });
+  }, [viewedId, from]);
   const counts = useProductCounts();
   const updateProduct = useUpdateProduct(id);
   const item = product.data?.values;
@@ -210,7 +224,10 @@ export function ItemDetailScreen() {
                 onSelect={(level) =>
                   updateProduct.mutate(
                     { wishLevel: level },
-                    { onError: () => showToast(TOAST_MESSAGES.ALL_005) },
+                    {
+                      onSuccess: () => trackEvent("product_edit", { product_id: id }),
+                      onError: () => showToast(TOAST_MESSAGES.ALL_005),
+                    },
                   )
                 }
                 hint={
@@ -267,6 +284,7 @@ export function ItemDetailScreen() {
             },
             {
               onSuccess: () => {
+                trackEvent("product_edit", { product_id: id });
                 setEditOpen(false);
                 showToast(TOAST_MESSAGES.ALL_004);
               },
@@ -366,9 +384,13 @@ export function ItemDetailScreen() {
           <View className="flex-1">
             <Button
               variant="secondary"
-              onPress={() =>
-                Linking.openURL(item.sourceUrl).catch(() => showToast(TOAST_MESSAGES.ALL_009))
-              }
+              onPress={() => {
+                trackEvent("external_product_click", {
+                  product_id: id,
+                  click_source: "my_product",
+                });
+                Linking.openURL(item.sourceUrl).catch(() => showToast(TOAST_MESSAGES.ALL_009));
+              }}
             >
               웹사이트 이동
             </Button>
