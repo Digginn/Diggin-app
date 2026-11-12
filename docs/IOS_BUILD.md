@@ -5,7 +5,8 @@
 - 버전: `1.0.1 (14)`
 - 소스: main `adc598517aa530249ffe9bf68526ab89f76b10a1` ([운영 반영 PR #213](https://github.com/Digginn/Diggin-app/pull/213)). 빌드용 checkout에서 앱 버전을 `1.0.1`로 설정하고, 마지막 성공 번호 `13`에서 `autoIncrement`로 `14`를 생성했다. 성공한 버전과 번호를 이 기록 PR의 `app.json`에 반영한다.
 - [EAS 빌드](https://expo.dev/accounts/diggin/projects/Diggin/builds/33ff60db-9be8-44e7-877b-9b70c91a269c): 성공.
-- [App Store Connect 업로드](https://expo.dev/accounts/diggin/projects/Diggin/submissions/a05e48e8-2b5a-4d0d-9987-02d2b6b458dc): EAS Submit 진행 중. Apple 처리·TestFlight 상태는 완료 후 확인한다.
+- [App Store Connect](https://appstoreconnect.apple.com/apps/6821486710/testflight): Apple 공식 Build Upload API로 IPA 전송 완료. 업로드 ID는 `e2c52da5-7e5d-4279-8e37-da3f925a8565`이며 2026-11-12 15:26 UTC 조회 시 Apple 처리 상태는 `PROCESSING`이다. 파일 전송 상태는 `COMPLETE`이고 오류·경고는 없다. TestFlight 노출은 처리 후 확인한다.
+- [EAS Submit 요청](https://expo.dev/accounts/diggin/projects/Diggin/submissions/a05e48e8-2b5a-4d0d-9987-02d2b6b458dc)은 20분 넘게 전송 대기 상태여서 취소를 확인한 뒤 직접 업로드로 전환했다. EAS 제출 완료로 기록하지 않는다.
 - IPA에서 본 앱·공유 확장 버전, App Group·운영 APNs·Apple 로그인 프로필, Google·Kakao URL 스킴, iPhone 전용 설정을 확인했다.
 - 본 앱과 공유 확장의 Amplitude 네이티브 모듈, production API 키와 운영 Supabase 주소 포함, 개발 Supabase 주소 미포함을 확인했다. API 키 값은 기록하지 않는다.
 - IPA·검증 기록: `Documents/DigginReleases/ios/Diggin-1.0.1-14.ipa` 및 같은 이름의 JSON. SHA-256: `934283667cc0a182a172b8aaf8f34beb0fbef2bed3366f4b1224f75e47f0d1fe`.
@@ -35,6 +36,8 @@
 
 - 2026-11-12: `1.0 (13)` 정식 출시 상태를 확인하기 전에 시작한 `1.0.0 (14)` [작업](https://expo.dev/accounts/diggin/projects/Diggin/builds/bab3e2ce-1b5a-4b1e-886c-50e4e2fdfa28)은 중단했다. 같은 main 소스에 앱 버전을 `1.0.1`로 조정한 뒤 위 14번 빌드로 성공했다. 취소된 작업은 성공 빌드로 기록하지 않는다.
 - EAS Submit의 `--what-to-test`가 `Changelog submission is currently available for Enterprise plan only`로 거절되면 해당 옵션을 빼고 같은 build ID로 제출한다. 이 오류는 제출 예약 단계의 제한이며, 빌드를 다시 실행할 필요가 없다. 테스트 내용은 App Store Connect에서 직접 입력할 수 있다.
+- EAS Submit 대기가 길면 기존 요청의 취소를 확인한 후 [Apple 공식 Build Upload API](https://developer.apple.com/documentation/appstoreconnectapi/build-uploads)로 같은 검증된 IPA를 전송할 수 있다. `buildUploads` 생성 → `buildUploadFiles` 예약(`ASSET`, `com.apple.ipa`) → 응답의 `uploadOperations`에 따라 정확한 offset·length의 파일 조각 전송 → `uploaded: true`로 파일 commit → 업로드·빌드 처리 상태 조회 순서다. API 자격 증명·JWT·서명된 업로드 URL은 로그나 저장소에 기록하지 않는다.
+- 14번 직접 업로드에서 선택 속성인 `sourceFileChecksums`에 SHA-256 문자열을 넣으면 Apple이 409로 거절했다. 파일 조각은 이미 전송됐으므로 재업로드하지 않고 선택 속성을 제외해 commit했으며 파일 상태 `COMPLETE`를 확인했다. 로컬 IPA의 SHA-256은 위 기록으로 별도 검증한다.
 
 ## Apple 전화 인증번호가 맞는데 거절되는 경우
 
