@@ -442,6 +442,23 @@ test("등록 성공 시 서버 목록을 갱신하고 투표 탭으로 복귀한
   assert.equal(ui.destination().params.tab, "vote");
 });
 
+test("계정 변경으로 닫힌 글쓰기의 늦은 완료 이벤트를 보내지 않는다", async () => {
+  for (const isVote of [false, true]) {
+    let resolve;
+    const ui = editor({ isVote, save: () => new Promise((done) => (resolve = done)) });
+    ui.input("등록할 정상 본문");
+    const cleanups = ui.runEffects().filter((cleanup) => typeof cleanup === "function");
+    analyticsEvents.length = 0;
+    ui.submit();
+    cleanups.forEach((cleanup) => cleanup());
+    resolve("12");
+    await settle();
+    assert.equal(analyticsEvents.length, 0);
+    assert.equal(ui.invalidations.length, 0);
+    assert.equal(ui.destination(), undefined);
+  }
+});
+
 test("등록 성공 후 화면 이동이 끝나기 전에는 첨부 초안을 비우지 않는다", async () => {
   for (const isVote of [false, true]) {
     const ui = editor({ isVote });

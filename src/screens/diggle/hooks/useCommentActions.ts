@@ -59,8 +59,8 @@ export function useCommentActions(postId: string, viewer: string | null) {
       const row = editing
         ? await updateComment(editing.id, body)
         : await createComment(postId, body, request.current.id);
-      if (!editing) trackEvent("comment_create", { post_id: postId });
       if (!current.active) return null;
+      if (!editing) trackEvent("comment_create", { post_id: postId });
       setState((prev) => ({
         ...prev,
         draft: editing ? prev.draft : "",

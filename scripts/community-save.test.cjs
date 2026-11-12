@@ -96,6 +96,7 @@ function formHarness({
   saveError = new Error("offline"),
 } = {}) {
   const state = [],
+    cleanups = [],
     calls = [],
     invalidated = [],
     destinations = [],
@@ -135,7 +136,10 @@ function formHarness({
   };
   const { CommunitySaveForm, SaveToAllScreen } = load("src/screens/diggle/SaveToAllScreen.tsx", {
     "react": {
-      useEffect: () => {},
+      useEffect: (effect) => {
+        const cleanup = effect();
+        if (typeof cleanup === "function") cleanups.push(cleanup);
+      },
       useRef: (initial) => ({ current: initial }),
       useState: (initial) => {
         const index = cursor++;
@@ -236,6 +240,7 @@ function formHarness({
       .props.onPress();
   return {
     render,
+    unmount: () => cleanups.forEach((cleanup) => cleanup()),
     field,
     sheet,
     open,
@@ -250,6 +255,18 @@ function formHarness({
     SaveToAllScreen,
   };
 }
+
+test("계정 변경으로 닫힌 상품 저장의 늦은 완료 이벤트를 보내지 않는다", async () => {
+  const h = formHarness();
+  h.open();
+  const pending = h.sheet().onComplete([]);
+  h.unmount();
+  analyticsEvents.length = 0;
+  await pending;
+  assert.equal(analyticsEvents.length, 0);
+  assert.equal(h.invalidated.length, 0);
+  assert.equal(h.returned, 0);
+});
 
 test("수정 가능한 초안에서 이미지·원본 링크는 고정하고 폴더 취소와 Snapshot 재조회에도 편집을 유지한다", () => {
   const h = formHarness();

@@ -143,10 +143,10 @@ export function CommunitySaveForm({
       );
     },
     onSuccess: (result) => {
+      // 로그아웃·계정 변경으로 초안이 사라진 뒤 온 응답은 새 화면이나 사용자 이벤트에 반영하지 않는다.
+      if (!isActive.current) return;
       if (!result.isDuplicate)
         trackEvent("community_product_save", { post_id: postId, product_id: result.productId });
-      // 로그아웃·계정 변경으로 초안이 사라진 뒤 온 응답은 새 화면에 반영하지 않는다.
-      if (!isActive.current) return;
       if (result.isDuplicate) {
         setDuplicateId(result.productId);
         return;

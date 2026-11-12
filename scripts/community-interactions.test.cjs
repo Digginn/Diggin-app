@@ -324,6 +324,7 @@ test("댓글 삭제 실패는 확인창·목록을 유지하고 재시도 성공
 });
 
 test("이전 계정의 늦은 댓글 응답이 새 계정의 초안·캐시를 변경하지 않는다", async () => {
+  analyticsEvents.length = 0;
   const work = deferred(),
     ui = harness({ create: () => work.promise });
   ui.render().setBody("이전 계정 초안");
@@ -331,6 +332,7 @@ test("이전 계정의 늦은 댓글 응답이 새 계정의 초안·캐시를 �
   assert.equal(ui.render("comments", "other").body, "");
   work.resolve(row());
   await request;
+  assert.equal(analyticsEvents.length, 0, "이전 계정의 댓글 완료 이벤트를 보내지 않는다");
   assert.equal(ui.invalidations.length, 0);
   assert.equal(ui.render("comments", "other").body, "");
   assert.equal(ui.toasts.length, 0);

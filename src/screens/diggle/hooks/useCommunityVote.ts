@@ -58,8 +58,8 @@ export function useCommunityVote(
     setPending({ scope, isPending: true });
     try {
       const saved = await setCommunityVote(post.id, choice);
-      trackEvent("vote_participate", { post_id: post.id, vote_option: choice });
       if (!current.active) return;
+      trackEvent("vote_participate", { post_id: post.id, vote_option: choice });
       queryClient.setQueryData<CommunityPost | null>(
         communityKeys.post(viewer, post.id),
         (previous) =>

@@ -155,8 +155,8 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
     setSubmitting(true);
     try {
       const postId = await createCommunityPost({ ...input, requestId: request.current.id });
-      trackEvent(isVote ? "vote_create" : "post_create", { post_id: postId });
       if (!mounted.current) return;
+      trackEvent(isVote ? "vote_create" : "post_create", { post_id: postId });
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
       setLeaving(true);
       showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글을 등록했습니다.");

@@ -273,6 +273,7 @@ test("서버 마감 거절은 기존 결과를 보존하고 안내 후 최종 �
 
 test("이전 계정·화면에서 늦게 도착한 투표 응답은 새 캐시에 적용하지 않는다", async () => {
   for (const unmount of [false, true]) {
+    analyticsEvents.length = 0;
     const work = deferred();
     const ui = harness(() => work.promise);
     const sending = ui.render().choose("BUY");
@@ -283,6 +284,7 @@ test("이전 계정·화면에서 늦게 도착한 투표 응답은 새 캐시�
     }
     work.resolve(saved());
     await sending;
+    assert.equal(analyticsEvents.length, 0, "이전 요청의 이벤트를 새 사용자에게 보내지 않는다");
     assert.equal(ui.post().myChoice, null);
     assert.equal(ui.invalidations.length, 0);
     if (!unmount) assert.equal(ui.render("viewer").isPending, false);
