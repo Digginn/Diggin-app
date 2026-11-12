@@ -25,6 +25,7 @@ import { DIGGLE_TOAST_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePostDraft } from "@/contexts/PostDraftContext";
 import { useToast } from "@/hooks/useToast";
+import { trackEvent } from "@/lib/analytics";
 import { startLogin } from "@/lib/loginIntent";
 
 import { communityKeys } from "./api/community";
@@ -153,8 +154,9 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
     busy.current = true;
     setSubmitting(true);
     try {
-      await createCommunityPost({ ...input, requestId: request.current.id });
+      const postId = await createCommunityPost({ ...input, requestId: request.current.id });
       if (!mounted.current) return;
+      trackEvent(isVote ? "vote_create" : "post_create", { post_id: postId });
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
       setLeaving(true);
       showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글을 등록했습니다.");

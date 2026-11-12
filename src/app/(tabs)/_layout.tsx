@@ -22,7 +22,7 @@ export default function TabLayout() {
     if (!session || pathname !== "/all") return;
     const resume = () =>
       void takeShareLink().then((url) => {
-        if (url) start(url);
+        if (url) start(url, "share");
       });
     // 소셜 로그인 창이 닫히는 동안 앱이 아직 inactive라, 이때 로딩 창을 띄우면 iOS가 무시하고 화면이 막힌다.
     if (AppState.currentState === "active") {

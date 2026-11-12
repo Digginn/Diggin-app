@@ -16,7 +16,7 @@ export function ItemSaveFlow({ itemSave }: ItemSaveFlowProps) {
   const { save } = itemSave;
   const openProduct = (productId: string) => {
     itemSave.close();
-    router.push(`/items/${productId}`);
+    router.push(`/items/${productId}?from=already_saved`);
   };
 
   return (

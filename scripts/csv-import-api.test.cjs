@@ -8,6 +8,13 @@ const { runInNewContext } = require("node:vm");
 const Papa = require("papaparse");
 const ts = require("typescript");
 
+const analyticsEvents = [];
+const analytics = {
+  trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
+  flushAnalytics: async () => {},
+  setAnalyticsUser() {},
+};
+
 function load(relativePath, overrides = {}) {
   const module = { exports: {} };
   runInNewContext(
@@ -21,6 +28,7 @@ function load(relativePath, overrides = {}) {
       URL,
       require: (name) =>
         overrides[name] ??
+        (name === "@/lib/analytics" ? analytics : undefined) ??
         (name === "../../save/domain/restrictedProduct"
           ? load("../src/screens/save/domain/restrictedProduct.ts")
           : require(name)),
@@ -262,6 +270,7 @@ test("IMP-005 승인 판매처 가격을 실제 가져오기 RPC에 전달하고
 
 test("서버 응답을 받지 못하면 완료로 표시하지 않고 같은 파일 재시도에 요청 ID를 유지한다", async () => {
   const storage = new Map();
+  analyticsEvents.length = 0;
   const first = setup({
     storage,
     rpc: () => ({ data: null, error: { code: "NETWORK", message: "응답 유실" } }),
@@ -272,6 +281,12 @@ test("서버 응답을 받지 못하면 완료로 표시하지 않고 같은 파
   const retry = setup({ storage });
   await retry.run();
   assert.equal(retry.calls[0].request_id, first.calls[0].request_id);
+  assert.deepEqual(
+    analyticsEvents.map(([name]) => name),
+    ["wishlist_import_start", "wishlist_import_complete"],
+    "같은 작업을 다시 시도해도 시작 이벤트는 한 번만 보낸다",
+  );
+  assert.equal(analyticsEvents.at(-1)[1].retry_count, 1, "다시 시도한 횟수를 함께 보낸다");
   assert.equal(
     retry.calls[0].import_plan.products[0].savedAt,
     first.calls[0].import_plan.products[0].savedAt,
@@ -384,4 +399,46 @@ test("충돌 재시도 중 처음 한도를 넘으면 저장 전에 한 번만 �
   });
   assert.equal(confirmations, 1);
   assert.equal(calls.length, 3);
+});
+
+test("가져오기 시작·완료 이벤트를 같은 작업 ID로 보내고 결과 수를 나눠 담는다", async () => {
+  analyticsEvents.length = 0;
+  const excluded = (kind, reason = "INVALID_PRODUCT_URL") => ({
+    productName: "상품",
+    reason,
+    kind,
+  });
+  const { run, calls } = setup({
+    folders: ["abcdefg"],
+    rpc: async () => ({
+      data: {
+        importedCount: 1,
+        excludedProducts: [
+          excluded("duplicate", "DUPLICATE"),
+          excluded("failed"),
+          excluded("failed"),
+          excluded("failed", "EMPTY_PRODUCT_NAME"),
+        ],
+        folderFailures: [],
+      },
+      error: null,
+    }),
+  });
+  await run();
+  const jobId = calls[0].request_id;
+  assert.deepEqual(JSON.parse(JSON.stringify(analyticsEvents)), [
+    ["wishlist_import_start", { import_job_id: jobId }],
+    [
+      "wishlist_import_complete",
+      {
+        import_job_id: jobId,
+        total_count: 1,
+        success_count: 1,
+        duplicate_count: 1,
+        fail_count: 3,
+        fail_reasons: ["INVALID_PRODUCT_URL", "EMPTY_PRODUCT_NAME"],
+        retry_count: 0,
+      },
+    ],
+  ]);
 });

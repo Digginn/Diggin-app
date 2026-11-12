@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFolders } from "@/hooks/useFolders";
 import { useToast } from "@/hooks/useToast";
+import { trackEvent } from "@/lib/analytics";
 import { startLogin } from "@/lib/loginIntent";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
 import { itemSaveErrorMessage } from "@/screens/save/domain/itemSaveError";
@@ -101,11 +102,19 @@ function SnapshotSave({
       />
     );
   }
-  return <CommunitySaveForm item={item} onBack={onBack} />;
+  return <CommunitySaveForm postId={postId} item={item} onBack={onBack} />;
 }
 
 /** 초기 Snapshot으로 초안을 한 번 만든다. 재조회가 사용자의 수정 내용을 덮지 않는다. */
-export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBack: () => void }) {
+export function CommunitySaveForm({
+  postId,
+  item,
+  onBack,
+}: {
+  postId: string;
+  item: CommunityItem;
+  onBack: () => void;
+}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const showToast = useToast();
@@ -134,8 +143,10 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
       );
     },
     onSuccess: (result) => {
-      // 로그아웃·계정 변경으로 초안이 사라진 뒤 온 응답은 새 화면에 반영하지 않는다.
+      // 로그아웃·계정 변경으로 초안이 사라진 뒤 온 응답은 새 화면이나 사용자 이벤트에 반영하지 않는다.
       if (!isActive.current) return;
+      if (!result.isDuplicate)
+        trackEvent("community_product_save", { post_id: postId, product_id: result.productId });
       if (result.isDuplicate) {
         setDuplicateId(result.productId);
         return;
@@ -293,7 +304,7 @@ export function CommunitySaveForm({ item, onBack }: { item: CommunityItem; onBac
                 secondaryAction={{ label: "괜찮아요", onPress: onBack }}
                 primaryAction={{
                   label: "확인하기",
-                  onPress: () => router.replace(`/items/${duplicateId}`),
+                  onPress: () => router.replace(`/items/${duplicateId}?from=already_saved`),
                 }}
                 onRequestClose={onBack}
               />

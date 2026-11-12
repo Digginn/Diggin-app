@@ -38,7 +38,7 @@ export default function AndroidShareRoute() {
   );
   const openItem = useCallback(
     (id: string) => {
-      router.replace({ pathname: "/items/[id]", params: { id } });
+      router.replace({ pathname: "/items/[id]", params: { id, from: "already_saved" } });
     },
     [router],
   );

@@ -162,6 +162,7 @@ test("공유 취소·저장 완료는 수신 값을 지우고 원래 앱으로 �
   assert.equal(duplicate.calls.cleared, 1);
   assert.equal(duplicate.calls.exited, 0);
   assert.equal(duplicate.calls.routes[0].pathname, "/items/[id]");
+  assert.equal(duplicate.calls.routes[0].params.from, "already_saved");
   assert.equal(duplicate.calls.routes[0].params.id, "25");
   const back = route(sharedLink);
   assert.equal(back.calls.back(), true);
