@@ -62,7 +62,7 @@ export function TermsConsentSheet({
   onOpenDocument,
   onConfirm,
   onClose,
-  isSigningIn = false,
+  loadingMessage,
 }: {
   visible: boolean;
   consent: TermsConsent;
@@ -70,9 +70,10 @@ export function TermsConsentSheet({
   onOpenDocument: (document: PolicyDocument) => void;
   onConfirm: () => void;
   onClose: () => void;
-  /** 확인 후 로그인 창이 뜨기 전까지 시트 위에 로그인 중 표시를 띄우고 닫히지 않게 한다. */
-  isSigningIn?: boolean;
+  /** 확인 후 로그인 창이 뜨기 전까지 시트 위에 띄우는 문구. 있는 동안 시트를 닫을 수 없다. */
+  loadingMessage?: string;
 }) {
+  const isSigningIn = !!loadingMessage;
   const isAllChecked = ROWS.every(({ key }) => consent[key]);
 
   return (
@@ -83,7 +84,7 @@ export function TermsConsentSheet({
       }}
       isScrimClosable={!isSigningIn}
       isCloseConfirmed={isSigningIn}
-      overlay={isSigningIn ? <LoadingOverlay message="로그인 중입니다." /> : undefined}
+      overlay={loadingMessage ? <LoadingOverlay message={loadingMessage} /> : undefined}
       handleClassName="mb-5 h-1 w-9 self-center rounded-sm bg-gray-300"
     >
       <View className="px-margin pb-1">

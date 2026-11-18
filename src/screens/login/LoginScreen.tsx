@@ -26,6 +26,13 @@ import {
   type TermsConsent,
 } from "./components/TermsConsentSheet";
 
+// 확인 직후에는 아직 로그인이 아니라 제공자의 계정 선택 화면으로 넘어가는 중이다.
+const PROVIDER_NAMES: Record<LoginProvider, string> = {
+  google: "Google",
+  kakao: "Kakao",
+  apple: "Apple",
+};
+
 const LOGIN_PROVIDERS: LoginProvider[] =
   Platform.OS === "ios" ? ["google", "kakao", "apple"] : ["google", "kakao"];
 
@@ -229,7 +236,11 @@ export function LoginScreen({
         }}
         onConfirm={confirmConsent}
         onClose={() => setIsConsentSheetOpen(false)}
-        isSigningIn={isStartingLogin}
+        loadingMessage={
+          isStartingLogin && pendingProvider
+            ? `${PROVIDER_NAMES[pendingProvider]} 로그인으로 이동 중입니다.`
+            : undefined
+        }
       />
       {suspension &&
         (suspension.reasonCategory === "underage" ? (

@@ -306,9 +306,14 @@ for (const os of ["ios", "android"]) {
       assert.equal(signIns.length, index, "동의를 확인하기 전에는 SDK 인증을 시작하지 않는다");
       sheet().props.onChange({ ...ALL_AGREED, usageAnalysis: false });
       const login = sheet().props.onConfirm();
-      assert.equal(sheet().props.isSigningIn, true, "확인하면 바로 로그인 중 표시를 띄운다");
+      const name = { google: "Google", kakao: "Kakao", apple: "Apple" }[provider];
+      assert.equal(
+        sheet().props.loadingMessage,
+        `${name} 로그인으로 이동 중입니다.`,
+        "확인하면 바로 누른 제공자로 이동 중임을 띄운다",
+      );
       await login;
-      assert.equal(sheet().props.isSigningIn, false, "로그인 창을 취소하면 표시를 거둔다");
+      assert.equal(sheet().props.loadingMessage, undefined, "로그인 창을 취소하면 표시를 거둔다");
       assert.equal(
         signIns.at(-1),
         provider,
