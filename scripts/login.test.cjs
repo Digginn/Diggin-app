@@ -11,7 +11,7 @@ const analyticsEvents = [];
 const analytics = {
   trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
   flushAnalytics: async () => {},
-  setAnalyticsUser() {},
+  syncAnalyticsConsent: async () => {},
 };
 
 function loadLoginIntent() {
@@ -704,10 +704,11 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const order = [];
   const cacheClears = [];
   const analyticsUsers = [];
+  let onAppState;
   let googleSignOutFails = false;
   const supabase = {
     auth: {
-      getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
+      getSession: () => Promise.resolve({ data: { session: { id: "s", user: { id: "u1" } } } }),
       onAuthStateChange: (listener) => {
         emit = listener;
         return { data: { subscription: { unsubscribe() {} } } };
@@ -751,7 +752,15 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     },
     "@/lib/supabase": { supabase },
     "@/lib/queryClient": { queryClient: { clear: () => cacheClears.push(true) } },
-    "@/lib/analytics": { setAnalyticsUser: (userId) => analyticsUsers.push(userId) },
+    "@/lib/analytics": { syncAnalyticsConsent: async (userId) => analyticsUsers.push(userId) },
+    "react-native": {
+      AppState: {
+        addEventListener: (_event, listener) => {
+          onAppState = listener;
+          return { remove() {} };
+        },
+      },
+    },
     "@/lib/pushNotifications": {
       unregisterDevicePush: async () => {
         order.push("unregisterPush");
@@ -785,7 +794,13 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.deepEqual(
     analyticsUsers,
     [null, "u2", null],
-    "로그인하면 회원을 연결하고 로그아웃·만료하면 끊는다",
+    "로그인하면 회원의 분석 동의를 확인하고 로그아웃·만료하면 끈다",
+  );
+  onAppState("active");
+  assert.equal(
+    analyticsUsers.at(-1),
+    "u1",
+    "앱으로 돌아오면 현재 세션의 회원 동의를 다시 확인한다",
   );
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);

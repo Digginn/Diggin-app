@@ -81,8 +81,10 @@ test("저장 시작 경로를 완료 이벤트까지 이어 보내고 중복 저
   ]);
 });
 
-test("Amplitude는 개인정보처리방침에 없는 IP·위치·광고 식별자·IDFV·앱 세트 ID를 보내지 않는다", () => {
-  let initOptions;
+function loadAnalytics({ consent = { usage_analysis: true, overseas_transfer: true } } = {}) {
+  const instances = [];
+  const removed = [];
+  let rpcResult = { data: consent, error: null };
   const module = { exports: {} };
   runInNewContext(
     ts.transpileModule(readFileSync(path.join(__dirname, "..", "src/lib/analytics.ts"), "utf8"), {
@@ -91,14 +93,99 @@ test("Amplitude는 개인정보처리방침에 없는 IP·위치·광고 식별�
     {
       module,
       exports: module.exports,
-      process: { env: { EXPO_PUBLIC_AMPLITUDE_API_KEY: "test-key" } },
-      require: (name) =>
-        name === "@amplitude/analytics-react-native"
-          ? { init: (_key, _userId, options) => (initOptions = options) }
-          : require(name),
+      setTimeout,
+      process: { env: { EXPO_PUBLIC_AMPLITUDE_API_KEY: "1234567890-key" } },
+      require: (name) => {
+        if (name === "@amplitude/analytics-react-native")
+          return {
+            createInstance: () => {
+              const instance = {
+                calls: [],
+                init: (key, userId, options) => instance.calls.push(["init", userId, options]),
+                setUserId: (userId) => instance.calls.push(["setUserId", userId]),
+                track: (eventName) => instance.calls.push(["track", eventName]),
+                setOptOut: (value) => instance.calls.push(["setOptOut", value]),
+                reset: () => instance.calls.push(["reset"]),
+                remove: (pluginName) => instance.calls.push(["remove", pluginName]),
+              };
+              instances.push(instance);
+              return instance;
+            },
+          };
+        if (name === "@react-native-async-storage/async-storage")
+          return { __esModule: true, default: { removeItem: async (key) => removed.push(key) } };
+        if (name === "@/lib/supabase") return { supabase: { rpc: async () => rpcResult } };
+        return require(name);
+      },
     },
   );
-  const { trackingOptions } = initOptions;
+  return {
+    analytics: module.exports,
+    instances,
+    removed,
+    setRpc: (value) => (rpcResult = value),
+  };
+}
+
+test("Amplitude는 개인정보처리방침에 없는 IP·위치·광고 식별자·IDFV·앱 세트 ID를 보내지 않는다", async () => {
+  const { analytics, instances } = loadAnalytics();
+  await analytics.syncAnalyticsConsent("u1");
+  const { trackingOptions } = instances[0].calls[0][2];
   for (const key of ["ipAddress", "adid", "idfv", "appSetId", "country"])
     assert.equal(trackingOptions[key], false, key);
+});
+
+test("두 선택 동의를 모두 한 회원만 Amplitude를 켜고, 비회원·한 항목 동의·조회 실패는 켜지 않는다", async () => {
+  for (const [consent, userId] of [
+    [{ usage_analysis: true, overseas_transfer: false }, "u1"],
+    [{ usage_analysis: false, overseas_transfer: true }, "u1"],
+    [{ usage_analysis: true, overseas_transfer: true }, null],
+  ]) {
+    const { analytics, instances } = loadAnalytics({ consent });
+    await analytics.syncAnalyticsConsent(userId);
+    analytics.trackEvent("community_view", { view_type: "feed" });
+    assert.equal(instances.length, 0, JSON.stringify([consent, userId]));
+  }
+  const failed = loadAnalytics();
+  failed.setRpc({ data: null, error: { message: "offline" } });
+  await failed.analytics.syncAnalyticsConsent("u1");
+  assert.equal(failed.instances.length, 0, "동의를 확인하지 못하면 켜지 않는다");
+
+  const { analytics, instances } = loadAnalytics();
+  await analytics.syncAnalyticsConsent("u1");
+  analytics.trackEvent("community_view", { view_type: "feed" });
+  assert.deepEqual(
+    instances[0].calls.map(([name, value]) => [name, value]),
+    [
+      ["init", "u1"],
+      ["track", "community_view"],
+    ],
+  );
+});
+
+test("철회하면 바로 멈추고 쌓인 이벤트를 지우며, 다시 동의하면 새로 시작한다", async () => {
+  const { analytics, instances, removed } = loadAnalytics();
+  await analytics.syncAnalyticsConsent("u1");
+  analytics.applyAnalyticsConsent("u1", { usage_analysis: false, overseas_transfer: true });
+  analytics.trackEvent("community_view", { view_type: "feed" });
+  assert.deepEqual(
+    instances[0].calls.slice(1).map(([name, value]) => [name, value]),
+    [
+      ["setOptOut", true],
+      ["reset", undefined],
+      ["remove", "amplitude"],
+    ],
+    "철회 뒤 이벤트는 보내지 않는다",
+  );
+  assert.deepEqual(removed, ["AMP_unsent_1234567890"]);
+  analytics.applyAnalyticsConsent("u1", { usage_analysis: true, overseas_transfer: true });
+  assert.equal(instances.length, 2, "다시 동의하면 새 인스턴스로 시작한다");
+});
+
+test("동의 확인이 늦게 끝나도 그 사이 로그아웃했으면 켜지 않는다", async () => {
+  const { analytics, instances } = loadAnalytics();
+  const pending = analytics.syncAnalyticsConsent("u1");
+  await analytics.syncAnalyticsConsent(null);
+  await pending;
+  assert.equal(instances.length, 0);
 });
