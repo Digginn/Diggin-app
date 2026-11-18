@@ -41,7 +41,7 @@ function setup(data = { usage_analysis: false, overseas_transfer: true }) {
         if (name === "@/hooks/useToast") return { useToast: () => (text) => toasts.push(text) };
         if (name === "@/lib/analytics")
           return { applyAnalyticsConsent: (userId, consent) => applied.push([userId, consent]) };
-        if (name === "../api/analyticsConsent")
+        if (name === "@/api/analyticsConsent")
           return { analyticsConsentKeys: { detail: (viewer) => ["consent", viewer] } };
         return require(name);
       },

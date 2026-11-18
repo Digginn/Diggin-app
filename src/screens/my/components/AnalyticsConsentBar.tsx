@@ -1,15 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { ConsentBar } from "@/components/ConsentBar";
-import { TOAST_MESSAGES } from "@/constants/messages";
-import { useToast } from "@/hooks/useToast";
-import { applyAnalyticsConsent, type AnalyticsConsent } from "@/lib/analytics";
-
 import {
   analyticsConsentKeys,
   fetchAnalyticsConsent,
   saveAnalyticsConsent,
-} from "../api/analyticsConsent";
+} from "@/api/analyticsConsent";
+import { ConsentBar } from "@/components/ConsentBar";
+import { TOAST_MESSAGES } from "@/constants/messages";
+import { useToast } from "@/hooks/useToast";
+import { applyAnalyticsConsent, type AnalyticsConsent } from "@/lib/analytics";
 
 export const ANALYTICS_CONSENT_ITEMS = {
   "usage-analysis": {

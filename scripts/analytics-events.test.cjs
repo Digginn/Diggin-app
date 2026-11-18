@@ -189,3 +189,14 @@ test("동의 확인이 늦게 끝나도 그 사이 로그아웃했으면 켜지 
   await pending;
   assert.equal(instances.length, 0);
 });
+
+test("설정에서 바꾼 동의는 그 전에 시작한 조회 결과로 덮이지 않는다", async () => {
+  const { analytics, instances, setRpc } = loadAnalytics();
+  setRpc({ data: { usage_analysis: false, overseas_transfer: false }, error: null });
+  const stale = analytics.syncAnalyticsConsent("u1");
+  analytics.applyAnalyticsConsent("u1", { usage_analysis: true, overseas_transfer: true });
+  await stale;
+  analytics.trackEvent("community_view", { view_type: "feed" });
+  assert.equal(instances.length, 1);
+  assert.equal(instances[0].calls.at(-1)[0], "track", "늦게 끝난 조회가 전송을 멈추지 않는다");
+});

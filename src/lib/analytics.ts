@@ -56,6 +56,8 @@ function stop() {
 
 /** 설정에서 바꾼 동의를 서버 저장 성공 뒤 바로 반영한다. */
 export function applyAnalyticsConsent(userId: string, consent: AnalyticsConsent) {
+  // 방금 저장한 동의가 그 전에 시작한 조회 결과로 덮이지 않게 한다.
+  revision++;
   if (consent.usage_analysis === true && consent.overseas_transfer === true) start(userId);
   else stop();
 }

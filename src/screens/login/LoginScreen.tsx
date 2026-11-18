@@ -1,17 +1,14 @@
-import { Redirect, useRouter, type Href } from "expo-router";
+import { Redirect, useFocusEffect, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SANCTION_REASON_LABELS, type AccountAccess } from "@/api/accountAccess";
-import CheckboxOff from "@/assets/images/icon-checkbox-off.svg";
-import CheckboxOn from "@/assets/images/icon-checkbox-on.svg";
 import BackIcon from "@/assets/images/icon-login-back.svg";
 import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
-import { ActionModal } from "@/components/modal";
 import { ToastText } from "@/components/ToastText";
 import { UnderageNoticeModal } from "@/components/UnderageNoticeModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,8 +17,14 @@ import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
 import { discardShareLink } from "@/lib/pendingShareLink";
 import { SanctionNoticeModal } from "@/screens/diggle/components/SanctionNoticeModal";
 
+import { saveLoginAnalyticsConsent } from "./api/loginConsent";
 import { signIn } from "./api/signIn";
 import { SocialLoginButton, type LoginProvider } from "./components/SocialLoginButton";
+import {
+  EMPTY_TERMS_CONSENT,
+  TermsConsentSheet,
+  type TermsConsent,
+} from "./components/TermsConsentSheet";
 
 const LOGIN_PROVIDERS: LoginProvider[] =
   Platform.OS === "ios" ? ["google", "kakao", "apple"] : ["google", "kakao"];
@@ -39,13 +42,19 @@ export function LoginScreen({
   isRedirectedWhenSignedIn = false,
 }: LoginScreenProps = {}) {
   const router = useRouter();
-  const { height, fontScale } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [hasError, setHasError] = useState(isLoginError);
   const [isLoading, setIsLoading] = useState(isLoginLoading);
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
-  const [isAgeConsented, setIsAgeConsented] = useState(false);
-  const [isConsentNoticeOpen, setIsConsentNoticeOpen] = useState(false);
+  const [consent, setConsent] = useState<TermsConsent>(EMPTY_TERMS_CONSENT);
+  const [isConsentSheetOpen, setIsConsentSheetOpen] = useState(false);
+  // 시트를 띄운 제공자. 확인하면 시트가 닫힌 뒤 이 제공자로 로그인한다.
+  const [pending, setPending] = useState<{ provider: LoginProvider; isConfirmed: boolean } | null>(
+    null,
+  );
+  // 약관 전문을 보고 돌아오면 체크한 그대로 시트를 다시 연다.
+  const isReturningToSheet = useRef(false);
   const hasSignedIn = useRef(false);
   const isSigningIn = useRef(false);
   const [didSignIn, setDidSignIn] = useState(false);
@@ -68,12 +77,41 @@ export function LoginScreen({
     [],
   );
 
-  async function handleLogin(provider: LoginProvider) {
+  useFocusEffect(
+    useCallback(() => {
+      if (!isReturningToSheet.current) return;
+      isReturningToSheet.current = false;
+      setIsConsentSheetOpen(true);
+    }, []),
+  );
+
+  // AUTH-02 소셜 로그인 버튼을 누르면 이용약관 동의 시트를 먼저 띄운다.
+  function openConsentSheet(provider: LoginProvider) {
     if (isSigningIn.current) return;
-    if (!isAgeConsented) {
-      setIsConsentNoticeOpen(true);
+    setPending({ provider, isConfirmed: false });
+    setIsConsentSheetOpen(true);
+  }
+
+  function confirmConsent() {
+    setIsConsentSheetOpen(false);
+    if (!pending) return;
+    // iOS는 닫히는 중인 시트 위에 로그인 창을 띄우지 않아 닫힘이 끝난 뒤(onDismiss) 시작한다.
+    if (Platform.OS === "ios") {
+      setPending({ ...pending, isConfirmed: true });
       return;
     }
+    setPending(null);
+    return handleLogin(pending.provider, consent);
+  }
+
+  function startConfirmedLogin() {
+    if (!pending?.isConfirmed) return;
+    setPending(null);
+    return handleLogin(pending.provider, consent);
+  }
+
+  async function handleLogin(provider: LoginProvider, agreed: TermsConsent) {
+    if (isSigningIn.current) return;
     isSigningIn.current = true;
     setHasError(false);
     try {
@@ -86,6 +124,11 @@ export function LoginScreen({
       }
       hasSignedIn.current = true;
       setDidSignIn(true);
+      // 가입 완료 이벤트가 동의 여부에 따라 전송되도록 선택 동의를 먼저 저장한다. 실패해도 로그인은 이어 간다.
+      await saveLoginAnalyticsConsent(result.isNewUser, {
+        usage_analysis: agreed.usageAnalysis,
+        overseas_transfer: agreed.overseasTransfer,
+      }).catch(() => console.warn("선택 동의를 저장하지 못했습니다."));
       const resume = takeLoginIntent();
       // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다. 이어 할 동작은 안내를 지난 뒤에 한다.
       if (result.isNewUser) {
@@ -164,53 +207,9 @@ export function LoginScreen({
             <SocialLoginButton
               key={provider}
               provider={provider}
-              onPress={() => handleLogin(provider)}
+              onPress={() => openConsentSheet(provider)}
             />
           ))}
-        </View>
-        {/* Figma AgeConsentRow는 화면 왼쪽 1.5, 오른쪽 46.5 여백 안에서 가운데 정렬돼 있다. */}
-        <View className="mt-4 w-full flex-row items-center justify-center pl-[1.5px] pr-[46.5px]">
-          <Pressable
-            onPress={() => setIsAgeConsented((checked) => !checked)}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: isAgeConsented }}
-            accessibilityLabel="(필수) 만 14세 이상이며 이용약관 및 개인정보 처리방침에 동의합니다."
-            className="size-12 items-center justify-center"
-          >
-            {isAgeConsented ? <CheckboxOn /> : <CheckboxOff />}
-          </Pressable>
-          <View className="shrink items-center pt-[7.75px]">
-            <Text className="text-center text-[#333333] font-meta">(필수) 만 14세 이상이며</Text>
-            <View
-              className="min-h-12 flex-row flex-wrap items-center justify-center gap-x-[3px]"
-              // 기본 크기는 Figma의 두 줄 간격을 맞추고, 글자 확대 시에는 겹치지 않게 분리한다.
-              style={{ marginTop: fontScale > 1 ? 0 : -15.5 }}
-            >
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel="이용약관"
-                onPress={() => router.push("/policies/terms")}
-                // Figma AgeConsentText의 이용약관은 최소 너비 없이 글자 너비만 쓴다.
-                className="min-h-12 items-center justify-center"
-              >
-                <Text className="text-center text-gray-700 underline font-meta">이용약관</Text>
-              </Pressable>
-              <Text className="text-center text-[#333333] font-meta">및</Text>
-              <View className="max-w-full flex-row flex-wrap items-center justify-center">
-                <Pressable
-                  accessibilityRole="link"
-                  accessibilityLabel="개인정보 처리방침"
-                  onPress={() => router.push("/policies/privacy")}
-                  className="min-h-12 min-w-12 items-center justify-center"
-                >
-                  <Text className="text-center text-gray-700 underline font-meta">
-                    개인정보 처리방침
-                  </Text>
-                </Pressable>
-                <Text className="text-center text-[#333333] font-meta">에 동의합니다.</Text>
-              </View>
-            </View>
-          </View>
         </View>
         <Pressable
           onPress={() => router.replace("/browse")}
@@ -221,13 +220,18 @@ export function LoginScreen({
         </Pressable>
       </ScrollView>
       {isLoading && <LoadingDialog message="로그인 중입니다." />}
-      <ActionModal
-        visible={isConsentNoticeOpen}
-        title="약관 동의가 필요합니다."
-        description="필수 항목에 동의한 후 다시 로그인해 주세요."
-        isPrimaryDisabled={false}
-        onRequestClose={() => setIsConsentNoticeOpen(false)}
-        primaryAction={{ label: "확인", onPress: () => setIsConsentNoticeOpen(false) }}
+      <TermsConsentSheet
+        visible={isConsentSheetOpen}
+        consent={consent}
+        onChange={setConsent}
+        onOpenDocument={(document) => {
+          isReturningToSheet.current = true;
+          setIsConsentSheetOpen(false);
+          router.push(`/policies/${document}` as Href);
+        }}
+        onConfirm={confirmConsent}
+        onClose={() => setIsConsentSheetOpen(false)}
+        onDismiss={startConfirmedLogin}
       />
       {suspension &&
         (suspension.reasonCategory === "underage" ? (
