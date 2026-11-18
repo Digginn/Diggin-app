@@ -5,7 +5,7 @@ create table private.analytics_consent_logs (
   user_id uuid not null references public.profiles (id) on delete cascade,
   item text not null check (item in ('usage_analysis', 'overseas_transfer')),
   is_agreed boolean not null,
-  source text not null check (source in ('signup', 'settings', 'operator')),
+  source text not null check (source in ('signup', 'login', 'settings', 'operator')),
   -- 이메일 철회 요청을 운영자가 처리한 기록만 남는다.
   admin_id uuid references private.admin_users (id),
   created_at timestamptz not null default now(),
@@ -83,6 +83,7 @@ as $$
 $$;
 
 -- 이전 상태와 값이 다르거나 기록이 없는 항목만 쌓는다. 가입 때 체크하지 않은 항목도 미동의로 남는다.
+-- 기존 회원이 로그인 동의 화면에서 체크한 항목은 앱이 현재 상태와 합쳐 보내 체크하지 않았다고 철회되지 않는다.
 create or replace function private.record_analytics_consent(
   target_user uuid, usage_analysis boolean, overseas_transfer boolean, consent_source text,
   actor uuid default null
@@ -146,7 +147,7 @@ declare
 begin
   perform private.assert_account_access();
   if usage_analysis is null or overseas_transfer is null or consent_source is null
-    or consent_source not in ('signup', 'settings') then
+    or consent_source not in ('signup', 'login', 'settings') then
     raise exception 'invalid_analytics_consent' using errcode = '22023';
   end if;
   return private.record_analytics_consent(viewer_id, usage_analysis, overseas_transfer, consent_source);

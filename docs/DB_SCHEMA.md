@@ -388,7 +388,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 ## 8-2. 이용 기록 분석 선택 동의 (#156)
 
 - 가입·MY에서 받는 선택 동의 2개: 서비스 이용 기록 분석(`usage_analysis`), 이용 기록의 국외 이전(`overseas_transfer`). 두 항목 모두 동의한 회원만 앱이 Amplitude를 켠다. 비회원과 기존 회원(기록 없음)은 미동의다.
-- `private.analytics_consent_logs`: 동의·철회할 때마다 항목·값·출처(`signup`·`settings`·`operator`)·시각을 쌓는다. 항목별 가장 최근 기록이 현재 상태이고, 상태 테이블은 따로 두지 않는다. 기록이 없는 항목과 값이 바뀐 항목만 쌓아 가입 때 체크하지 않은 항목도 미동의로 남는다. 운영자 처리 기록에는 `admin_id`를 남긴다. 탈퇴하면 프로필과 함께 지운다.
+- `private.analytics_consent_logs`: 동의·철회할 때마다 항목·값·출처(`signup`·`login`·`settings`·`operator`)·시각을 쌓는다. 기존 회원이 로그인 동의 화면에서 체크한 항목은 앱이 현재 상태와 합쳐(`login`) 보내 체크하지 않은 항목이 철회되지 않는다. 항목별 가장 최근 기록이 현재 상태이고, 상태 테이블은 따로 두지 않는다. 기록이 없는 항목과 값이 바뀐 항목만 쌓아 가입 때 체크하지 않은 항목도 미동의로 남는다. 운영자 처리 기록에는 `admin_id`를 남긴다. 탈퇴하면 프로필과 함께 지운다.
 - `get_analytics_consent()` → `{usage_analysis, overseas_transfer}`, `set_analytics_consent(usage_analysis, overseas_transfer, consent_source)`: 본인만. 앱은 `operator` 출처를 쓸 수 없다. 프로필 행을 잠가 동시 변경을 줄 세운다.
 - `admin_withdraw_analytics_consent(actor, actor_session, target_email)`: 이메일 철회 요청을 운영자가 처리한다(service_role 전용, `assert_moderator`). 요청 메일 주소로 회원을 찾고 같은 이메일 계정이 둘 이상이면 `user_email_conflict`로 거부한다. 회원 앱은 다음 실행 때 반영한다.
 - `private.amplitude_deletion_jobs`: 두 항목 동의 상태에서 철회하거나(`consent_withdrawn`), 두 항목에 동의한 적 있는 회원의 프로필이 지워지면(`account_deleted`, 탈퇴·만 14세 미만 정리 공통 트리거) Amplitude 삭제를 요청한다. 탈퇴 후에도 처리해야 해서 profiles와 연결하지 않고, 회원별 대기 중 요청은 하나만 둔다.

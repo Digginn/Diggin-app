@@ -29,7 +29,7 @@ CREATE TABLE "private"."analytics_consent_logs" (
   CONSTRAINT "analytics_consent_logs_check" CHECK (((source = 'operator'::text) = (admin_id IS NOT NULL))),
   CONSTRAINT "analytics_consent_logs_item_check" CHECK ((item = ANY (ARRAY['usage_analysis'::text, 'overseas_transfer'::text]))),
   CONSTRAINT "analytics_consent_logs_pkey" PRIMARY KEY (id),
-  CONSTRAINT "analytics_consent_logs_source_check" CHECK ((source = ANY (ARRAY['signup'::text, 'settings'::text, 'operator'::text])))
+  CONSTRAINT "analytics_consent_logs_source_check" CHECK ((source = ANY (ARRAY['signup'::text, 'login'::text, 'settings'::text, 'operator'::text])))
 );
 
 ALTER TABLE "private"."analytics_consent_logs"
@@ -282,7 +282,7 @@ declare
 begin
   perform private.assert_account_access();
   if usage_analysis is null or overseas_transfer is null or consent_source is null
-    or consent_source not in ('signup', 'settings') then
+    or consent_source not in ('signup', 'login', 'settings') then
     raise exception 'invalid_analytics_consent' using errcode = '22023';
   end if;
   return private.record_analytics_consent(viewer_id, usage_analysis, overseas_transfer, consent_source);

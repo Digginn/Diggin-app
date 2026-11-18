@@ -26,7 +26,7 @@ select throws_ok($$select public.set_analytics_consent(null,true,'settings')$$,'
 select throws_ok($$select * from private.analytics_consent_logs$$,'42501',null,'이력 테이블 직접 조회 불가');
 select throws_ok($$select public.claim_amplitude_deletions()$$,'42501',null,'앱은 삭제 대기열을 가져갈 수 없음');
 select throws_ok($$select public.admin_withdraw_analytics_consent('15600000-0000-0000-0000-000000000001','15600000-0000-0000-0001-000000000001','agree156@test.invalid')$$,'42501',null,'앱은 운영자 철회를 부를 수 없음');
-select lives_ok($$select public.set_analytics_consent(true,false,'settings')$$,'같은 값으로 다시 저장');
+select lives_ok($$select public.set_analytics_consent(true,false,'login')$$,'로그인 동의 화면에서 같은 값으로 다시 저장');
 select lives_ok($$select public.set_analytics_consent(true,true,'settings')$$,'국외 이전 동의');
 select lives_ok($$select public.set_analytics_consent(false,true,'settings')$$,'이용 분석 철회');
 reset role;
