@@ -12,6 +12,7 @@ import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
 import { UnderageNoticeModal } from "@/components/UnderageNoticeModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { whenNativeModalIdle } from "@/hooks/useNativeModalVisible";
 import { trackEvent } from "@/lib/analytics";
 import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
 import { discardShareLink } from "@/lib/pendingShareLink";
@@ -49,10 +50,8 @@ export function LoginScreen({
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
   const [consent, setConsent] = useState<TermsConsent>(EMPTY_TERMS_CONSENT);
   const [isConsentSheetOpen, setIsConsentSheetOpen] = useState(false);
-  // 시트를 띄운 제공자. 확인하면 시트가 닫힌 뒤 이 제공자로 로그인한다.
-  const [pending, setPending] = useState<{ provider: LoginProvider; isConfirmed: boolean } | null>(
-    null,
-  );
+  // 시트를 띄운 제공자. 확인하면 시트가 사라진 뒤 바로 이 제공자로 로그인한다.
+  const [pendingProvider, setPendingProvider] = useState<LoginProvider | null>(null);
   // 약관 전문을 보고 돌아오면 체크한 그대로 시트를 다시 연다.
   const isReturningToSheet = useRef(false);
   const hasSignedIn = useRef(false);
@@ -88,26 +87,21 @@ export function LoginScreen({
   // AUTH-02 소셜 로그인 버튼을 누르면 이용약관 동의 시트를 먼저 띄운다.
   function openConsentSheet(provider: LoginProvider) {
     if (isSigningIn.current) return;
-    setPending({ provider, isConfirmed: false });
+    setPendingProvider(provider);
     setIsConsentSheetOpen(true);
   }
 
+  /** 확인하면 다시 버튼을 누르지 않아도 고른 소셜 로그인을 이어서 시작한다. */
   function confirmConsent() {
     setIsConsentSheetOpen(false);
-    if (!pending) return;
-    // iOS는 닫히는 중인 시트 위에 로그인 창을 띄우지 않아 닫힘이 끝난 뒤(onDismiss) 시작한다.
-    if (Platform.OS === "ios") {
-      setPending({ ...pending, isConfirmed: true });
-      return;
-    }
-    setPending(null);
-    return handleLogin(pending.provider, consent);
-  }
-
-  function startConfirmedLogin() {
-    if (!pending?.isConfirmed) return;
-    setPending(null);
-    return handleLogin(pending.provider, consent);
+    const provider = pendingProvider;
+    setPendingProvider(null);
+    if (!provider) return;
+    const agreed = consent;
+    // iOS는 닫히는 중인 시트 위에 로그인 창을 띄우지 않는다. 시트가 완전히 사라진 뒤 시작한다.
+    return new Promise<void>((resolve) => {
+      whenNativeModalIdle(() => void handleLogin(provider, agreed).finally(resolve));
+    });
   }
 
   async function handleLogin(provider: LoginProvider, agreed: TermsConsent) {
@@ -231,7 +225,6 @@ export function LoginScreen({
         }}
         onConfirm={confirmConsent}
         onClose={() => setIsConsentSheetOpen(false)}
-        onDismiss={startConfirmedLogin}
       />
       {suspension &&
         (suspension.reasonCategory === "underage" ? (

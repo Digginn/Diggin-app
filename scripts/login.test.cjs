@@ -8,6 +8,9 @@ const React = require("react");
 const ts = require("typescript");
 
 const loginConsents = [];
+// 시트가 사라지기를 기다리는 콜백. 테스트에서 직접 실행해 "사라진 뒤 시작"을 확인한다.
+const idleCallbacks = [];
+const flushIdle = () => idleCallbacks.splice(0).forEach((callback) => callback());
 const analyticsEvents = [];
 const analytics = {
   trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
@@ -56,6 +59,8 @@ function load(relativePath, mocks = {}) {
             overseasTransfer: false,
           },
         };
+      if (name === "@/hooks/useNativeModalVisible")
+        return { whenNativeModalIdle: (callback) => idleCallbacks.push(callback) };
       if (name === "./api/loginConsent")
         return {
           saveLoginAnalyticsConsent: async (isNewUser, consent) =>
@@ -134,8 +139,9 @@ async function pressSocialAfterConsent(hooks, screen, consent = ALL_AGREED, inde
     [index].props.onPress();
   const sheet = () => hooks.render(screen).find((node) => node.type === "TermsConsentSheet");
   sheet().props.onChange(consent);
-  await sheet().props.onConfirm();
-  await sheet().props.onDismiss();
+  const login = sheet().props.onConfirm();
+  flushIdle();
+  await login;
 }
 
 test("소셜 버튼이 공통 Button과 지정 로고·색상·콜백을 사용한다", () => {
@@ -306,17 +312,13 @@ for (const os of ["ios", "android"]) {
       assert.equal(sheet().props.visible, true, "소셜 버튼을 누르면 동의 시트를 띄운다");
       assert.equal(signIns.length, index, "동의를 확인하기 전에는 SDK 인증을 시작하지 않는다");
       sheet().props.onChange({ ...ALL_AGREED, usageAnalysis: false });
-      await sheet().props.onConfirm();
+      const login = sheet().props.onConfirm();
       assert.equal(sheet().props.visible, false);
-      assert.equal(
-        signIns.length,
-        os === "ios" ? index : index + 1,
-        "iOS는 시트가 닫힌 뒤에 로그인 창을 연다",
-      );
-      await sheet().props.onDismiss();
-      await sheet().props.onDismiss();
-      assert.equal(signIns.at(-1), provider);
-      assert.equal(signIns.length, index + 1, "닫힘이 두 번 와도 한 번만 로그인한다");
+      assert.equal(signIns.length, index, "시트가 다 사라지기 전에는 로그인 창을 열지 않는다");
+      flushIdle();
+      await login;
+      assert.equal(signIns.at(-1), provider, "다시 누르지 않아도 고른 소셜 로그인으로 이어진다");
+      assert.equal(signIns.length, index + 1);
     }
     assert.equal(alerts.length, 0);
     hooks
@@ -326,11 +328,12 @@ for (const os of ["ios", "android"]) {
     sheet().props.onOpenDocument("terms");
     assert.equal(routes.at(-1), "/policies/terms");
     assert.equal(sheet().props.visible, false, "약관 전문을 열면 시트를 닫는다");
-    await sheet().props.onDismiss();
+    sheet().props.onClose();
+    flushIdle();
     assert.equal(
       signIns.length,
       expectedProviders.split(",").length,
-      "확인하지 않고 닫히면 로그인하지 않는다",
+      "확인하지 않고 닫으면 로그인하지 않는다",
     );
     const consented = hooks.render(LoginScreen);
     consented

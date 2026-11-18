@@ -61,7 +61,6 @@ export function TermsConsentSheet({
   onOpenDocument,
   onConfirm,
   onClose,
-  onDismiss,
 }: {
   visible: boolean;
   consent: TermsConsent;
@@ -69,7 +68,6 @@ export function TermsConsentSheet({
   onOpenDocument: (document: PolicyDocument) => void;
   onConfirm: () => void;
   onClose: () => void;
-  onDismiss?: () => void;
 }) {
   const isAllChecked = ROWS.every(({ key }) => consent[key]);
 
@@ -77,7 +75,6 @@ export function TermsConsentSheet({
     <BottomSheet
       visible={visible}
       onRequestClose={onClose}
-      onDismiss={onDismiss}
       handleClassName="mb-5 h-1 w-9 self-center rounded-sm bg-gray-300"
     >
       <View className="px-margin pb-1">
