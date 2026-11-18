@@ -80,3 +80,25 @@ test("저장 시작 경로를 완료 이벤트까지 이어 보내고 중복 저
     ["product_add_complete", { entry_point: "direct" }],
   ]);
 });
+
+test("Amplitude는 개인정보처리방침에 없는 IP·위치·광고 식별자·IDFV·앱 세트 ID를 보내지 않는다", () => {
+  let initOptions;
+  const module = { exports: {} };
+  runInNewContext(
+    ts.transpileModule(readFileSync(path.join(__dirname, "..", "src/lib/analytics.ts"), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText,
+    {
+      module,
+      exports: module.exports,
+      process: { env: { EXPO_PUBLIC_AMPLITUDE_API_KEY: "test-key" } },
+      require: (name) =>
+        name === "@amplitude/analytics-react-native"
+          ? { init: (_key, _userId, options) => (initOptions = options) }
+          : require(name),
+    },
+  );
+  const { trackingOptions } = initOptions;
+  for (const key of ["ipAddress", "adid", "idfv", "appSetId", "country"])
+    assert.equal(trackingOptions[key], false, key);
+});

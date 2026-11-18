@@ -5,19 +5,20 @@ const API_KEY = process.env.EXPO_PUBLIC_AMPLITUDE_API_KEY;
 // 키가 없는 빌드는 수집하지 않는다.
 if (API_KEY)
   amplitude.init(API_KEY, undefined, {
-    // 일부만 넘기면 나머지가 꺼져 SDK 기본값을 모두 적는다. 광고 식별자는 수집하지 않는다(MY-010).
+    // 일부만 넘기면 나머지가 꺼져 SDK 기본값을 모두 적는다. 개인정보처리방침에 적은 값만 보낸다.
+    // 광고 식별자(MY-010)·IP 주소와 위치는 수집하지 않고, 기기는 device_id로 구분해 IDFV·앱 세트 ID도 보내지 않는다.
     trackingOptions: {
       adid: false,
       carrier: true,
       deviceManufacturer: true,
       deviceModel: true,
-      ipAddress: true,
+      ipAddress: false,
       language: true,
       osName: true,
       osVersion: true,
       platform: true,
-      appSetId: true,
-      idfv: true,
+      appSetId: false,
+      idfv: false,
       country: false,
     },
   });
