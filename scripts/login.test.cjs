@@ -305,7 +305,10 @@ for (const os of ["ios", "android"]) {
       assert.equal(sheet().props.visible, true, "소셜 버튼을 누르면 동의 시트를 띄운다");
       assert.equal(signIns.length, index, "동의를 확인하기 전에는 SDK 인증을 시작하지 않는다");
       sheet().props.onChange({ ...ALL_AGREED, usageAnalysis: false });
-      await sheet().props.onConfirm();
+      const login = sheet().props.onConfirm();
+      assert.equal(sheet().props.isSigningIn, true, "확인하면 바로 로그인 중 표시를 띄운다");
+      await login;
+      assert.equal(sheet().props.isSigningIn, false, "로그인 창을 취소하면 표시를 거둔다");
       assert.equal(
         signIns.at(-1),
         provider,

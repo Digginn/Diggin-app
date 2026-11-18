@@ -5,6 +5,7 @@ import CheckboxOff from "@/assets/images/icon-consent-checkbox-off.svg";
 import CheckboxOn from "@/assets/images/icon-consent-checkbox-on.svg";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Button } from "@/components/Button";
+import { LoadingOverlay } from "@/components/Loading";
 import type { PolicyDocument } from "@/components/PolicyDocumentContent";
 
 export type TermsConsent = {
@@ -61,6 +62,7 @@ export function TermsConsentSheet({
   onOpenDocument,
   onConfirm,
   onClose,
+  isSigningIn = false,
 }: {
   visible: boolean;
   consent: TermsConsent;
@@ -68,13 +70,20 @@ export function TermsConsentSheet({
   onOpenDocument: (document: PolicyDocument) => void;
   onConfirm: () => void;
   onClose: () => void;
+  /** 확인 후 로그인 창이 뜨기 전까지 시트 위에 로그인 중 표시를 띄우고 닫히지 않게 한다. */
+  isSigningIn?: boolean;
 }) {
   const isAllChecked = ROWS.every(({ key }) => consent[key]);
 
   return (
     <BottomSheet
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={() => {
+        if (!isSigningIn) onClose();
+      }}
+      isScrimClosable={!isSigningIn}
+      isCloseConfirmed={isSigningIn}
+      overlay={isSigningIn ? <LoadingOverlay message="로그인 중입니다." /> : undefined}
       handleClassName="mb-5 h-1 w-9 self-center rounded-sm bg-gray-300"
     >
       <View className="px-margin pb-1">

@@ -51,6 +51,8 @@ export function LoginScreen({
   const [isConsentSheetOpen, setIsConsentSheetOpen] = useState(false);
   // 시트를 띄운 제공자. 확인하면 시트가 사라진 뒤 바로 이 제공자로 로그인한다.
   const [pendingProvider, setPendingProvider] = useState<LoginProvider | null>(null);
+  // 확인부터 로그인 창이 뜨기 전까지 멈춘 것처럼 보이지 않게 시트 위에 로그인 중 표시를 띄운다.
+  const [isStartingLogin, setIsStartingLogin] = useState(false);
   // 약관 전문을 보고 돌아오면 체크한 그대로 시트를 다시 연다.
   const isReturningToSheet = useRef(false);
   const hasSignedIn = useRef(false);
@@ -96,8 +98,9 @@ export function LoginScreen({
    * 로그인을 취소하면 체크한 그대로 시트가 남아 다시 확인하거나 닫을 수 있다.
    */
   function confirmConsent() {
-    if (!pendingProvider) return;
-    return handleLogin(pendingProvider, consent);
+    if (!pendingProvider || isSigningIn.current) return;
+    setIsStartingLogin(true);
+    return handleLogin(pendingProvider, consent).finally(() => setIsStartingLogin(false));
   }
 
   async function handleLogin(provider: LoginProvider, agreed: TermsConsent) {
@@ -226,6 +229,7 @@ export function LoginScreen({
         }}
         onConfirm={confirmConsent}
         onClose={() => setIsConsentSheetOpen(false)}
+        isSigningIn={isStartingLogin}
       />
       {suspension &&
         (suspension.reasonCategory === "underage" ? (
