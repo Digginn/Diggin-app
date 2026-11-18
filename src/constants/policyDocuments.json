@@ -2522,5 +2522,175 @@
         ]
       }
     ]
+  },
+  "usage-analysis": {
+    "gap": 20,
+    "children": [
+      {
+        "variant": "body",
+        "text": "Diggin(디긴)은 더 나은 서비스를 만들기 위해 아래와 같이 앱 이용 기록을 수집·이용합니다."
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "수집·이용 목적:",
+            "isLabel": true
+          },
+          {
+            "text": " 서비스 이용 통계 분석을 통한 기능 개선"
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "수집 항목:",
+            "isLabel": true
+          },
+          {
+            "text": " 회원 식별번호(서비스 내부 회원 ID), 기기 식별값(앱이 생성한 임의의 값), 기기 제조사·모델, 플랫폼·운영체제, 앱·SDK 버전, 언어, 통신사, 서비스 이용 기록(기능 사용 내역, 이용 일시, 접속 세션 정보, 이벤트 순번 등 중복 전송 방지를 위한 식별값)"
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "수집하지 않는 항목:",
+            "isLabel": true
+          },
+          {
+            "text": " IP 주소, 위치 정보, 광고 식별자, 이메일, 이름"
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "보유 및 이용기간:",
+            "isLabel": true
+          },
+          {
+            "text": " 수집일부터 1년. 동의 철회 또는 회원탈퇴 시 삭제를 요청하며, 요청일부터 최대 35일 이내에 삭제됩니다."
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "text": "동의를 거부할 권리가 있으며, 동의하지 않아도 Diggin(디긴)의 모든 기능을 이용할 수 있습니다. 동의한 후에는 앱의 MY 설정 또는 diggin.app@gmail.com으로 언제든 철회할 수 있습니다."
+      },
+      {
+        "variant": "body",
+        "text": "이용 기록 분석은 미국의 Amplitude, Inc.를 통해 처리되므로, ‘이용 기록의 국외 이전’에도 함께 동의한 경우에만 분석을 시작합니다."
+      },
+      {
+        "variant": "body",
+        "text": "자세한 내용은 개인정보처리방침 제2조⑦을 확인해 주세요."
+      }
+    ]
+  },
+  "overseas-transfer": {
+    "gap": 20,
+    "children": [
+      {
+        "variant": "body",
+        "text": "Diggin(디긴)은 서비스 이용 기록 분석을 위해 아래와 같이 개인정보를 국외로 이전합니다."
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "이전받는 자 및 연락처:",
+            "isLabel": true
+          },
+          {
+            "text": " Amplitude, Inc.(privacy@amplitude.com)"
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "이전 국가:",
+            "isLabel": true
+          },
+          {
+            "text": " 미국"
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "이전 항목:",
+            "isLabel": true
+          },
+          {
+            "text": " 회원 식별번호, 기기 식별값, 기기 제조사·모델, 플랫폼·운영체제, 앱·SDK 버전, 언어, 통신사, 서비스 이용 기록"
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "이전 목적:",
+            "isLabel": true
+          },
+          {
+            "text": " 서비스 이용 통계 분석"
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "이전 시기 및 방법:",
+            "isLabel": true
+          },
+          {
+            "text": " 앱 이용 중 이벤트가 발생할 때 일정 주기로 암호화된 통신망을 통해 전송"
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "보유 및 이용기간:",
+            "isLabel": true
+          },
+          {
+            "text": " 수집일부터 1년. 동의 철회 또는 회원탈퇴 시 Amplitude에 삭제를 요청하며, 요청일부터 최대 35일 이내에 삭제됩니다."
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "segments": [
+          {
+            "text": "이전 거부 방법 및 효과:",
+            "isLabel": true
+          },
+          {
+            "text": " 동의하지 않으면 국외로 전송하지 않습니다. 동의한 후에는 앱의 MY 설정 또는 diggin.app@gmail.com으로 철회할 수 있습니다. 앱에서 철회하면 즉시, 이메일로 요청하면 운영자가 처리한 뒤 다음 앱 실행 시부터 전송을 중단하며, 기존 데이터 삭제를 요청합니다."
+          }
+        ]
+      },
+      {
+        "variant": "body",
+        "text": "동의를 거부할 권리가 있으며, 거부해도 Diggin(디긴)의 모든 기능을 이용할 수 있습니다."
+      },
+      {
+        "variant": "body",
+        "text": "자세한 내용은 개인정보처리방침 제6조④를 확인해 주세요."
+      }
+    ]
   }
 }

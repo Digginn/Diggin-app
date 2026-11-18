@@ -35,6 +35,7 @@ function setup(
     mailAvailable = false,
     mailFailure = false;
   let readNickname = async () => ({ data: { nickname: "디기" } });
+  const auth = { session: { user: { id: "viewer" } } };
   const composed = [];
   const states = [],
     refs = [];
@@ -150,8 +151,11 @@ function setup(
           return { useSafeAreaInsets: () => ({ bottom: 34 }) };
         if (name === "@/hooks/useToast") return { useToast: () => (text) => toasts.push(text) };
         if (name === "@/contexts/AuthContext")
-          return { useAuth: () => ({ session: { user: { id: "viewer" } }, isRestoring: false }) };
+          return { useAuth: () => ({ session: auth.session, isRestoring: false }) };
         if (name === "@/components/app-bar") return { AppBar: "AppBar" };
+        if (name === "@/components/ConsentBar") return { ConsentBar: "ConsentBar" };
+        if (name === "./components/AnalyticsConsentBar")
+          return { AnalyticsConsentBar: "AnalyticsConsentBar" };
         if (name === "@/components/Button") return { Button: "Button" };
         if (name === "@/components/modal") return { Modal: "Modal", ActionModal: "ActionModal" };
         if (name === "@/components/BottomSheet") return { BottomSheet: "BottomSheet" };
@@ -222,6 +226,7 @@ function setup(
     setReadNickname: (read) => {
       readNickname = read;
     },
+    auth,
   };
 }
 
@@ -490,7 +495,14 @@ test("약관 목록은 48px 행·safe area를 적용하고 문서 종류를 사�
   const rows = nodes.filter((node) => node.type === "Pressable");
   assert.deepEqual(
     rows.map((node) => node.props.accessibilityLabel),
-    ["이용약관", "개인정보 처리방침", "커뮤니티 이용정책", "오픈소스 라이센스"],
+    [
+      "이용약관",
+      "개인정보 처리방침",
+      "커뮤니티 이용정책",
+      "(선택) 서비스 이용 기록 분석 동의",
+      "(선택) 이용 기록의 국외 이전 동의",
+      "오픈소스 라이센스",
+    ],
   );
   assert.ok(rows.every((row) => row.props.className.includes("h-12")));
   assert.equal(
@@ -498,7 +510,14 @@ test("약관 목록은 48px 행·safe area를 적용하고 문서 종류를 사�
     58,
   );
   rows.forEach((row) => row.props.onPress());
-  assert.deepEqual(selected, ["terms", "privacy", "community", "licenses"]);
+  assert.deepEqual(selected, [
+    "terms",
+    "privacy",
+    "community",
+    "usage-analysis",
+    "overseas-transfer",
+    "licenses",
+  ]);
   assert.equal(nodes.find((node) => node.type === "AppBar").props.title, "약관 및 정책");
   descendants(context.Screen())
     .filter((node) => node.type === "Pressable")
@@ -507,6 +526,8 @@ test("약관 목록은 48px 행·safe area를 적용하고 문서 종류를 사�
     "/policies/terms",
     "/policies/privacy",
     "/policies/community",
+    "/policies/usage-analysis",
+    "/policies/overseas-transfer",
     "/policies/licenses",
   ]);
   assert.deepEqual(context.toasts, []);
@@ -541,6 +562,22 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
     assert.ok(textNodes.every((node) => node.props.selectable));
     assert.ok(textNodes.every((node) => node.props.className));
   }
+});
+
+test("약관 상세 체크박스는 회원에게만 하단에 띄우고, 필수 약관은 누를 수 없는 회색으로 둔다", () => {
+  const context = setup("PolicyDocumentScreen");
+  const bar = (document) =>
+    expand(context.Screen({ document })).find(
+      (node) => node.type === "ConsentBar" || node.type === "AnalyticsConsentBar",
+    );
+  assert.deepEqual({ ...bar("terms").props }, { label: "(필수) 이용약관 동의", state: "disabled" });
+  assert.equal(bar("privacy").props.label, "(필수) 개인정보 처리방침 동의");
+  assert.equal(bar("community"), undefined, "커뮤니티 이용정책은 체크박스가 없다");
+  assert.equal(bar("usage-analysis").props.document, "usage-analysis");
+  assert.equal(bar("overseas-transfer").props.userId, "viewer");
+  context.auth.session = null;
+  for (const document of ["terms", "privacy", "usage-analysis", "overseas-transfer"])
+    assert.equal(bar(document), undefined, `비회원 ${document}는 전문만 보여 준다`);
 });
 
 test("커뮤니티 이용정책 마지막 두 문단은 바텀시트에서만 띄운다", () => {
