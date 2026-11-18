@@ -12,7 +12,6 @@ import { LoadingDialog } from "@/components/LoadingDialog";
 import { ToastText } from "@/components/ToastText";
 import { UnderageNoticeModal } from "@/components/UnderageNoticeModal";
 import { useAuth } from "@/contexts/AuthContext";
-import { whenNativeModalIdle } from "@/hooks/useNativeModalVisible";
 import { trackEvent } from "@/lib/analytics";
 import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
 import { discardShareLink } from "@/lib/pendingShareLink";
@@ -91,17 +90,14 @@ export function LoginScreen({
     setIsConsentSheetOpen(true);
   }
 
-  /** 확인하면 다시 버튼을 누르지 않아도 고른 소셜 로그인을 이어서 시작한다. */
+  /**
+   * 확인하면 다시 버튼을 누르지 않아도 고른 소셜 로그인을 바로 시작한다.
+   * iOS는 닫히는 중인 시트 위에 로그인 창을 띄우지 않아, 시트를 연 채로 그 위에 띄우고 인증이 끝나면 닫는다.
+   * 로그인을 취소하면 체크한 그대로 시트가 남아 다시 확인하거나 닫을 수 있다.
+   */
   function confirmConsent() {
-    setIsConsentSheetOpen(false);
-    const provider = pendingProvider;
-    setPendingProvider(null);
-    if (!provider) return;
-    const agreed = consent;
-    // iOS는 닫히는 중인 시트 위에 로그인 창을 띄우지 않는다. 시트가 완전히 사라진 뒤 시작한다.
-    return new Promise<void>((resolve) => {
-      whenNativeModalIdle(() => void handleLogin(provider, agreed).finally(resolve));
-    });
+    if (!pendingProvider) return;
+    return handleLogin(pendingProvider, consent);
   }
 
   async function handleLogin(provider: LoginProvider, agreed: TermsConsent) {
@@ -110,8 +106,12 @@ export function LoginScreen({
     setHasError(false);
     try {
       // iOS는 화면이 떠오르는 중에 다른 화면을 띄우지 않는다. 로딩 창을 먼저 띄우면 로그인 창이 안 열린다.
-      const result = await signIn(provider, () => setIsLoading(true));
+      const result = await signIn(provider, () => {
+        setIsConsentSheetOpen(false);
+        setIsLoading(true);
+      });
       if (result.status === "cancelled") return;
+      setIsConsentSheetOpen(false);
       if (result.status === "suspended") {
         setSuspension(result.access);
         return;
@@ -139,6 +139,7 @@ export function LoginScreen({
       router.replace("/(tabs)/all" as Href);
     } catch {
       console.warn("소셜 로그인에 실패했습니다.");
+      setIsConsentSheetOpen(false);
       setHasError(true);
     } finally {
       isSigningIn.current = false;
