@@ -451,6 +451,10 @@ verify_jwt = false
 [functions.notification-push]
 verify_jwt = false
 
+# 전용 AMPLITUDE_DELETION_SECRET을 함수 내부에서 검증한다. pg_cron만 부른다.
+[functions.amplitude-deletion]
+verify_jwt = false
+
 # Supabase 세션 대신 함수 내부에서 제공자 ID token의 서명·issuer·audience를 검증한다.
 [functions.account-restriction]
 verify_jwt = false

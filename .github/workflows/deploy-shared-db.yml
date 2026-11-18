@@ -151,6 +151,7 @@ jobs:
           supabase functions deploy csv-import --project-ref "$SUPABASE_PROJECT_ID"
           supabase functions deploy apple-token --project-ref "$SUPABASE_PROJECT_ID"
           supabase functions deploy underage-cleanup --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy amplitude-deletion --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Report the deployed commit
         env:
