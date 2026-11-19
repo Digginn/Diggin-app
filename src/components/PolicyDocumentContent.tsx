@@ -13,7 +13,8 @@ type ContentBlock = {
   sheetGap?: number;
   paddingBottom?: number;
   isListItem?: boolean;
-  segments?: { text: string; isStrong?: boolean }[];
+  /** isLabel은 MY-17 선택 동의 전문의 항목명(14px 진한 글씨)이다. */
+  segments?: { text: string; isStrong?: boolean; isLabel?: boolean }[];
   children?: ContentBlock[];
 };
 
@@ -51,7 +52,13 @@ function DocumentContent({ block, isSheet }: { block: ContentBlock; isSheet: boo
         <Text
           key={index}
           selectable
-          className={segment.isStrong ? "font-pretendard-semibold" : "font-pretendard"}
+          className={
+            segment.isLabel
+              ? "text-gray-900 font-label-14"
+              : segment.isStrong
+                ? "font-pretendard-semibold"
+                : "font-pretendard"
+          }
         >
           {segment.text}
         </Text>

@@ -385,9 +385,19 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - 같은 계정은 재로그인·재설치·다른 기기에서도 닫은 안내를 반복하지 않는다. 기존 기기 저장 기록은 계정 소유자를 구분할 수 없어 승계하지 않는다. 따라서 전환 후 서버 기록이 없는 기존 사용자도 각 안내를 한 번 다시 본다. 탈퇴 시 프로필 FK cascade로 기록도 삭제되므로 새 UUID로 재가입하면 다시 안내한다.
 - 비회원·인증 복원 중에는 표시하지 않는다. 조회 실패 시에는 안내를 표시하고, 닫기 저장 실패 시 현재 앱 실행 중에만 재노출을 막는다. 다음 실행까지의 중복 방지는 서버 저장 성공을 전제로 한다.
 
+## 8-2. 이용 기록 분석 선택 동의 (#156)
+
+- 가입·MY에서 받는 선택 동의 2개: 서비스 이용 기록 분석(`usage_analysis`), 이용 기록의 국외 이전(`overseas_transfer`). 두 항목 모두 동의한 회원만 앱이 Amplitude를 켠다. 비회원과 기존 회원(기록 없음)은 미동의다.
+- `private.analytics_consent_logs`: 동의·철회할 때마다 항목·값·출처(`signup`·`login`·`settings`·`operator`)·시각을 쌓는다. 기존 회원이 로그인 동의 화면에서 체크한 항목은 앱이 현재 상태와 합쳐(`login`) 보내 체크하지 않은 항목이 철회되지 않는다. 항목별 가장 최근 기록이 현재 상태이고, 상태 테이블은 따로 두지 않는다. 기록이 없는 항목과 값이 바뀐 항목만 쌓아 가입 때 체크하지 않은 항목도 미동의로 남는다. 운영자 처리 기록에는 `admin_id`를 남긴다. 탈퇴하면 프로필과 함께 지운다.
+- `get_analytics_consent()` → `{usage_analysis, overseas_transfer}`, `set_analytics_consent(usage_analysis, overseas_transfer, consent_source)`: 본인만. 앱은 `operator` 출처를 쓸 수 없다. 프로필 행을 잠가 동시 변경을 줄 세운다.
+- `admin_withdraw_analytics_consent(actor, actor_session, target_email)`: 이메일 철회 요청을 운영자가 처리한다(service_role 전용, `assert_moderator`). 요청 메일 주소로 회원을 찾고 같은 이메일 계정이 둘 이상이면 `user_email_conflict`로 거부한다. 회원 앱은 다음 실행 때 반영한다.
+- `private.amplitude_deletion_jobs`: 앱에서 두 항목 동의 상태를 철회하면(`consent_withdrawn`) Amplitude 삭제를 요청한다. 운영자 이메일 철회와 회원 삭제(`account_deleted`, 탈퇴·만 14세 미만 정리 공통 트리거)는 동의 이력 없이 수집한 이전 빌드 데이터도 지워야 해 이력과 관계없이 항상 요청한다. 수집된 적 없는 ID는 Amplitude가 무시한다(`ignore_invalid_id`). 탈퇴 후에도 처리해야 해서 profiles와 연결하지 않고, 회원별 대기 중 요청은 하나만 둔다.
+- `claim_amplitude_deletions()`·`finish_amplitude_deletions(claim_id, succeeded, error_code)`: service_role 전용. 100명씩 5분 lease로 가져가고, 실패하면 2분부터 두 배씩 최대 6시간 간격으로 계속 다시 시도한다. 지난 lease의 결과는 반영하지 않는다.
+- pg_cron `amplitude-deletion-dispatch`가 10분마다 처리할 요청이 있을 때만 Vault의 `amplitude_deletion_url`/`amplitude_deletion_secret`으로 Edge Function을 부른다. 설정 전에는 호출하지 않는다. `amplitude-deletion-cleanup`이 매일 03:40(KST)에 처리 끝난 지 35일(Amplitude 처리 기간) 지난 요청을 지운다.
+
 ## 9. DB에 두지 않는 것
 
-최근 검색어(기기 저장), 온보딩 완료 여부, 로그인 전 공유 임시 데이터, 일반 툴팁 노출 여부, Analytics, 추천. ALL·FOLDER·상품 상세 첫 진입 안내는 위 계정별 서버 기록으로 관리한다.
+최근 검색어(기기 저장), 온보딩 완료 여부, 로그인 전 공유 임시 데이터, 일반 툴팁 노출 여부, Analytics 이벤트(Amplitude에만 보낸다. 선택 동의 기록은 위 8-2), 추천. ALL·FOLDER·상품 상세 첫 진입 안내는 위 계정별 서버 기록으로 관리한다.
 
 ## 10. 확인 필요 (PM·팀 결정 대기)
 

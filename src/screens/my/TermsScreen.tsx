@@ -6,12 +6,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconMyChevron } from "@/assets/images/my";
 import { AppBar } from "@/components/app-bar";
 
-export type TermsDocument = "terms" | "privacy" | "community" | "licenses";
+export type TermsDocument =
+  "terms" | "privacy" | "community" | "usage-analysis" | "overseas-transfer" | "licenses";
 
 const DOCUMENTS: { key: TermsDocument; label: string }[] = [
   { key: "terms", label: "이용약관" },
   { key: "privacy", label: "개인정보 처리방침" },
   { key: "community", label: "커뮤니티 이용정책" },
+  { key: "usage-analysis", label: "(선택) 서비스 이용 기록 분석 동의" },
+  { key: "overseas-transfer", label: "(선택) 이용 기록의 국외 이전 동의" },
   { key: "licenses", label: "오픈소스 라이센스" },
 ];
 

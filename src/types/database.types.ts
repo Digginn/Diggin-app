@@ -412,11 +412,16 @@ export type Database = {
         };
         Returns: boolean;
       };
+      admin_withdraw_analytics_consent: {
+        Args: { actor: string; actor_session: string; target_email: string };
+        Returns: Json;
+      };
       agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
       block_community_author: {
         Args: { target_id: number; target_type: string };
         Returns: undefined;
       };
+      claim_amplitude_deletions: { Args: Record<PropertyKey, never>; Returns: Json };
       claim_notification_pushes: { Args: { receipts?: boolean }; Returns: Json };
       claim_underage_deletion: { Args: { target: string }; Returns: boolean };
       create_comment: {
@@ -449,6 +454,10 @@ export type Database = {
         Args: { product_image_url?: string; target_product_id: number };
         Returns: string;
       };
+      finish_amplitude_deletions: {
+        Args: { claim_id: string; error_code?: string; succeeded: boolean };
+        Returns: number;
+      };
       finish_notification_push: {
         Args: {
           claim_id: string;
@@ -460,6 +469,7 @@ export type Database = {
         Returns: boolean;
       };
       get_account_access: { Args: Record<PropertyKey, never>; Returns: Json };
+      get_analytics_consent: { Args: Record<PropertyKey, never>; Returns: Json };
       get_community_comments: {
         Args: { after_created_at?: string; after_id?: number; target_post_id: number };
         Returns: Json;
@@ -533,6 +543,10 @@ export type Database = {
           is_duplicate: boolean;
           product_id: number;
         }[];
+      };
+      set_analytics_consent: {
+        Args: { consent_source: string; overseas_transfer: boolean; usage_analysis: boolean };
+        Returns: Json;
       };
       set_avatar: { Args: { new_path: string }; Returns: undefined };
       set_community_like: { Args: { is_liked: boolean; target_post_id: number }; Returns: Json };

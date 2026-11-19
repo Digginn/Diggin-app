@@ -189,3 +189,32 @@ Deno.test("보관 유지 표시는 대상과 true/false만 받아 인증한 운�
   );
   assert(bad.status === 400 && calls.length === 1);
 });
+
+Deno.test("이용 기록 분석 동의 철회는 검증한 운영자와 이메일만 넘기고 중복 이메일은 409", async () => {
+  const calls: [string, Record<string, unknown>][] = [];
+  const handler = createAdminHandler({
+    authenticate: () => Promise.resolve(actor),
+    rpc: (name, args) => {
+      calls.push([name, args]);
+      return args.target_email === "same@test.invalid"
+        ? Promise.reject(new Error("user_email_conflict"))
+        : Promise.resolve({ user_id: userId, usage_analysis: false, overseas_transfer: false });
+    },
+    updateAuth: () => Promise.reject(new Error("should_not_run")),
+  });
+  const ok = await handler(
+    request({ action: "withdraw_analytics_consent", email: " user@test.invalid " }),
+  );
+  assert(ok.status === 200);
+  assert(
+    JSON.stringify(calls[0]) === JSON.stringify([
+      "admin_withdraw_analytics_consent",
+      { target_email: "user@test.invalid", actor: actor.userId, actor_session: actor.sessionId },
+    ]),
+  );
+  const conflict = await handler(
+    request({ action: "withdraw_analytics_consent", email: "same@test.invalid" }),
+  );
+  assert(conflict.status === 409);
+  assert((await handler(request({ action: "withdraw_analytics_consent" }))).status === 400);
+});

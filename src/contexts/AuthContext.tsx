@@ -1,8 +1,9 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { AppState } from "react-native";
 
 import { fetchAccountAccess, type AccountAccess } from "@/api/accountAccess";
-import { setAnalyticsUser } from "@/lib/analytics";
+import { syncAnalyticsConsent } from "@/lib/analytics";
 import { GoogleSignin } from "@/lib/googleSignIn";
 import { finishDeviceSignOut, unregisterDevicePush } from "@/lib/pushNotifications";
 import { queryClient } from "@/lib/queryClient";
@@ -45,10 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentRevision = ++revision.current;
       setSession(nextSession);
       if (event !== "SIGNED_OUT") {
-        if (nextSession) setAnalyticsUser(nextSession.user.id);
+        if (nextSession) void syncAnalyticsConsent(nextSession.user.id);
         return;
       }
-      setAnalyticsUser(null);
+      void syncAnalyticsConsent(null);
       // 다음에 로그인한 계정에 이전 계정의 상품이 잠깐이라도 보이지 않게 비운다.
       queryClient.clear();
       if (!isSigningOutRef.current) {
@@ -75,6 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
     return () => data.subscription.unsubscribe();
+  }, []);
+
+  // 운영자가 이메일 철회 요청으로 바꾼 동의는 앱을 다시 열거나 앱으로 돌아올 때 반영한다.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void syncAnalyticsConsent(sessionRef.current?.user.id ?? null);
+    });
+    return () => subscription.remove();
   }, []);
 
   async function signOut() {

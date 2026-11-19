@@ -110,6 +110,12 @@ export function createAdminHandler(services: Services) {
           }),
         });
       }
+      // 이용 기록 분석 동의 철회 요청 메일을 처리한다(#156). 같은 이메일 계정이 둘 이상이면 DB가 거부한다.
+      if (body.action === "withdraw_analytics_consent") {
+        return json(
+          await rpc("admin_withdraw_analytics_consent", { target_email: text(body.email, 320) }),
+        );
+      }
       const requestId = uuid(body.request_id);
       if (body.action === "sanction_request") {
         return json(await rpc("admin_sanction_request", { request_id: requestId }));
