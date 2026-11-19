@@ -65,6 +65,13 @@ reset role;
 select is((select count(*)::int from private.analytics_consent_logs where user_id='15600000-0000-0000-0000-000000000002' and source='operator' and admin_id='15600000-0000-0000-0000-000000000001'),2,'운영자 처리 기록');
 select is((select count(*)::int from private.amplitude_deletion_jobs where user_id='15600000-0000-0000-0000-000000000002' and completed_at is null),1,'운영자 철회도 삭제 요청');
 
+insert into auth.users(id,email) values ('15600000-0000-0000-0000-000000000006','legacy156@test.invalid');
+set local role service_role;
+select lives_ok($$select public.admin_withdraw_analytics_consent('15600000-0000-0000-0000-000000000001','15600000-0000-0000-0001-000000000001','legacy156@test.invalid')$$,'동의 이력이 없는 기존 회원의 이메일 철회');
+reset role;
+select is((select reason from private.amplitude_deletion_jobs where user_id='15600000-0000-0000-0000-000000000006'),'consent_withdrawn','이전 빌드 수집분을 위해 이메일 철회는 항상 삭제 요청');
+delete from private.amplitude_deletion_jobs where user_id='15600000-0000-0000-0000-000000000006';
+
 -- 삭제 대기열 처리
 set local role service_role;
 select set_config('test.claim',(public.claim_amplitude_deletions()->>'claim_id'),true);
@@ -83,7 +90,7 @@ select is((select count(*)::int from private.amplitude_deletion_jobs where compl
 -- 탈퇴·미성년 정리처럼 회원이 지워질 때
 delete from auth.users where id in ('15600000-0000-0000-0000-000000000002','15600000-0000-0000-0000-000000000003');
 select is((select reason from private.amplitude_deletion_jobs where user_id='15600000-0000-0000-0000-000000000002' and completed_at is null),'account_deleted','두 항목에 동의한 적 있는 회원은 탈퇴 시 삭제 요청');
-select is((select count(*)::int from private.amplitude_deletion_jobs where user_id='15600000-0000-0000-0000-000000000003'),0,'수집된 적 없는 회원은 요청 없음');
+select is((select reason from private.amplitude_deletion_jobs where user_id='15600000-0000-0000-0000-000000000003'),'account_deleted','동의 이력이 없어도 이전 빌드 수집분을 위해 탈퇴 시 삭제 요청');
 select is((select count(*)::int from private.analytics_consent_logs where user_id in ('15600000-0000-0000-0000-000000000002','15600000-0000-0000-0000-000000000003')),0,'탈퇴하면 동의 이력도 지움');
 
 select * from finish();

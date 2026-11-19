@@ -182,11 +182,14 @@ begin
     raise exception 'user_email_conflict' using errcode = 'P0001';
   end if;
   state := private.record_analytics_consent(matches[1], false, false, 'operator', actor);
+  -- 이메일 철회는 동의 이력이 없는 이전 빌드 수집분도 지워야 해 항상 삭제를 요청한다.
+  perform private.enqueue_amplitude_deletion(matches[1], 'consent_withdrawn');
   return jsonb_build_object('user_id', matches[1]) || state;
 end;
 $$;
 
--- 탈퇴·만 14세 미만 정리 모두 profiles를 지운다. 두 항목에 동의한 적이 있으면 수집됐을 수 있어 삭제를 요청한다.
+-- 탈퇴·만 14세 미만 정리 모두 profiles를 지운다. 이전 빌드는 동의 이력 없이 수집했을 수 있어 모든 회원의 삭제를 요청한다.
+-- 수집된 적 없는 회원 ID는 Amplitude가 무시한다(ignore_invalid_id).
 create or replace function private.enqueue_amplitude_deletion_on_profile_delete()
 returns trigger
 language plpgsql
@@ -194,15 +197,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if exists (
-    select 1 from private.analytics_consent_logs
-    where user_id = old.id and item = 'usage_analysis' and is_agreed
-  ) and exists (
-    select 1 from private.analytics_consent_logs
-    where user_id = old.id and item = 'overseas_transfer' and is_agreed
-  ) then
-    perform private.enqueue_amplitude_deletion(old.id, 'account_deleted');
-  end if;
+  perform private.enqueue_amplitude_deletion(old.id, 'account_deleted');
   return old;
 end;
 $$;
