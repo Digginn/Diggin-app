@@ -81,7 +81,10 @@ test("저장 시작 경로를 완료 이벤트까지 이어 보내고 중복 저
   ]);
 });
 
-function loadAnalytics({ consent = { usage_analysis: true, overseas_transfer: true } } = {}) {
+function loadAnalytics({
+  consent = { usage_analysis: true, overseas_transfer: true },
+  makeTimeline,
+} = {}) {
   const instances = [];
   const removed = [];
   let rpcResult = { data: consent, error: null };
@@ -94,12 +97,14 @@ function loadAnalytics({ consent = { usage_analysis: true, overseas_transfer: tr
       module,
       exports: module.exports,
       setTimeout,
+      clearTimeout,
       process: { env: { EXPO_PUBLIC_AMPLITUDE_API_KEY: "1234567890-key" } },
       require: (name) => {
         if (name === "@amplitude/analytics-react-native")
           return {
             createInstance: () => {
               const instance = {
+                timeline: makeTimeline ? makeTimeline() : undefined,
                 calls: [],
                 init: (key, userId, options) => instance.calls.push(["init", userId, options]),
                 setUserId: (userId) => instance.calls.push(["setUserId", userId]),
@@ -199,4 +204,63 @@ test("설정에서 바꾼 동의는 그 전에 시작한 조회 결과로 덮이
   analytics.trackEvent("community_view", { view_type: "feed" });
   assert.equal(instances.length, 1);
   assert.equal(instances[0].calls.at(-1)[0], "track", "늦게 끝난 조회가 전송을 멈추지 않는다");
+});
+
+test("철회하면 이미 예약된 전송과 메모리 대기열도 비워 SDK 전송 플러그인이 보내지 않는다", async () => {
+  const { Destination, Logger } = require("@amplitude/analytics-core");
+  const sent = [];
+  const stored = new Map();
+  const destination = new Destination();
+  await destination.setup({
+    apiKey: "1234567890-key",
+    flushIntervalMillis: 20,
+    flushQueueSize: 30,
+    flushMaxRetries: 5,
+    serverUrl: "https://api2.amplitude.com/2/httpapi",
+    loggerProvider: new Logger(),
+    transportProvider: {
+      send: async (url, payload) => (
+        sent.push(payload),
+        { status: "Success", statusCode: 200, body: {} }
+      ),
+    },
+    storageProvider: {
+      get: async (key) => stored.get(key),
+      set: async (key, value) => stored.set(key, value),
+      remove: async (key) => stored.delete(key),
+    },
+  });
+  const { analytics } = loadAnalytics({
+    makeTimeline: () => ({ queue: [], plugins: [destination] }),
+  });
+  await analytics.syncAnalyticsConsent("u1");
+  void destination.execute({ event_type: "community_view" });
+  assert.equal(destination.queue.length, 1, "전송이 예약된 상태");
+  analytics.applyAnalyticsConsent("u1", { usage_analysis: false, overseas_transfer: true });
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.deepEqual(sent, [], "예약 시각이 지나도 보내지 않는다");
+  assert.equal(destination.queue.length, 0);
+  assert.equal(stored.get("AMP_unsent_1234567890").length, 0, "저장소의 미전송 목록도 비운다");
+});
+
+test("다시 동의하면 저장된 optOut을 풀고 시작한다", async () => {
+  const { analytics, instances } = loadAnalytics();
+  await analytics.syncAnalyticsConsent("u1");
+  assert.equal(instances[0].calls[0][2].optOut, false);
+});
+
+test("이전 계정의 늦은 동의 저장 응답은 분석을 켜거나 사용자를 바꾸지 않는다", async () => {
+  const loggedOut = loadAnalytics({ consent: { usage_analysis: false, overseas_transfer: false } });
+  await loggedOut.analytics.syncAnalyticsConsent("A");
+  await loggedOut.analytics.syncAnalyticsConsent(null);
+  loggedOut.analytics.applyAnalyticsConsent("A", { usage_analysis: true, overseas_transfer: true });
+  assert.equal(loggedOut.instances.length, 0, "로그아웃 뒤 A의 응답으로 켜지지 않는다");
+
+  const switched = loadAnalytics();
+  await switched.analytics.syncAnalyticsConsent("B");
+  switched.analytics.applyAnalyticsConsent("A", { usage_analysis: true, overseas_transfer: true });
+  assert.ok(
+    !switched.instances[0].calls.some(([name, value]) => name === "setUserId" && value === "A"),
+    "B로 바뀐 뒤 A의 응답이 사용자를 A로 바꾸지 않는다",
+  );
 });
