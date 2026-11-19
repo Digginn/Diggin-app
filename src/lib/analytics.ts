@@ -1,3 +1,4 @@
+import { FetchTransport } from "@amplitude/analytics-core";
 import * as amplitude from "@amplitude/analytics-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -46,9 +47,47 @@ function start(userId: string) {
   if (client) {
     if (clientUserId !== userId) client.setUserId(userId);
   } else {
-    client = amplitude.createInstance();
+    const nextClient = amplitude.createInstance();
+    client = nextClient;
+    const transport = new FetchTransport();
     // 철회·로그아웃 때 저장된 optOut이 새 인스턴스에 되살아나지 않게 다시 동의한 시점에 푼다.
-    client.init(API_KEY, userId, { ...OPTIONS, optOut: false });
+    nextClient.init(API_KEY, userId, {
+      ...OPTIONS,
+      optOut: false,
+      // 초기화 중인 플러그인은 stop()에서 찾을 수 없다. 늦게 읽힌 이벤트와 전송도 이 인스턴스의 철회 상태를 따른다.
+      storageProvider: {
+        isEnabled: async () => true,
+        async getRaw(key: string) {
+          const value = await AsyncStorage.getItem(key).catch(() => null);
+          return client === nextClient ? (value ?? undefined) : undefined;
+        },
+        async get<T>(key: string): Promise<T | undefined> {
+          try {
+            const value = await this.getRaw(key);
+            return client === nextClient && value ? (JSON.parse(value) as T) : undefined;
+          } catch {
+            return undefined;
+          }
+        },
+        async set<T>(key: string, value: T) {
+          if (client !== nextClient) return;
+          await AsyncStorage.setItem(key, JSON.stringify(value)).catch(() => {});
+        },
+        async remove(key: string) {
+          if (client !== nextClient) return;
+          await AsyncStorage.removeItem(key).catch(() => {});
+        },
+        async reset() {
+          if (client !== nextClient) return;
+          // SDK 대기열만 지우고 로그인 등 앱의 다른 저장 값은 보존한다.
+          await AsyncStorage.removeItem(`AMP_unsent_${API_KEY.slice(0, 10)}`).catch(() => {});
+        },
+      },
+      transportProvider: {
+        send: (...args: Parameters<typeof transport.send>) =>
+          client === nextClient ? transport.send(...args) : Promise.resolve(null),
+      },
+    });
   }
   clientUserId = userId;
 }

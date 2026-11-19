@@ -84,9 +84,12 @@ test("저장 시작 경로를 완료 이벤트까지 이어 보내고 중복 저
 function loadAnalytics({
   consent = { usage_analysis: true, overseas_transfer: true },
   makeTimeline,
+  makeClient,
+  storage,
 } = {}) {
   const instances = [];
   const removed = [];
+  const transported = [];
   let rpcResult = { data: consent, error: null };
   const module = { exports: {} };
   runInNewContext(
@@ -103,6 +106,11 @@ function loadAnalytics({
         if (name === "@amplitude/analytics-react-native")
           return {
             createInstance: () => {
+              if (makeClient) {
+                const instance = makeClient();
+                instances.push(instance);
+                return instance;
+              }
               const instance = {
                 timeline: makeTimeline ? makeTimeline() : undefined,
                 calls: [],
@@ -118,7 +126,19 @@ function loadAnalytics({
             },
           };
         if (name === "@react-native-async-storage/async-storage")
-          return { __esModule: true, default: { removeItem: async (key) => removed.push(key) } };
+          return {
+            __esModule: true,
+            default: storage ?? { removeItem: async (key) => removed.push(key) },
+          };
+        if (name === "@amplitude/analytics-core")
+          return {
+            FetchTransport: class {
+              async send(url, payload) {
+                transported.push(payload);
+                return null;
+              }
+            },
+          };
         if (name === "@/lib/supabase") return { supabase: { rpc: async () => rpcResult } };
         return require(name);
       },
@@ -128,6 +148,7 @@ function loadAnalytics({
     analytics: module.exports,
     instances,
     removed,
+    transported,
     setRpc: (value) => (rpcResult = value),
   };
 }
@@ -138,6 +159,83 @@ test("Amplitude는 개인정보처리방침에 없는 IP·위치·광고 식별�
   const { trackingOptions } = instances[0].calls[0][2];
   for (const key of ["ipAddress", "adid", "idfv", "appSetId", "country"])
     assert.equal(trackingOptions[key], false, key);
+});
+
+test("SDK가 저장 이벤트를 읽는 중 철회·로그아웃하면 늦게 읽힌 이벤트도 전송하지 않는다", async () => {
+  const { AmplitudeCore, Destination, Logger } = require("@amplitude/analytics-core");
+  for (const action of ["withdraw", "logout"]) {
+    const records = new Map([
+      ["AMP_unsent_1234567890", [{ event_type: "prior_session_event", user_id: "u1" }]],
+    ]);
+    let finishRead, startRead, initialized, destination;
+    const reading = new Promise((resolve) => (startRead = resolve));
+    const storage = {
+      getItem: async (key) => {
+        const snapshot = JSON.stringify(records.get(key) ?? null);
+        if (key === "AMP_unsent_1234567890") {
+          startRead();
+          await new Promise((resolve) => (finishRead = resolve));
+        }
+        return snapshot;
+      },
+      setItem: async (key, value) => records.set(key, JSON.parse(value)),
+      removeItem: async (key) => records.delete(key),
+    };
+    const core = new AmplitudeCore();
+    const { analytics, transported } = loadAnalytics({
+      storage,
+      makeClient: () => ({
+        timeline: core.timeline,
+        init(apiKey, userId, options) {
+          const config = {
+            ...options,
+            apiKey,
+            userId,
+            flushIntervalMillis: 10,
+            flushQueueSize: 30,
+            loggerProvider: new Logger(),
+            transportProvider: options.transportProvider ?? {
+              send: async (url, payload) => (transported.push(payload), null),
+            },
+            storageProvider: options.storageProvider ?? {
+              get: async (key) => JSON.parse(await storage.getItem(key)),
+              set: async (key, value) => storage.setItem(key, JSON.stringify(value)),
+            },
+          };
+          initialized = (async () => {
+            await core._init(config);
+            destination = new Destination();
+            await core.add(destination).promise;
+          })();
+          return { promise: initialized };
+        },
+        setOptOut: (value) => core.setOptOut(value),
+        reset: () => {},
+        remove: (name) => core.remove(name),
+      }),
+    });
+    await analytics.syncAnalyticsConsent("u1");
+    await reading;
+    assert.equal(
+      core.timeline.plugins.length,
+      0,
+      "setup 중에는 전송 플러그인이 아직 등록되지 않는다",
+    );
+    if (action === "withdraw") {
+      analytics.applyAnalyticsConsent("u1", { usage_analysis: false, overseas_transfer: true });
+    } else {
+      await analytics.syncAnalyticsConsent(null);
+    }
+    finishRead();
+    await initialized;
+    // 실제 SDK의 예약 시각을 기다리지 않고 같은 flush 경로를 실행한다.
+    if (destination.scheduleId) clearTimeout(destination.scheduleId);
+    destination.resetSchedule();
+    await destination.flush();
+    assert.deepEqual(transported, [], `${action}: 초기화가 늦게 끝나도 전송하면 안 된다`);
+    assert.equal(destination.queue.length, 0, `${action}: 철회 전 이벤트를 다시 쌓으면 안 된다`);
+    assert.equal(records.has("AMP_unsent_1234567890"), false);
+  }
 });
 
 test("두 선택 동의를 모두 한 회원만 Amplitude를 켜고, 비회원·한 항목 동의·조회 실패는 켜지 않는다", async () => {
@@ -247,6 +345,24 @@ test("다시 동의하면 저장된 optOut을 풀고 시작한다", async () => 
   const { analytics, instances } = loadAnalytics();
   await analytics.syncAnalyticsConsent("u1");
   assert.equal(instances[0].calls[0][2].optOut, false);
+});
+
+test("철회한 인스턴스의 늦은 전송은 재동의 뒤에도 차단하고 새 인스턴스만 전송한다", async () => {
+  const { analytics, instances, transported } = loadAnalytics();
+  await analytics.syncAnalyticsConsent("u1");
+  const previous = instances[0].calls[0][2].transportProvider;
+  const url = "https://api2.amplitude.com/2/httpapi";
+  const payload = { events: [{ event_type: "community_view" }] };
+  await previous.send(url, payload);
+  assert.equal(transported.length, 1, "동의한 활성 인스턴스는 기본 전송으로 넘긴다");
+  analytics.applyAnalyticsConsent("u1", { usage_analysis: false, overseas_transfer: true });
+  await previous.send(url, payload);
+  assert.equal(transported.length, 1, "철회 직후의 늦은 전송은 차단한다");
+  analytics.applyAnalyticsConsent("u1", { usage_analysis: true, overseas_transfer: true });
+  await previous.send(url, payload);
+  assert.equal(transported.length, 1, "재동의해도 이전 인스턴스는 다시 허용하지 않는다");
+  await instances[1].calls[0][2].transportProvider.send(url, payload);
+  assert.equal(transported.length, 2, "재동의한 새 인스턴스는 정상 전송한다");
 });
 
 test("이전 계정의 늦은 동의 저장 응답은 분석을 켜거나 사용자를 바꾸지 않는다", async () => {
