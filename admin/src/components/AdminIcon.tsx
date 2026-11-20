@@ -46,14 +46,21 @@ export type IconAsset =
   | "visibility-hide"
   | "visibility-restore"
   | "toast-check"
-  | "nav-report";
+  | "nav-report"
+  | "nav-shield"
+  | "nav-user"
+  | "search-field"
+  | "select-chevron"
+  | "pagination-left"
+  | "pagination-right"
+  | `summary-${"received" | "reviewing" | "resolved" | "rejected"}`;
 
 export function AdminIcon({
   name,
   asset,
   size = 24,
 }: ({ name: AdminIconName; asset?: never } | { asset: IconAsset; name?: never }) & {
-  size?: 6 | 10 | 12 | 16 | 18 | 20 | 24;
+  size?: 6 | 8 | 10 | 12 | 16 | 18 | 20 | 22 | 24;
 }) {
   const source = ASSETS[`../assets/${asset ?? `icon-${name}`}.svg`];
   // 슬롯별 SVG의 혼합 색상도 보존한다. 색 전환이 필요한 행 화살표·이력 점만 마스크를 쓴다.

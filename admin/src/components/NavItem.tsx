@@ -7,6 +7,7 @@ export function NavItem({
   count,
   isActive = false,
   icon = "report",
+  className = "",
   ...props
 }: Omit<ComponentProps<"a">, "children"> & {
   label: string;
@@ -15,9 +16,11 @@ export function NavItem({
   icon?: AdminIconName;
 }) {
   return (
-    <a {...props} className="nav-item" aria-current={isActive ? "page" : undefined}>
+    <a {...props} className={`nav-item ${className}`} aria-current={isActive ? "page" : undefined}>
       {icon === "report" && !isActive ? (
         <AdminIcon asset="nav-report" size={20} />
+      ) : !isActive && (icon === "shield" || icon === "user") ? (
+        <AdminIcon asset={icon === "shield" ? "nav-shield" : "nav-user"} size={20} />
       ) : (
         <AdminIcon name={icon} size={20} />
       )}

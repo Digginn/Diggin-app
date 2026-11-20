@@ -1,13 +1,15 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { ComponentPreview } from "./ComponentPreview";
+import { App } from "./App";
 import "./theme/tokens.css";
 import "./components/components.css";
 import "./preview.css";
+import "./screens/screens.css";
+import "./design-index.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ComponentPreview />
+    <App />
   </StrictMode>,
 );
