@@ -2,13 +2,21 @@ import { expect, test } from "@playwright/test";
 
 import type * as BrowserHarness from "./browser-harness";
 
-test("디자인 상태 선택에서 7개 화면과 구역 제목을 확인한다", async ({ page }) => {
+test("디자인 상태 선택에서 로그인과 신고 목록 구역을 확인한다", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "로그인 · 비로그인 · 로그아웃" })).toBeVisible();
   await expect(page.getByText("실제 계정과 연결되지 않은 미리보기입니다.")).toBeVisible();
   await expect(
-    page.getByRole("navigation", { name: "디자인 상태 선택" }).getByRole("link"),
+    page.getByRole("navigation", { name: "디자인 상태 선택", exact: true }).getByRole("link"),
   ).toHaveCount(7);
+  await expect(
+    page.getByRole("heading", { name: "신고 목록 · 상태 필터 · 유형 · 검색" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: "신고 목록 디자인 상태 선택", exact: true })
+      .getByRole("link"),
+  ).toHaveCount(11);
   await page.getByRole("link", { name: "공통 컴포넌트 보기" }).click();
   await expect(page.getByRole("heading", { name: "관리자 컴포넌트", exact: true })).toBeVisible();
 });
@@ -132,7 +140,8 @@ test("신고 필터·유형·검색·빈 결과가 예시 데이터에 적용된
   const filters = page.getByRole("group", { name: "신고 상태 필터" });
   await filters.getByRole("button", { name: /^접수/ }).click();
   await expect(page.locator(".report-row")).toHaveCount(3);
-  await page.getByLabel("콘텐츠 유형", { exact: true }).selectOption("comment");
+  await page.getByRole("combobox", { name: "콘텐츠 유형", exact: true }).click();
+  await page.getByRole("option", { name: "댓글", exact: true }).click();
   await expect(page.getByText("조건에 맞는 신고가 없습니다.")).toBeVisible();
   await filters.getByRole("button", { name: /^전체/ }).click();
   await expect(page.locator(".report-row")).toHaveCount(3);

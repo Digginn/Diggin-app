@@ -50,6 +50,7 @@ export type IconAsset =
   | "nav-shield"
   | "nav-user"
   | "search-field"
+  | "search-clear"
   | "select-chevron"
   | "pagination-left"
   | "pagination-right"

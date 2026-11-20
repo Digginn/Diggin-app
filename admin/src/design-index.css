@@ -11,13 +11,21 @@
   color: var(--gray-500);
   font: var(--label-l2);
 }
-.design-index h1 {
+.design-index h1,
+.design-index .design-section-heading {
   margin: 12px 0 20px;
   color: var(--gray-700);
   font:
     700 40px/1.35 Pretendard,
     sans-serif;
   letter-spacing: -0.01em;
+}
+.design-index .design-section-heading {
+  margin: 48px 0 20px;
+}
+.design-index__section-description {
+  color: var(--gray-600);
+  font: var(--body-b3);
 }
 .design-index header > p:last-child {
   color: var(--gray-600);
@@ -83,7 +91,8 @@
   .design-index__screens {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .design-index h1 {
+  .design-index h1,
+  .design-index .design-section-heading {
     font-size: 30px;
   }
 }

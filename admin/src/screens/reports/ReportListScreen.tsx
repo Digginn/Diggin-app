@@ -3,11 +3,13 @@ import { useEffect, useId, useRef, useState } from "react";
 import { AdminBrand } from "../../components/AdminBrand";
 import { AdminBtn } from "../../components/AdminBtn";
 import { AdminIcon } from "../../components/AdminIcon";
-import { REPORT_STATUS, REPORT_STATUSES, type ContentType } from "../../components/Badges";
+import { REPORT_STATUS, REPORT_STATUSES } from "../../components/Badges";
 import { FilterTab, type ReportFilter } from "../../components/FilterTab";
 import { NavItem } from "../../components/NavItem";
 import { ReportRow, type ReportRowData } from "../../components/ReportRow";
 import { LogoutDialog } from "../auth/LogoutDialog";
+
+import { ContentTypeSelect, type ContentTypeFilter } from "./components/ContentTypeSelect";
 
 const STATUS_DESCRIPTIONS = {
   received: "아직 확인하지 않은 신고",
@@ -21,6 +23,10 @@ export function ReportListScreen({
   email,
   initialProfileOpen = false,
   initialLogoutOpen = false,
+  initialSelected = "all",
+  initialTypeFilter = "all",
+  initialQuery = "",
+  initialTypeOpen = false,
   onLogout,
   onRefresh,
   onOpenReport,
@@ -29,15 +35,19 @@ export function ReportListScreen({
   email: string;
   initialProfileOpen?: boolean;
   initialLogoutOpen?: boolean;
+  initialSelected?: ReportFilter;
+  initialTypeFilter?: ContentTypeFilter;
+  initialQuery?: string;
+  initialTypeOpen?: boolean;
   onLogout: () => Promise<void>;
   onRefresh: () => Promise<void>;
   onOpenReport: (id: string) => void;
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(initialProfileOpen);
   const [isLogoutOpen, setIsLogoutOpen] = useState(initialLogoutOpen);
-  const [selected, setSelected] = useState<ReportFilter>("all");
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | ContentType>("all");
+  const [selected, setSelected] = useState<ReportFilter>(initialSelected);
+  const [query, setQuery] = useState(initialQuery);
+  const [typeFilter, setTypeFilter] = useState<ContentTypeFilter>(initialTypeFilter);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const refreshLock = useRef(false);
@@ -45,6 +55,7 @@ export function ReportListScreen({
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const menuItemRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -204,35 +215,41 @@ export function ReportListScreen({
         <div className="report-table-scroll" role="region" aria-label="신고 목록 표" tabIndex={0}>
           <section className="report-table">
             <div className="report-toolbar">
-              <FilterTab
-                selected={selected}
-                onChange={setSelected}
-                counts={countReports(candidates)}
-              />
+              <FilterTab selected={selected} onChange={setSelected} counts={counts} />
               <div className="report-search-controls">
-                <label className="report-search">
-                  <AdminIcon asset="search-field" size={18} />
-                  <span className="sr-only">신고 검색</span>
+                <div className={`report-search ${query ? "report-search--filled" : ""}`}>
+                  {query ? (
+                    <AdminIcon name="search" size={18} />
+                  ) : (
+                    <AdminIcon asset="search-field" size={18} />
+                  )}
                   <input
+                    ref={searchRef}
+                    aria-label="신고 검색"
                     type="search"
                     placeholder="콘텐츠 ID, 내용, 작성자 검색"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                   />
-                </label>
-                <label className="report-type-select">
-                  <span className="sr-only">콘텐츠 유형</span>
-                  <select
-                    aria-label="콘텐츠 유형"
-                    value={typeFilter}
-                    onChange={(event) => setTypeFilter(event.target.value as "all" | ContentType)}
-                  >
-                    <option value="all">전체 유형</option>
-                    <option value="post">게시글</option>
-                    <option value="comment">댓글</option>
-                  </select>
-                  <AdminIcon asset="select-chevron" size={16} />
-                </label>
+                  {query && (
+                    <button
+                      className="report-search__clear"
+                      type="button"
+                      aria-label="검색어 지우기"
+                      onClick={() => {
+                        setQuery("");
+                        searchRef.current?.focus();
+                      }}
+                    >
+                      <AdminIcon asset="search-clear" size={12} />
+                    </button>
+                  )}
+                </div>
+                <ContentTypeSelect
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  initialOpen={initialTypeOpen}
+                />
               </div>
             </div>
             <div className="report-table__head" aria-hidden="true">

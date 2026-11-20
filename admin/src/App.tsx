@@ -3,6 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { ComponentPreview } from "./ComponentPreview";
 import { AdminBrand } from "./components/AdminBrand";
 import { AdminToast } from "./components/AdminToast";
+import { REPORT_DESIGN_STATES } from "./preview-data/report-states";
 import { PREVIEW_REPORTS } from "./preview-data/reports";
 import {
   INVALID_CREDENTIALS_MESSAGE,
@@ -94,6 +95,22 @@ function DesignIndex() {
           </a>
         ))}
       </nav>
+      <section className="design-index__section" aria-labelledby="report-designs-title">
+        <h2 className="design-section-heading" id="report-designs-title">
+          신고 목록 · 상태 필터 · 유형 · 검색
+        </h2>
+        <p className="design-index__section-description">
+          상태별 전체 건수는 유지하며, 필터·검색·유형 선택을 조합해 예시 목록을 확인합니다.
+        </p>
+        <nav className="design-index__screens" aria-label="신고 목록 디자인 상태 선택">
+          {REPORT_DESIGN_STATES.map((state) => (
+            <a href={`#/designs/${state.path}`} key={state.path}>
+              <span>{state.title}</span>
+              <small>{state.node}</small>
+            </a>
+          ))}
+        </nav>
+      </section>
       <footer>
         <a href="#/preview/reports">비로그인 상태에서 보호 화면 진입</a>
         <a href="#/components">공통 컴포넌트 보기</a>
@@ -157,7 +174,9 @@ export function App() {
     return <LoggedOutScreen key={route} onLogin={previewLogin} />;
 
   const isProtectedRoute = route.startsWith("/preview/");
+  const reportDesign = REPORT_DESIGN_STATES.find((state) => route === `/designs/${state.path}`);
   if (
+    reportDesign ||
     route === "/designs/reports-profile" ||
     route === "/designs/logout-confirm" ||
     (isProtectedRoute && isPreviewSignedIn)
@@ -170,6 +189,10 @@ export function App() {
           email={previewEmail}
           initialProfileOpen={route === "/designs/reports-profile"}
           initialLogoutOpen={route === "/designs/logout-confirm"}
+          initialSelected={reportDesign?.selected}
+          initialTypeFilter={reportDesign?.type}
+          initialQuery={reportDesign?.query}
+          initialTypeOpen={reportDesign?.isTypeOpen}
           onLogout={previewLogout}
           onRefresh={async () => showToast("신고 목록을 새로고침했어요.")}
           onOpenReport={(id) => showToast(`콘텐츠 #${id}을 선택했어요.`)}
