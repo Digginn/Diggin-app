@@ -7,16 +7,20 @@ export function HistoryItem({
   reason,
   kind = "sanction",
   hasLine = true,
+  isHighlighted = false,
 }: {
   action: string;
   time: string;
   meta: string;
   reason?: string;
-  kind?: "sanction" | "release" | "content" | "status";
+  kind?: "sanction" | "release" | "content" | "status" | "review" | "completed";
   hasLine?: boolean;
+  isHighlighted?: boolean;
 }) {
   return (
-    <div className={`history-item history-item--${kind}`}>
+    <div
+      className={`history-item history-item--${kind} ${isHighlighted ? "history-item--highlighted" : ""}`}
+    >
       <div className="history-item__rail">
         <AdminIcon asset="history-dot" size={10} />
         {hasLine && <span />}

@@ -51,6 +51,12 @@ export type IconAsset =
   | "nav-user"
   | "search-field"
   | "search-clear"
+  | "detail-back"
+  | "detail-eye"
+  | "detail-avatar"
+  | "detail-ban"
+  | "detail-current-ban"
+  | "detail-warning"
   | "select-chevron"
   | "pagination-left"
   | "pagination-right"
@@ -61,7 +67,7 @@ export function AdminIcon({
   asset,
   size = 24,
 }: ({ name: AdminIconName; asset?: never } | { asset: IconAsset; name?: never }) & {
-  size?: 6 | 8 | 10 | 12 | 16 | 18 | 20 | 22 | 24;
+  size?: 6 | 8 | 10 | 12 | 14 | 16 | 18 | 20 | 22 | 24;
 }) {
   const source = ASSETS[`../assets/${asset ?? `icon-${name}`}.svg`];
   // 슬롯별 SVG의 혼합 색상도 보존한다. 색 전환이 필요한 행 화살표·이력 점만 마스크를 쓴다.

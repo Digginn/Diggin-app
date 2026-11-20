@@ -3,6 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { ComponentPreview } from "./ComponentPreview";
 import { AdminBrand } from "./components/AdminBrand";
 import { AdminToast } from "./components/AdminToast";
+import { DETAIL_DESIGN_STATES } from "./preview-data/report-details";
 import { REPORT_ACTION_DESIGN_STATES, REPORT_DESIGN_STATES } from "./preview-data/report-states";
 import { PREVIEW_REPORTS } from "./preview-data/reports";
 import {
@@ -10,6 +11,7 @@ import {
   LoginScreen,
   type LoginCredentials,
 } from "./screens/auth/LoginScreen";
+import { ReportDetailScreen } from "./screens/reports/ReportDetailScreen";
 import { ReportListScreen } from "./screens/reports/ReportListScreen";
 
 const EXAMPLE_EMAIL = "diggin.app@gmail.com";
@@ -128,6 +130,29 @@ function DesignIndex() {
           ))}
         </nav>
       </section>
+      {(["post-30", "comment-112"] as const).map((content) => (
+        <section
+          className="design-index__section"
+          key={content}
+          aria-labelledby={`detail-${content}-title`}
+        >
+          <h2 className="design-section-heading" id={`detail-${content}-title`}>
+            {content === "post-30" ? "게시글 #30" : "댓글 #112"} 처리 흐름 · 상세 → 조치 입력 → 확인
+            모달 → 조치 완료
+          </h2>
+          <nav
+            className="design-index__screens"
+            aria-label={`${content === "post-30" ? "게시글 #30" : "댓글 #112"} 처리 흐름 선택`}
+          >
+            {DETAIL_DESIGN_STATES.filter((state) => state.content === content).map((state) => (
+              <a key={state.path} href={`#/designs/${state.path}`}>
+                <span>{state.title}</span>
+                <small>{state.node}</small>
+              </a>
+            ))}
+          </nav>
+        </section>
+      ))}
       <footer>
         <a href="#/preview/reports">비로그인 상태에서 보호 화면 진입</a>
         <a href="#/components">공통 컴포넌트 보기</a>
@@ -164,6 +189,7 @@ export function App() {
   const route = useSyncExternalStore(subscribeRoute, readRoute);
   const [isPreviewSignedIn, setIsPreviewSignedIn] = useState(false);
   const [previewEmail, setPreviewEmail] = useState(EXAMPLE_EMAIL);
+  const [reportPreview, setReportPreview] = useState(PREVIEW_REPORTS);
   const [toast, setToast] = useState({ id: 0, message: "", isVisible: false });
   const dismissToast = useCallback(
     () => setToast((current) => ({ ...current, isVisible: false })),
@@ -191,11 +217,35 @@ export function App() {
     return <LoggedOutScreen key={route} onLogin={previewLogin} />;
 
   const isProtectedRoute = route.startsWith("/preview/");
+  const detailDesign = DETAIL_DESIGN_STATES.find((state) => route === `/designs/${state.path}`);
+  if (detailDesign) {
+    return (
+      <ReportDetailScreen
+        key={route}
+        content={detailDesign.content}
+        initialStep={detailDesign.step}
+        email={previewEmail}
+        onLogout={previewLogout}
+        onBack={(status) => {
+          const isPost = detailDesign.content === "post-30";
+          setReportPreview(
+            PREVIEW_REPORTS.map((report) =>
+              report.type === (isPost ? "post" : "comment") && report.id === (isPost ? "30" : "112")
+                ? { ...report, status }
+                : report,
+            ),
+          );
+          navigate("/designs/reports-current");
+        }}
+      />
+    );
+  }
   const reportDesign = [...REPORT_DESIGN_STATES, ...REPORT_ACTION_DESIGN_STATES].find(
     (state) => route === `/designs/${state.path}`,
   );
   if (
     reportDesign ||
+    route === "/designs/reports-current" ||
     route === "/designs/reports-profile" ||
     route === "/designs/logout-confirm" ||
     (isProtectedRoute && isPreviewSignedIn)
@@ -204,8 +254,16 @@ export function App() {
       <>
         <ReportListScreen
           key={route}
-          reports={reportDesign?.reports ?? PREVIEW_REPORTS}
-          className={reportDesign?.reports ? "report-screen--after-action" : ""}
+          reports={
+            route === "/designs/reports-current"
+              ? reportPreview
+              : (reportDesign?.reports ?? PREVIEW_REPORTS)
+          }
+          className={
+            reportDesign?.reports || route === "/designs/reports-current"
+              ? "report-screen--after-action"
+              : ""
+          }
           email={previewEmail}
           initialProfileOpen={route === "/designs/reports-profile"}
           initialLogoutOpen={route === "/designs/logout-confirm"}
@@ -215,7 +273,18 @@ export function App() {
           initialTypeOpen={reportDesign?.isTypeOpen}
           onLogout={previewLogout}
           onRefresh={async () => showToast("신고 목록을 새로고침했어요.")}
-          onOpenReport={(id) => showToast(`콘텐츠 #${id}을 선택했어요.`)}
+          onOpenReport={(id) => {
+            if (id === "30" || id === "112") {
+              const reports =
+                route === "/designs/reports-current"
+                  ? reportPreview
+                  : (reportDesign?.reports ?? PREVIEW_REPORTS);
+              const isComplete = reports.find((report) => report.id === id)?.status === "resolved";
+              navigate(
+                `/designs/report-${id === "30" ? "post-30" : "comment-112"}${isComplete ? "-complete" : ""}`,
+              );
+            } else showToast(`콘텐츠 #${id}을 선택했어요.`);
+          }}
         />
         <div className="auth-toast-position">
           <AdminToast

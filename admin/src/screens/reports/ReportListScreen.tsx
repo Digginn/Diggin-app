@@ -1,13 +1,11 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-import { AdminBrand } from "../../components/AdminBrand";
 import { AdminBtn } from "../../components/AdminBtn";
 import { AdminIcon } from "../../components/AdminIcon";
+import { AdminSidebar } from "../../components/AdminSidebar";
 import { REPORT_STATUS, REPORT_STATUSES } from "../../components/Badges";
 import { FilterTab, type ReportFilter } from "../../components/FilterTab";
-import { NavItem } from "../../components/NavItem";
 import { ReportRow, type ReportRowData } from "../../components/ReportRow";
-import { LogoutDialog } from "../auth/LogoutDialog";
 
 import { ContentTypeSelect, type ContentTypeFilter } from "./components/ContentTypeSelect";
 
@@ -45,52 +43,13 @@ export function ReportListScreen({
   onRefresh: () => Promise<void>;
   onOpenReport: (id: string) => void;
 }) {
-  const [isProfileOpen, setIsProfileOpen] = useState(initialProfileOpen);
-  const [isLogoutOpen, setIsLogoutOpen] = useState(initialLogoutOpen);
   const [selected, setSelected] = useState<ReportFilter>(initialSelected);
   const [query, setQuery] = useState(initialQuery);
   const [typeFilter, setTypeFilter] = useState<ContentTypeFilter>(initialTypeFilter);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const refreshLock = useRef(false);
-  const profileRef = useRef<HTMLDivElement>(null);
-  const profileButtonRef = useRef<HTMLButtonElement>(null);
-  const menuItemRef = useRef<HTMLButtonElement>(null);
-  const menuId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!isProfileOpen) return;
-    function dismissOutside(event: PointerEvent | FocusEvent) {
-      if (event.target instanceof Node && !profileRef.current?.contains(event.target))
-        setIsProfileOpen(false);
-    }
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setIsProfileOpen(false);
-        profileButtonRef.current?.focus();
-      }
-      if (
-        event.key === "ArrowDown" ||
-        event.key === "ArrowUp" ||
-        event.key === "Home" ||
-        event.key === "End"
-      ) {
-        event.preventDefault();
-        menuItemRef.current?.focus();
-      }
-    }
-    menuItemRef.current?.focus();
-    document.addEventListener("pointerdown", dismissOutside);
-    document.addEventListener("focusin", dismissOutside);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("pointerdown", dismissOutside);
-      document.removeEventListener("focusin", dismissOutside);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [isProfileOpen]);
 
   const counts = countReports(reports);
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -104,10 +63,6 @@ export function ReportListScreen({
   );
   const filtered = candidates.filter((report) => selected === "all" || report.status === selected);
 
-  function closeLogout() {
-    setIsLogoutOpen(false);
-    profileButtonRef.current?.focus();
-  }
   async function refresh() {
     if (refreshLock.current) return;
     refreshLock.current = true;
@@ -125,62 +80,13 @@ export function ReportListScreen({
 
   return (
     <div className={`report-screen ${className}`}>
-      <aside className="admin-sidebar" aria-label="관리자 내비게이션">
-        <div className="admin-sidebar__brand">
-          <AdminBrand />
-        </div>
-        <p className="admin-sidebar__group">커뮤니티 운영</p>
-        <nav>
-          <NavItem
-            href="#/preview/reports"
-            label="신고 관리"
-            count={counts.received + counts.reviewing}
-            isActive
-          />
-          <NavItem label="제재 이력" icon="shield" aria-disabled="true" />
-          <NavItem label="회원 관리" icon="user" aria-disabled="true" />
-        </nav>
-        <div className="admin-profile" ref={profileRef}>
-          <button
-            ref={profileButtonRef}
-            className="admin-profile__button"
-            type="button"
-            aria-label={`운영자 ${email} 프로필 메뉴`}
-            aria-haspopup="menu"
-            aria-expanded={isProfileOpen}
-            aria-controls={menuId}
-            onClick={() => setIsProfileOpen((value) => !value)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowDown") {
-                event.preventDefault();
-                setIsProfileOpen(true);
-              }
-            }}
-          >
-            <span className="admin-profile__avatar">D</span>
-            <span className="admin-profile__info">
-              <span>운영자</span>
-              <span>{email}</span>
-            </span>
-          </button>
-          {isProfileOpen && (
-            <div className="profile-menu" id={menuId} role="menu" aria-label="프로필 메뉴">
-              <button
-                ref={menuItemRef}
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setIsProfileOpen(false);
-                  setIsLogoutOpen(true);
-                }}
-              >
-                <AdminIcon name="logout" size={18} />
-                로그아웃
-              </button>
-            </div>
-          )}
-        </div>
-      </aside>
+      <AdminSidebar
+        email={email}
+        count={counts.received + counts.reviewing}
+        initialProfileOpen={initialProfileOpen}
+        initialLogoutOpen={initialLogoutOpen}
+        onLogout={onLogout}
+      />
       <main className="report-main">
         <header className="report-page-header">
           <div>
@@ -294,7 +200,6 @@ export function ReportListScreen({
           </section>
         </div>
       </main>
-      <LogoutDialog isOpen={isLogoutOpen} onCancel={closeLogout} onLogout={onLogout} />
     </div>
   );
 }
