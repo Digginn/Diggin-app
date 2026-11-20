@@ -4,5 +4,9 @@ dist
 ios
 android
 package-lock.json
+admin/package-lock.json
+admin/dist
+admin/test-results
+admin/playwright-report
 expo-env.d.ts
 supabase/functions

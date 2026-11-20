@@ -1,0 +1,97 @@
+.operations-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-l);
+  background: var(--gray-0);
+}
+.operations-table {
+  display: block;
+  width: 100%;
+  min-width: 1126px;
+  border-collapse: collapse;
+  font: var(--body-b3);
+  color: var(--gray-800);
+}
+.operations-table thead,
+.operations-table tbody {
+  display: block;
+}
+.operations-table tr {
+  display: grid;
+  gap: var(--space-6);
+  align-items: center;
+  padding: 16px 24px;
+  border-top: 1px solid var(--gray-200);
+}
+.operations-table--sanctions tr {
+  grid-template-columns: 170px 170px 110px 220px 80px minmax(0, 1fr);
+}
+.operations-table--members tr {
+  grid-template-columns: 190px 120px 110px 100px 100px 130px minmax(0, 1fr);
+}
+.operations-table thead tr {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-top: 0;
+  background: var(--gray-50);
+}
+.operations-table th {
+  color: var(--gray-600);
+  font: var(--caption-c1);
+  text-align: left;
+}
+.operations-table td,
+.operations-table th {
+  min-width: 0;
+  padding: 0;
+}
+.operations-author {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.operations-author strong {
+  color: var(--gray-900);
+  font: var(--body-b2);
+}
+.operations-author small {
+  color: var(--gray-500);
+  font: var(--caption-c2);
+}
+.operations-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius-s);
+  font: var(--label-l3);
+  white-space: nowrap;
+}
+.operations-chip--danger {
+  color: var(--error);
+  background: var(--error-bg);
+}
+.operations-chip--record {
+  color: var(--received-text);
+  background: var(--received-bg);
+}
+.operations-chip--neutral {
+  color: var(--gray-600);
+  background: var(--gray-100);
+}
+.operations-chip--normal {
+  color: var(--resolved-text);
+  background: var(--resolved-bg);
+}
+@media (max-width: 900px) {
+  .report-screen.operations-screen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .operations-screen .admin-sidebar {
+    position: static;
+    height: auto;
+    min-height: 0;
+    gap: var(--space-3);
+  }
+  .operations-screen .admin-profile {
+    max-width: var(--nav-width);
+  }
+}

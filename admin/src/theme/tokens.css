@@ -1,0 +1,110 @@
+/* 모바일 앱과 같은 Pretendard 원본을 빌드 시 함께 포함한다. */
+@font-face {
+  font-family: Pretendard;
+  src: url("../../../assets/fonts/Pretendard-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: Pretendard;
+  src: url("../../../assets/fonts/Pretendard-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: Pretendard;
+  src: url("../../../assets/fonts/Pretendard-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: Pretendard;
+  src: url("../../../assets/fonts/Pretendard-SemiBold.otf") format("opentype");
+  font-weight: 600;
+  font-display: swap;
+}
+
+:root {
+  font-family: Pretendard, sans-serif;
+  font-synthesis: none;
+  color: var(--gray-900);
+  background: var(--gray-0);
+  --gray-0: #fff;
+  --gray-50: #f9f9f9;
+  --gray-100: #f4f4f4;
+  --gray-200: #ececec;
+  --gray-300: #ddd;
+  --gray-400: #b9b9b9;
+  --gray-500: #9a9a9a;
+  --gray-600: #717171;
+  --gray-700: #5d5d5d;
+  --gray-800: #3f3f3f;
+  --gray-900: #1e1e1e;
+  --error: #eb2525;
+  --error-bg: #fdecec;
+  --received-bg: #fff4d6;
+  --received-text: #9a6700;
+  --reviewing-bg: #e6f1f8;
+  --reviewing-text: #0076af;
+  --resolved-bg: #e5f5ec;
+  --resolved-text: #1e7f4f;
+  --label-l1: 600 14px/1.4 Pretendard, sans-serif;
+  --head-h1: 700 26px/1.35 Pretendard, sans-serif;
+  --head-h2: 600 18px/1.4 Pretendard, sans-serif;
+  --number-n1: 700 30px/1.2 Pretendard, sans-serif;
+  --label-l2: 600 13px/1.4 Pretendard, sans-serif;
+  --label-l3: 600 12px/1.3 Pretendard, sans-serif;
+  --body-b2: 500 14px/1.45 Pretendard, sans-serif;
+  --body-b3: 400 14px/1.5 Pretendard, sans-serif;
+  --caption-c1: 500 13px/1.45 Pretendard, sans-serif;
+  --caption-c2: 400 12px/1.4 Pretendard, sans-serif;
+  --tracking: -0.01em;
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --panel-width: 392px;
+  --sidebar-width: 232px;
+  --login-width: 420px;
+  --dialog-width: 440px;
+  --radius-l: 8px;
+  --nav-width: 200px;
+  --control-height: 44px;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 14px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+textarea {
+  font: inherit;
+  letter-spacing: inherit;
+}
+button {
+  color: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+button,
+a,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 2px solid var(--reviewing-text);
+  outline-offset: 3px;
+}
+p {
+  margin: 0;
+}

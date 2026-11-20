@@ -24,6 +24,7 @@
 - 런타임 계산이 필요하거나 NativeWind로 표현하기 어려운 스타일만 `style` 또는 `StyleSheet`을 사용합니다.
 - 디자인 시안의 임의 색상과 수치를 컴포넌트에 반복해서 직접 작성하지 않습니다.
 - 공통 디자인 값은 토큰으로 정의하고 화면과 컴포넌트에서 재사용합니다.
+- 위 NativeWind 규칙은 모바일 앱에 적용합니다. 별도 웹 앱인 `admin/`은 CSS와 `src/theme/tokens.css`의 관리자 디자인 토큰을 사용합니다.
 
 ### 디자인 토큰
 
@@ -42,7 +43,7 @@ src/theme/
 - 색상과 간격은 토큰 이름을 사용하고, 타이포그래피는 `font-<토큰명>` 클래스로 적용합니다.
 
 ```tsx
-<View className="bg-gray-0 px-margin gap-gutter">
+<View className="gap-gutter bg-gray-0 px-margin">
   <Text className="text-gray-900 font-h1">Diggin</Text>
 </View>
 ```
@@ -54,6 +55,7 @@ src/theme/
 - 일반 아이콘 파일은 `icon-<이름>` 형식을 사용합니다.
 - 색상별 별도 파일이 필요하다면 `icon-<이름>-<색상명>` 형식을 사용합니다.
 - 동일한 SVG의 색상만 다른 경우에는 파일을 복제하기보다 컴포넌트의 `color` 속성으로 제어하는 방식을 우선 검토합니다.
+- 관리자 웹 전용 SVG는 `admin/src/assets`에 보관하고, 공통 Pretendard 폰트는 루트 `assets/fonts`를 빌드 시 재사용합니다.
 
 ## 3. Git Convention
 
@@ -88,15 +90,15 @@ feat: 로그인 화면 구현 (#12)
 fix: 프로필 이미지 비율 수정 (#24)
 ```
 
-| Type | 용도 |
-| --- | --- |
-| `feat` | 새로운 기능 추가 |
-| `fix` | 버그 수정 |
-| `refactor` | 기능 변경 없는 코드 구조 개선 |
-| `style` | UI 스타일 변경 또는 코드 포맷 수정 |
-| `chore` | 설정, 패키지, 빌드 및 기타 작업 |
-| `docs` | 문서 작성 및 수정 |
-| `test` | 테스트 추가 및 수정 |
+| Type       | 용도                               |
+| ---------- | ---------------------------------- |
+| `feat`     | 새로운 기능 추가                   |
+| `fix`      | 버그 수정                          |
+| `refactor` | 기능 변경 없는 코드 구조 개선      |
+| `style`    | UI 스타일 변경 또는 코드 포맷 수정 |
+| `chore`    | 설정, 패키지, 빌드 및 기타 작업    |
+| `docs`     | 문서 작성 및 수정                  |
+| `test`     | 테스트 추가 및 수정                |
 
 - 커밋 메시지는 변경 내용을 구체적으로 작성합니다.
 - 커밋 끝에는 관련 이슈 번호를 작성합니다.
@@ -106,6 +108,12 @@ fix: 프로필 이미지 비율 수정 (#24)
 
 ```text
 .
+├── admin/                   # 별도 실행·빌드하는 관리자 React 웹 앱
+│   ├── src/
+│   │   ├── assets/          # Figma 관리자 SVG 원본
+│   │   ├── components/      # 관리자 공통 UI
+│   │   └── theme/           # 관리자 CSS 디자인 토큰
+│   └── tests/               # 브라우저 상호작용 검증
 ├── assets/
 │   ├── images/              # 이미지와 앱 아이콘
 │   └── fonts/               # 폰트 파일
