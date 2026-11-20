@@ -243,6 +243,9 @@
   width: 100%;
   margin-top: auto;
 }
+.report-screen--after-action {
+  --profile-background: var(--gray-50);
+}
 .admin-profile__button {
   display: flex;
   align-items: center;
@@ -251,7 +254,7 @@
   padding: 12px;
   border: 0;
   border-radius: var(--radius-m);
-  background: var(--gray-100);
+  background: var(--profile-background, var(--gray-100));
   text-align: left;
 }
 .admin-profile__button[aria-expanded="true"],

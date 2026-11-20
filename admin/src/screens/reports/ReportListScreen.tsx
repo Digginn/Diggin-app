@@ -21,6 +21,7 @@ const STATUS_DESCRIPTIONS = {
 export function ReportListScreen({
   reports,
   email,
+  className = "",
   initialProfileOpen = false,
   initialLogoutOpen = false,
   initialSelected = "all",
@@ -33,6 +34,7 @@ export function ReportListScreen({
 }: {
   reports: ReportRowData[];
   email: string;
+  className?: string;
   initialProfileOpen?: boolean;
   initialLogoutOpen?: boolean;
   initialSelected?: ReportFilter;
@@ -122,7 +124,7 @@ export function ReportListScreen({
   }
 
   return (
-    <div className="report-screen">
+    <div className={`report-screen ${className}`}>
       <aside className="admin-sidebar" aria-label="관리자 내비게이션">
         <div className="admin-sidebar__brand">
           <AdminBrand />

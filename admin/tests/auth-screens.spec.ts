@@ -17,6 +17,12 @@ test("디자인 상태 선택에서 로그인과 신고 목록 구역을 확인�
       .getByRole("navigation", { name: "신고 목록 디자인 상태 선택", exact: true })
       .getByRole("link"),
   ).toHaveCount(11);
+  await expect(page.getByRole("heading", { name: "조치 후 신고 목록 (처리 반영)" })).toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: "조치 후 신고 목록 디자인 상태 선택", exact: true })
+      .getByRole("link"),
+  ).toHaveCount(5);
   await page.getByRole("link", { name: "공통 컴포넌트 보기" }).click();
   await expect(page.getByRole("heading", { name: "관리자 컴포넌트", exact: true })).toBeVisible();
 });

@@ -1,5 +1,8 @@
 import type { ReportFilter } from "../components/FilterTab";
+import type { ReportRowData } from "../components/ReportRow";
 import type { ContentTypeFilter } from "../screens/reports/components/ContentTypeSelect";
+
+import { PREVIEW_REPORTS } from "./reports";
 
 type ReportDesignState = {
   path: string;
@@ -9,6 +12,7 @@ type ReportDesignState = {
   type?: ContentTypeFilter;
   query?: string;
   isTypeOpen?: boolean;
+  reports?: ReportRowData[];
 };
 
 export const REPORT_DESIGN_STATES: ReportDesignState[] = [
@@ -59,5 +63,49 @@ export const REPORT_DESIGN_STATES: ReportDesignState[] = [
     node: "7068:144661",
     type: "comment",
     isTypeOpen: true,
+  },
+];
+
+// 각 시안은 기본 목록에서 한 콘텐츠만 조치한 독립 예시다. 조치를 누적하지 않는다.
+function afterReportAction(
+  type: ReportRowData["type"],
+  id: string,
+  status: ReportRowData["status"],
+): ReportRowData[] {
+  return PREVIEW_REPORTS.map((report) =>
+    report.type === type && report.id === id ? { ...report, status } : report,
+  );
+}
+
+export const REPORT_ACTION_DESIGN_STATES: ReportDesignState[] = [
+  {
+    path: "reports-after-post-30",
+    title: "게시글 #30 · 처리 완료 반영",
+    node: "7068:141410",
+    reports: afterReportAction("post", "30", "resolved"),
+  },
+  {
+    path: "reports-after-comment-112",
+    title: "댓글 #112 · 처리 완료 반영",
+    node: "7068:141510",
+    reports: afterReportAction("comment", "112", "resolved"),
+  },
+  {
+    path: "reports-after-post-11",
+    title: "게시글 #11 · 반려 반영",
+    node: "7068:141610",
+    reports: afterReportAction("post", "11", "rejected"),
+  },
+  {
+    path: "reports-after-post-10",
+    title: "게시글 #10 · 처리 완료 반영",
+    node: "7068:141710",
+    reports: afterReportAction("post", "10", "resolved"),
+  },
+  {
+    path: "reports-after-comment-98",
+    title: "댓글 #98 · 처리 완료 반영",
+    node: "7068:141810",
+    reports: afterReportAction("comment", "98", "resolved"),
   },
 ];

@@ -3,7 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { ComponentPreview } from "./ComponentPreview";
 import { AdminBrand } from "./components/AdminBrand";
 import { AdminToast } from "./components/AdminToast";
-import { REPORT_DESIGN_STATES } from "./preview-data/report-states";
+import { REPORT_ACTION_DESIGN_STATES, REPORT_DESIGN_STATES } from "./preview-data/report-states";
 import { PREVIEW_REPORTS } from "./preview-data/reports";
 import {
   INVALID_CREDENTIALS_MESSAGE,
@@ -111,6 +111,23 @@ function DesignIndex() {
           ))}
         </nav>
       </section>
+      <section className="design-index__section" aria-labelledby="report-actions-title">
+        <h2 className="design-section-heading" id="report-actions-title">
+          조치 후 신고 목록 (처리 반영)
+        </h2>
+        <p className="design-index__section-description">
+          각 콘텐츠를 처리 완료 또는 반려한 뒤의 상태와 집계를 확인합니다. 예시별 조치는
+          독립적입니다.
+        </p>
+        <nav className="design-index__screens" aria-label="조치 후 신고 목록 디자인 상태 선택">
+          {REPORT_ACTION_DESIGN_STATES.map((state) => (
+            <a href={`#/designs/${state.path}`} key={state.path}>
+              <span>{state.title}</span>
+              <small>{state.node}</small>
+            </a>
+          ))}
+        </nav>
+      </section>
       <footer>
         <a href="#/preview/reports">비로그인 상태에서 보호 화면 진입</a>
         <a href="#/components">공통 컴포넌트 보기</a>
@@ -174,7 +191,9 @@ export function App() {
     return <LoggedOutScreen key={route} onLogin={previewLogin} />;
 
   const isProtectedRoute = route.startsWith("/preview/");
-  const reportDesign = REPORT_DESIGN_STATES.find((state) => route === `/designs/${state.path}`);
+  const reportDesign = [...REPORT_DESIGN_STATES, ...REPORT_ACTION_DESIGN_STATES].find(
+    (state) => route === `/designs/${state.path}`,
+  );
   if (
     reportDesign ||
     route === "/designs/reports-profile" ||
@@ -185,7 +204,8 @@ export function App() {
       <>
         <ReportListScreen
           key={route}
-          reports={PREVIEW_REPORTS}
+          reports={reportDesign?.reports ?? PREVIEW_REPORTS}
+          className={reportDesign?.reports ? "report-screen--after-action" : ""}
           email={previewEmail}
           initialProfileOpen={route === "/designs/reports-profile"}
           initialLogoutOpen={route === "/designs/logout-confirm"}

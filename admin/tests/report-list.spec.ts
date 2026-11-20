@@ -10,6 +10,86 @@ const ALL_TITLES = [
   "댓글 #64",
   "게시글 #5",
 ];
+
+const ACTION_CASES = [
+  { path: "reports-after-post-30", index: 0, status: "처리 완료", counts: [2, 2, 3, 1] },
+  { path: "reports-after-comment-112", index: 1, status: "처리 완료", counts: [3, 1, 3, 1] },
+  { path: "reports-after-post-11", index: 2, status: "반려", counts: [2, 2, 2, 2] },
+  { path: "reports-after-post-10", index: 3, status: "처리 완료", counts: [2, 2, 3, 1] },
+  { path: "reports-after-comment-98", index: 4, status: "처리 완료", counts: [3, 1, 3, 1] },
+];
+
+for (const design of ACTION_CASES) {
+  test(`조치 후 목록 ${design.path}의 상태와 집계가 함께 반영된다`, async ({ page }) => {
+    await page.goto(`/#/designs/${design.path}`);
+    await expect(page.locator(".report-row__title > span:last-child")).toHaveText(ALL_TITLES);
+    const statuses = [
+      "접수",
+      "검토 중",
+      "접수",
+      "접수",
+      "검토 중",
+      "처리 완료",
+      "반려",
+      "처리 완료",
+    ];
+    statuses[design.index] = design.status;
+    await expect(page.locator(".report-row .status-badge")).toHaveText(statuses);
+    await expect(page.locator(".report-stat__value > strong")).toHaveText(
+      design.counts.map(String),
+    );
+    const tabs = page.getByRole("group", { name: "신고 상태 필터" });
+    const labels = [
+      "전체8",
+      ...["접수", "검토 중", "처리 완료", "반려"].map((label, i) => `${label}${design.counts[i]}`),
+    ];
+    await expect(tabs.getByRole("button")).toHaveText(labels);
+    await expect(page.locator(".nav-item__count")).toHaveText("4");
+    await expect(page.locator(".report-table__footer")).toContainText("8건 표시 중");
+    await tabs.getByRole("button", { name: new RegExp(`^${design.status}`) }).click();
+    await expect(page.locator(".report-row__title > span:last-child")).toContainText(
+      ALL_TITLES.filter((_, i) => statuses[i] === design.status),
+    );
+    await expect(page.locator(".report-row")).toHaveCount(
+      statuses.filter((status) => status === design.status).length,
+    );
+    const changedTitle = ALL_TITLES[design.index];
+    await page.getByRole("combobox", { name: "콘텐츠 유형" }).click();
+    await page
+      .getByRole("option", {
+        name: changedTitle.startsWith("게시글") ? "게시글" : "댓글",
+        exact: true,
+      })
+      .click();
+    await page.getByRole("searchbox", { name: "신고 검색" }).fill(changedTitle);
+    await expect(page.locator(".report-row__title > span:last-child")).toHaveText([changedTitle]);
+    await expect(tabs.getByRole("button")).toHaveText(labels);
+    await expect(page.locator(".report-stat__value > strong")).toHaveText(
+      design.counts.map(String),
+    );
+  });
+}
+
+test("조치 후 예시는 새로고침·재진입 후 유지되고 다른 예시나 기본 목록에 누적되지 않는다", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: /게시글 #30 · 처리 완료 반영/ }).click();
+  const firstStatus = page.locator(".report-row .status-badge").first();
+  await expect(firstStatus).toHaveText("처리 완료");
+  await page.getByRole("button", { name: "새로고침", exact: true }).click();
+  await expect(firstStatus).toHaveText("처리 완료");
+  await page.reload();
+  await expect(firstStatus).toHaveText("처리 완료");
+  await page.goto("/#/designs/reports-after-comment-112");
+  await expect(firstStatus).toHaveText("접수");
+  await expect(page.locator(".report-row .status-badge").nth(1)).toHaveText("처리 완료");
+  await page.goto("/#/designs/reports");
+  await expect(page.locator(".report-stat__value > strong")).toHaveText(["3", "2", "2", "1"]);
+  await expect(page.locator(".nav-item__count")).toHaveText("5");
+  await page.goBack();
+  await expect(page.locator(".report-row .status-badge").nth(1)).toHaveText("처리 완료");
+});
 const CASES = [
   { path: "reports", titles: ALL_TITLES, tab: "전체8" },
   { path: "reports-received", titles: ["게시글 #30", "게시글 #11", "게시글 #10"], tab: "접수3" },
