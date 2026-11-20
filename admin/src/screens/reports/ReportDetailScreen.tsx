@@ -27,12 +27,14 @@ import "./report-detail.css";
 export function ReportDetailScreen({
   content,
   initialStep,
+  initialRefreshToast = false,
   email,
   onBack,
   onLogout,
 }: {
   content: DetailKey;
   initialStep: DetailStep;
+  initialRefreshToast?: boolean;
   email: string;
   onBack: (status: ReportStatus) => void;
   onLogout: () => Promise<void>;
@@ -59,8 +61,13 @@ export function ReportDetailScreen({
   const [visibilityHistory, setVisibilityHistory] = useState<DetailHistory[]>([]);
   const [toast, setToast] = useState({
     id: 0,
-    message: example.initialStatus === "rejected" ? "신고를 반려했어요." : "조치를 적용했어요.",
-    visible: initialStep === "complete",
+    message: initialRefreshToast
+      ? "최신 정보로 새로고침했어요."
+      : example.initialStatus === "rejected"
+        ? "신고를 반려했어요."
+        : "조치를 적용했어요.",
+    visible: initialRefreshToast || initialStep === "complete",
+    isRefresh: initialRefreshToast,
   });
   const dismissToast = useCallback(() => setToast((t) => ({ ...t, visible: false })), []);
   const applyRef = useRef<HTMLButtonElement>(null);
@@ -100,8 +107,8 @@ export function ReportDetailScreen({
       });
   }
   const history = [...visibilityHistory, ...currentHistory, ...example.history];
-  const showToast = (message: string) =>
-    setToast((t) => ({ id: t.id + 1, message, visible: true }));
+  const showToast = (message: string, isRefresh = false) =>
+    setToast((t) => ({ id: t.id + 1, message, visible: true, isRefresh }));
   function closeConfirm() {
     setIsConfirmOpen(false);
     applyRef.current?.focus();
@@ -158,7 +165,7 @@ export function ReportDetailScreen({
             variant="outline"
             size="s"
             icon="refresh"
-            onClick={() => showToast("상세 내용을 새로고침했어요.")}
+            onClick={() => showToast("최신 정보로 새로고침했어요.", true)}
           >
             상세 새로고침
           </AdminBtn>
@@ -388,6 +395,7 @@ export function ReportDetailScreen({
         <AdminToast
           key={toast.id}
           message={toast.message}
+          variant={toast.isRefresh ? "refresh" : "success"}
           isVisible={toast.visible}
           onDismiss={dismissToast}
         />

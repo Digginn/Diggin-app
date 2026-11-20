@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { AdminBtn } from "../../components/AdminBtn";
 import { AdminIcon } from "../../components/AdminIcon";
 import { AdminSidebar } from "../../components/AdminSidebar";
+import { AdminToast } from "../../components/AdminToast";
 import { REPORT_STATUS, REPORT_STATUSES } from "../../components/Badges";
 import { FilterTab, type ReportFilter } from "../../components/FilterTab";
 import { ReportRow, type ReportRowData } from "../../components/ReportRow";
@@ -26,6 +27,8 @@ export function ReportListScreen({
   initialTypeFilter = "all",
   initialQuery = "",
   initialTypeOpen = false,
+  initialRefreshToast = false,
+  reportsHref,
   onLogout,
   onRefresh,
   onOpenReport,
@@ -39,6 +42,8 @@ export function ReportListScreen({
   initialTypeFilter?: ContentTypeFilter;
   initialQuery?: string;
   initialTypeOpen?: boolean;
+  initialRefreshToast?: boolean;
+  reportsHref?: string;
   onLogout: () => Promise<void>;
   onRefresh: () => Promise<void>;
   onOpenReport: (id: string) => void;
@@ -50,6 +55,8 @@ export function ReportListScreen({
   const [refreshError, setRefreshError] = useState("");
   const refreshLock = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState({ id: 0, isVisible: initialRefreshToast });
+  const dismissToast = useCallback(() => setToast((t) => ({ ...t, isVisible: false })), []);
 
   const counts = countReports(reports);
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -70,6 +77,7 @@ export function ReportListScreen({
     setRefreshError("");
     try {
       await onRefresh();
+      setToast((t) => ({ id: t.id + 1, isVisible: true }));
     } catch {
       setRefreshError("신고 목록을 불러오지 못했습니다. 다시 시도해 주세요.");
     } finally {
@@ -83,6 +91,7 @@ export function ReportListScreen({
       <AdminSidebar
         email={email}
         count={counts.received + counts.reviewing}
+        reportsHref={reportsHref}
         initialProfileOpen={initialProfileOpen}
         initialLogoutOpen={initialLogoutOpen}
         onLogout={onLogout}
@@ -200,6 +209,15 @@ export function ReportListScreen({
           </section>
         </div>
       </main>
+      <div className="admin-toast-position">
+        <AdminToast
+          key={toast.id}
+          message="목록을 새로고침했어요."
+          variant="refresh"
+          isVisible={toast.isVisible}
+          onDismiss={dismissToast}
+        />
+      </div>
     </div>
   );
 }

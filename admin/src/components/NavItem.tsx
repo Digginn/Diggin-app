@@ -1,12 +1,13 @@
 import type { ComponentProps } from "react";
 
-import { AdminIcon, type AdminIconName } from "./AdminIcon";
+import { AdminIcon, type AdminIconName, type IconAsset } from "./AdminIcon";
 
 export function NavItem({
   label,
   count,
   isActive = false,
   icon = "report",
+  iconAsset,
   className = "",
   ...props
 }: Omit<ComponentProps<"a">, "children"> & {
@@ -14,13 +15,16 @@ export function NavItem({
   count?: number;
   isActive?: boolean;
   icon?: AdminIconName;
+  iconAsset?: IconAsset;
 }) {
   return (
     <a {...props} className={`nav-item ${className}`} aria-current={isActive ? "page" : undefined}>
-      {icon === "report" && !isActive ? (
+      {iconAsset ? (
+        <AdminIcon asset={iconAsset} size={20} />
+      ) : icon === "report" && !isActive ? (
         <AdminIcon asset="nav-report" size={20} />
-      ) : !isActive && (icon === "shield" || icon === "user") ? (
-        <AdminIcon asset={icon === "shield" ? "nav-shield" : "nav-user"} size={20} />
+      ) : icon === "shield" || icon === "user" ? (
+        <AdminIcon asset={`nav-${icon}${isActive ? "-active" : ""}`} size={20} />
       ) : (
         <AdminIcon name={icon} size={20} />
       )}

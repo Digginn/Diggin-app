@@ -3,6 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { ComponentPreview } from "./ComponentPreview";
 import { AdminBrand } from "./components/AdminBrand";
 import { AdminToast } from "./components/AdminToast";
+import { OPERATIONS_DESIGN_STATES } from "./preview-data/operations";
 import { DETAIL_DESIGN_STATES, DETAIL_EXAMPLES } from "./preview-data/report-details";
 import { REPORT_ACTION_DESIGN_STATES, REPORT_DESIGN_STATES } from "./preview-data/report-states";
 import { PREVIEW_REPORTS } from "./preview-data/reports";
@@ -11,6 +12,7 @@ import {
   LoginScreen,
   type LoginCredentials,
 } from "./screens/auth/LoginScreen";
+import { OperationsScreen } from "./screens/operations/OperationsScreen";
 import { ReportDetailScreen } from "./screens/reports/ReportDetailScreen";
 import { ReportListScreen } from "./screens/reports/ReportListScreen";
 
@@ -154,6 +156,22 @@ function DesignIndex() {
           </nav>
         </section>
       ))}
+      <section className="design-index__section" aria-labelledby="operations-designs-title">
+        <h2 className="design-section-heading" id="operations-designs-title">
+          기타 메뉴 · 새로고침 토스트
+        </h2>
+        <p className="design-index__section-description">
+          제재 이력·회원 목록의 독립 예시와 목록·상세 새로고침 안내를 확인합니다.
+        </p>
+        <nav className="design-index__screens" aria-label="기타 메뉴와 새로고침 디자인 상태 선택">
+          {OPERATIONS_DESIGN_STATES.map((state) => (
+            <a key={state.path} href={`#/designs/${state.path}`}>
+              <span>{state.title}</span>
+              <small>{state.node}</small>
+            </a>
+          ))}
+        </nav>
+      </section>
       <footer>
         <a href="#/preview/reports">비로그인 상태에서 보호 화면 진입</a>
         <a href="#/components">공통 컴포넌트 보기</a>
@@ -218,13 +236,37 @@ export function App() {
     return <LoggedOutScreen key={route} onLogin={previewLogin} />;
 
   const isProtectedRoute = route.startsWith("/preview/");
-  const detailDesign = DETAIL_DESIGN_STATES.find((state) => route === `/designs/${state.path}`);
+  const operationsView = route.endsWith("/sanctions")
+    ? "sanctions"
+    : route.endsWith("/members")
+      ? "members"
+      : null;
+  if (
+    operationsView &&
+    (route === `/designs/${operationsView}` || (isProtectedRoute && isPreviewSignedIn))
+  ) {
+    return (
+      <OperationsScreen
+        key={route}
+        view={operationsView}
+        email={previewEmail}
+        isPreview={isProtectedRoute}
+        onLogout={previewLogout}
+      />
+    );
+  }
+  const detailDesign =
+    DETAIL_DESIGN_STATES.find((state) => route === `/designs/${state.path}`) ??
+    (route === "/designs/detail-refresh"
+      ? { content: "post-30" as const, step: "detail" as const }
+      : undefined);
   if (detailDesign) {
     return (
       <ReportDetailScreen
         key={route}
         content={detailDesign.content}
         initialStep={detailDesign.step}
+        initialRefreshToast={route === "/designs/detail-refresh"}
         email={previewEmail}
         onLogout={previewLogout}
         onBack={(status) => {
@@ -246,6 +288,7 @@ export function App() {
   );
   if (
     reportDesign ||
+    route === "/designs/reports-refresh" ||
     route === "/designs/reports-current" ||
     route === "/designs/reports-profile" ||
     route === "/designs/logout-confirm" ||
@@ -266,6 +309,8 @@ export function App() {
               : ""
           }
           email={previewEmail}
+          reportsHref={isProtectedRoute ? "#/preview/reports" : "#/designs/reports"}
+          initialRefreshToast={route === "/designs/reports-refresh"}
           initialProfileOpen={route === "/designs/reports-profile"}
           initialLogoutOpen={route === "/designs/logout-confirm"}
           initialSelected={reportDesign?.selected}
@@ -273,7 +318,7 @@ export function App() {
           initialQuery={reportDesign?.query}
           initialTypeOpen={reportDesign?.isTypeOpen}
           onLogout={previewLogout}
-          onRefresh={async () => showToast("신고 목록을 새로고침했어요.")}
+          onRefresh={async () => {}}
           onOpenReport={(id) => {
             const detail = DETAIL_DESIGN_STATES.find(
               (state) =>

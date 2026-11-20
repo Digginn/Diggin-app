@@ -160,7 +160,7 @@ test("신고 필터·유형·검색·빈 결과가 예시 데이터에 적용된
   await expect(page.getByRole("button", { name: "다음 페이지" })).toBeDisabled();
   await page.getByRole("button", { name: "새로고침", exact: true }).click();
   await expect(
-    page.getByRole("status").filter({ hasText: "신고 목록을 새로고침했어요." }),
+    page.getByRole("status").filter({ hasText: "목록을 새로고침했어요." }),
   ).toBeVisible();
 });
 

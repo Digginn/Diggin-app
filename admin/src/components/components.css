@@ -316,6 +316,19 @@
   letter-spacing: var(--tracking);
   text-decoration: none;
 }
+
+.admin-toast--refresh {
+  background: var(--gray-700);
+  opacity: 0.92;
+}
+.admin-toast-position {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  pointer-events: none;
+}
 .nav-item[aria-current="page"] {
   background: var(--gray-100);
   color: var(--gray-900);
