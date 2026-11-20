@@ -20,7 +20,7 @@
 
 환경과 채널은 별개입니다. `channel`은 받을 업데이트를, `environment`는 번들에 들어갈 환경변수를 정합니다. npm 배포 명령에는 둘 다 지정했습니다. 빌드 프로필의 `env`나 로컬 `.env`에만 의존하지 않습니다.
 
-2026-11-20 확인 시 production에는 공개 환경변수 6개가 있고 preview는 비어 있습니다. preview 첫 빌드 전에 EAS 대시보드의 **Environment variables → preview**에 해당 환경 값을 등록합니다. 개발 DB를 사용할 경우 preview의 값으로 연결하며 운영 값을 그대로 복제하지 않습니다.
+각 환경의 값은 EAS 대시보드의 **Environment variables → preview / production**에서 관리합니다. 개발 DB를 사용할 경우 preview에 개발용 연결 값을 등록합니다.
 
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
@@ -41,18 +41,22 @@ Secret 변수는 로컬 OTA 명령에서 읽을 수 없습니다. 필요한 네�
 
 ```powershell
 # 환경변수를 준비하고, 검증할 정확한 커밋에서 실행
-npx eas-cli build --profile preview --platform android
+npx eas-cli@27.4.1 build --profile preview --platform android
 # iOS 실기기 내부 배포는 기기 등록·프로비저닝 준비 필요
-npx eas-cli build --profile preview --platform ios
+npx eas-cli@27.4.1 build --profile preview --platform ios
 
 # 운영 릴리스는 승인·병합된 main의 정확한 커밋에서 수행
-npx eas-cli build --profile production --platform android
-npx eas-cli build --profile production --platform ios
+npx eas-cli@27.4.1 build --profile production --platform android
+npx eas-cli@27.4.1 build --profile production --platform ios
 ```
 
 빌드·스토어 업로드와 OTA 게시는 별도 작업입니다. 이 설정 PR은 빌드를 시작하거나 업데이트를 게시하지 않습니다. EAS Build는 빌드 프로필의 채널을 설정합니다. 최초 빌드 후 대시보드에서 실제 채널·브랜치 연결과 런타임을 확인합니다.
 
 ## 이후 JavaScript·에셋 수정 배포
+
+배포 명령은 검증한 EAS CLI `27.4.1`로 고정했습니다. 운영 OTA는 `.env`·`.env.*`가 없는 별도 체크아웃과 앱 환경변수를 직접 설정하지 않은 새 터미널에서 실행합니다. 기존 개발 체크아웃의 파일은 삭제하지 않습니다.
+
+`--environment production`은 로컬 `.env` 자동 로딩을 차단하지만, 터미널에 이미 설정된 환경변수를 지우지는 않습니다. EAS에 없는 앱 설정값이 상속되지 않도록 배포 전 터미널 환경도 확인합니다.
 
 1. 배포할 커밋을 확정하고 변경 사항과 환경변수를 확인합니다. 운영은 승인·병합된 `main`, 검증은 해당 preview 커밋을 사용하며 작업 트리는 깨끗하게 유지합니다.
 2. 같은 네이티브 설정으로 preview에서 먼저 검증합니다. EAS 대시보드의 런타임이 대상 빌드와 일치하는지 확인합니다.
@@ -77,7 +81,7 @@ npm run update:production -- --platform all --message "로그인 화면 문구 �
 - 문제가 생기면 해당 채널·런타임의 최신 update group을 골라 이전 업데이트로 되돌립니다. 이전 OTA가 없으면 embedded update로 복구합니다. 복구 명령도 실제 배포 동작이므로 대상 그룹을 확인한 뒤 실행합니다.
 
 ```powershell
-npx eas-cli update:rollback <문제가_생긴_최신_update_group_ID> --message "이전 정상 버전으로 복구"
+npx eas-cli@27.4.1 update:rollback <문제가_생긴_최신_update_group_ID> --message "이전 정상 버전으로 복구"
 ```
 
 복구도 호환되는 빌드가 다음 업데이트를 확인할 때 적용됩니다. 런타임을 임의로 고정하거나 바꿔 호환성 검사를 우회하지 않습니다.

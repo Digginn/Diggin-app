@@ -86,8 +86,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "update:preview": "npx eas-cli update --channel preview --environment preview",
-    "update:production": "npx eas-cli update --channel production --environment production",
+    "update:preview": "npx eas-cli@27.4.1 update --channel preview --environment preview",
+    "update:production": "npx eas-cli@27.4.1 update --channel production --environment production",
     "lint:fix": "expo lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
