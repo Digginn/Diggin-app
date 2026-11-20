@@ -1,6 +1,9 @@
 import type { ComponentProps } from "react";
 
+import type { ReportStatus } from "../components/Badges";
 import type { HistoryItem } from "../components/HistoryItem";
+import type { ReportRowData } from "../components/ReportRow";
+import type { Sanction } from "../components/SanctionSelect";
 
 import { PREVIEW_REPORTS } from "./reports";
 
@@ -8,9 +11,22 @@ export const POST_REASON =
   "동일 게시글에 욕설·비방 신고가 반복 접수되어 커뮤니티 운영정책 3조에 따라 7일 이용 제한합니다.";
 export const COMMENT_REASON =
   "다른 사용자의 취향을 비하하는 표현으로 경고합니다. 반복 시 이용이 제한됩니다.";
-export type DetailKey = "post-30" | "comment-112";
+export type DetailKey = "post-30" | "comment-112" | "post-11" | "post-10";
 export type DetailStep = "detail" | "input" | "confirm" | "complete";
 export type DetailHistory = ComponentProps<typeof HistoryItem>;
+type DetailExample = {
+  report: ReportRowData;
+  uuid: string;
+  sanctions: number;
+  reason: string;
+  initialStatus: ReportStatus;
+  initialSanction: Sanction | null;
+  sanctionReason: string;
+  product?: string;
+  created: string;
+  history: DetailHistory[];
+  reports: { id: number; label: string; time: string; reporter: string; reason?: string }[];
+};
 const postHistory: DetailHistory[] = [
   {
     action: "제재 해제",
@@ -46,12 +62,16 @@ const postHistory: DetailHistory[] = [
     kind: "status",
   },
 ];
-export const DETAIL_EXAMPLES = {
+export const DETAIL_EXAMPLES: Record<DetailKey, DetailExample> = {
   "post-30": {
     report: PREVIEW_REPORTS[0],
     uuid: "67754824-5d6f-4e0a-a4c6-1bd6cde0834a",
     sanctions: 3,
     reason: POST_REASON,
+    initialStatus: "resolved",
+    initialSanction: "community_restricted",
+    sanctionReason: "욕설·비방",
+    product: "벨로시티 나이트로 4 GTX - 블랙:실버 / 311144-01",
     created: "작성 2026.10.26 18:52 · 댓글 2 · 좋아요 0",
     history: postHistory,
     reports: [
@@ -71,6 +91,9 @@ export const DETAIL_EXAMPLES = {
     uuid: "2b1f9c03-4e17-4b8a-9d2e-5c0a7f3091ac",
     sanctions: 0,
     reason: COMMENT_REASON,
+    initialStatus: "resolved",
+    initialSanction: "warning",
+    sanctionReason: "욕설·비방",
     created: "작성 2026.10.26 23:31 · 좋아요 1",
     history: [
       {
@@ -79,7 +102,7 @@ export const DETAIL_EXAMPLES = {
         meta: "운영자 diggin.app · 접수 → 검토 중",
         kind: "review",
       },
-    ] as DetailHistory[],
+    ],
     reports: [
       { id: 48, label: "욕설·비방", time: "10.27 09:12", reporter: "c7e1…2a90b" },
       { id: 45, label: "욕설·비방", time: "10.27 01:05", reporter: "0a3f…e81c4" },
@@ -91,6 +114,58 @@ export const DETAIL_EXAMPLES = {
         reason: "다른 사람 취향을 비하하는 댓글이에요.",
       },
       { id: 41, label: "욕설·비방", time: "10.26 23:40", reporter: "5be2…0f3d1" },
+    ],
+  },
+  "post-11": {
+    report: PREVIEW_REPORTS[2],
+    uuid: "9c0e5d71-2b3a-4f88-a1c9-7e64d1fa22d1",
+    sanctions: 0,
+    reason: "상품 후기 공유로 신고 사유에 해당하는 내용이 없어 반려합니다.",
+    initialStatus: "rejected",
+    initialSanction: null,
+    sanctionReason: "욕설·비방",
+    product: "에어 줌 페가수스 41 - 화이트 / FD2722-100",
+    created: "작성 2026.10.25 21:40 · 댓글 5 · 좋아요 12",
+    history: [],
+    reports: [
+      { id: 31, label: "욕설·비방", time: "10.26 20:01", reporter: "8e40…b1c27" },
+      {
+        id: 22,
+        label: "기타",
+        time: "10.25 22:01",
+        reporter: "4a7d…09e5f",
+        reason: "광고 같아요.",
+      },
+    ],
+  },
+  "post-10": {
+    report: PREVIEW_REPORTS[3],
+    uuid: "1d4d3144-b95a-4aef-a569-8adbc28ccd0a",
+    sanctions: 1,
+    reason: "외부 오픈채팅 유도 홍보 글을 반복 게시하여 7일 이용 제한합니다.",
+    initialStatus: "resolved",
+    initialSanction: "community_restricted",
+    sanctionReason: "도배",
+    created: "작성 2026.10.25 19:30 · 댓글 0 · 좋아요 0",
+    history: [
+      {
+        action: "경고",
+        time: "10.20 11:04",
+        meta: "운영자 diggin.app · 도배",
+        reason: "같은 홍보 글을 반복 게시하여 경고합니다.",
+        kind: "status",
+      },
+    ],
+    reports: [
+      { id: 21, label: "도배", time: "10.25 22:09", reporter: "77ab…5e310" },
+      { id: 19, label: "도배", time: "10.25 20:30", reporter: "c7e1…2a90b" },
+      {
+        id: 17,
+        label: "도배",
+        time: "10.25 19:43",
+        reporter: "0a3f…e81c4",
+        reason: "같은 글을 하루에 다섯 번 올렸어요.",
+      },
     ],
   },
 };
@@ -155,6 +230,62 @@ export const DETAIL_DESIGN_STATES: {
     title: "댓글 #112 · 조치 완료",
     node: "7068:142511",
     content: "comment-112",
+    step: "complete",
+  },
+  {
+    path: "report-post-11",
+    title: "게시글 #11 · 상세",
+    node: "7068:142629",
+    content: "post-11",
+    step: "detail",
+  },
+  {
+    path: "report-post-11-input",
+    title: "게시글 #11 · 조치 입력",
+    node: "7068:142739",
+    content: "post-11",
+    step: "input",
+  },
+  {
+    path: "report-post-11-confirm",
+    title: "게시글 #11 · 확인 모달",
+    node: "7068:144371",
+    content: "post-11",
+    step: "confirm",
+  },
+  {
+    path: "report-post-11-complete",
+    title: "게시글 #11 · 조치 완료",
+    node: "7068:142849",
+    content: "post-11",
+    step: "complete",
+  },
+  {
+    path: "report-post-10",
+    title: "게시글 #10 · 상세",
+    node: "7068:142955",
+    content: "post-10",
+    step: "detail",
+  },
+  {
+    path: "report-post-10-input",
+    title: "게시글 #10 · 조치 입력",
+    node: "7068:143066",
+    content: "post-10",
+    step: "input",
+  },
+  {
+    path: "report-post-10-confirm",
+    title: "게시글 #10 · 확인 모달",
+    node: "7068:144392",
+    content: "post-10",
+    step: "confirm",
+  },
+  {
+    path: "report-post-10-complete",
+    title: "게시글 #10 · 조치 완료",
+    node: "7068:143177",
+    content: "post-10",
     step: "complete",
   },
 ];

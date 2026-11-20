@@ -42,8 +42,8 @@ export function ReportDetailScreen({
   const isPost = report.type === "post";
   const hasInput = initialStep !== "detail";
   const initialAction: ReportAction = {
-    status: "resolved",
-    sanction: isPost ? "community_restricted" : "warning",
+    status: example.initialStatus,
+    sanction: example.initialSanction,
     reason: example.reason,
   };
   const [draft, setDraft] = useState<ReportAction>(
@@ -57,7 +57,7 @@ export function ReportDetailScreen({
   const [visibilityHistory, setVisibilityHistory] = useState<DetailHistory[]>([]);
   const [toast, setToast] = useState({
     id: 0,
-    message: "조치를 적용했어요.",
+    message: example.initialStatus === "rejected" ? "신고를 반려했어요." : "조치를 적용했어요.",
     visible: initialStep === "complete",
   });
   const dismissToast = useCallback(() => setToast((t) => ({ ...t, visible: false })), []);
@@ -69,16 +69,23 @@ export function ReportDetailScreen({
   if (applied) {
     if (applied.status !== report.status)
       currentHistory.push({
-        action: applied.status === "resolved" ? "신고 처리 완료" : "신고 상태 변경",
+        action:
+          applied.status === "resolved"
+            ? "신고 처리 완료"
+            : applied.status === "rejected"
+              ? "신고 반려"
+              : "신고 상태 변경",
         time: "방금 전",
         meta: `운영자 diggin.app · ${REPORT_STATUS[report.status]} → ${REPORT_STATUS[applied.status]} · 신고 ${report.reportCount}건 일괄 처리`,
-        kind: "completed",
+        kind: applied.status === "rejected" ? "rejected" : "completed",
+        reason: applied.status === "rejected" ? applied.reason : undefined,
+        isHighlighted: applied.status === "rejected",
       });
     if (applied.sanction)
       currentHistory.push({
         action: SANCTION_LABELS[applied.sanction],
         time: "방금 전",
-        meta: `운영자 diggin.app · 욕설·비방${isRestricted ? " · 11.07 14:20 종료 예정" : ""}`,
+        meta: `운영자 diggin.app · ${example.sanctionReason}${isRestricted ? " · 11.07 14:20 종료 예정" : ""}`,
         reason: applied.reason,
         kind:
           applied.sanction === "warning"
@@ -99,9 +106,13 @@ export function ReportDetailScreen({
   function apply() {
     if (appliedLock.current) return;
     appliedLock.current = true;
-    setApplied({ ...draft, reason: draft.reason.trim() });
+    setApplied({
+      ...draft,
+      sanction: draft.status === "rejected" ? null : draft.sanction,
+      reason: draft.reason.trim(),
+    });
     setIsConfirmOpen(false);
-    showToast("조치를 적용했어요.");
+    showToast(draft.status === "rejected" ? "신고를 반려했어요." : "조치를 적용했어요.");
     window.scrollTo({ top: 0, behavior: "instant" });
   }
   const hasChange = draft.status !== report.status || draft.sanction !== null;
@@ -134,7 +145,10 @@ export function ReportDetailScreen({
             <h1>{report.title}</h1>
             <p>
               콘텐츠 ID {report.id} · 신고 {report.reportCount}건 · 최초 신고 2026.{report.firstAt}{" "}
-              · {applied ? "처리 완료 2026.10.31 14:20" : `최근 신고 2026.${report.latestAt}`}
+              ·{" "}
+              {applied
+                ? `${REPORT_STATUS[status]} 2026.10.31 14:20`
+                : `최근 신고 2026.${report.latestAt}`}
             </p>
           </div>
           <AdminBtn
@@ -188,12 +202,12 @@ export function ReportDetailScreen({
                 </div>
               )}
               <div className="detail-content">{report.excerpt}</div>
-              {isPost && (
+              {example.product && (
                 <div className="detail-product">
                   <span aria-hidden="true" />
                   <div>
                     <p>연결 상품</p>
-                    <p>벨로시티 나이트로 4 GTX - 블랙:실버 / 311144-01</p>
+                    <p>{example.product}</p>
                   </div>
                 </div>
               )}
@@ -229,7 +243,11 @@ export function ReportDetailScreen({
                   <div>
                     <dt>조치</dt>
                     <dd>
-                      {applied.sanction ? SANCTION_LABELS[applied.sanction] : "신고 상태 변경"}
+                      {applied.sanction
+                        ? SANCTION_LABELS[applied.sanction]
+                        : applied.status === "rejected"
+                          ? "조치 없음"
+                          : "신고 상태 변경"}
                     </dd>
                   </div>
                   <div>
@@ -275,7 +293,13 @@ export function ReportDetailScreen({
                   <h3>신고 상태</h3>
                   <StatusSegment
                     selected={draft.status}
-                    onChange={(status) => setDraft((d) => ({ ...d, status }))}
+                    onChange={(status) =>
+                      setDraft((d) => ({
+                        ...d,
+                        status,
+                        sanction: status === "rejected" ? null : d.sanction,
+                      }))
+                    }
                   />
                 </div>
                 <div>
@@ -289,6 +313,7 @@ export function ReportDetailScreen({
                   </div>
                   <SanctionSelect
                     selected={draft.sanction}
+                    disabled={draft.status === "rejected"}
                     onChange={(sanction: Sanction | null) => setDraft((d) => ({ ...d, sanction }))}
                   />
                 </div>
@@ -328,6 +353,9 @@ export function ReportDetailScreen({
                     hasLine={index < history.length - 1}
                   />
                 ))}
+                {history.length === 0 && (
+                  <p className="detail-history-empty">아직 처리 이력이 없습니다.</p>
+                )}
               </div>
             </section>
           </div>
@@ -338,6 +366,7 @@ export function ReportDetailScreen({
         action={draft}
         previousStatus={report.status}
         author={report.author}
+        reportCount={report.reportCount}
         onCancel={closeConfirm}
         onApply={apply}
       />

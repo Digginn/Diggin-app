@@ -57,6 +57,7 @@ export type IconAsset =
   | "detail-ban"
   | "detail-current-ban"
   | "detail-warning"
+  | "detail-info"
   | "select-chevron"
   | "pagination-left"
   | "pagination-right"

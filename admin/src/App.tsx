@@ -3,7 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { ComponentPreview } from "./ComponentPreview";
 import { AdminBrand } from "./components/AdminBrand";
 import { AdminToast } from "./components/AdminToast";
-import { DETAIL_DESIGN_STATES } from "./preview-data/report-details";
+import { DETAIL_DESIGN_STATES, DETAIL_EXAMPLES } from "./preview-data/report-details";
 import { REPORT_ACTION_DESIGN_STATES, REPORT_DESIGN_STATES } from "./preview-data/report-states";
 import { PREVIEW_REPORTS } from "./preview-data/reports";
 import {
@@ -130,19 +130,18 @@ function DesignIndex() {
           ))}
         </nav>
       </section>
-      {(["post-30", "comment-112"] as const).map((content) => (
+      {Object.entries(DETAIL_EXAMPLES).map(([content, example]) => (
         <section
           className="design-index__section"
           key={content}
           aria-labelledby={`detail-${content}-title`}
         >
           <h2 className="design-section-heading" id={`detail-${content}-title`}>
-            {content === "post-30" ? "게시글 #30" : "댓글 #112"} 처리 흐름 · 상세 → 조치 입력 → 확인
-            모달 → 조치 완료
+            {example.report.title} 처리 흐름 · 상세 → 조치 입력 → 확인 모달 → 조치 완료
           </h2>
           <nav
             className="design-index__screens"
-            aria-label={`${content === "post-30" ? "게시글 #30" : "댓글 #112"} 처리 흐름 선택`}
+            aria-label={`${example.report.title} 처리 흐름 선택`}
           >
             {DETAIL_DESIGN_STATES.filter((state) => state.content === content).map((state) => (
               <a key={state.path} href={`#/designs/${state.path}`}>
@@ -227,10 +226,10 @@ export function App() {
         email={previewEmail}
         onLogout={previewLogout}
         onBack={(status) => {
-          const isPost = detailDesign.content === "post-30";
+          const currentReport = DETAIL_EXAMPLES[detailDesign.content].report;
           setReportPreview(
             PREVIEW_REPORTS.map((report) =>
-              report.type === (isPost ? "post" : "comment") && report.id === (isPost ? "30" : "112")
+              report.type === currentReport.type && report.id === currentReport.id
                 ? { ...report, status }
                 : report,
             ),
@@ -274,15 +273,17 @@ export function App() {
           onLogout={previewLogout}
           onRefresh={async () => showToast("신고 목록을 새로고침했어요.")}
           onOpenReport={(id) => {
-            if (id === "30" || id === "112") {
+            const detail = DETAIL_DESIGN_STATES.find(
+              (state) => state.step === "detail" && DETAIL_EXAMPLES[state.content].report.id === id,
+            );
+            if (detail) {
               const reports =
                 route === "/designs/reports-current"
                   ? reportPreview
                   : (reportDesign?.reports ?? PREVIEW_REPORTS);
-              const isComplete = reports.find((report) => report.id === id)?.status === "resolved";
-              navigate(
-                `/designs/report-${id === "30" ? "post-30" : "comment-112"}${isComplete ? "-complete" : ""}`,
-              );
+              const status = reports.find((report) => report.id === id)?.status;
+              const isComplete = status === "resolved" || status === "rejected";
+              navigate(`/designs/${detail.path}${isComplete ? "-complete" : ""}`);
             } else showToast(`콘텐츠 #${id}을 선택했어요.`);
           }}
         />

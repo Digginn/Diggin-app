@@ -32,9 +32,11 @@ const OPTIONS: { value: Sanction; label: string; description: string; icon: Admi
 export function SanctionSelect({
   selected,
   onChange,
+  disabled = false,
 }: {
   selected: Sanction | null;
   onChange: (sanction: Sanction | null) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="sanction-select" role="group" aria-label="작성자 제재 선택">
@@ -44,6 +46,7 @@ export function SanctionSelect({
           <button
             key={option.value}
             type="button"
+            disabled={disabled}
             aria-pressed={isSelected}
             className={`sanction-option ${option.value === "suspended" ? "sanction-option--danger" : ""}`}
             onClick={() => onChange(isSelected ? null : option.value)}

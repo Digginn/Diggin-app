@@ -13,7 +13,7 @@ export function HistoryItem({
   time: string;
   meta: string;
   reason?: string;
-  kind?: "sanction" | "release" | "content" | "status" | "review" | "completed";
+  kind?: "sanction" | "release" | "content" | "status" | "review" | "completed" | "rejected";
   hasLine?: boolean;
   isHighlighted?: boolean;
 }) {

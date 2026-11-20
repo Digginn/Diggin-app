@@ -290,6 +290,20 @@
 .detail-history .history-item--completed .history-item__rail {
   color: var(--resolved-text);
 }
+.detail-history .history-item--rejected .history-item__rail {
+  color: var(--gray-400);
+}
+.detail-history:has(.detail-history-empty) {
+  padding-bottom: 22px;
+}
+.detail-history-empty {
+  padding: 16px;
+  border-radius: var(--radius-m);
+  background: var(--gray-50);
+  color: var(--gray-500);
+  font: var(--caption-c1);
+  text-align: center;
+}
 .detail-history .history-item--highlighted .history-item__reason {
   background: var(--resolved-bg);
 }
