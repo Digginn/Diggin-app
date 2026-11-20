@@ -58,6 +58,11 @@ export const PRODUCT_PAGE_PRICE_GRACE_MS = 2500;
  * 곧 상품 페이지로 넘어가므로, 중간 페이지에서는 끝내지 않고 다음 페이지에서 새로 읽는다.
  */
 export const PRODUCT_PAGE_SCRIPT = `(() => {
+  // 숨긴 웹뷰의 쇼핑몰 알림이 앱 위에 뜨거나 추출을 멈추지 않게 한다.
+  window.alert = () => {};
+  window.confirm = () => false;
+  window.prompt = () => null;
+
   const meta = (key) =>
     document.querySelector('meta[property="' + key + '"], meta[name="' + key + '"]')?.getAttribute("content")?.trim() || null;
 
