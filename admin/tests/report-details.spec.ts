@@ -38,6 +38,15 @@ const STATES = [
     sanction: "커뮤니티 이용 제한",
     reason: "외부 오픈채팅 유도 홍보 글을 반복 게시하여 7일 이용 제한합니다.",
   },
+  {
+    content: "comment-98",
+    title: "댓글 #98",
+    reports: 5,
+    history: 3,
+    outcome: "처리 완료",
+    sanction: "계정 이용 정지",
+    reason: "이용 제한 이후에도 홍보 댓글을 반복 게시하여 계정 이용을 정지합니다.",
+  },
 ];
 for (const item of STATES) {
   for (const step of ["detail", "input", "confirm", "complete"]) {
@@ -65,10 +74,22 @@ for (const item of STATES) {
         else if (step === "input")
           await expect(page.getByRole("button", { name: "조치 적용", exact: true })).toBeEnabled();
       }
-      await expect(page.getByRole("dialog", { name: /적용합니까|반려합니까/ })).toHaveCount(
-        step === "confirm" ? 1 : 0,
-      );
+      await expect(
+        page.getByRole("dialog", { name: /적용합니까|반려합니까|정지합니까/ }),
+      ).toHaveCount(step === "confirm" ? 1 : 0);
       if (step === "confirm") await expect(page.getByRole("dialog")).toContainText(item.reason);
+      if (item.content === "comment-98" && step === "confirm") {
+        await expect(
+          page.getByRole("dialog").getByRole("button", { name: "정지하기", exact: true }),
+        ).toHaveCSS("background-color", "rgb(235, 37, 37)");
+      }
+      if (item.content === "comment-98" && isComplete) {
+        await expect(page.locator(".detail-account-chip")).toHaveText("계정 이용 정지");
+        await expect(page.locator(".detail-author > span:last-child")).toHaveText("누적 제재 3회");
+        await expect(page.locator(".detail-restriction")).toHaveText(
+          "계정 이용 정지 중 · 제재 해제 전까지 유지",
+        );
+      }
     });
   }
   test(`${item.title} 목록에서 입력·확인·완료·목록 반영까지 외부 요청 없이 전환한다`, async ({
@@ -104,7 +125,15 @@ for (const item of STATES) {
     await expect(page.locator(".detail-header .status-badge")).not.toHaveText(item.outcome);
     await apply.click();
     await dialog
-      .getByRole("button", { name: item.outcome === "반려" ? "반려하기" : "적용하기", exact: true })
+      .getByRole("button", {
+        name:
+          item.outcome === "반려"
+            ? "반려하기"
+            : item.sanction === "계정 이용 정지"
+              ? "정지하기"
+              : "적용하기",
+        exact: true,
+      })
       .evaluate((e) => {
         (e as HTMLButtonElement).click();
         (e as HTMLButtonElement).click();
@@ -200,12 +229,22 @@ test("반려를 선택하면 제재 선택을 해제하고 적용 후에도 작�
 
 test("처리 흐름 목차와 작은 화면의 상세·확인 모달을 확인한다", async ({ page }) => {
   await page.goto("/");
-  for (const title of ["게시글 #30", "댓글 #112", "게시글 #11", "게시글 #10"])
+  for (const title of ["게시글 #30", "댓글 #112", "게시글 #11", "게시글 #10", "댓글 #98"])
     await expect(
       page
         .getByRole("navigation", { name: `${title} 처리 흐름 선택`, exact: true })
         .getByRole("link"),
     ).toHaveCount(4);
+  for (const title of ["게시글 #7", "댓글 #64", "게시글 #5"]) {
+    await expect(
+      page.getByRole("heading", { name: `${title} 상세 (처리 종료된 신고)`, exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("navigation", { name: `${title} 종료된 신고 상세 선택`, exact: true })
+        .getByRole("link"),
+    ).toHaveCount(1);
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/#/designs/report-comment-112-input");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
@@ -215,3 +254,96 @@ test("처리 흐름 목차와 작은 화면의 상세·확인 모달을 확인�
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
 });
+const CLOSED_STATES = [
+  {
+    path: "post-7",
+    title: "게시글 #7",
+    status: "처리 완료",
+    at: "2026.10.24 13:02",
+    reports: 1,
+    history: 3,
+    sanctions: 1,
+    account: "정상 이용",
+    isHidden: true,
+  },
+  {
+    path: "comment-64",
+    title: "댓글 #64",
+    status: "반려",
+    at: "2026.10.23 18:10",
+    reports: 1,
+    history: 1,
+    sanctions: 0,
+    account: "정상 이용",
+    isHidden: false,
+  },
+  {
+    path: "post-5",
+    title: "게시글 #5",
+    status: "처리 완료",
+    at: "2026.10.22 09:30",
+    reports: 6,
+    history: 3,
+    sanctions: 1,
+    account: "계정 이용 정지",
+    isHidden: true,
+  },
+];
+for (const item of CLOSED_STATES) {
+  test(`${item.title} 종료된 신고는 기존 결과·이력·집계를 유지한다`, async ({ page }) => {
+    await page.goto("/#/designs/reports");
+    await page.getByRole("button", { name: `${item.title} 신고 상세 보기`, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp("/report-" + item.path + "$"));
+    await expect(page.locator(".detail-header .status-badge")).toHaveText(item.status);
+    await expect(page.locator(".detail-header > div > p")).toContainText(item.at);
+    await expect(page.locator(".detail-reports li")).toHaveCount(item.reports);
+    await expect(page.locator(".history-item")).toHaveCount(item.history);
+    await expect(page.locator(".detail-author > span:last-child")).toHaveText(
+      `누적 제재 ${item.sanctions}회`,
+    );
+    await expect(page.locator(".detail-account-chip")).toHaveText(item.account);
+    await expect(page.locator(".detail-visibility-chip")).toHaveText(
+      item.isHidden ? "숨김 처리됨" : "공개 중",
+    );
+    await expect(page.locator(".nav-item__count")).toHaveText("5");
+    await expect(page.getByRole("textbox", { name: "조치 사유" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "조치 적용", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("status")).toHaveCount(0);
+    await page.getByRole("button", { name: "상세 새로고침", exact: true }).click();
+    await expect(page.locator(".history-item")).toHaveCount(item.history);
+    await page.reload();
+    await expect(page.locator(".history-item")).toHaveCount(item.history);
+    await expect(page.getByRole("status")).toHaveCount(0);
+    await page.getByRole("link", { name: "신고 목록", exact: true }).click();
+    await expect(page.locator(".nav-item__count")).toHaveText("5");
+    await page.getByRole("button", { name: `${item.title} 신고 상세 보기`, exact: true }).click();
+    await expect(page.locator(".detail-header .status-badge")).toHaveText(item.status);
+  });
+  if (item.isHidden)
+    test(`${item.title} 숨김 복구는 과거 처리 결과와 계정 제재를 바꾸지 않는다`, async ({
+      page,
+    }) => {
+      await page.goto("/#/designs/report-" + item.path);
+      const summary = page
+        .getByRole("region", { name: "처리 결과" })
+        .locator(".detail-result-summary");
+      const original = await summary.innerText();
+      await page.getByRole("button", { name: "복구하기", exact: true }).click();
+      await expect(page.locator(".detail-visibility-chip")).toHaveText("공개 중");
+      await expect(page.locator(".detail-content--hidden")).toHaveCount(0);
+      await expect(page.locator(".history-item")).toHaveCount(item.history + 1);
+      await expect(page.locator(".history-item__title > p").first()).toHaveText("콘텐츠 복구");
+      await expect(summary).toHaveText(original, { useInnerText: true });
+      await expect(page.locator(".detail-account-chip")).toHaveText(item.account);
+      await expect(page.locator(".detail-author > span:last-child")).toHaveText(
+        `누적 제재 ${item.sanctions}회`,
+      );
+      await page.getByRole("button", { name: "숨기기", exact: true }).click();
+      await expect(page.locator(".detail-visibility-chip")).toHaveText("숨김 처리됨");
+      await expect(page.locator(".history-item")).toHaveCount(item.history + 2);
+      await expect(page.locator(".nav-item__count")).toHaveText("5");
+      await page.reload();
+      await expect(page.locator(".history-item")).toHaveCount(item.history);
+      await expect(page.locator(".detail-visibility-chip")).toHaveText("숨김 처리됨");
+    });
+}

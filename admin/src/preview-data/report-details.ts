@@ -11,8 +11,19 @@ export const POST_REASON =
   "동일 게시글에 욕설·비방 신고가 반복 접수되어 커뮤니티 운영정책 3조에 따라 7일 이용 제한합니다.";
 export const COMMENT_REASON =
   "다른 사용자의 취향을 비하하는 표현으로 경고합니다. 반복 시 이용이 제한됩니다.";
-export type DetailKey = "post-30" | "comment-112" | "post-11" | "post-10";
-export type DetailStep = "detail" | "input" | "confirm" | "complete";
+const POST_7_REASON = "가품 판매처 정보 공유로 콘텐츠를 숨기고 경고합니다.";
+const COMMENT_64_REASON = "의견 표현으로 커뮤니티 가이드 위반이 아니어서 반려합니다.";
+const POST_5_REASON = "피싱 의심 링크를 반복 게시하여 콘텐츠를 숨기고 계정 이용을 정지합니다.";
+export type DetailKey =
+  | "post-30"
+  | "comment-112"
+  | "post-11"
+  | "post-10"
+  | "comment-98"
+  | "post-7"
+  | "comment-64"
+  | "post-5";
+export type DetailStep = "detail" | "input" | "confirm" | "complete" | "closed";
 export type DetailHistory = ComponentProps<typeof HistoryItem>;
 type DetailExample = {
   report: ReportRowData;
@@ -23,6 +34,9 @@ type DetailExample = {
   initialSanction: Sanction | null;
   sanctionReason: string;
   product?: string;
+  parentPost?: string;
+  isHidden?: boolean;
+  closed?: { at: string; action: string };
   created: string;
   history: DetailHistory[];
   reports: { id: number; label: string; time: string; reporter: string; reason?: string }[];
@@ -94,6 +108,7 @@ export const DETAIL_EXAMPLES: Record<DetailKey, DetailExample> = {
     initialStatus: "resolved",
     initialSanction: "warning",
     sanctionReason: "욕설·비방",
+    parentPost: "게시글 #84 · 이번 시즌 패딩 고민 중인데 다들 뭐 사셨어요?",
     created: "작성 2026.10.26 23:31 · 좋아요 1",
     history: [
       {
@@ -166,6 +181,169 @@ export const DETAIL_EXAMPLES: Record<DetailKey, DetailExample> = {
         reporter: "0a3f…e81c4",
         reason: "같은 글을 하루에 다섯 번 올렸어요.",
       },
+    ],
+  },
+  "comment-98": {
+    report: PREVIEW_REPORTS[4],
+    uuid: "77ab0e42-6c19-4d35-b8f0-3a1c9e75e310",
+    sanctions: 2,
+    reason: "이용 제한 이후에도 홍보 댓글을 반복 게시하여 계정 이용을 정지합니다.",
+    initialStatus: "resolved",
+    initialSanction: "suspended",
+    sanctionReason: "도배",
+    parentPost: "게시글 #52 · 겨울 아우터 위시리스트 같이 봐요",
+    created: "작성 2026.10.25 13:58 · 좋아요 0",
+    history: [
+      {
+        action: "검토 시작",
+        time: "10.25 18:45",
+        meta: "운영자 diggin.app · 접수 → 검토 중",
+        kind: "review",
+      },
+      {
+        action: "커뮤니티 이용 제한 7일",
+        time: "10.12 10:20",
+        meta: "운영자 diggin.app · 도배 · 10.19 10:20 종료",
+        reason: "홍보 댓글 반복으로 이용을 제한합니다.",
+      },
+      {
+        action: "경고",
+        time: "10.05 09:41",
+        meta: "운영자 diggin.app · 도배",
+        reason: "홍보 댓글을 반복 게시하여 경고합니다.",
+        kind: "status",
+      },
+    ],
+    reports: [
+      { id: 39, label: "도배", time: "10.25 18:30", reporter: "2b1f…091ac" },
+      { id: 37, label: "도배", time: "10.25 17:12", reporter: "9c0e…a22d1" },
+      { id: 35, label: "도배", time: "10.25 16:40", reporter: "54c2…c0b9e" },
+      {
+        id: 34,
+        label: "기타",
+        time: "10.25 15:05",
+        reporter: "3fa1…18c42",
+        reason: "모든 게시글에 같은 댓글을 달고 있어요.",
+      },
+      { id: 33, label: "도배", time: "10.25 14:02", reporter: "1d4d…8cd0a" },
+    ],
+  },
+  "post-7": {
+    report: PREVIEW_REPORTS[5],
+    uuid: "54c2d8e1-90af-4c3b-8e27-61b5ad3c0b9e",
+    sanctions: 1,
+    reason: POST_7_REASON,
+    initialStatus: "resolved",
+    initialSanction: "warning",
+    sanctionReason: "부적절한 콘텐츠",
+    isHidden: true,
+    closed: { at: "2026.10.24 13:02", action: "콘텐츠 숨김 · 경고" },
+    created: "작성 2026.10.24 10:05 · 댓글 3 · 좋아요 2",
+    history: [
+      {
+        action: "신고 처리 완료",
+        time: "10.24 13:02",
+        meta: "운영자 diggin.app · 접수 → 처리 완료",
+        kind: "completed",
+      },
+      {
+        action: "경고",
+        time: "10.24 13:02",
+        meta: "운영자 diggin.app · 부적절한 콘텐츠",
+        reason: POST_7_REASON,
+        kind: "status",
+      },
+      {
+        action: "콘텐츠 숨김",
+        time: "10.24 13:01",
+        meta: "운영자 diggin.app · 공개 → 숨김",
+        kind: "content",
+      },
+    ],
+    reports: [
+      {
+        id: 15,
+        label: "부적절한 콘텐츠",
+        time: "10.24 11:20",
+        reporter: "6f12…3d8a0",
+        reason: "가품 구매처를 홍보하는 글이에요.",
+      },
+    ],
+  },
+  "comment-64": {
+    report: PREVIEW_REPORTS[6],
+    uuid: "3fa1b6c2-7d09-4e5a-9b31-c2e8f0a18c42",
+    sanctions: 0,
+    reason: COMMENT_64_REASON,
+    initialStatus: "rejected",
+    initialSanction: null,
+    sanctionReason: "기타",
+    parentPost: "게시글 #40 · 요즘 유행하는 러닝화 솔직 후기",
+    closed: { at: "2026.10.23 18:10", action: "조치 없음" },
+    created: "작성 2026.10.23 16:20 · 좋아요 4",
+    history: [
+      {
+        action: "신고 반려",
+        time: "10.23 18:10",
+        meta: "운영자 diggin.app · 접수 → 반려",
+        reason: COMMENT_64_REASON,
+        kind: "rejected",
+      },
+    ],
+    reports: [
+      {
+        id: 12,
+        label: "기타",
+        time: "10.23 16:45",
+        reporter: "e9d0…74417",
+        reason: "저를 저격하는 댓글이에요.",
+      },
+    ],
+  },
+  "post-5": {
+    report: PREVIEW_REPORTS[7],
+    uuid: "e9d04a17-3c58-4b2e-a6f9-8d10c2e74417",
+    sanctions: 1,
+    reason: POST_5_REASON,
+    initialStatus: "resolved",
+    initialSanction: "suspended",
+    sanctionReason: "도배",
+    isHidden: true,
+    closed: { at: "2026.10.22 09:30", action: "콘텐츠 숨김 · 계정 이용 정지" },
+    created: "작성 2026.10.22 07:51 · 댓글 0 · 좋아요 0",
+    history: [
+      {
+        action: "신고 처리 완료",
+        time: "10.22 09:30",
+        meta: "운영자 diggin.app · 접수 → 처리 완료",
+        kind: "completed",
+      },
+      {
+        action: "계정 이용 정지",
+        time: "10.22 09:30",
+        meta: "운영자 diggin.app · 도배",
+        reason: POST_5_REASON,
+      },
+      {
+        action: "콘텐츠 숨김",
+        time: "10.22 09:28",
+        meta: "운영자 diggin.app · 공개 → 숨김",
+        kind: "content",
+      },
+    ],
+    reports: [
+      { id: 11, label: "도배", time: "10.22 08:13", reporter: "2b1f…091ac" },
+      { id: 10, label: "도배", time: "10.22 08:10", reporter: "9c0e…a22d1" },
+      {
+        id: 9,
+        label: "부적절한 콘텐츠",
+        time: "10.22 08:06",
+        reporter: "54c2…c0b9e",
+        reason: "피싱 링크로 보여요.",
+      },
+      { id: 8, label: "도배", time: "10.22 08:03", reporter: "77ab…5e310" },
+      { id: 7, label: "도배", time: "10.22 08:01", reporter: "3fa1…18c42" },
+      { id: 6, label: "도배", time: "10.22 07:58", reporter: "6775…0834a" },
     ],
   },
 };
@@ -287,5 +465,54 @@ export const DETAIL_DESIGN_STATES: {
     node: "7068:143177",
     content: "post-10",
     step: "complete",
+  },
+  {
+    path: "report-comment-98",
+    title: "댓글 #98 · 상세",
+    node: "7068:143289",
+    content: "comment-98",
+    step: "detail",
+  },
+  {
+    path: "report-comment-98-input",
+    title: "댓글 #98 · 조치 입력",
+    node: "7068:143417",
+    content: "comment-98",
+    step: "input",
+  },
+  {
+    path: "report-comment-98-confirm",
+    title: "댓글 #98 · 확인 모달",
+    node: "7068:144413",
+    content: "comment-98",
+    step: "confirm",
+  },
+  {
+    path: "report-comment-98-complete",
+    title: "댓글 #98 · 조치 완료",
+    node: "7068:143545",
+    content: "comment-98",
+    step: "complete",
+  },
+  {
+    path: "report-post-7",
+    title: "게시글 #7 · 종료된 신고 상세",
+    node: "7068:143674",
+    content: "post-7",
+    step: "closed",
+  },
+  {
+    path: "report-comment-64",
+    title: "댓글 #64 · 종료된 신고 상세",
+    node: "7068:143770",
+    content: "comment-64",
+    step: "closed",
+  },
+  {
+    path: "report-post-5",
+    title: "게시글 #5 · 종료된 신고 상세",
+    node: "7068:143867",
+    content: "post-5",
+    step: "closed",
   },
 ];

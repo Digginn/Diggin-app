@@ -103,6 +103,13 @@
   color: var(--gray-600);
   font: var(--label-l3);
 }
+.detail-visibility-chip--hidden {
+  background: var(--received-bg);
+  color: var(--received-text);
+}
+.detail-content--hidden {
+  color: var(--gray-500);
+}
 .detail-author {
   display: flex;
   align-items: center;

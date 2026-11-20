@@ -52,8 +52,10 @@ export function ReportDetailScreen({
   const [applied, setApplied] = useState<ReportAction | null>(
     initialStep === "complete" ? initialAction : null,
   );
+  const result = applied ?? (example.closed ? initialAction : null);
+  const resultAt = example.closed?.at ?? "2026.10.31 14:20";
   const [isConfirmOpen, setIsConfirmOpen] = useState(initialStep === "confirm");
-  const [isHidden, setIsHidden] = useState(false);
+  const [isHidden, setIsHidden] = useState(example.isHidden ?? false);
   const [visibilityHistory, setVisibilityHistory] = useState<DetailHistory[]>([]);
   const [toast, setToast] = useState({
     id: 0,
@@ -62,9 +64,10 @@ export function ReportDetailScreen({
   });
   const dismissToast = useCallback(() => setToast((t) => ({ ...t, visible: false })), []);
   const applyRef = useRef<HTMLButtonElement>(null);
-  const appliedLock = useRef(initialStep === "complete");
+  const appliedLock = useRef(initialStep === "complete" || Boolean(example.closed));
   const status = applied?.status ?? report.status;
-  const isRestricted = applied?.sanction === "community_restricted";
+  const isRestricted = result?.sanction === "community_restricted";
+  const isSuspended = result?.sanction === "suspended";
   const currentHistory: DetailHistory[] = [];
   if (applied) {
     if (applied.status !== report.status)
@@ -146,8 +149,8 @@ export function ReportDetailScreen({
             <p>
               콘텐츠 ID {report.id} · 신고 {report.reportCount}건 · 최초 신고 2026.{report.firstAt}{" "}
               ·{" "}
-              {applied
-                ? `${REPORT_STATUS[status]} 2026.10.31 14:20`
+              {result
+                ? `${REPORT_STATUS[status]} ${resultAt}`
                 : `최근 신고 2026.${report.latestAt}`}
             </p>
           </div>
@@ -168,8 +171,10 @@ export function ReportDetailScreen({
             >
               <div className="detail-card-heading">
                 <h2>{isPost ? "게시글" : "댓글"} 원문</h2>
-                <span className="detail-visibility-chip">
-                  <AdminIcon asset="detail-eye" size={14} />
+                <span
+                  className={`detail-visibility-chip ${isHidden ? "detail-visibility-chip--hidden" : ""}`}
+                >
+                  <AdminIcon asset={isHidden ? "detail-eye-off" : "detail-eye"} size={14} />
                   {isHidden ? "숨김 처리됨" : "공개 중"}
                 </span>
               </div>
@@ -181,9 +186,13 @@ export function ReportDetailScreen({
                   <div>
                     <strong>{report.author}</strong>
                     <span
-                      className={`detail-account-chip ${isRestricted ? "detail-account-chip--restricted" : ""}`}
+                      className={`detail-account-chip ${isRestricted || isSuspended ? "detail-account-chip--restricted" : ""}`}
                     >
-                      {isRestricted ? "커뮤니티 이용 제한 중" : "정상 이용"}
+                      {isSuspended
+                        ? "계정 이용 정지"
+                        : isRestricted
+                          ? "커뮤니티 이용 제한 중"
+                          : "정상 이용"}
                     </span>
                   </div>
                   <p>UUID {example.uuid}</p>
@@ -195,13 +204,15 @@ export function ReportDetailScreen({
                   회
                 </span>
               </div>
-              {!isPost && (
+              {example.parentPost && (
                 <div className="detail-parent">
                   <p>원 게시글</p>
-                  <p>게시글 #84 · 이번 시즌 패딩 고민 중인데 다들 뭐 사셨어요?</p>
+                  <p>{example.parentPost}</p>
                 </div>
               )}
-              <div className="detail-content">{report.excerpt}</div>
+              <div className={`detail-content ${isHidden ? "detail-content--hidden" : ""}`}>
+                {report.excerpt}
+              </div>
               {example.product && (
                 <div className="detail-product">
                   <span aria-hidden="true" />
@@ -233,7 +244,7 @@ export function ReportDetailScreen({
             </section>
           </div>
           <div className="detail-right">
-            {applied ? (
+            {result ? (
               <section className="detail-card detail-processing" aria-label="처리 결과">
                 <div className="detail-card-heading">
                   <h2>처리 결과</h2>
@@ -243,11 +254,12 @@ export function ReportDetailScreen({
                   <div>
                     <dt>조치</dt>
                     <dd>
-                      {applied.sanction
-                        ? SANCTION_LABELS[applied.sanction]
-                        : applied.status === "rejected"
-                          ? "조치 없음"
-                          : "신고 상태 변경"}
+                      {example.closed?.action ??
+                        (result.sanction
+                          ? SANCTION_LABELS[result.sanction]
+                          : result.status === "rejected"
+                            ? "조치 없음"
+                            : "신고 상태 변경")}
                     </dd>
                   </div>
                   <div>
@@ -256,17 +268,19 @@ export function ReportDetailScreen({
                   </div>
                   <div>
                     <dt>처리 일시</dt>
-                    <dd>2026.10.31 14:20</dd>
+                    <dd>{resultAt}</dd>
                   </div>
                   <div>
                     <dt>조치 사유</dt>
-                    <dd>{applied.reason}</dd>
+                    <dd>{result.reason}</dd>
                   </div>
                 </dl>
-                {isRestricted && (
+                {applied && (isRestricted || isSuspended) && (
                   <p className="detail-restriction">
                     <AdminIcon asset="detail-current-ban" size={16} />
-                    커뮤니티 이용 제한 중 · 2026.11.07 14:20 종료 예정
+                    {isSuspended
+                      ? "계정 이용 정지 중 · 제재 해제 전까지 유지"
+                      : "커뮤니티 이용 제한 중 · 2026.11.07 14:20 종료 예정"}
                   </p>
                 )}
                 <div className="detail-visibility-section">

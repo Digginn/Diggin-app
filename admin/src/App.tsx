@@ -137,11 +137,13 @@ function DesignIndex() {
           aria-labelledby={`detail-${content}-title`}
         >
           <h2 className="design-section-heading" id={`detail-${content}-title`}>
-            {example.report.title} 처리 흐름 · 상세 → 조치 입력 → 확인 모달 → 조치 완료
+            {example.closed
+              ? `${example.report.title} 상세 (처리 종료된 신고)`
+              : `${example.report.title} 처리 흐름 · 상세 → 조치 입력 → 확인 모달 → 조치 완료`}
           </h2>
           <nav
             className="design-index__screens"
-            aria-label={`${example.report.title} 처리 흐름 선택`}
+            aria-label={`${example.report.title} ${example.closed ? "종료된 신고 상세 선택" : "처리 흐름 선택"}`}
           >
             {DETAIL_DESIGN_STATES.filter((state) => state.content === content).map((state) => (
               <a key={state.path} href={`#/designs/${state.path}`}>
@@ -274,7 +276,9 @@ export function App() {
           onRefresh={async () => showToast("신고 목록을 새로고침했어요.")}
           onOpenReport={(id) => {
             const detail = DETAIL_DESIGN_STATES.find(
-              (state) => state.step === "detail" && DETAIL_EXAMPLES[state.content].report.id === id,
+              (state) =>
+                (state.step === "detail" || state.step === "closed") &&
+                DETAIL_EXAMPLES[state.content].report.id === id,
             );
             if (detail) {
               const reports =
@@ -283,7 +287,9 @@ export function App() {
                   : (reportDesign?.reports ?? PREVIEW_REPORTS);
               const status = reports.find((report) => report.id === id)?.status;
               const isComplete = status === "resolved" || status === "rejected";
-              navigate(`/designs/${detail.path}${isComplete ? "-complete" : ""}`);
+              navigate(
+                `/designs/${detail.path}${isComplete && detail.step !== "closed" ? "-complete" : ""}`,
+              );
             } else showToast(`콘텐츠 #${id}을 선택했어요.`);
           }}
         />
