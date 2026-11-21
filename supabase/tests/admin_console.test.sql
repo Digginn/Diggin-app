@@ -48,6 +48,18 @@ select is(public.admin_console('22400000-0000-0000-0000-000000000001','22400000-
 select is(public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','sanctions')->>'total','0','빈 제재 목록');
 reset role;
 select ok((select count(*)>0 from private.admin_console_access_logs),'개인정보 목록 조회 기록 저장');
+update auth.sessions set ip='203.0.113.24' where id='22400000-0000-0000-0001-000000000001';
+set local role service_role;
+select public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','members','','all','all',2);
+reset role;
+select is((select subject_ids from private.admin_console_access_logs where resource='members' order by id desc limit 1),'{}'::uuid[],'빈 페이지는 조회 대상 없음');
+set local role service_role;
+select public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','members','22400000-0000-0000-0000-000000000002');
+select public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','report_detail','','all','all',1,current_setting('test.admin224.report')::bigint);
+reset role;
+select is((select session_ip::text from private.admin_console_access_logs where resource='members' order by id desc limit 1),'203.0.113.24/32','검증한 Auth 세션의 로그인 IP 저장');
+select is((select subject_ids from private.admin_console_access_logs where resource='members' order by id desc limit 1),array['22400000-0000-0000-0000-000000000002'::uuid],'실제로 반환한 회원만 조회 기록에 저장');
+select ok((select subject_ids @> array['22400000-0000-0000-0000-000000000002'::uuid,'22400000-0000-0000-0000-000000000003'::uuid,'22400000-0000-0000-0000-000000000004'::uuid] from private.admin_access_logs order by id desc limit 1),'상세에서 반환한 작성자·신고자 기록');
 update private.admin_users set disabled_at=now() where id='22400000-0000-0000-0000-000000000001';
 set local role service_role;
 select throws_ok($$select public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','reports')$$,'42501','admin_required','비활성 운영자는 기존 세션으로도 조회 불가');

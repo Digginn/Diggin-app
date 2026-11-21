@@ -25,7 +25,7 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 - `resource: "sanctions"` → `{total,rows}`. query/page 지원. 제재·사유·기간·해제 여부와 관련 신고 ID를 반환한다. 보관 정책에 따라 삭제된 과거 제재는 집계하지 않는다.
 - `action: "report_group_status"`, `report_id`, `request_id`, `status`, `reason_category`, `reason` → `{action_id}`. 동일 콘텐츠의 미완료 신고를 하나의 트랜잭션으로 상태 변경한다. 접수는 reviewing으로만, 접수가 없는 검토 중 그룹은 resolved/rejected로 변경한다. 이미 완료된 신고는 보존한다. 서버 상태가 달라졌으면 409로 거부한다. 동일 UUID 재시도는 최초 결과를 반환하며 다른 본문은 거부한다. underage는 사용할 수 없다.
 
-조회 RPC `admin_console`과 일괄 상태 RPC `admin_report_group_status`는 기존 패턴대로 public invoker → private definer이며 service_role만 실행한다. 회원·제재·신고 목록 조회는 `private.admin_console_access_logs`에 운영자·화면·시각을 기록하고 기존 정리 작업이 1년 후 삭제한다. 검색어·비밀번호·토큰은 기록하지 않는다. 기존 상세 조회 로그는 유지한다.
+조회 RPC `admin_console`과 일괄 상태 RPC `admin_report_group_status`는 기존 패턴대로 public invoker → private definer이며 service_role만 실행한다. 회원·제재·신고 목록 조회는 `private.admin_console_access_logs`에 운영자·화면·시각·실제 반환한 회원 UUID를 기록하고 기존 정리 작업이 1년 후 삭제한다. 상세 조회도 반환한 작성자·신고자 UUID를 기록한다. 두 로그의 `session_ip`는 검증한 Auth 세션의 로그인 당시 IP이며 현재 요청 IP와 다르다. 검색어·비밀번호·토큰은 기록하지 않는다. 요청 IP의 신뢰 가능한 수집 및 최종 접속기록 기준 확정은 남아 있다.
 
 웹 설정·전환 절차와 Retool 보조 기능의 남은 이전 범위는 [admin/README.md](../admin/README.md)를 따른다.
 

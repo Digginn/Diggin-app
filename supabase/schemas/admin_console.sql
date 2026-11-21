@@ -3,6 +3,8 @@ create table private.admin_console_access_logs (
   id bigint generated always as identity primary key,
   admin_id uuid not null references private.admin_users(id),
   resource text not null check (resource in ('reports','members','sanctions')),
+  session_ip inet,
+  subject_ids uuid[] not null default '{}',
   created_at timestamptz not null default now()
 );
 create index admin_console_access_logs_admin_idx on private.admin_console_access_logs(admin_id);
@@ -15,7 +17,7 @@ create or replace function private.admin_console(actor uuid, actor_session uuid,
   search_query text default '', status_filter text default 'all', type_filter text default 'all',
   page_number integer default 1, report_id bigint default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare result jsonb; detail jsonb; selected_report private.reports%rowtype;
+declare result jsonb; detail jsonb; selected_report private.reports%rowtype; viewed_subjects uuid[];
 begin
   perform private.assert_moderator(actor,actor_session);
   if resource is null or resource not in ('session','reports','report_detail','members','sanctions') or
@@ -38,7 +40,6 @@ begin
       'report_count',(select count(*) from private.reports r where r.target_type=selected_report.target_type
         and (r.post_id=selected_report.post_id or r.comment_id=selected_report.comment_id)));
   end if;
-  insert into private.admin_console_access_logs(admin_id,resource) values(actor,resource);
   if resource='reports' then
     with grouped as (
       select r.target_type,coalesce(r.post_id,r.comment_id) as target_id,max(r.id) as latest_id,
@@ -89,6 +90,13 @@ begin
     select jsonb_build_object('total',(select count(*) from filtered),'rows',coalesce((select jsonb_agg(to_jsonb(p) ||
       jsonb_build_object('id',p.id::text,'action_id',p.action_id::text,'report_id',p.report_id::text) order by p.id desc) from page p),'[]'::jsonb)) into result;
   end if;
+  select coalesce(array_agg(distinct subject_id) filter(where subject_id is not null),'{}'::uuid[])
+    into viewed_subjects from (
+      select (row->>case resource when 'members' then 'id' when 'reports' then 'author_id' else 'user_id' end)::uuid as subject_id
+      from jsonb_array_elements(result->'rows') row
+    ) subjects;
+  insert into private.admin_console_access_logs(admin_id,resource,session_ip,subject_ids)
+    values(actor,resource,(select s.ip from auth.sessions s where s.id=actor_session and s.user_id=actor),viewed_subjects);
   return result;
 end;
 $$;

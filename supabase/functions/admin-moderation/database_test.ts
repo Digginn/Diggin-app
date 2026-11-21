@@ -30,7 +30,7 @@ Deno.test({
       const clients: Session[] = [];
       for (let index = 0; index < 2; index++) {
         const email = `${crypto.randomUUID()}@admin224.test`;
-        const password = crypto.randomUUID();
+        const password = `LocalTest!1-${crypto.randomUUID()}`;
         const created = await service.auth.admin.createUser({
           email,
           password,

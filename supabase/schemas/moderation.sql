@@ -57,6 +57,8 @@ create table private.admin_access_logs (
   id bigint generated always as identity primary key,
   admin_id uuid not null references private.admin_users(id),
   report_id bigint not null,
+  session_ip inet,
+  subject_ids uuid[] not null default '{}',
   created_at timestamptz not null default now()
 );
 create index admin_access_logs_admin_idx on private.admin_access_logs(admin_id);
@@ -163,7 +165,13 @@ begin
     left join private.comments c on c.id=r.comment_id
     left join private.posts p on p.id=coalesce(r.post_id,c.post_id)
     left join public.profiles profile on profile.id=r.reported_user_id;
-  insert into private.admin_access_logs(admin_id, report_id) values (actor, report);
+  insert into private.admin_access_logs(admin_id,report_id,session_ip,subject_ids)
+    values(actor,report,(select s.ip from auth.sessions s where s.id=actor_session and s.user_id=actor),
+      (select coalesce(array_agg(distinct subject_id) filter(where subject_id is not null),'{}'::uuid[])
+        from (
+          select r.reported_user_id as subject_id
+          union all select (item->>'reporter_id')::uuid from jsonb_array_elements(result->'related_reports') item
+        ) subjects));
   return result;
 end;
 $$;
