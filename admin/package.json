@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "review": "node scripts/review.mjs",
+    "test:review": "playwright test --config playwright.review.config.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",

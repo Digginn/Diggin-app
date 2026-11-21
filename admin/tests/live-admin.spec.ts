@@ -142,6 +142,39 @@ test("일반 계정은 권한 오류를 표시하고 관리자 데이터를 표�
   await expect(page.locator(".report-row")).toHaveCount(0);
 });
 
+test("관리자 확인 API가 미배포된 경우 입력 오류 대신 배포 대기 안내를 표시한다", async ({
+  page,
+}) => {
+  await signedIn(page);
+  let isDeployed = false;
+  await setup(page, async (body, route) => {
+    if (body.resource !== "session" || isDeployed) return false;
+    await reply(route, { error: "invalid_request" }, 400);
+    return true;
+  });
+  await page.goto("/#/reports");
+  await expect(page.getByRole("alert")).toContainText(
+    "관리자 서비스 배포가 아직 완료되지 않았습니다",
+  );
+  await expect(page.getByRole("alert")).not.toContainText("입력값");
+  await expect(page.locator(".report-row")).toHaveCount(0);
+  isDeployed = true;
+  await page.getByRole("button", { name: "다시 확인" }).click();
+  await expect(page.getByText(group.content)).toBeVisible();
+});
+
+test("목록의 실제 잘못된 요청은 배포 오류로 바꾸지 않는다", async ({ page }) => {
+  await signedIn(page);
+  await setup(page, async (body, route) => {
+    if (body.resource !== "reports") return false;
+    await reply(route, { error: "invalid_request" }, 400);
+    return true;
+  });
+  await page.goto("/#/reports");
+  await expect(page.getByRole("alert")).toContainText("입력값이나 현재 상태를 확인해 주세요.");
+  await expect(page.getByRole("alert")).not.toContainText("배포");
+});
+
 test("목록 검색·유형·페이지를 서버로 전달하고 조회 실패 뒤 재시도한다", async ({ page }) => {
   await signedIn(page);
   const requests: Body[] = [];

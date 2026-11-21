@@ -140,8 +140,12 @@ export function LiveApp({ route }: { route: string }) {
       <div
         className={`admin-environment ${adminEnvironment === "production" ? "admin-environment--production" : ""}`}
       >
-        {adminEnvironment === "production" ? "운영" : "개발·테스트"} 환경 ·{" "}
-        {new URL(import.meta.env.VITE_SUPABASE_URL).hostname}
+        {adminEnvironment === "review"
+          ? "로컬 검증 · 예시 데이터"
+          : adminEnvironment === "production"
+            ? "운영 환경"
+            : "개발·테스트 환경"}{" "}
+        · {new URL(import.meta.env.VITE_SUPABASE_URL).hostname}
       </div>
       <ProtectedPages key={identity.id} route={route} identity={identity} onLogout={logout} />
     </>

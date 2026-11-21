@@ -19,7 +19,8 @@ export const supabase =
   isValidUrl &&
   url &&
   key?.startsWith("sb_publishable_") &&
-  ["development", "production"].includes(adminEnvironment)
+  ["development", "production", "review"].includes(adminEnvironment) &&
+  (adminEnvironment !== "review" || url === "http://127.0.0.1:55421")
     ? createClient(url, key, {
         auth: {
           storageKey: `diggin-admin-auth-${new URL(url).hostname}`,
@@ -47,7 +48,11 @@ export async function adminRequest<T>(
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session) throw new AdminApiError("not_authenticated", 401);
   const session = data.session;
-  const response = await fetch(`${url}/functions/v1/admin-moderation`, {
+  const apiUrl =
+    adminEnvironment === "review"
+      ? "http://127.0.0.1:55425"
+      : `${url}/functions/v1/admin-moderation`;
+  const response = await fetch(apiUrl, {
     method: "POST",
     signal,
     headers: {
@@ -63,6 +68,15 @@ export async function adminRequest<T>(
       result && typeof result === "object" && "error" in result && typeof result.error === "string"
         ? result.error
         : "request_failed";
+    // 구버전 Edge는 유효한 새 세션 확인 요청도 알 수 없는 action으로 거부한다.
+    if (
+      body.action === "console" &&
+      body.resource === "session" &&
+      response.status === 400 &&
+      code === "invalid_request"
+    ) {
+      throw new AdminApiError("admin_api_not_deployed", response.status);
+    }
     if (response.status === 401 || response.status === 403) {
       window.dispatchEvent(
         new CustomEvent("admin-access-lost", {
@@ -77,6 +91,8 @@ export async function adminRequest<T>(
 
 export function errorMessage(error: unknown): string {
   if (error instanceof AdminApiError) {
+    if (error.code === "admin_api_not_deployed")
+      return "관리자 서비스 배포가 아직 완료되지 않았습니다. 배포 완료 후 다시 확인해 주세요.";
     if (error.status === 401) return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
     if (error.status === 403) return "관리자 권한이 없습니다. 서비스 관리자에게 문의해 주세요.";
     if (error.code.includes("conflict") || error.code === "invalid_report_transition")
