@@ -1,15 +1,16 @@
 import { clsx } from "clsx";
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import SendSvg from "@/assets/images/icon-send.svg";
+import { COMMENT_MAX_LENGTH } from "@/constants/comments";
 import { colors, typography } from "@/theme";
 import { normalizeText, textLength } from "@/utils/text";
 
 const SEND_ICON_SIZE = 26.667;
 // 3줄까지 늘고 그 뒤로는 입력창 안에서 스크롤함
 const MAX_INPUT_HEIGHT = 94;
-export const COMMENT_MAX_LENGTH = 30;
+export { COMMENT_MAX_LENGTH };
 
 type CommentInputProps = {
   value: string;
@@ -27,7 +28,7 @@ export const CommentInput = forwardRef<TextInput, CommentInputProps>(function Co
     value,
     onChangeText,
     onSend,
-    placeholder = "댓글을 입력해 주세요. (최대 30자)",
+    placeholder = `댓글을 입력해 주세요. (최대 ${COMMENT_MAX_LENGTH}자)`,
     errorMessage,
     isDisabled = false,
     bottomInset = 40,
@@ -35,8 +36,11 @@ export const CommentInput = forwardRef<TextInput, CommentInputProps>(function Co
   },
   ref,
 ) {
+  const [isFocused, setIsFocused] = useState(false);
   const validationError =
-    textLength(value) > COMMENT_MAX_LENGTH ? "댓글은 30자 이하로 입력해 주세요." : errorMessage;
+    textLength(value) > COMMENT_MAX_LENGTH
+      ? `댓글은 ${COMMENT_MAX_LENGTH}자 이하로 입력해 주세요.`
+      : errorMessage;
   const canSend = value.trim().length > 0 && !validationError && !isDisabled;
 
   return (
@@ -56,7 +60,11 @@ export const CommentInput = forwardRef<TextInput, CommentInputProps>(function Co
       <View
         className={clsx(
           "min-h-12 w-full flex-row items-center justify-between rounded border-field bg-gray-0 pl-4 pr-1",
-          validationError ? "border-semantic-error" : value ? "border-gray-600" : "border-gray-300",
+          validationError
+            ? "border-semantic-error"
+            : isFocused || value
+              ? "border-gray-600"
+              : "border-gray-300",
         )}
       >
         <TextInput
@@ -64,6 +72,7 @@ export const CommentInput = forwardRef<TextInput, CommentInputProps>(function Co
           accessibilityLabel="댓글 입력"
           editable={!isDisabled}
           multiline
+          scrollEnabled
           className="min-w-0 flex-1 self-stretch py-[13px] text-gray-900 font-label-16-medium-input"
           placeholder={placeholder}
           placeholderTextColor={colors.gray[400]}
@@ -72,6 +81,8 @@ export const CommentInput = forwardRef<TextInput, CommentInputProps>(function Co
             lineHeight: typography["label-16-medium"].size * 1.4,
           }}
           value={value}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           onChangeText={(text) => onChangeText(normalizeText(text))}
         />
         <Pressable

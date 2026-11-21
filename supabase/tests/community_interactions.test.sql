@@ -24,7 +24,7 @@ set local request.jwt.claims = '{"sub":"97000000-0000-0000-0000-000000000002","r
 select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,'',gen_random_uuid())$$,'22023','invalid_comment_content','빈 댓글 거부');
 select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,E' \n\t',gen_random_uuid())$$,'22023','invalid_comment_content','공백 댓글 거부');
 select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,U&'\00A0\3000',gen_random_uuid())$$,'22023','invalid_comment_content','Unicode 공백 댓글 거부');
-select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('가',31),gen_random_uuid())$$,'22023','invalid_comment_content','31자 거부');
+select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('가',151),gen_random_uuid())$$,'22023','invalid_comment_content','151자 거부');
 select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,null,gen_random_uuid())$$,'22023','invalid_comment_content','null 본문 거부');
 select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,'댓글',null)$$,'22023','invalid_request_id','재시도 키 필요');
 select set_config('test.comment',public.create_comment(current_setting('test.post')::bigint,'첫 댓글','97000000-0000-0000-0000-000000000011')->>'id',true);
@@ -36,13 +36,17 @@ select is(jsonb_array_length(public.get_community_comments(current_setting('test
 select is(public.create_comment(current_setting('test.post')::bigint,'두 번째 댓글',gen_random_uuid())->>'anon_number','1','같은 글에서 같은 번호');
 select is(public.create_comment(current_setting('test.second')::bigint,'다른 글 댓글',gen_random_uuid())->>'anon_number','1','다른 글 번호는 새로 할당');
 select throws_ok($$select public.create_comment(current_setting('test.second')::bigint,'다른 글 댓글','97000000-0000-0000-0000-000000000011')$$,'22023','invalid_request_id','키를 다른 게시글에서 재사용하지 못함');
-select lives_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('👍🏽',30),gen_random_uuid())$$,'피부색 이모지 30자 허용');
+select lives_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('👍🏽',150),gen_random_uuid())$$,'피부색 이모지 150자 허용');
+select lives_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('가',150),gen_random_uuid())$$,'한글 150자 허용');
+select lives_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('👩‍👩‍👧‍👦',150),gen_random_uuid())$$,'가족 이모지 150자 허용');
+select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('👍🏽',151),gen_random_uuid())$$,'22023','invalid_comment_content','피부색 이모지 151자 거부');
 select is(public.create_comment(current_setting('test.post')::bigint,U&'e\0301',gen_random_uuid())->>'content','é','NFC 정규화');
 select is(public.create_comment(current_setting('test.post')::bigint,E'첫줄\r\n\r\n끝줄',gen_random_uuid())->>'content',E'첫줄\n\n끝줄','CRLF를 줄바꿈 1자로 정규화하고 연속 줄바꿈 유지');
-select lives_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('가',29)||E'\r\n',gen_random_uuid())$$,'29자+CRLF는 30자');
+select lives_ok($$select public.create_comment(current_setting('test.post')::bigint,repeat('가',149)||E'\r\n',gen_random_uuid())$$,'149자+CRLF는 150자');
+select is(public.update_comment(current_setting('test.comment')::bigint,repeat(U&'e\0301',150))->>'content',repeat('é',150),'수정도 정규화 후 150자 허용');
 select is(public.update_comment(current_setting('test.comment')::bigint,'수정한 댓글')->>'content','수정한 댓글','내 댓글 수정');
 select lives_ok($$select public.update_comment(current_setting('test.comment')::bigint,'수정한 댓글')$$,'동일 본문 저장도 허용');
-select throws_ok($$select public.update_comment(current_setting('test.comment')::bigint,repeat('가',31))$$,'22023','invalid_comment_content','수정도 길이 검증');
+select throws_ok($$select public.update_comment(current_setting('test.comment')::bigint,repeat('가',151))$$,'22023','invalid_comment_content','수정도 151자 거부');
 select is(public.set_community_like(current_setting('test.post')::bigint,true)->>'like_count','1','좋아요 등록');
 select is(public.set_community_like(current_setting('test.post')::bigint,true)->>'like_count','1','등록 재시도는 1개 유지');
 select is(public.get_community_post(current_setting('test.post')::bigint)->>'is_liked','true','상세 본인 좋아요 상태 반영');
@@ -107,5 +111,7 @@ select throws_ok($$select public.create_comment(current_setting('test.post')::bi
 select throws_ok($$select public.update_comment(current_setting('test.author_comment')::bigint,'삭제 글 수정')$$,'42501','post_not_found','삭제 글의 댓글 수정 불가');
 select throws_ok($$select public.set_community_like(current_setting('test.post')::bigint,true)$$,'42501','post_not_found','삭제 글 좋아요 불가');
 select throws_ok($$select public.create_comment(999999999,'없는 글 댓글',gen_random_uuid())$$,'42501','post_not_found','없는 글 등록 불가');
+reset role;
+select throws_ok($$insert into private.comments(post_id,content) values(current_setting('test.post')::bigint,repeat('가',151))$$,'23514',null,'테이블 제약도 151자 저장 차단');
 select * from finish();
 rollback;

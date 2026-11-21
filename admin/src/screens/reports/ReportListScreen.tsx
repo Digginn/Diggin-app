@@ -1,0 +1,281 @@
+import { useCallback, useRef, useState } from "react";
+
+import { AdminBtn } from "../../components/AdminBtn";
+import { AdminIcon } from "../../components/AdminIcon";
+import { AdminSidebar } from "../../components/AdminSidebar";
+import { AdminToast } from "../../components/AdminToast";
+import { REPORT_STATUS, REPORT_STATUSES } from "../../components/Badges";
+import { FilterTab, type ReportFilter } from "../../components/FilterTab";
+import { Pagination, QueryState } from "../../components/QueryState";
+import { ReportRow, type ReportRowData } from "../../components/ReportRow";
+
+import { ContentTypeSelect, type ContentTypeFilter } from "./components/ContentTypeSelect";
+
+const STATUS_DESCRIPTIONS = {
+  received: "아직 확인하지 않은 신고",
+  reviewing: "담당자가 확인하고 있는 신고",
+  resolved: "조치를 마친 신고",
+  rejected: "위반이 아닌 것으로 판단한 신고",
+};
+
+export function ReportListScreen({
+  reports,
+  email,
+  className = "",
+  initialProfileOpen = false,
+  initialLogoutOpen = false,
+  initialSelected = "all",
+  initialTypeFilter = "all",
+  initialQuery = "",
+  initialTypeOpen = false,
+  initialRefreshToast = false,
+  reportsHref,
+  onLogout,
+  onRefresh,
+  onOpenReport,
+  remote,
+}: {
+  reports: ReportRowData[];
+  email: string;
+  className?: string;
+  initialProfileOpen?: boolean;
+  initialLogoutOpen?: boolean;
+  initialSelected?: ReportFilter;
+  initialTypeFilter?: ContentTypeFilter;
+  initialQuery?: string;
+  initialTypeOpen?: boolean;
+  initialRefreshToast?: boolean;
+  reportsHref?: string;
+  onLogout: () => Promise<void>;
+  onRefresh: () => Promise<void>;
+  onOpenReport: (id: string) => void;
+  remote?: {
+    counts: Record<ReportFilter, number>;
+    total: number;
+    page: number;
+    status: ReportFilter;
+    type: ContentTypeFilter;
+    query: string;
+    isLoading: boolean;
+    error?: unknown;
+    onFilter: (filter: { status?: ReportFilter; type?: ContentTypeFilter; query?: string }) => void;
+    onPage: (page: number) => void;
+    onRetry: () => void;
+  };
+}) {
+  const [localSelected, setSelected] = useState<ReportFilter>(initialSelected);
+  const [localQuery, setQuery] = useState(initialQuery);
+  const [localType, setTypeFilter] = useState<ContentTypeFilter>(initialTypeFilter);
+  const selected = remote?.status ?? localSelected;
+  const query = remote?.query ?? localQuery;
+  const typeFilter = remote?.type ?? localType;
+  const changeQuery = (value: string) =>
+    remote ? remote.onFilter({ query: value }) : setQuery(value);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
+  const refreshLock = useRef(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState({ id: 0, isVisible: initialRefreshToast });
+  const dismissToast = useCallback(() => setToast((t) => ({ ...t, isVisible: false })), []);
+
+  const counts = remote?.counts ?? countReports(reports);
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const candidates = reports.filter(
+    (report) =>
+      (typeFilter === "all" || report.type === typeFilter) &&
+      (!normalizedQuery ||
+        `${report.title} ${report.excerpt} ${report.author} ${report.authorId}`
+          .toLocaleLowerCase()
+          .includes(normalizedQuery)),
+  );
+  const filtered = remote
+    ? reports
+    : candidates.filter((report) => selected === "all" || report.status === selected);
+
+  async function refresh() {
+    if (refreshLock.current) return;
+    refreshLock.current = true;
+    setIsRefreshing(true);
+    setRefreshError("");
+    try {
+      await onRefresh();
+      setToast((t) => ({ id: t.id + 1, isVisible: true }));
+    } catch {
+      setRefreshError("신고 목록을 불러오지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      refreshLock.current = false;
+      setIsRefreshing(false);
+    }
+  }
+
+  return (
+    <div className={`report-screen ${className}`}>
+      <AdminSidebar
+        email={email}
+        count={counts.received + counts.reviewing}
+        reportsHref={reportsHref}
+        initialProfileOpen={initialProfileOpen}
+        initialLogoutOpen={initialLogoutOpen}
+        onLogout={onLogout}
+      />
+      <main className="report-main">
+        <header className="report-page-header">
+          <div>
+            <p className="report-breadcrumb">커뮤니티 운영 / 신고 관리</p>
+            <h1>신고 목록</h1>
+            <p className="report-page-description">
+              신고된 게시글·댓글을 콘텐츠별로 모아 확인하고 처리합니다.
+            </p>
+          </div>
+          <AdminBtn
+            variant="outline"
+            icon="refresh"
+            disabled={isRefreshing || remote?.isLoading}
+            onClick={remote ? remote.onRetry : refresh}
+          >
+            {isRefreshing || remote?.isLoading ? "새로고침 중…" : "새로고침"}
+          </AdminBtn>
+        </header>
+        <section className="report-summary" aria-label="신고 현황">
+          {REPORT_STATUSES.map((status) => (
+            <div className="report-stat" key={status}>
+              <div className="report-stat__label">
+                <AdminIcon asset={`summary-${status}`} size={8} />
+                <span>{REPORT_STATUS[status]}</span>
+              </div>
+              <p className="report-stat__value">
+                <strong>{counts[status]}</strong>
+                <span>건</span>
+              </p>
+              <p className="report-stat__description">{STATUS_DESCRIPTIONS[status]}</p>
+            </div>
+          ))}
+        </section>
+        {refreshError && (
+          <p className="login-error" role="alert">
+            {refreshError}
+          </p>
+        )}
+        <div className="report-table-scroll" role="region" aria-label="신고 목록 표" tabIndex={0}>
+          <section className="report-table">
+            <div className="report-toolbar">
+              <FilterTab
+                selected={selected}
+                onChange={(status) => (remote ? remote.onFilter({ status }) : setSelected(status))}
+                counts={counts}
+              />
+              <div className="report-search-controls">
+                <div className={`report-search ${query ? "report-search--filled" : ""}`}>
+                  {query ? (
+                    <AdminIcon name="search" size={18} />
+                  ) : (
+                    <AdminIcon asset="search-field" size={18} />
+                  )}
+                  <input
+                    ref={searchRef}
+                    aria-label="신고 검색"
+                    type="search"
+                    placeholder="콘텐츠 ID, 내용, 작성자 검색"
+                    value={query}
+                    maxLength={100}
+                    onChange={(event) => changeQuery(event.target.value)}
+                  />
+                  {query && (
+                    <button
+                      className="report-search__clear"
+                      type="button"
+                      aria-label="검색어 지우기"
+                      onClick={() => {
+                        changeQuery("");
+                        searchRef.current?.focus();
+                      }}
+                    >
+                      <AdminIcon asset="search-clear" size={12} />
+                    </button>
+                  )}
+                </div>
+                <ContentTypeSelect
+                  value={typeFilter}
+                  onChange={(type) => (remote ? remote.onFilter({ type }) : setTypeFilter(type))}
+                  initialOpen={initialTypeOpen}
+                />
+              </div>
+            </div>
+            <div className="report-table__head" aria-hidden="true">
+              <span>콘텐츠</span>
+              <span>작성자</span>
+              <span>신고 수</span>
+              <span>신고 사유</span>
+              <span>최근 신고</span>
+              <span>상태</span>
+              <span />
+            </div>
+            <div className="report-table__body">
+              {remote && (
+                <QueryState
+                  isLoading={remote.isLoading}
+                  error={remote.error}
+                  onRetry={remote.onRetry}
+                />
+              )}
+              {filtered.map((report) => (
+                <ReportRow
+                  key={`${report.type}-${report.id}`}
+                  report={report}
+                  onOpen={onOpenReport}
+                />
+              ))}
+            </div>
+            {filtered.length === 0 && !remote?.isLoading && !remote?.error && (
+              <p className="report-table__empty" role="status">
+                조건에 맞는 신고가 없습니다.
+              </p>
+            )}
+            {remote ? (
+              <Pagination
+                page={remote.page}
+                total={remote.total}
+                isLoading={remote.isLoading}
+                onChange={remote.onPage}
+              />
+            ) : (
+              <footer className="report-table__footer">
+                <p aria-live="polite">{filtered.length}건 표시 중</p>
+                <nav className="report-pagination" aria-label="신고 목록 페이지">
+                  <button type="button" aria-label="이전 페이지" disabled>
+                    <AdminIcon asset="pagination-left" size={16} />
+                  </button>
+                  <button type="button" aria-label="1페이지" aria-current="page">
+                    1
+                  </button>
+                  <button type="button" aria-label="다음 페이지" disabled>
+                    <AdminIcon asset="pagination-right" size={16} />
+                  </button>
+                </nav>
+              </footer>
+            )}
+          </section>
+        </div>
+      </main>
+      <div className="admin-toast-position">
+        <AdminToast
+          key={toast.id}
+          message="목록을 새로고침했어요."
+          variant="refresh"
+          isVisible={toast.isVisible}
+          onDismiss={dismissToast}
+        />
+      </div>
+    </div>
+  );
+}
+
+function countReports(reports: ReportRowData[]): Record<ReportFilter, number> {
+  return reports.reduce(
+    (counts, report) => {
+      counts[report.status] += 1;
+      return counts;
+    },
+    { all: reports.length, received: 0, reviewing: 0, resolved: 0, rejected: 0 },
+  );
+}

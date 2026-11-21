@@ -9,6 +9,47 @@ const actor = {
 };
 const requestId = "11400000-0000-0000-0002-000000000001";
 const userId = "11400000-0000-0000-0000-000000000002";
+
+Deno.test("관리자 웹 조회·그룹 상태 변경은 검증한 actor/session과 필터를 전달", async () => {
+  const calls: string[] = [];
+  const handler = createAdminHandler({
+    authenticate: () => Promise.resolve(actor),
+    updateAuth: () => Promise.resolve(),
+    rpc: (name, args) => {
+      assert(args.actor === actor.userId && args.actor_session === actor.sessionId);
+      calls.push(name);
+      if (name === "admin_console") {
+        assert(
+          args.page_number === 2 && args.search_query === "검색" && args.type_filter === "comment",
+        );
+      }
+      return Promise.resolve({});
+    },
+  });
+  assert(
+    (await handler(
+      request({ action: "console", resource: "reports", page: 2, query: "검색", type: "comment" }),
+    )).status === 200,
+  );
+  assert(
+    (await handler(
+      request({
+        action: "report_group_status",
+        report_id: "9223372036854775807",
+        request_id: requestId,
+        status: "reviewing",
+        reason_category: "other",
+        reason: "확인",
+      }),
+    )).status === 200,
+  );
+  for (const page of [0, -1, 1.5, "2", 100001]) {
+    assert(
+      (await handler(request({ action: "console", resource: "members", page }))).status === 400,
+    );
+  }
+  assert(calls.join(",") === "admin_console,admin_report_group_status");
+});
 const body = {
   action: "sanction",
   request_id: requestId,
@@ -188,4 +229,33 @@ Deno.test("보관 유지 표시는 대상과 true/false만 받아 인증한 운�
     request({ action: "retention_hold", target_type: "sanction", target_id: "7", held: "yes" }),
   );
   assert(bad.status === 400 && calls.length === 1);
+});
+
+Deno.test("이용 기록 분석 동의 철회는 검증한 운영자와 이메일만 넘기고 중복 이메일은 409", async () => {
+  const calls: [string, Record<string, unknown>][] = [];
+  const handler = createAdminHandler({
+    authenticate: () => Promise.resolve(actor),
+    rpc: (name, args) => {
+      calls.push([name, args]);
+      return args.target_email === "same@test.invalid"
+        ? Promise.reject(new Error("user_email_conflict"))
+        : Promise.resolve({ user_id: userId, usage_analysis: false, overseas_transfer: false });
+    },
+    updateAuth: () => Promise.reject(new Error("should_not_run")),
+  });
+  const ok = await handler(
+    request({ action: "withdraw_analytics_consent", email: " user@test.invalid " }),
+  );
+  assert(ok.status === 200);
+  assert(
+    JSON.stringify(calls[0]) === JSON.stringify([
+      "admin_withdraw_analytics_consent",
+      { target_email: "user@test.invalid", actor: actor.userId, actor_session: actor.sessionId },
+    ]),
+  );
+  const conflict = await handler(
+    request({ action: "withdraw_analytics_consent", email: "same@test.invalid" }),
+  );
+  assert(conflict.status === 409);
+  assert((await handler(request({ action: "withdraw_analytics_consent" }))).status === 400);
 });

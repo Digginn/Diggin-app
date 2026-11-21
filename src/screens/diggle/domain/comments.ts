@@ -7,8 +7,18 @@ export function mergeComments(
 ) {
   const merged = new Map(rows.map((row) => [row.id, row]));
   for (const [id, row] of Object.entries(changes)) {
-    if (row) merged.set(id, row);
-    else merged.delete(id);
+    if (row) {
+      const fetched = merged.get(id);
+      // 작성·수정 직후의 본문은 유지하되 재조회한 관리자·투표 라벨을 반영한다.
+      merged.set(
+        id,
+        fetched?.isWithdrawn
+          ? fetched
+          : fetched
+            ? { ...row, isOperator: fetched.isOperator, voteChoice: fetched.voteChoice }
+            : row,
+      );
+    } else merged.delete(id);
   }
   return [...merged.values()].sort((a, b) => {
     if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;

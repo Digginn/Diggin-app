@@ -6,10 +6,13 @@
     "production": {
       "distribution": "store",
       "environment": "production",
+      "channel": "production",
       "autoIncrement": true
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       }

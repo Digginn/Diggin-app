@@ -70,16 +70,23 @@ export function LoadingDialog({ visible, message, onDismiss }: LoadingDialogProp
       statusBarTranslucent
       onDismiss={onDismiss}
     >
-      <View className="flex-1 items-center justify-center">
-        <View className="absolute inset-0 bg-black/[0.36]" />
-        <View
-          accessibilityLiveRegion="polite"
-          className="w-60 items-center justify-center gap-4 rounded-lg bg-gray-0 px-6 py-7"
-        >
-          <Spinner />
-          <Text className="w-full text-center text-gray-700 font-b3">{message}</Text>
-        </View>
-      </View>
+      <LoadingOverlay message={message} />
     </Modal>
+  );
+}
+
+/** 로딩 창 그림. 이미 떠 있는 모달 위에는 iOS가 새 모달을 막을 수 있어 모달 대신 이것을 겹쳐 그린다. */
+export function LoadingOverlay({ message }: { message: string }) {
+  return (
+    <View className="absolute inset-0 items-center justify-center">
+      <View className="absolute inset-0 bg-black/[0.36]" />
+      <View
+        accessibilityLiveRegion="polite"
+        className="w-60 items-center justify-center gap-4 rounded-lg bg-gray-0 px-6 py-7"
+      >
+        <Spinner />
+        <Text className="w-full text-center text-gray-700 font-b3">{message}</Text>
+      </View>
+    </View>
   );
 }

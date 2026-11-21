@@ -12,7 +12,7 @@ const analyticsEvents = [];
 const analytics = {
   trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
   flushAnalytics: async () => {},
-  setAnalyticsUser() {},
+  syncAnalyticsConsent: async () => {},
 };
 
 function load(relativePath, overrides = {}) {

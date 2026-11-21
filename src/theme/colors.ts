@@ -15,6 +15,7 @@ export const colors = {
     1000: "#000000",
     "placeholder": "#B3B3B3",
     "skeleton": "#EEEEEE",
+    "vote-not": "#EDEDED",
     "reason-background": "#FAFAFA",
     "reason-border": "#E0E0E0",
     "menu-text": "#44403C",

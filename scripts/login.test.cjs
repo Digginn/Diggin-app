@@ -7,11 +7,12 @@ const { runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
+const loginConsents = [];
 const analyticsEvents = [];
 const analytics = {
   trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
   flushAnalytics: async () => {},
-  setAnalyticsUser() {},
+  syncAnalyticsConsent: async () => {},
 };
 
 function loadLoginIntent() {
@@ -38,7 +39,28 @@ function load(relativePath, mocks = {}) {
     exports: componentModule.exports,
     module: componentModule,
     require: (name) => {
+      // 로그인 화면이 새로 쓰는 훅은 기존 mock에 기본값을 채운다.
+      if (name === "react" && mocks.react)
+        return { useCallback: (callback) => callback, ...mocks.react };
+      if (name === "expo-router" && mocks["expo-router"])
+        return { useFocusEffect: () => {}, ...mocks["expo-router"] };
       if (name in mocks) return mocks[name];
+      if (name === "./components/TermsConsentSheet")
+        return {
+          TermsConsentSheet: "TermsConsentSheet",
+          EMPTY_TERMS_CONSENT: {
+            age: false,
+            terms: false,
+            privacy: false,
+            usageAnalysis: false,
+            overseasTransfer: false,
+          },
+        };
+      if (name === "./api/loginConsent")
+        return {
+          saveLoginAnalyticsConsent: async (isNewUser, consent) =>
+            loginConsents.push([isNewUser, consent]),
+        };
       if (name === "@/lib/analytics") return analytics;
       if (name === "@/lib/googleSignIn") return load("lib/googleSignIn.ts", mocks);
       if (name === "@/api/accountAccess")
@@ -96,15 +118,23 @@ function stateHooks() {
   };
 }
 
-function pressSocialAfterConsent(hooks, screen) {
+const ALL_AGREED = {
+  age: true,
+  terms: true,
+  privacy: true,
+  usageAnalysis: true,
+  overseasTransfer: true,
+};
+
+/** 소셜 버튼 → 이용약관 동의 시트 체크 → 확인. iOS는 시트가 닫힌 뒤(onDismiss) 로그인을 시작한다. */
+async function pressSocialAfterConsent(hooks, screen, consent = ALL_AGREED, index = 0) {
   hooks
     .render(screen)
-    .find((node) => node.props.accessibilityRole === "checkbox")
-    .props.onPress();
-  return hooks
-    .render(screen)
-    .find((node) => node.type === "SocialLoginButton")
-    .props.onPress();
+    .filter((node) => node.type === "SocialLoginButton")
+    [index].props.onPress();
+  const sheet = () => hooks.render(screen).find((node) => node.type === "TermsConsentSheet");
+  sheet().props.onChange(consent);
+  await sheet().props.onConfirm();
 }
 
 test("소셜 버튼이 공통 Button과 지정 로고·색상·콜백을 사용한다", () => {
@@ -261,51 +291,53 @@ for (const os of ["ios", "android"]) {
     assert.equal(scroll.props.contentContainerStyle.paddingBottom, 36);
     const providers = tree.filter((node) => node.type === "SocialLoginButton");
     assert.equal(providers.map((node) => node.props.provider).join(","), expectedProviders);
-    const checkbox = tree.find((node) => node.props.accessibilityRole === "checkbox");
-    assert.equal(checkbox.props.accessibilityState.checked, false);
-    for (const button of providers) await button.props.onPress();
-    assert.equal(signIns.length, 0, "만 14세 확인 전에는 SDK 인증을 시작하지 않는다");
-    const notice = hooks.render(LoginScreen).find((node) => node.type === "ActionModal");
-    assert.equal(notice.props.visible, true, "체크 전에 누르면 약관 동의 안내를 띄운다");
-    assert.equal(notice.props.title, "약관 동의가 필요합니다.");
-    assert.equal(notice.props.description, "필수 항목에 동의한 후 다시 로그인해 주세요.");
-    notice.props.primaryAction.onPress();
-    assert.equal(
-      hooks.render(LoginScreen).find((node) => node.type === "ActionModal").props.visible,
-      false,
+    assert.ok(
+      !tree.some((node) => node.props.accessibilityRole === "checkbox"),
+      "필수 동의는 화면이 아니라 이용약관 동의 시트에서 받는다",
     );
-    checkbox.props.onPress();
-    const consented = hooks.render(LoginScreen);
-    assert.equal(
-      consented.find((node) => node.props.accessibilityRole === "checkbox").props.accessibilityState
-        .checked,
-      true,
-    );
-    for (const button of consented.filter((node) => node.type === "SocialLoginButton"))
-      await button.props.onPress();
-    assert.equal(signIns.join(","), expectedProviders);
-    assert.equal(alerts.length, 0);
-    const links = consented.filter((node) => node.props.accessibilityRole === "link");
-    assert.equal(links.length, 2);
-    for (const link of links) {
-      assert.equal(link.type, "Pressable", "약관 링크는 독립적인 터치 영역을 사용한다");
-      assert.ok(link.props.className.includes("min-h-12"));
-      const label = nodes(link).find((node) => node.type === "Text");
-      assert.ok(label.props.className.includes("underline"));
+    const sheet = () => hooks.render(LoginScreen).find((node) => node.type === "TermsConsentSheet");
+    assert.equal(sheet().props.visible, false);
+    for (const [index, provider] of expectedProviders.split(",").entries()) {
+      hooks
+        .render(LoginScreen)
+        .filter((node) => node.type === "SocialLoginButton")
+        [index].props.onPress();
+      assert.equal(sheet().props.visible, true, "소셜 버튼을 누르면 동의 시트를 띄운다");
+      assert.equal(signIns.length, index, "동의를 확인하기 전에는 SDK 인증을 시작하지 않는다");
+      sheet().props.onChange({ ...ALL_AGREED, usageAnalysis: false });
+      const login = sheet().props.onConfirm();
+      const name = { google: "Google", kakao: "Kakao", apple: "Apple" }[provider];
+      assert.equal(
+        sheet().props.loadingMessage,
+        `${name} 로그인으로 이동 중입니다.`,
+        "확인하면 바로 누른 제공자로 이동 중임을 띄운다",
+      );
+      await login;
+      assert.equal(sheet().props.loadingMessage, undefined, "로그인 창을 취소하면 표시를 거둔다");
+      assert.equal(
+        signIns.at(-1),
+        provider,
+        "다시 누르지 않아도 고른 소셜 로그인으로 바로 이어진다",
+      );
+      assert.equal(sheet().props.visible, true, "로그인을 취소하면 체크한 그대로 시트가 남는다");
+      sheet().props.onClose();
+      assert.equal(signIns.length, index + 1);
     }
-    // Figma처럼 이용약관은 글자 너비, 개인정보 처리방침만 최소 너비 48px이다.
-    assert.ok(!links[0].props.className.includes("min-w-12"));
-    assert.ok(links[1].props.className.includes("min-w-12"));
-    links[0].props.onPress();
+    assert.equal(alerts.length, 0);
+    hooks
+      .render(LoginScreen)
+      .find((node) => node.type === "SocialLoginButton")
+      .props.onPress();
+    sheet().props.onOpenDocument("terms");
     assert.equal(routes.at(-1), "/policies/terms");
-    links[1].props.onPress();
-    assert.equal(routes.at(-1), "/policies/privacy");
+    assert.equal(sheet().props.visible, false, "약관 전문을 열면 시트를 닫는다");
+    sheet().props.onClose();
     assert.equal(
-      hooks.render(LoginScreen).find((node) => node.props.accessibilityRole === "checkbox").props
-        .accessibilityState.checked,
-      true,
-      "정책 링크를 눌러도 필수 동의 체크는 바뀌지 않는다",
+      signIns.length,
+      expectedProviders.split(",").length,
+      "확인하지 않고 닫으면 로그인하지 않는다",
     );
+    const consented = hooks.render(LoginScreen);
     consented
       .find((node) => node.type === "Pressable" && node.props.accessibilityRole === "button")
       .props.onPress();
@@ -704,10 +736,11 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const order = [];
   const cacheClears = [];
   const analyticsUsers = [];
+  let onAppState;
   let googleSignOutFails = false;
   const supabase = {
     auth: {
-      getSession: () => Promise.resolve({ data: { session: { id: "s" } } }),
+      getSession: () => Promise.resolve({ data: { session: { id: "s", user: { id: "u1" } } } }),
       onAuthStateChange: (listener) => {
         emit = listener;
         return { data: { subscription: { unsubscribe() {} } } };
@@ -751,7 +784,15 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     },
     "@/lib/supabase": { supabase },
     "@/lib/queryClient": { queryClient: { clear: () => cacheClears.push(true) } },
-    "@/lib/analytics": { setAnalyticsUser: (userId) => analyticsUsers.push(userId) },
+    "@/lib/analytics": { syncAnalyticsConsent: async (userId) => analyticsUsers.push(userId) },
+    "react-native": {
+      AppState: {
+        addEventListener: (_event, listener) => {
+          onAppState = listener;
+          return { remove() {} };
+        },
+      },
+    },
     "@/lib/pushNotifications": {
       unregisterDevicePush: async () => {
         order.push("unregisterPush");
@@ -785,7 +826,13 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   assert.deepEqual(
     analyticsUsers,
     [null, "u2", null],
-    "로그인하면 회원을 연결하고 로그아웃·만료하면 끊는다",
+    "로그인하면 회원의 분석 동의를 확인하고 로그아웃·만료하면 끈다",
+  );
+  onAppState("active");
+  assert.equal(
+    analyticsUsers.at(-1),
+    "u1",
+    "앱으로 돌아오면 현재 세션의 회원 동의를 다시 확인한다",
   );
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);
@@ -1047,8 +1094,20 @@ test("로그인 필요 모달에서 온 로그인은 성공하면 원래 화면�
 
   loginIntent.startLogin(router, () => resumed.push("vote"));
   const newbie = render({ status: "success", isNewUser: true });
+  loginConsents.length = 0;
+  analyticsEvents.length = 0;
   await newbie.press();
   newbie.unmount();
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(loginConsents)),
+    [[true, { usage_analysis: true, overseas_transfer: true }]],
+    "시트에서 체크한 선택 동의를 신규 회원으로 저장한다",
+  );
+  assert.equal(
+    analyticsEvents[0]?.[0],
+    "signup_complete",
+    "동의를 저장한 뒤 가입 완료 이벤트를 보낸다",
+  );
   assert.deepEqual(newbie.routes, ["/signup-complete"], "신규 회원은 가입 완료 안내를 먼저 본다");
   assert.deepEqual(resumed, ["like"]);
   loginIntent.takeLoginIntent()();

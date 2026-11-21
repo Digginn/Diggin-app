@@ -1,0 +1,15 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
+select ok(has_function_privilege('supabase_auth_admin','private.reject_public_email_signup(jsonb)','execute'),'Auth만 가입 훅 실행 가능');
+select ok(not has_function_privilege('anon','private.reject_public_email_signup(jsonb)','execute'),'비회원은 가입 훅 직접 실행 불가');
+select ok(not has_function_privilege('authenticated','private.reject_public_email_signup(jsonb)','execute'),'회원은 가입 훅 직접 실행 불가');
+select ok(not has_function_privilege('service_role','private.reject_public_email_signup(jsonb)','execute'),'서비스 역할에도 훅 실행 권한을 주지 않음');
+select is(private.reject_public_email_signup('{"user":{"app_metadata":{"provider":"email"}}}')->'error'->>'http_code','403','이메일 공개 가입 거부');
+select is(private.reject_public_email_signup('{"user":{"app_metadata":{"provider":"email"},"user_metadata":{"provider":"google"}}}')->'error'->>'http_code','403','사용자가 바꿀 수 있는 metadata로 우회 불가');
+select is(private.reject_public_email_signup('{}')->'error'->>'http_code','403','인증 제공자 없는 가입 거부');
+select is(private.reject_public_email_signup('{"user":{"app_metadata":{"provider":"google"}}}'),'{}'::jsonb,'구글 신규 가입 유지');
+select is(private.reject_public_email_signup('{"user":{"app_metadata":{"provider":"kakao"}}}'),'{}'::jsonb,'카카오 신규 가입 유지');
+select is(private.reject_public_email_signup('{"user":{"app_metadata":{"provider":"apple"}}}'),'{}'::jsonb,'애플 신규 가입 유지');
+select * from finish();
+rollback;

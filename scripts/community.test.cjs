@@ -12,7 +12,7 @@ const analyticsEvents = [];
 const analytics = {
   trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
   flushAnalytics: async () => {},
-  setAnalyticsUser() {},
+  syncAnalyticsConsent: async () => {},
 };
 
 const LOGIN_SOURCES = {
@@ -789,7 +789,7 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
         authorNickname: "다정한디기34",
         isMine: true,
         anonNumber: 1,
-        body: "줄바꿈\n댓글",
+        body: "\n  줄바꿈\r\n\n\t　댓글  \n",
         createdAt: PREVIEW.created_at,
       },
       { id: "3", isWithdrawn: true, body: null, createdAt: PREVIEW.created_at },
@@ -812,6 +812,11 @@ test("상세는 실제 댓글 라벨을 표시하고 조회 화면에서 가짜 
   assert.equal(comments[0].props.author, "느긋한디기12 (글쓴이)");
   assert.equal(comments[1].props.author, "다정한디기34 (나)");
   assert.equal(comments[1].props.body, "줄바꿈 댓글");
+  assert.equal(
+    nodes(screen, "FlatList")[0].props.data[1].body,
+    "\n  줄바꿈\r\n\n\t　댓글  \n",
+    "수정용 원문은 변경하지 않는다",
+  );
   assert.equal(comments[2].props.isDeleted, true);
   assert.equal(typeof comments[0].props.onPressReport, "function");
   assert.equal(comments[1].props.onPressReport, undefined);

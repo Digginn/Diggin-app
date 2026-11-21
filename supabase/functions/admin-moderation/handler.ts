@@ -89,6 +89,26 @@ export function createAdminHandler(services: Services) {
       }
       const rpc = (name: string, args: Record<string, unknown>) =>
         services.rpc(name, { ...args, ...identity });
+      if (body.action === "console") {
+        const page = body.page ?? 1;
+        const searchQuery = body.query ?? "";
+        if (
+          typeof page !== "number" || !Number.isInteger(page) || page < 1 || page > 100000 ||
+          typeof searchQuery !== "string" || searchQuery.length > 100
+        ) {
+          return json({ error: "invalid_request" }, 400);
+        }
+        return json(
+          await rpc("admin_console", {
+            resource: text(body.resource, 30),
+            search_query: searchQuery.trim(),
+            status_filter: body.status === undefined ? "all" : text(body.status, 20),
+            type_filter: body.type === undefined ? "all" : text(body.type, 20),
+            page_number: page,
+            report_id: id(body.report_id, true),
+          }),
+        );
+      }
       if (body.action === "list_reports") {
         return json(await rpc("admin_report_groups", { before_id: id(body.before_id, true) }));
       }
@@ -110,6 +130,12 @@ export function createAdminHandler(services: Services) {
           }),
         });
       }
+      // 이용 기록 분석 동의 철회 요청 메일을 처리한다(#156). 같은 이메일 계정이 둘 이상이면 DB가 거부한다.
+      if (body.action === "withdraw_analytics_consent") {
+        return json(
+          await rpc("admin_withdraw_analytics_consent", { target_email: text(body.email, 320) }),
+        );
+      }
       const requestId = uuid(body.request_id);
       if (body.action === "sanction_request") {
         return json(await rpc("admin_sanction_request", { request_id: requestId }));
@@ -118,6 +144,16 @@ export function createAdminHandler(services: Services) {
         category: text(body.reason_category, 30),
         explanation: text(body.reason, 4000),
       };
+      if (body.action === "report_group_status") {
+        return json({
+          action_id: await rpc("admin_report_group_status", {
+            ...reason,
+            request_id: requestId,
+            report: id(body.report_id),
+            new_status: text(body.status, 20),
+          }),
+        });
+      }
       if (body.action === "report_status" || body.action === "hide" || body.action === "restore") {
         const actionId = await rpc("admin_content_action", {
           ...reason,

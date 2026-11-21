@@ -32,6 +32,7 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   const styledAnimatedTargets = [];
   let isReducedMotion = false;
   let effect;
+  let effectDependencies;
   let cancellations = 0;
   runInNewContext(
     compiled +
@@ -42,8 +43,9 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
       require: (name) => {
         if (name === "react")
           return {
-            useEffect: (callback) => {
+            useEffect: (callback, dependencies) => {
               effect = callback;
+              effectDependencies = dependencies;
             },
           };
         if (name === "react-native") return { Image: "Image", Text: "Text", View: "View" };
@@ -66,7 +68,7 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
             useSharedValue: () => time,
             useReducedMotion: () => isReducedMotion,
             withTiming: (to, options) => {
-              timings.push({ to, options });
+              timings.push({ to, options, from: time.value });
               return to;
             },
             withRepeat: (animation, count, reverse) => {
@@ -181,6 +183,30 @@ test("온보딩 일러스트는 Figma 타임라인·모션 줄이기·원본 에
   OnboardingIllustration({ page: 3 });
   effect();
   assert.equal(timings.at(-1).options.duration, 4750);
+  const startedTimelines = timings.length;
+  OnboardingIllustration({ page: 0, isActive: false });
+  effect();
+  const inactiveDependencies = effectDependencies;
+  assert.equal(
+    timings.length,
+    startedTimelines,
+    "비활성 페이지에서는 반복 타임라인을 시작하지 않는다",
+  );
+  time.value = 1800;
+  OnboardingIllustration({ page: 0, isActive: true });
+  const replayCleanup = effect();
+  assert.ok(
+    effectDependencies.some((value, index) => value !== inactiveDependencies[index]),
+    "페이지 선택 상태가 바뀌면 재생 효과를 다시 실행한다",
+  );
+  assert.equal(timings.at(-1).from, 0, "페이지 재진입 시 중간 프레임 대신 처음부터 재생한다");
+  replayCleanup();
+  OnboardingIllustration({ page: 0, isActive: false });
+  effect();
+  time.value = 2400;
+  OnboardingIllustration({ page: 0, isActive: true });
+  effect();
+  assert.equal(timings.at(-1).from, 0, "여러 번 돌아와도 매번 처음부터 재생한다");
 });
 
 test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·접근성 이동을 처리한다", () => {
@@ -207,7 +233,10 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
             initial === false ? [false, () => {}] : [activeIndex, (index) => (activeIndex = index)],
           useCallback: (callback) => callback,
           useEffect: () => {},
-          useRef: () => ({ current: { scrollTo: (options) => scrollCalls.push(options) } }),
+          useRef: (initial) => ({
+            current:
+              initial === null ? { scrollTo: (options) => scrollCalls.push(options) } : initial,
+          }),
         };
       }
       if (name === "react-native") {
@@ -285,7 +314,7 @@ test("공통 캐러셀이 Figma의 296px 간격으로 스와이프·점 선택·
   assert.equal(componentModule.exports.SwipeCarousel({ children: null }), null);
 });
 
-test("자동 전환은 마지막에서 멈추고 스와이프·모션 줄이기 시에는 쉬어간다", () => {
+function carouselHarness() {
   const source = readFileSync(
     path.join(__dirname, "../src/components/carousel/SwipeCarousel.tsx"),
     "utf8",
@@ -297,7 +326,9 @@ test("자동 전환은 마지막에서 멈추고 스와이프·모션 줄이기 
   const state = [0, false];
   const timers = new Map();
   const scrollCalls = [];
+  const refs = [];
   let hookIndex = 0;
+  let refIndex = 0;
   let effect;
   let cleanup;
   let isReducedMotion = false;
@@ -319,7 +350,14 @@ test("자동 전환은 마지막에서 멈추고 스와이프·모션 줄이기 
           useEffect: (callback) => {
             effect = callback;
           },
-          useRef: () => ({ current: { scrollTo: (options) => scrollCalls.push(options) } }),
+          useRef: (initial) => {
+            const slot = refIndex++;
+            refs[slot] ??= {
+              current:
+                initial === null ? { scrollTo: (options) => scrollCalls.push(options) } : initial,
+            };
+            return refs[slot];
+          },
           useState: () => {
             const slot = hookIndex++;
             return [
@@ -337,49 +375,92 @@ test("자동 전환은 마지막에서 멈추고 스와이프·모션 줄이기 
       return require(name);
     },
   });
-  function render(autoAdvanceDelays = [2500, 2500]) {
+  function render(autoAdvanceDelays = [3000, 3000]) {
     cleanup?.();
     hookIndex = 0;
+    refIndex = 0;
     const root = componentModule.exports.SwipeCarousel({
       children: ["1", "2", "3"].map((key) => React.createElement("CardCarousel", { key })),
       autoAdvanceDelays,
     });
     cleanup = effect();
-    return React.Children.toArray(root.props.children)[0];
+    const [scroll, indicators] = React.Children.toArray(root.props.children);
+    return { scroll, dots: React.Children.toArray(indicators.props.children) };
   }
+  return {
+    render,
+    state,
+    timers,
+    scrollCalls,
+    setReducedMotion: (value) => {
+      isReducedMotion = value;
+    },
+    unmount: () => cleanup?.(),
+  };
+}
+
+test("자동 전환은 3초 뒤 시작하고 마지막·모션 줄이기·언마운트에서 멈춘다", () => {
+  const { render, state, timers, scrollCalls, setReducedMotion, unmount } = carouselHarness();
   render();
-  assert.equal(timers.values().next().value.delay, 2500);
+  assert.equal(timers.values().next().value.delay, 3000);
   timers.values().next().value.callback();
   assert.equal(state[0], 0, "자동 이동도 실제 스크롤 위치를 기다린다");
-  render().props.onScroll({ nativeEvent: { contentOffset: { x: 296 } } });
+  render().scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 296 } } });
   assert.equal(state[0], 1);
   assert.equal(scrollCalls.at(-1).x, 296);
   render();
-  assert.equal(timers.values().next().value.delay, 2500);
+  assert.equal(timers.values().next().value.delay, 3000);
   timers.values().next().value.callback();
-  render().props.onScroll({ nativeEvent: { contentOffset: { x: 592 } } });
+  render().scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 592 } } });
   assert.equal(state[0], 2);
   assert.equal(scrollCalls.at(-1).x, 592);
   render();
   assert.equal(timers.size, 0);
 
   state[0] = 0;
-  render().props.onScrollBeginDrag();
+  render().scroll.props.onMomentumScrollBegin();
   render();
   assert.equal(timers.size, 0);
-  render().props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
+  render().scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
   render();
-  assert.equal(timers.values().next().value.delay, 2500);
+  assert.equal(
+    timers.values().next().value.delay,
+    3000,
+    "자동 스크롤의 관성 이벤트는 수동 탐색으로 오인하지 않는다",
+  );
 
-  isReducedMotion = true;
+  setReducedMotion(true);
   render();
   assert.equal(timers.size, 0);
-  isReducedMotion = false;
+  setReducedMotion(false);
   render([]);
   assert.equal(timers.size, 0);
   render();
-  cleanup();
+  unmount();
   assert.equal(timers.size, 0);
+});
+
+test("스와이프·점 선택·접근성 이동 이후에는 자동 전환이 다시 시작되지 않는다", () => {
+  for (const action of ["swipe", "dot", "current-dot", "accessibility"]) {
+    const { render, timers, scrollCalls } = carouselHarness();
+    const tree = render();
+    const pendingTimer = timers.values().next().value;
+    if (action === "swipe") tree.scroll.props.onScrollBeginDrag();
+    else if (action === "accessibility")
+      tree.scroll.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
+    else tree.dots[action === "dot" ? 1 : 0].props.onPress();
+    assert.equal(timers.size, 0, `${action}: 사용자 입력 즉시 예약된 자동 이동을 취소한다`);
+    const manualCalls = scrollCalls.length;
+    pendingTimer.callback();
+    assert.equal(scrollCalls.length, manualCalls, "이미 큐에 들어간 자동 이동 콜백도 무시한다");
+    render().scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 296 } } });
+    render();
+    assert.equal(timers.size, 0, `${action}: 다른 페이지로 이동해도 자동 넘김이 재개되지 않는다`);
+    render().dots[0].props.onPress();
+    render().scroll.props.onScroll({ nativeEvent: { contentOffset: { x: 0 } } });
+    render();
+    assert.equal(timers.size, 0, "이전 페이지로 돌아와도 직접 읽을 수 있게 유지한다");
+  }
 });
 
 test("카드 문구·이미지를 사용처에서 받고, 페이지 버튼의 터치 영역은 겹치지 않는다", () => {
@@ -486,13 +567,14 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
   ])
     assert.ok(background.props.className.includes(className));
   assert.equal(carousel.type, "SwipeCarousel");
-  assert.equal(Array.from(carousel.props.autoAdvanceDelays).join(","), "2500,2500,2500");
+  assert.equal(Array.from(carousel.props.autoAdvanceDelays).join(","), "3000,3000,3000");
   const cards = React.Children.toArray(carousel.props.children);
   assert.equal(cards.length, 4);
   assert.equal(cards[3].props.mainCopy, "기존에 모아둔 아이템,\n그대로 옮겨 오세요.");
   assert.equal(carousel.props.media, undefined);
   for (const [index, card] of cards.entries()) {
     assert.equal(card.props.children.type, "OnboardingIllustration");
+    assert.equal(card.props.children.props.isActive, index === 0);
     assert.equal(
       card.props.children.props.page,
       index,
@@ -501,6 +583,13 @@ test("마지막 온보딩 장에만 시작하기 버튼을 표시하고 로그�
   }
   carousel.props.onPageChange(2);
   assert.equal(render().length, 1, "세 번째 장에는 시작하기 버튼이 없다.");
+  const thirdCarousel = React.Children.toArray(render()[0].props.children)[1];
+  assert.deepEqual(
+    React.Children.toArray(thirdCarousel.props.children).map(
+      (card) => card.props.children.props.isActive,
+    ),
+    [false, false, true, false],
+  );
   carousel.props.onPageChange(3);
   const lastPage = render();
   assert.equal(lastPage.length, 2);

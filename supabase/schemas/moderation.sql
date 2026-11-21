@@ -57,6 +57,8 @@ create table private.admin_access_logs (
   id bigint generated always as identity primary key,
   admin_id uuid not null references private.admin_users(id),
   report_id bigint not null,
+  session_ip inet,
+  subject_ids uuid[] not null default '{}',
   created_at timestamptz not null default now()
 );
 create index admin_access_logs_admin_idx on private.admin_access_logs(admin_id);
@@ -151,17 +153,25 @@ begin
         (other.post_id=r.post_id or other.comment_id=r.comment_id) and (before_report_id is null or other.id<before_report_id) order by other.id desc limit 50) page),'[]'::jsonb),
     'post',case when p.id is null then null else to_jsonb(p) || jsonb_build_object('id',p.id::text) end,
     'comment',case when c.id is null then null else to_jsonb(c) || jsonb_build_object('id',c.id::text,'post_id',c.post_id::text) end,
-    'products',coalesce((select jsonb_agg(to_jsonb(pp) order by pp.position) from private.post_products pp where pp.post_id=p.id),'[]'::jsonb),
+    'products',coalesce((select jsonb_agg(to_jsonb(pp) || jsonb_build_object('post_id',pp.post_id::text) order by pp.position) from private.post_products pp where pp.post_id=p.id),'[]'::jsonb),
     'author',case when profile.id is null then null else jsonb_build_object('id',profile.id,'status',profile.status,'restricted_until',profile.restricted_until) end,
     'sanctions',coalesce((select jsonb_agg(to_jsonb(s) || jsonb_build_object('id',s.id::text,'action_id',s.action_id::text) order by s.id desc)
       from private.user_sanctions s where s.user_id = r.reported_user_id),'[]'::jsonb),
     'actions',coalesce((select jsonb_agg(to_jsonb(a) || jsonb_build_object('id',a.id::text) order by a.id desc)
-      from private.admin_actions a where a.report_id = r.id or (a.target_type='user' and a.target_id=r.reported_user_id::text)),'[]'::jsonb)
+      from private.admin_actions a where a.report_id = r.id or
+        (a.target_type=r.target_type::text and a.target_id=coalesce(r.post_id,r.comment_id)::text) or
+        (a.target_type='user' and a.target_id=r.reported_user_id::text)),'[]'::jsonb)
   ) into result from (select 1) seed
     left join private.comments c on c.id=r.comment_id
     left join private.posts p on p.id=coalesce(r.post_id,c.post_id)
     left join public.profiles profile on profile.id=r.reported_user_id;
-  insert into private.admin_access_logs(admin_id, report_id) values (actor, report);
+  insert into private.admin_access_logs(admin_id,report_id,session_ip,subject_ids)
+    values(actor,report,(select s.ip from auth.sessions s where s.id=actor_session and s.user_id=actor),
+      (select coalesce(array_agg(distinct subject_id) filter(where subject_id is not null),'{}'::uuid[])
+        from (
+          select r.reported_user_id as subject_id
+          union all select (item->>'reporter_id')::uuid from jsonb_array_elements(result->'related_reports') item
+        ) subjects));
   return result;
 end;
 $$;

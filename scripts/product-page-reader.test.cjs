@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
-const { runInNewContext } = require("node:vm");
+const { createContext, runInContext, runInNewContext } = require("node:vm");
 const React = require("react");
 const ts = require("typescript");
 
@@ -35,6 +35,79 @@ function load(file, mocks = {}) {
 function resolver(fetch) {
   return load("../src/screens/save/api/resolveProductPageUrl.ts", { "expo/fetch": { fetch } });
 }
+
+test("숨긴 웹뷰는 쇼핑몰 대화상자 없이 페이지 실행과 상품 정보 추출을 계속한다", () => {
+  const { ProductPageReader } = load("../src/screens/save/components/ProductPageReader.tsx", {
+    "react": {
+      useState: () => [null, () => {}],
+      useRef: () => ({ current: false }),
+      useCallback: (callback) => callback,
+      useEffect: () => {},
+    },
+    "react-native": { View: "View", useWindowDimensions: () => ({ width: 393, height: 852 }) },
+    "react-native-webview": { WebView: "WebView" },
+    "../api/resolveProductPageUrl": { isNaverShortLink: () => false },
+  });
+  // 새 페이지·리다이렉트마다 새 window에서 문서 시작 스크립트를 실행한다.
+  for (const url of ["https://www.musinsa.com/products/1234567", "https://shop.test/product/1"]) {
+    const dialogs = [];
+    const done = [];
+    const metas = {};
+    let tick;
+    const view = ProductPageReader({ url, onDone: (value) => done.push(value) }).props.children;
+    const page = createContext({
+      alert: (message) => dialogs.push(["alert", message]),
+      confirm: (message) => {
+        dialogs.push(["confirm", message]);
+        return true;
+      },
+      prompt: (message) => {
+        dialogs.push(["prompt", message]);
+        return "input";
+      },
+      document: {
+        querySelector: (selector) => {
+          const key = /"([^"]+)"/.exec(selector)[1];
+          return metas[key] ? { getAttribute: () => metas[key] } : null;
+        },
+        querySelectorAll: () => [],
+        getElementById: () => null,
+      },
+      location: { href: url, hostname: new URL(url).hostname },
+      ReactNativeWebView: {
+        postMessage: (data) => view.props.onMessage({ nativeEvent: { data } }),
+      },
+      setInterval: (callback) => {
+        tick = callback;
+        return 1;
+      },
+      clearInterval: () => {},
+    });
+    runInContext("window = globalThis", page);
+    runInContext(view.props.injectedJavaScriptBeforeContentLoaded, page);
+    runInContext(
+      `alert("유효하지 않은 상품 입니다.");
+       confirmResult = confirm("쇼핑몰로 이동하시겠습니까?");
+       promptResult = prompt("입력해 주세요.");
+       didContinue = true;`,
+      page,
+    );
+    assert.deepEqual(dialogs, [], "외부 페이지 알림이 네이티브 대화상자로 전달되면 안 된다");
+    assert.equal(page.confirmResult, false);
+    assert.equal(page.promptResult, null);
+    assert.equal(page.didContinue, true);
+    assert.equal(done.length, 0);
+    Object.assign(metas, {
+      "og:title": "상품",
+      "og:image": "https://cdn.test/product.jpg",
+      "product:price:amount": "10000",
+      "product:price:currency": "KRW",
+    });
+    tick();
+    assert.equal(done.length, 1);
+    assert.equal(done[0].og.image, "https://cdn.test/product.jpg");
+  }
+});
 
 test("네이버 짧은 링크는 상품 주소를 확인한 뒤 WebView를 열고 결과는 한 번만 전달한다", async () => {
   const states = [],

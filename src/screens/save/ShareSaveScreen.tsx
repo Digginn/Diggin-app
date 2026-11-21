@@ -9,7 +9,7 @@ import { useCreateFolder } from "@/hooks/useCreateFolder";
 import { useFolders } from "@/hooks/useFolders";
 import { EMPTY_ITEM_SAVE_VALUES, useItemSave } from "@/hooks/useItemSave";
 import { useToast } from "@/hooks/useToast";
-import { flushAnalytics, setAnalyticsUser } from "@/lib/analytics";
+import { flushAnalytics, syncAnalyticsConsent } from "@/lib/analytics";
 import { markSharedSave } from "@/lib/sharedSaves";
 import { supabase } from "@/lib/supabase";
 import { FolderManageSheet } from "@/screens/item-detail/components/FolderManageSheet";
@@ -69,9 +69,10 @@ export function ShareSaveScreen({
       .then(({ data, error }) => {
         if (!isMounted.current) return;
         if (data.session) {
-          // iOS 공유 확장은 앱과 따로 실행돼 AuthProvider가 없다.
-          setAnalyticsUser(data.session.user.id);
-          return start(link, "share");
+          // iOS 공유 확장은 앱과 따로 실행돼 AuthProvider가 없다. 동의를 확인한 뒤 저장 이벤트를 보낸다.
+          return syncAnalyticsConsent(data.session.user.id).then(() => {
+            if (isMounted.current) start(link, "share");
+          });
         }
         // 만료된 토큰을 갱신하다 연결이 끊긴 것은 로그인이 풀린 게 아니다. 여기서 알리고 앱으로 보내지 않는다.
         if (isAuthRetryableFetchError(error)) return setSessionError("network");

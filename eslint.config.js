@@ -6,7 +6,17 @@ module.exports = defineConfig([
   expoConfig,
   eslintConfigPrettier,
   {
-    ignores: ["dist/*", ".expo/*", "ios/*", "android/*", "node_modules/*", "supabase/functions/**"],
+    ignores: [
+      "dist/*",
+      ".expo/*",
+      "ios/*",
+      "android/*",
+      "node_modules/*",
+      "supabase/functions/**",
+      "admin/dist/**",
+      "admin/test-results/**",
+      "admin/playwright-report/**",
+    ],
   },
   {
     files: ["*.config.{js,ts}", "eslint.config.js"],

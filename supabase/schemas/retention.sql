@@ -82,6 +82,7 @@ begin
   perform pg_catalog.set_config('private.retention_cleanup', '', true);
   delete from private.admin_access_logs l where l.created_at < now() - interval '1 year'
     and not exists (select 1 from private.retention_holds h where h.target_type = 'report' and h.target_id = l.report_id);
+  delete from private.admin_console_access_logs where created_at < now() - interval '1 year';
   delete from private.retention_holds h
   where (h.target_type = 'report' and not exists (select 1 from private.reports r where r.id = h.target_id)) or
     (h.target_type = 'sanction' and not exists (select 1 from private.user_sanctions s where s.id = h.target_id));
