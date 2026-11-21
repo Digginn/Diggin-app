@@ -61,6 +61,66 @@ test("운영 배포는 승인된 main 병합 커밋만 허용하며 개발 배�
   }
 });
 
+test("PR 230 배포 복구 예외는 지정 PR·기준 커밋·브랜치·실행자·임시 head에만 허용한다", async () => {
+  const originalHead = process.env.PR230_AUTHORIZED_HEAD;
+  const head = "a".repeat(40);
+  try {
+    for (const scenario of [
+      { allowed: true },
+      { number: 232 },
+      { baseSha: "other-base" },
+      { branch: "other-branch" },
+      { headRepo: "other/repo" },
+      { head: "b".repeat(40) },
+      { variable: "" },
+      { variable: "not-a-commit" },
+      { actor: "other-user" },
+      { ref: "refs/heads/develop" },
+      { sha: "other-merge" },
+      { merged: false },
+      { base: "develop" },
+    ]) {
+      process.env.PR230_AUTHORIZED_HEAD = scenario.variable ?? head;
+      const failures = [];
+      const pr = {
+        number: scenario.number ?? 231,
+        merged_at: scenario.merged === false ? null : "2026-11-22",
+        merge_commit_sha: scenario.sha ?? "merge-commit",
+        base: {
+          ref: scenario.base ?? "main",
+          sha: scenario.baseSha ?? "5b5324f988ff4fb38fbb3020f600dee070908b99",
+          repo: { full_name: "Digginn/Diggin-app" },
+        },
+        head: {
+          ref: scenario.branch ?? "fix/224-pr230-production-deploy",
+          sha: scenario.head ?? head,
+          repo: { full_name: scenario.headRepo ?? "Digginn/Diggin-app" },
+        },
+      };
+      await guard(
+        {
+          rest: { repos: { listPullRequestsAssociatedWithCommit() {} } },
+          paginate: async () => [pr],
+          graphql: async () => ({
+            repository: { pullRequest: { reviewDecision: "REVIEW_REQUIRED" } },
+          }),
+        },
+        {
+          repo: { owner: "Digginn", repo: "Diggin-app" },
+          sha: "merge-commit",
+          ref: scenario.ref ?? "refs/heads/main",
+          actor: scenario.actor ?? "Sonseongoh",
+        },
+        { setFailed: (message) => failures.push(message), info() {} },
+      );
+      assert.equal(failures.length === 0, scenario.allowed === true, JSON.stringify(scenario));
+    }
+  } finally {
+    if (originalHead === undefined) delete process.env.PR230_AUTHORIZED_HEAD;
+    else process.env.PR230_AUTHORIZED_HEAD = originalHead;
+  }
+});
+
 test("운영 접속 정보는 Diggin-pro만 허용하고 비밀번호를 URL 인코딩한다", () => {
   const python = workflow
     .match(/DB_URL="\$\(python3 - <<'PY'\r?\n([\s\S]*?)\r?\n          PY/)[1]
