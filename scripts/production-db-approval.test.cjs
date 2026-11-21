@@ -101,7 +101,9 @@ test("PR 230 배포 복구 예외는 지정 PR·기준 커밋·브랜치·실행
         {
           rest: { repos: { listPullRequestsAssociatedWithCommit() {} } },
           paginate: async () => [pr],
-          graphql: async () => ({ repository: { pullRequest: { reviewDecision: "REVIEW_REQUIRED" } } }),
+          graphql: async () => ({
+            repository: { pullRequest: { reviewDecision: "REVIEW_REQUIRED" } },
+          }),
         },
         {
           repo: { owner: "Digginn", repo: "Diggin-app" },
