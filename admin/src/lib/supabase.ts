@@ -91,6 +91,8 @@ export async function adminRequest<T>(
 
 export function errorMessage(error: unknown): string {
   if (error instanceof AdminApiError) {
+    if (error.code === "pending_request_storage_unavailable")
+      return "재시도 정보를 보관할 수 없습니다. 브라우저 저장소 설정을 확인한 뒤 다시 시도해 주세요.";
     if (error.code === "admin_api_not_deployed")
       return "관리자 서비스 배포가 아직 완료되지 않았습니다. 배포 완료 후 다시 확인해 주세요.";
     if (error.status === 401) return "로그인이 만료되었습니다. 다시 로그인해 주세요.";

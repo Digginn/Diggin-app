@@ -17,8 +17,9 @@ import { QueryState } from "../../components/QueryState";
 import { SanctionSelect, type Sanction } from "../../components/SanctionSelect";
 import { StatusSegment } from "../../components/StatusSegment";
 import { VisibilityControl } from "../../components/VisibilityControl";
+import { useAdminMutationPlan } from "../../hooks/useAdminMutationPlan";
 import { useAdminQuery } from "../../hooks/useAdminQuery";
-import { AdminApiError, adminRequest, errorMessage } from "../../lib/supabase";
+import { adminRequest, errorMessage } from "../../lib/supabase";
 
 import {
   ReportActionDialog,
@@ -27,14 +28,14 @@ import {
 } from "./components/ReportActionDialog";
 import "./report-detail.css";
 
-type Operation = { body: Record<string, unknown>; isDone: boolean };
-
 export function LiveReportDetailScreen({
   reportId,
+  adminId,
   email,
   onLogout,
 }: {
   reportId: string;
+  adminId: string;
   email: string;
   onLogout: () => Promise<void>;
 }) {
@@ -45,12 +46,15 @@ export function LiveReportDetailScreen({
   const [reason, setReason] = useState("");
   const [category, setCategory] = useState<Reason>("other");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [hasPendingPlan, setHasPendingPlan] = useState(false);
-  const lock = useRef(false);
-  const plan = useRef<Operation[]>([]);
+  const mutation = useAdminMutationPlan(
+    data
+      ? `${adminId}:report:${data.report.target_type}:${data.report.post_id ?? data.report.comment_id}`
+      : undefined,
+    query.refresh,
+  );
+  const { hasPendingPlan, isApplying } = mutation;
   const [olderReports, setOlderReports] = useState<IndividualReport[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const reportPageLock = useRef(false);
@@ -61,64 +65,22 @@ export function LiveReportDetailScreen({
     reason,
   };
 
-  async function runPlan() {
-    if (lock.current) return;
-    lock.current = true;
-    setIsApplying(true);
+  async function runPlan(operations?: Record<string, unknown>[]) {
     setError("");
     setNotice("");
-    try {
-      for (const operation of plan.current) {
-        if (operation.isDone) continue;
-        try {
-          await adminRequest(operation.body);
-          operation.isDone = true;
-        } catch (failure) {
-          if (
-            failure instanceof AdminApiError &&
-            ["auth_moderation_failed", "request_failed_use_new_id"].includes(failure.code)
-          ) {
-            operation.body.request_id = crypto.randomUUID();
-          }
-          throw failure;
-        }
-      }
-      plan.current = [];
-      setHasPendingPlan(false);
-      setIsConfirmOpen(false);
+    setIsConfirmOpen(false);
+    if (await mutation.runPlan(operations)) {
       setStatus(undefined);
       setSanction(null);
       setReason("");
       setOlderReports([]);
       pageCursor.current = undefined;
       setNotice("조치가 적용되었습니다. 서버의 최신 정보를 다시 확인합니다.");
-    } catch (failure) {
-      setIsConfirmOpen(false);
-      const hasPartial = plan.current.some((operation) => operation.isDone);
-      const message = `${hasPartial ? "일부 조치는 적용되었습니다. " : ""}${errorMessage(failure)}`;
-      const definiteFailure =
-        failure instanceof AdminApiError &&
-        failure.status >= 400 &&
-        failure.status < 500 &&
-        !failure.code.includes("pending");
-      if (definiteFailure) {
-        plan.current = [];
-        setHasPendingPlan(false);
-        setIsConfirmOpen(false);
-        setStatus(undefined);
-        setSanction(null);
-      }
-      setError(message);
-    } finally {
-      lock.current = false;
-      setIsApplying(false);
-      // 응답 유실·부분 성공도 확인하기 위해 완료 여부와 관계없이 원본을 재조회한다.
-      query.refresh();
     }
   }
 
   function prepareAction(hidden?: boolean, reasonCategory: Reason = category) {
-    if (!data || lock.current || hasPendingPlan || !reason.trim()) return;
+    if (!data || !mutation.isReady || isApplying || hasPendingPlan || !reason.trim()) return;
     const common = { reason: reason.trim(), reason_category: reasonCategory, report_id: reportId };
     const operations: Record<string, unknown>[] = [];
     if (hidden !== undefined) operations.push({ ...common, action: hidden ? "hide" : "restore" });
@@ -129,12 +91,7 @@ export function LiveReportDetailScreen({
       if (draft.status !== data.group_status)
         operations.push({ ...common, action: "report_group_status", status: draft.status });
     }
-    plan.current = operations.map((body) => ({
-      body: { ...body, request_id: crypto.randomUUID() },
-      isDone: false,
-    }));
-    setHasPendingPlan(true);
-    void runPlan();
+    void runPlan(operations);
   }
 
   async function loadReports() {
@@ -184,6 +141,7 @@ export function LiveReportDetailScreen({
   );
   const canChange =
     data &&
+    mutation.isReady &&
     (draft.status !== data.group_status || sanction !== null) &&
     reason.trim() &&
     !(
@@ -203,9 +161,9 @@ export function LiveReportDetailScreen({
             {notice}
           </p>
         )}
-        {error && (
+        {(error || mutation.error) && (
           <p className="live-error" role="alert">
-            {error}
+            {error || mutation.error}
           </p>
         )}
         {hasPendingPlan && !isApplying && (
@@ -273,9 +231,12 @@ export function LiveReportDetailScreen({
                     </div>
                   )}
                   <div className="detail-content">
-                    {target?.content ??
-                      data.report.reported_content ??
-                      "삭제되어 원문을 확인할 수 없습니다."}
+                    {data.report.target_type === "comment" && <h3>현재 댓글</h3>}
+                    <p>
+                      {target?.content ??
+                        data.report.reported_content ??
+                        "삭제되어 원문을 확인할 수 없습니다."}
+                    </p>
                   </div>
                   {data.products.map((product, index) => (
                     <div className="detail-product" key={index}>
@@ -301,6 +262,13 @@ export function LiveReportDetailScreen({
                           <StatusBadge status={report.status} />
                         </div>
                         {report.detail && <p>{report.detail}</p>}
+                        {report.reported_content !== null &&
+                          report.reported_content !== undefined && (
+                            <div className="detail-content">
+                              <h3>신고 당시 댓글</h3>
+                              <p>{report.reported_content}</p>
+                            </div>
+                          )}
                         <small>신고자 {report.reporter_id ?? "탈퇴"}</small>
                       </li>
                     ))}

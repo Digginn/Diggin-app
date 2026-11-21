@@ -377,3 +377,205 @@ test("제재 해제는 사유를 확인하고 서버가 실패 확정한 요청�
   });
   expect(requests[0].request_id).not.toBe(requests[1].request_id);
 });
+
+test("수정된 댓글과 개별 신고 당시의 원문을 함께 확인한다", async ({ page }) => {
+  await signedIn(page);
+  await setup(page, async (body, route) => {
+    if (body.resource !== "report_detail") return false;
+    const value = detail();
+    await reply(route, {
+      ...value,
+      report: { ...value.report, target_type: "comment", reported_content: "최신 신고 당시 원문" },
+      comment: { ...value.post, id: "99", content: "신고 후 수정된 댓글" },
+      related_reports: [
+        { ...value.related_reports[0], reported_content: "최신 신고 당시 원문" },
+        { ...value.related_reports[0], id: "41", reported_content: "이전 신고 당시 원문" },
+      ],
+      report_count: 2,
+    });
+    return true;
+  });
+  await page.goto(`/#/reports/${group.id}`);
+  await expect(page.getByText("신고 후 수정된 댓글", { exact: true })).toBeVisible();
+  await expect(page.getByText("최신 신고 당시 원문", { exact: true })).toBeVisible();
+  await expect(page.getByText("이전 신고 당시 원문", { exact: true })).toBeVisible();
+});
+
+for (const leave of ["목록 이동", "새로고침", "같은 콘텐츠의 다른 신고로 이동"] as const) {
+  test(`경고 응답 유실 뒤 ${leave}해도 같은 요청으로 복구한다`, async ({ page }) => {
+    await signedIn(page);
+    const mutations: Body[] = [];
+    await setup(page, async (body, route) => {
+      if (body.action !== "sanction") return false;
+      mutations.push(body);
+      if (mutations.length === 1) await route.abort("failed");
+      else await reply(route, { state: "applied", action_id: "1" });
+      return true;
+    });
+    await page.goto(`/#/reports/${group.id}`);
+    await page
+      .getByRole("group", { name: "작성자 제재 선택" })
+      .getByRole("button", { name: "경고", exact: false })
+      .click();
+    await page.getByRole("textbox", { name: "조치 사유" }).fill("정책 위반 확인");
+    await page.getByRole("button", { name: "조치 적용", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "적용하기" }).click();
+    await expect(page.getByRole("button", { name: "같은 요청 재시도" })).toBeVisible();
+    if (leave === "목록 이동") {
+      await page.getByRole("link", { name: "← 신고 목록" }).click();
+      await expect(page).toHaveURL(/#\/reports$/);
+      await page.goto(`/#/reports/${group.id}`);
+    } else if (leave === "새로고침") await page.reload();
+    else await page.goto("/#/reports/41");
+    await page.getByRole("button", { name: "같은 요청 재시도" }).click();
+    await expect(
+      page.getByRole("status").filter({ hasText: "조치가 적용되었습니다" }),
+    ).toBeVisible();
+    expect(mutations).toHaveLength(2);
+    expect(mutations[1]).toEqual(mutations[0]);
+  });
+}
+
+test("부분 성공 뒤 새로고침해도 완료된 경고를 반복하지 않는다", async ({ page }) => {
+  await signedIn(page);
+  const mutations: Body[] = [];
+  let status = "reviewing";
+  await setup(page, async (body, route) => {
+    if (body.resource === "report_detail") {
+      await reply(route, detail(status));
+      return true;
+    }
+    if (body.action !== "sanction" && body.action !== "report_group_status") return false;
+    mutations.push(body);
+    if (body.action === "report_group_status" && status === "reviewing") {
+      status = "resolved";
+      await route.abort("failed");
+    } else await reply(route, { state: "applied", action_id: "1" });
+    return true;
+  });
+  await page.goto(`/#/reports/${group.id}`);
+  await page
+    .getByRole("group", { name: "신고 상태 변경" })
+    .getByRole("button", { name: "처리 완료" })
+    .click();
+  await page
+    .getByRole("group", { name: "작성자 제재 선택" })
+    .getByRole("button", { name: "경고", exact: false })
+    .click();
+  await page.getByRole("textbox", { name: "조치 사유" }).fill("정책 위반 확인");
+  await page.getByRole("button", { name: "조치 적용", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "적용하기" }).click();
+  await expect(page.getByRole("button", { name: "같은 요청 재시도" })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "같은 요청 재시도" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "조치가 적용되었습니다" })).toBeVisible();
+  expect(mutations.filter((body) => body.action === "sanction")).toHaveLength(1);
+  const changes = mutations.filter((body) => body.action === "report_group_status");
+  expect(changes).toHaveLength(2);
+  expect(changes[1]).toEqual(changes[0]);
+});
+
+for (const committed of [true, false]) {
+  test(`제재 해제 응답 유실 뒤 서버 ${committed ? "성공" : "미적용"} 결과를 확인한다`, async ({
+    page,
+  }) => {
+    await signedIn(page);
+    const mutations: Body[] = [];
+    let isReleased = false;
+    let queries = 0;
+    await setup(page, async (body, route) => {
+      if (body.resource === "sanctions") {
+        queries++;
+        await reply(route, {
+          total: 1,
+          rows: [
+            {
+              id: "71",
+              user_id: group.author_id,
+              nickname: group.author,
+              kind: "suspended",
+              reason_category: "abuse",
+              reason: "정책 위반",
+              created_at: group.latest_at,
+              state: isReleased ? "released" : "active",
+              released_at: isReleased ? group.latest_at : null,
+            },
+          ],
+        });
+        return true;
+      }
+      if (body.action !== "sanction") return false;
+      mutations.push(body);
+      isReleased = committed || mutations.length > 1;
+      if (mutations.length === 1) await route.abort("failed");
+      else await reply(route, { state: "applied" });
+      return true;
+    });
+    await page.goto("/#/sanctions");
+    await page.getByRole("button", { name: "해제", exact: true }).click();
+    await page.getByRole("textbox", { name: "해제 사유" }).fill("재검토 후 해제");
+    await page.getByRole("button", { name: "해제 확인" }).click();
+    await expect.poll(() => queries).toBeGreaterThan(1);
+    if (!committed) {
+      await page.reload();
+      await expect(page.getByRole("textbox", { name: "해제 사유" })).toHaveValue("재검토 후 해제");
+      await page.getByRole("button", { name: "같은 요청 재시도" }).click();
+      expect(mutations[1]).toEqual(mutations[0]);
+    }
+    await expect(
+      page.getByRole("table").getByRole("cell", { name: "해제", exact: true }),
+    ).toBeVisible();
+  });
+}
+
+test("재시도 정보를 저장할 수 없으면 조치를 전송하지 않는다", async ({ page }) => {
+  await signedIn(page);
+  await page.addInitScript(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith("diggin-admin-pending:")) throw new Error("storage unavailable");
+      original.call(this, key, value);
+    };
+  });
+  const mutations: Body[] = [];
+  await setup(page, async (body, route) => {
+    if (body.action !== "sanction") return false;
+    mutations.push(body);
+    await reply(route, { state: "applied" });
+    return true;
+  });
+  await page.goto(`/#/reports/${group.id}`);
+  await page
+    .getByRole("group", { name: "작성자 제재 선택" })
+    .getByRole("button", { name: "경고", exact: false })
+    .click();
+  await page.getByRole("textbox", { name: "조치 사유" }).fill("정책 위반 확인");
+  await page.getByRole("button", { name: "조치 적용", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "적용하기" }).click();
+  await expect(page.getByRole("alert")).toContainText("재시도 정보를 보관할 수 없습니다");
+  expect(mutations).toHaveLength(0);
+});
+
+test("서버가 실패로 확정한 제재만 새 요청 ID로 복구한다", async ({ page }) => {
+  await signedIn(page);
+  const mutations: Body[] = [];
+  await setup(page, async (body, route) => {
+    if (body.action !== "sanction") return false;
+    mutations.push(body);
+    if (mutations.length === 1) await reply(route, { error: "request_failed_use_new_id" }, 400);
+    else await reply(route, { state: "applied" });
+    return true;
+  });
+  await page.goto(`/#/reports/${group.id}`);
+  await page
+    .getByRole("group", { name: "작성자 제재 선택" })
+    .getByRole("button", { name: "경고", exact: false })
+    .click();
+  await page.getByRole("textbox", { name: "조치 사유" }).fill("정책 위반 확인");
+  await page.getByRole("button", { name: "조치 적용", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "적용하기" }).click();
+  await page.getByRole("button", { name: "같은 요청 재시도" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "조치가 적용되었습니다" })).toBeVisible();
+  expect(mutations).toHaveLength(2);
+  expect(mutations[0].request_id).not.toBe(mutations[1].request_id);
+});

@@ -166,6 +166,7 @@ function ProtectedPages({
       <LiveOperationsScreen
         key={route}
         view={route === "/members" ? "members" : "sanctions"}
+        adminId={identity.id}
         email={identity.email}
         onLogout={onLogout}
       />
@@ -176,6 +177,7 @@ function ProtectedPages({
       <LiveReportDetailScreen
         key={detailId}
         reportId={detailId}
+        adminId={identity.id}
         email={identity.email}
         onLogout={onLogout}
       />
