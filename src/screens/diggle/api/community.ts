@@ -134,8 +134,12 @@ export async function fetchCommunityComments(
 
 export function parseCommunityComment(value: unknown): CommunityComment {
   const row = record(value);
+  if (row.vote_choice != null && row.vote_choice !== "buy" && row.vote_choice !== "not")
+    throw new Error("invalid_community_response");
   return {
     ...cursor(row),
+    isOperator: row.is_withdrawn !== true && row.is_operator === true,
+    voteChoice: row.is_withdrawn === true ? null : (row.vote_choice ?? null),
     body: optionalText(row.content),
     isPostAuthor: row.is_post_author === true,
     isMine: row.is_mine === true,

@@ -81,3 +81,30 @@ test("닉네임 저장 성공 시 커뮤니티 전체 캐시를 무효화하고 
     } else assert.equal(value, "이미 사용 중인 닉네임입니다.");
   }
 });
+
+test("댓글 라벨은 서버의 관리자 여부·투표 선택만 사용하며 구버전·탈퇴 응답에는 표시하지 않는다", () => {
+  const { parseCommunityComment } = load("src/screens/diggle/api/community.ts", {
+    "@/lib/supabase": { supabase: {} },
+  });
+  const row = { id: "1", created_at: "2026-11-21T01:00:00Z", author_nickname: "Diggin" };
+  assert.equal(parseCommunityComment(row).isOperator, false);
+  assert.equal(parseCommunityComment(row).voteChoice, null);
+  for (const choice of ["buy", "not", null]) {
+    const comment = parseCommunityComment({ ...row, is_operator: true, vote_choice: choice });
+    assert.equal(comment.isOperator, true);
+    assert.equal(comment.voteChoice, choice);
+    const withdrawn = parseCommunityComment({
+      ...row,
+      is_operator: true,
+      vote_choice: choice,
+      is_withdrawn: true,
+    });
+    assert.equal(withdrawn.isOperator, false);
+    assert.equal(withdrawn.voteChoice, null);
+  }
+  assert.equal(parseCommunityComment({ ...row, is_operator: "true" }).isOperator, false);
+  assert.throws(
+    () => parseCommunityComment({ ...row, vote_choice: "other" }),
+    /invalid_community_response/,
+  );
+});

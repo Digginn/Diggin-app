@@ -40,10 +40,55 @@ function findAll(node, type) {
 
 // Remote detail access and comment display are covered by community.test.cjs.
 
-test("댓글 30자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {
+test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자는 BUY/NOT, 탈퇴자는 라벨을 숨긴다", () => {
+  const { Comment } = load("../src/components/Comment.tsx", {
+    "react": { useRef: () => ({ current: null }), useState: () => [false, () => {}] },
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+    "@/assets/images/icon-kebab.svg": { __esModule: true, default: "KebabSvg" },
+    "@/components/ReportBlockMenu": { ReportBlockMenu: "ReportBlockMenu" },
+    "@/theme": { colors: { gray: { 500: "gray" } } },
+    "@/utils/httpLinks": { httpLinkParts: (body) => [{ text: body }] },
+  });
+  const labels = (props) =>
+    findAll(
+      Comment({
+        author: "느긋한디기12 (나)",
+        body: "댓글",
+        timeLabel: "방금 전",
+        ...props,
+      }),
+      "Text",
+    )
+      .map((node) => node.props.children)
+      .filter((value) => typeof value === "string");
+  assert.deepEqual(labels({ isOperator: true, voteChoice: "buy" }), [
+    "느긋한디기12 (나)",
+    "운영자",
+    "·",
+    "방금 전",
+  ]);
+  assert.ok(labels({ voteChoice: "buy" }).includes("BUY"));
+  assert.ok(labels({ voteChoice: "not" }).includes("NOT"));
+  assert.equal(labels({ author: "Diggin" }).includes("운영자"), false);
+  const withdrawn = labels({ isOperator: true, voteChoice: "buy", isDeleted: true });
+  assert.equal(withdrawn.includes("운영자"), false);
+  assert.equal(withdrawn.includes("BUY"), false);
+});
+
+test("댓글 150자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {
+  let isFocused = false;
   const { CommentInput } = load("../src/components/CommentInput.tsx", {
+    "@/constants/comments": load("../src/constants/comments.ts", {}),
     "@/utils/text": load("../src/utils/text.ts", {}),
-    "react": { forwardRef: (render) => render },
+    "react": {
+      forwardRef: (render) => render,
+      useState: () => [
+        isFocused,
+        (value) => {
+          isFocused = value;
+        },
+      ],
+    },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable", TextInput: "TextInput" },
     "@/assets/images/icon-send.svg": { __esModule: true, default: "SendSvg" },
     "@/theme": {
@@ -51,7 +96,7 @@ test("댓글 30자 초과는 오류를 표시하고 줄이면 전송 가능한 �
       typography: { "label-16-medium": { size: 16 } },
     },
   });
-  const longValue = "a".repeat(30) + "\n";
+  const longValue = "a".repeat(150) + "\n";
   let changed;
   const render = (value) =>
     CommentInput(
@@ -65,7 +110,7 @@ test("댓글 30자 초과는 오류를 표시하고 줄이면 전송 가능한 �
       null,
     );
   const tooLong = render(longValue);
-  assert.equal(findAll(tooLong, "Text")[0].props.children, "댓글은 30자 이하로 입력해 주세요.");
+  assert.equal(findAll(tooLong, "Text")[0].props.children, "댓글은 150자 이하로 입력해 주세요.");
   assert.ok(
     findAll(tooLong, "View").some((view) => view.props.className.includes("border-semantic-error")),
   );
@@ -73,11 +118,30 @@ test("댓글 30자 초과는 오류를 표시하고 줄이면 전송 가능한 �
   const field = findAll(tooLong, "TextInput")[0];
   assert.equal(field.props.value, longValue);
   assert.equal(field.props.maxLength, undefined, "입력을 잘라내지 않는다");
-  field.props.onChangeText("a".repeat(29) + "\n");
+  assert.equal(field.props.scrollEnabled, true, "오류 상태에서도 입력창 내부 스크롤을 유지한다");
+  field.props.onChangeText("a".repeat(149) + "\r\n");
   const recovered = render(changed);
   assert.equal(findAll(recovered, "Text").length, 0);
   assert.equal(findAll(recovered, "Pressable")[0].props.disabled, false);
+  assert.equal(
+    findAll(recovered, "TextInput")[0].props.placeholder,
+    "댓글을 입력해 주세요. (최대 150자)",
+  );
+  assert.equal(changed, "a".repeat(149) + "\n");
+  assert.equal(findAll(render("👍🏽".repeat(150)), "Pressable")[0].props.disabled, false);
+  assert.equal(findAll(render("👍🏽".repeat(151)), "Pressable")[0].props.disabled, true);
+  assert.equal(findAll(render("👩‍👩‍👧‍👦".repeat(150)), "Pressable")[0].props.disabled, false);
   assert.equal(findAll(render(" \n "), "Pressable")[0].props.disabled, true);
+  const empty = render("");
+  findAll(empty, "TextInput")[0].props.onFocus();
+  assert.ok(
+    findAll(render(""), "View").some((view) => view.props.className.includes("border-gray-600")),
+  );
+  assert.equal(findAll(render(""), "Pressable")[0].props.disabled, true);
+  findAll(render(""), "TextInput")[0].props.onBlur();
+  assert.ok(
+    findAll(render(""), "View").some((view) => view.props.className.includes("border-gray-300")),
+  );
 });
 
 test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 교체한다", () => {

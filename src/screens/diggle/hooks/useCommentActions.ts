@@ -3,6 +3,7 @@ import { randomUUID } from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
 
 import { restrictionMessage } from "@/api/accountAccess";
+import { COMMENT_MAX_LENGTH } from "@/constants/comments";
 import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
 import { normalizeText, textLength } from "@/utils/text";
@@ -48,7 +49,8 @@ export function useCommentActions(postId: string, viewer: string | null) {
   const body = state.editing ? state.editBody : state.draft;
 
   async function send() {
-    if (!viewer || busy.current || !body.trim() || textLength(body) > 30) return null;
+    if (!viewer || busy.current || !body.trim() || textLength(body) > COMMENT_MAX_LENGTH)
+      return null;
     const current = lifetime.current;
     const editing = state.editing;
     busy.current = true;

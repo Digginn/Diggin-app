@@ -22,10 +22,14 @@ returns jsonb language sql stable set search_path = '' as $$
     'content', case when c.author_id is null then null else c.content end,
     'is_post_author', c.author_id = p.author_id,
     'is_mine', c.author_id = (select auth.uid()), 'is_withdrawn', c.author_id is null,
-    'anon_number', a.number, 'author_nickname', author.nickname
+    'anon_number', a.number, 'author_nickname', author.nickname,
+    'is_operator', operator.id is not null,
+    'vote_choice', vote.choice
   ) from private.comments c join private.posts p on p.id = c.post_id
   left join public.profiles author on author.id = c.author_id
   left join private.post_anon_numbers a on a.post_id = c.post_id and a.user_id = c.author_id
+  left join private.admin_users operator on operator.id = c.author_id and operator.disabled_at is null
+  left join private.vote_responses vote on p.type = 'vote' and vote.post_id = c.post_id and vote.user_id = c.author_id
   where c.id = target_comment_id;
 $$;
 
@@ -34,7 +38,7 @@ returns text language plpgsql stable set search_path = '' as $$
 declare
   clean_content text := normalize(replace(replace(comment_content, E'\r\n', E'\n'), E'\r', E'\n'), NFC);
 begin
-  if clean_content is null or private.char_count(clean_content) not between 1 and 30 or
+  if clean_content is null or private.char_count(clean_content) not between 1 and 150 or
      regexp_replace(clean_content, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]', '', 'g') = '' then
     raise exception 'invalid_comment_content' using errcode = '22023';
   end if;

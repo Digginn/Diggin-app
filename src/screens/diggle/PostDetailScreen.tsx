@@ -377,9 +377,13 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                       comment.isPostAuthor,
                     )
               }
-              body={normalizeText(comment.body ?? "").replace(/\n/g, " ")}
+              body={normalizeText(comment.body ?? "")
+                .replace(/\s+/gu, " ")
+                .trim()}
               timeLabel={formatCommunityTime(comment.createdAt)}
               isDeleted={comment.isWithdrawn}
+              isOperator={comment.isOperator}
+              voteChoice={comment.voteChoice}
               onPressReport={
                 !comment.isMine && !comment.isWithdrawn && !isBusy
                   ? () => {
