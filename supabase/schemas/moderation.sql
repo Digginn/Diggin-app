@@ -151,12 +151,14 @@ begin
         (other.post_id=r.post_id or other.comment_id=r.comment_id) and (before_report_id is null or other.id<before_report_id) order by other.id desc limit 50) page),'[]'::jsonb),
     'post',case when p.id is null then null else to_jsonb(p) || jsonb_build_object('id',p.id::text) end,
     'comment',case when c.id is null then null else to_jsonb(c) || jsonb_build_object('id',c.id::text,'post_id',c.post_id::text) end,
-    'products',coalesce((select jsonb_agg(to_jsonb(pp) order by pp.position) from private.post_products pp where pp.post_id=p.id),'[]'::jsonb),
+    'products',coalesce((select jsonb_agg(to_jsonb(pp) || jsonb_build_object('post_id',pp.post_id::text) order by pp.position) from private.post_products pp where pp.post_id=p.id),'[]'::jsonb),
     'author',case when profile.id is null then null else jsonb_build_object('id',profile.id,'status',profile.status,'restricted_until',profile.restricted_until) end,
     'sanctions',coalesce((select jsonb_agg(to_jsonb(s) || jsonb_build_object('id',s.id::text,'action_id',s.action_id::text) order by s.id desc)
       from private.user_sanctions s where s.user_id = r.reported_user_id),'[]'::jsonb),
     'actions',coalesce((select jsonb_agg(to_jsonb(a) || jsonb_build_object('id',a.id::text) order by a.id desc)
-      from private.admin_actions a where a.report_id = r.id or (a.target_type='user' and a.target_id=r.reported_user_id::text)),'[]'::jsonb)
+      from private.admin_actions a where a.report_id = r.id or
+        (a.target_type=r.target_type::text and a.target_id=coalesce(r.post_id,r.comment_id)::text) or
+        (a.target_type='user' and a.target_id=r.reported_user_id::text)),'[]'::jsonb)
   ) into result from (select 1) seed
     left join private.comments c on c.id=r.comment_id
     left join private.posts p on p.id=coalesce(r.post_id,c.post_id)

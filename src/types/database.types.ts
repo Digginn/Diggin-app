@@ -364,6 +364,19 @@ export type Database = {
     Functions: {
       accept_policy: { Args: { target_policy_id: number }; Returns: undefined };
       acknowledge_sanction_notice: { Args: { sanction_id: number }; Returns: undefined };
+      admin_console: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          page_number?: number;
+          report_id?: number;
+          resource: string;
+          search_query?: string;
+          status_filter?: string;
+          type_filter?: string;
+        };
+        Returns: Json;
+      };
       admin_content_action: {
         Args: {
           actor: string;
@@ -393,6 +406,18 @@ export type Database = {
       admin_report_detail: {
         Args: { actor: string; actor_session: string; before_report_id?: number; report: number };
         Returns: Json;
+      };
+      admin_report_group_status: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          category: string;
+          explanation: string;
+          new_status: string;
+          report: number;
+          request_id: string;
+        };
+        Returns: string;
       };
       admin_report_groups: {
         Args: { actor: string; actor_session: string; before_id?: number };

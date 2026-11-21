@@ -16,6 +16,19 @@ RPT-005~006 구현. Retool 화면 구성은 #115에서 이 API에 연결한다. 
 
 ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID를 만들고, 응답 유실로 같은 동작을 재시도할 때 유지한다. 같은 키로 내용을 바꾸면 400이다. 정상 실패로 종료된 제재 요청을 새로 시도할 때는 새 키를 사용한다.
 
+### 관리자 웹 추가 요청 (#224)
+
+- `action: "console"`, `resource: "session"` → 검증된 관리자 `{id,email,role}`. UI 진입 때 권한을 확인하며 이후 모든 RPC에서도 재검사한다.
+- `resource: "reports"` → `{total,counts,rows}`. `query`(최대 100자, 문자 그대로 부분 검색), `status`(all/received/reviewing/resolved/rejected), `type`(all/post/comment), `page`(1부터, 20건)를 받는다. 전체 요약은 콘텐츠 그룹별이며 필터와 별개다. 그룹 상태 우선순위는 received → reviewing → resolved → rejected다. ID는 모두 문자열로 반환한다.
+- `resource: "report_detail"`, `report_id` → 기존 상세 + `author_name`, `group_status`, `report_count`. 개별 신고는 기존 `report_detail`의 `before_report_id`로 50건씩 추가 조회한다. 콘텐츠 조치 이력은 해당 콘텐츠의 다른 신고에서 수행한 조치도 포함한다.
+- `resource: "members"` → `{total,rows}`. query/page 지원. 이메일·Auth 메타데이터는 노출하지 않고 UUID·닉네임·가입/최근 로그인·활동/신고/보관 제재 수·실효 계정 상태만 반환한다. 기간 만료된 커뮤니티 제한은 정상으로 표시한다.
+- `resource: "sanctions"` → `{total,rows}`. query/page 지원. 제재·사유·기간·해제 여부와 관련 신고 ID를 반환한다. 보관 정책에 따라 삭제된 과거 제재는 집계하지 않는다.
+- `action: "report_group_status"`, `report_id`, `request_id`, `status`, `reason_category`, `reason` → `{action_id}`. 동일 콘텐츠의 미완료 신고를 하나의 트랜잭션으로 상태 변경한다. 접수는 reviewing으로만, 접수가 없는 검토 중 그룹은 resolved/rejected로 변경한다. 이미 완료된 신고는 보존한다. 서버 상태가 달라졌으면 409로 거부한다. 동일 UUID 재시도는 최초 결과를 반환하며 다른 본문은 거부한다. underage는 사용할 수 없다.
+
+조회 RPC `admin_console`과 일괄 상태 RPC `admin_report_group_status`는 기존 패턴대로 public invoker → private definer이며 service_role만 실행한다. 회원·제재·신고 목록 조회는 `private.admin_console_access_logs`에 운영자·화면·시각을 기록하고 기존 정리 작업이 1년 후 삭제한다. 검색어·비밀번호·토큰은 기록하지 않는다. 기존 상세 조회 로그는 유지한다.
+
+웹 설정·전환 절차와 Retool 보조 기능의 남은 이전 범위는 [admin/README.md](../admin/README.md)를 따른다.
+
 | action                     | 추가 필드                                                          | 결과                                                                                                                                                        |
 | -------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | list_reports               | before_id?                                                         | 콘텐츠별 신고 수·사유별/상태별 수·최초/최근 시각. 최신 신고 ID 역순 50그룹                                                                                  |

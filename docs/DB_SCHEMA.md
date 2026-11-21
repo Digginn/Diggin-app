@@ -357,6 +357,14 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - 제재는 준비 RPC → Auth Admin 변경 → auth.users 지연 트리거 순서다. Auth 트랜잭션 안에서 최종 ban 확인·프로필·제재·감사 기록·세션 제거를 함께 확정하며 실패하면 함께 롤백한다. 재시도는 같은 request_id로 최초 적용 결과를 반환한다.
 - API 계약·관리자 등록·OIDC 설정·검증 방법과 남은 실기기 확인은 [MODERATION_API.md](MODERATION_API.md)를 따른다.
 
+### 6-6. 관리자 웹 연결 (#224)
+
+- `supabase/schemas/admin_console.sql`의 `admin_console`은 관리자 세션 확인·신고 그룹/상세·회원·전체 제재 목록을 제공한다. public 래퍼와 private 구현은 모두 service_role 전용이며 기존 `assert_moderator(actor,actor_session)`로 매번 권한과 실제 세션을 검사한다. 브라우저에는 publishable key와 관리자 세션만 사용한다.
+- 목록은 서버에서 문자 그대로 검색·상태/유형 필터·20건 페이지를 적용한다. 신고 그룹은 received가 있으면 received, 아니면 reviewing → resolved → rejected 순으로 상태를 결정한다. 상단 건수는 전체 콘텐츠 그룹 기준이다. 보관된 제재 수와 실효 계정 상태(7일 제한 만료 반영)를 표시하며 Auth 이메일·메타데이터는 회원 목록에 반환하지 않는다.
+- `admin_report_group_status`는 콘텐츠별 미완료 신고를 행 ID 순서로 잠그고 하나의 트랜잭션에서 상태·감사 기록을 변경한다. 접수 → 검토 중 → 완료/반려만 허용하고 기존 완료 신고는 보존한다. request_id로 결과를 재사용하고 본문이 달라지면 거부한다. Auth 제재는 기존 준비/확정 경로를 그대로 재사용하며 웹이 단계별 성공과 요청 UUID를 보존한다.
+- `private.admin_console_access_logs(id bigint identity, admin_id FK admin_users, resource, created_at)`는 신고·회원·제재 목록의 개인정보 조회 기록이다. RLS·직접 권한 회수·관리자/시간 인덱스를 적용한다. 검색어와 토큰은 저장하지 않는다. 기존 `delete_expired_records()`가 1년 지난 기록을 지운다. 상세는 기존 `admin_access_logs`에 기록한다.
+- 기존 신고 상세는 같은 콘텐츠의 다른 신고에서 수행한 콘텐츠 조치도 반환한다. pgTAP `admin_console.test.sql`, Edge handler 테스트와 로컬 Auth/DB 통합 테스트로 권한 차단·검색/페이지·일괄 상태·중복 요청·실제 Auth 제재를 검증한다. 운영 반영과 Retool 호스팅 전환은 별도 승인 배포를 따른다.
+
 ## 7. 제재 (RPT-006)
 
 - warning: 기능 제한 없이 이력과 안내만.

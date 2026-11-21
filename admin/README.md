@@ -2,7 +2,35 @@
 
 모바일 Expo 앱과 같은 저장소에서 관리하되 실행·의존성·빌드는 분리한 React + Vite + TypeScript 웹 앱입니다. 소스는 `admin/`, 배포 결과물은 `admin/dist/`입니다. 별도 npm workspace 전환 없이 `admin/package-lock.json`으로 의존성을 고정합니다.
 
-현재 진입 화면은 관리자 화면 상태를 선택하는 미리보기입니다. 로그인·로그아웃, 신고 목록의 상태 필터·콘텐츠 유형·검색·유형 선택 메뉴, 조치 후 목록과 게시글·댓글 상세의 조치 흐름, 제재 이력·회원 관리 목록과 새로고침 안내를 확인할 수 있습니다. 현재 작업은 전부 화면과 상호작용이며, 실제 운영자 인증·운영 데이터 연결과 Retool에서의 이전은 화면 구현을 마친 뒤 별도 작업으로 진행합니다.
+기본 진입 화면은 실제 관리자 로그인입니다(#224). Supabase Auth와 기존 `admin-moderation` API를 사용해 신고 조회·처리, 콘텐츠 숨김·복구, 작성자 제재·해제, 회원·제재 목록을 연결합니다. 디자인 예시는 `/#/designs`에서 계속 확인할 수 있으며 실제 API를 호출하지 않습니다.
+
+## 실제 데이터 연결 설정
+
+`admin/.env.example`을 `admin/.env.local`로 복사하고 **개발 프로젝트** 값부터 입력합니다.
+
+```dotenv
+VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+VITE_ADMIN_ENVIRONMENT=development
+```
+
+운영 빌드는 별도 호스트/환경에 운영 프로젝트의 URL·publishable key와 `VITE_ADMIN_ENVIRONMENT=production`을 설정합니다. Vite 변수는 빌드 때 포함되며 EAS 환경변수와 별개입니다. 이 웹에는 service_role/secret key·DB 비밀번호를 등록하지 않습니다. 환경 이름·키·URL이 빠지거나 잘못되면 설정 안내가 표시됩니다. 설정을 바꾸면 서버/빌드를 다시 실행합니다. 상단에 환경 이름과 프로젝트 도메인을 표시하고, 로그인 저장소는 프로젝트 도메인별로 구분합니다.
+
+DB 마이그레이션과 같은 커밋의 `admin-moderation` Edge Function을 저장소의 승인된 배포 경로로 먼저 반영해야 합니다. 이 브랜치에서 공유·운영 DB에 직접 배포하지 않습니다. 기존 `private.admin_users`에 등록되어 있고 비활성화되지 않은 Supabase 이메일/비밀번호 계정으로 로그인합니다. 웹에서 관리자 계정을 새로 발급하거나 권한을 승격하지 않습니다. 등록·비밀번호 설정은 [관리자 API 문서](../docs/MODERATION_API.md)의 기존 절차를 따릅니다.
+
+| 실제 경로             | 기능                                                   |
+| --------------------- | ------------------------------------------------------ |
+| `/#/login`            | 로그인·권한 확인·세션 복원                             |
+| `/#/reports`          | 콘텐츠별 신고 집계, 서버 검색·필터, 20건 페이지        |
+| `/#/reports/{신고ID}` | 원문·작성자·신고/조치 내역, 상태 변경, 숨김·복구, 제재 |
+| `/#/sanctions`        | 보관 중인 제재 이력, 제재 해제                         |
+| `/#/members`          | 회원 UUID·닉네임·활동 집계·계정 상태·최근 로그인       |
+
+신고는 접수 → 검토 중 → 완료/반려 순서로 변경합니다. 같은 콘텐츠의 미완료 신고를 한 트랜잭션으로 변경하고 이미 완료된 신고는 유지합니다. 사유 분류와 조치 사유를 입력해야 숨김·제재도 적용할 수 있습니다. 만 14세 미만 사유는 계정 정지·해제에만 사용합니다. 회원 탈퇴나 작성자 삭제로 사라진 원문은 복구하지 않습니다.
+
+제재와 신고 상태 변경은 별개 단계입니다. 제재가 먼저 성공하고 다음 단계가 실패하면 부분 성공을 안내하고 서버 결과를 다시 조회합니다. 응답을 확인하지 못한 동안 입력을 잠그고 **같은 요청 재시도**로 보존된 UUID와 입력을 재사용합니다. 서버가 실패로 확정한 제재만 새 UUID로 다시 시도합니다. 확인되지 않은 요청이 있으면 해당 화면에서 결과를 확인한 뒤 이동합니다. 새로고침 버튼·로그아웃·메뉴 전환은 기존 Retool 데이터와 같은 서버를 사용합니다.
+
+Retool 전환 전에는 개발 관리자 계정으로 로그인·모든 신고 유형·제재/해제·권한 회수·조회 실패를 대조한 뒤 운영 환경을 설정합니다. Retool의 분석 동의 철회·보관 유지 API는 그대로 유지하지만 이번 디자인의 웹 메뉴에는 추가하지 않았습니다. 이 보조 작업은 기존 도구를 유지하며 별도로 이전합니다. 운영 계정의 실제 데이터로 수행하는 인수 확인·호스팅 전환은 별도 단계입니다.
 
 ## 실행과 검증
 
@@ -18,6 +46,14 @@ npm --prefix admin run typecheck
 npm --prefix admin run build
 npm --prefix admin run preview
 ```
+
+브라우저 테스트는 `npm --prefix admin test`입니다. 실제 경로의 테스트는 전용 가짜 API 호스트를 사용하며 운영·개발 DB에 접속하지 않습니다. 실제 Auth·JWT·RPC 통합 검증은 로컬 임시 Supabase만 허용하는 `supabase/functions/admin-moderation/database_test.ts`로 수행합니다. `ADMIN_MODERATION_TEST_DB_URL`, `ADMIN_MODERATION_TEST_API_URL`, `ADMIN_MODERATION_TEST_PUBLIC_KEY`, `ADMIN_MODERATION_TEST_SERVICE_KEY`에 로컬 값만 주입하고 다음 명령을 실행합니다.
+
+```powershell
+npm exec --yes --package=deno@2.5.6 -- deno test --allow-env --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/database_test.ts
+```
+
+스키마·권한·그룹 처리 검증은 `supabase/tests/admin_console.test.sql`과 기존 moderation 테스트에 포함됩니다. 마이그레이션은 CLI 2.120.0의 declarative sync로 생성했고, 기존 함수 41개의 의미 없는 포맷 차이는 검토 후 제외했습니다.
 
 브라우저 검증은 Windows에서 설치된 Microsoft Edge를 사용합니다. 다른 환경에서는 Chromium을 설치합니다.
 

@@ -73,7 +73,7 @@ for (const design of ACTION_CASES) {
 test("조치 후 예시는 새로고침·재진입 후 유지되고 다른 예시나 기본 목록에 누적되지 않는다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/#/designs");
   await page.getByRole("link", { name: /게시글 #30 · 처리 완료 반영/ }).click();
   const firstStatus = page.locator(".report-row .status-badge").first();
   await expect(firstStatus).toHaveText("처리 완료");

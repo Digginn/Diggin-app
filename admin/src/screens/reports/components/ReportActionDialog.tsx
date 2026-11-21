@@ -21,6 +21,9 @@ export function ReportActionDialog({
   reportCount,
   onCancel,
   onApply,
+  isApplying = false,
+  error,
+  isLive = false,
 }: {
   isOpen: boolean;
   action: ReportAction;
@@ -29,6 +32,9 @@ export function ReportActionDialog({
   reportCount: number;
   onCancel: () => void;
   onApply: () => void;
+  isApplying?: boolean;
+  error?: string;
+  isLive?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -63,7 +69,9 @@ export function ReportActionDialog({
         ? `${author}님은 2026.11.07 14:20까지 게시글·댓글을 작성할 수 없습니다. 적용 후에는 처리 이력에 기록됩니다.`
         : isSuspension
           ? `${author}님은 로그인과 모든 기능을 이용할 수 없습니다. 정지는 제재 해제 전까지 유지됩니다.`
-          : "입력한 조치는 이 화면의 예시에 반영되고 처리 이력에 표시됩니다.";
+          : isLive
+            ? "입력한 조치를 실제 데이터에 적용하고 처리 이력에 기록합니다."
+            : "입력한 조치는 이 화면의 예시에 반영되고 처리 이력에 표시됩니다.";
   return (
     <dialog
       ref={ref}
@@ -72,7 +80,7 @@ export function ReportActionDialog({
       aria-describedby={descriptionId}
       onCancel={(e) => {
         e.preventDefault();
-        onCancel();
+        if (!isApplying) onCancel();
       }}
       onClick={(e) => {
         const r = e.currentTarget.getBoundingClientRect();
@@ -80,7 +88,7 @@ export function ReportActionDialog({
           e.target === e.currentTarget &&
           (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
         )
-          onCancel();
+          if (!isApplying) onCancel();
       }}
     >
       <div className="logout-dialog__head">
@@ -109,7 +117,11 @@ export function ReportActionDialog({
           )}
         </span>
         <h2 id={titleId}>{title}</h2>
-        <p id={descriptionId}>{description}</p>
+        <p id={descriptionId}>
+          {isLive && isRestriction
+            ? `${author}님의 커뮤니티 이용을 적용 시점부터 7일간 제한합니다.`
+            : description}
+        </p>
       </div>
       <dl className="detail-result-summary">
         <div>
@@ -133,12 +145,27 @@ export function ReportActionDialog({
           <dd>{action.reason}</dd>
         </div>
       </dl>
+      {error && (
+        <p className="live-error" role="alert">
+          {error}
+        </p>
+      )}
       <div className="logout-dialog__actions">
-        <AdminBtn variant="secondary" autoFocus onClick={onCancel}>
+        <AdminBtn variant="secondary" autoFocus disabled={isApplying} onClick={onCancel}>
           취소
         </AdminBtn>
-        <AdminBtn variant={isSuspension ? "danger" : "primary"} onClick={onApply}>
-          {isRejection ? "반려하기" : isSuspension ? "정지하기" : "적용하기"}
+        <AdminBtn
+          variant={isSuspension ? "danger" : "primary"}
+          disabled={isApplying}
+          onClick={onApply}
+        >
+          {isApplying
+            ? "처리 중…"
+            : isRejection
+              ? "반려하기"
+              : isSuspension
+                ? "정지하기"
+                : "적용하기"}
         </AdminBtn>
       </div>
     </dialog>

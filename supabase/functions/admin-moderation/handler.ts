@@ -89,6 +89,26 @@ export function createAdminHandler(services: Services) {
       }
       const rpc = (name: string, args: Record<string, unknown>) =>
         services.rpc(name, { ...args, ...identity });
+      if (body.action === "console") {
+        const page = body.page ?? 1;
+        const searchQuery = body.query ?? "";
+        if (
+          typeof page !== "number" || !Number.isInteger(page) || page < 1 || page > 100000 ||
+          typeof searchQuery !== "string" || searchQuery.length > 100
+        ) {
+          return json({ error: "invalid_request" }, 400);
+        }
+        return json(
+          await rpc("admin_console", {
+            resource: text(body.resource, 30),
+            search_query: searchQuery.trim(),
+            status_filter: body.status === undefined ? "all" : text(body.status, 20),
+            type_filter: body.type === undefined ? "all" : text(body.type, 20),
+            page_number: page,
+            report_id: id(body.report_id, true),
+          }),
+        );
+      }
       if (body.action === "list_reports") {
         return json(await rpc("admin_report_groups", { before_id: id(body.before_id, true) }));
       }
@@ -124,6 +144,16 @@ export function createAdminHandler(services: Services) {
         category: text(body.reason_category, 30),
         explanation: text(body.reason, 4000),
       };
+      if (body.action === "report_group_status") {
+        return json({
+          action_id: await rpc("admin_report_group_status", {
+            ...reason,
+            request_id: requestId,
+            report: id(body.report_id),
+            new_status: text(body.status, 20),
+          }),
+        });
+      }
       if (body.action === "report_status" || body.action === "hide" || body.action === "restore") {
         const actionId = await rpc("admin_content_action", {
           ...reason,

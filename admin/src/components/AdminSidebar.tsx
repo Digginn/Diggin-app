@@ -16,7 +16,7 @@ export function AdminSidebar({
   onLogout,
 }: {
   email: string;
-  count: number;
+  count?: number;
   initialProfileOpen?: boolean;
   initialLogoutOpen?: boolean;
   reportsHref?: string;
