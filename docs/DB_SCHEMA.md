@@ -359,6 +359,8 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 ### 6-6. 관리자 웹 연결 (#224)
 
+- 개발 관리자 등록 데이터는 `20261121031503_register_development_admin_accounts.sql`로 관리한다. 사용자 확인을 받은 개발 Auth UUID·이메일 2쌍, 이메일 확인·비밀번호 설정 완료를 대조한 계정만 operator로 등록한다. 기존 등록·비활성화 상태는 보존하며 운영 계정 UUID나 스키마는 바꾸지 않는다. 데이터 마이그레이션이므로 선언형 스키마와 생성 타입에는 변경이 없다. 검증은 `development_admin_registration.test.sql`에 포함한다.
+
 - `supabase/schemas/admin_console.sql`의 `admin_console`은 관리자 세션 확인·신고 그룹/상세·회원·전체 제재 목록을 제공한다. public 래퍼와 private 구현은 모두 service_role 전용이며 기존 `assert_moderator(actor,actor_session)`로 매번 권한과 실제 세션을 검사한다. 브라우저에는 publishable key와 관리자 세션만 사용한다.
 - 목록은 서버에서 문자 그대로 검색·상태/유형 필터·20건 페이지를 적용한다. 신고 그룹은 received가 있으면 received, 아니면 reviewing → resolved → rejected 순으로 상태를 결정한다. 상단 건수는 전체 콘텐츠 그룹 기준이다. 보관된 제재 수와 실효 계정 상태(7일 제한 만료 반영)를 표시하며 Auth 이메일·메타데이터는 회원 목록에 반환하지 않는다.
 - `admin_report_group_status`는 콘텐츠별 미완료 신고를 행 ID 순서로 잠그고 하나의 트랜잭션에서 상태·감사 기록을 변경한다. 접수 → 검토 중 → 완료/반려만 허용하고 기존 완료 신고는 보존한다. request_id로 결과를 재사용하고 본문이 달라지면 거부한다. Auth 제재는 기존 준비/확정 경로를 그대로 재사용하며 웹이 단계별 성공과 요청 UUID를 보존한다.
