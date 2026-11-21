@@ -6,6 +6,7 @@ import { AdminSidebar } from "../../components/AdminSidebar";
 import { AdminToast } from "../../components/AdminToast";
 import { REPORT_STATUS, REPORT_STATUSES } from "../../components/Badges";
 import { FilterTab, type ReportFilter } from "../../components/FilterTab";
+import { Pagination, QueryState } from "../../components/QueryState";
 import { ReportRow, type ReportRowData } from "../../components/ReportRow";
 
 import { ContentTypeSelect, type ContentTypeFilter } from "./components/ContentTypeSelect";
@@ -32,6 +33,7 @@ export function ReportListScreen({
   onLogout,
   onRefresh,
   onOpenReport,
+  remote,
 }: {
   reports: ReportRowData[];
   email: string;
@@ -47,10 +49,28 @@ export function ReportListScreen({
   onLogout: () => Promise<void>;
   onRefresh: () => Promise<void>;
   onOpenReport: (id: string) => void;
+  remote?: {
+    counts: Record<ReportFilter, number>;
+    total: number;
+    page: number;
+    status: ReportFilter;
+    type: ContentTypeFilter;
+    query: string;
+    isLoading: boolean;
+    error?: unknown;
+    onFilter: (filter: { status?: ReportFilter; type?: ContentTypeFilter; query?: string }) => void;
+    onPage: (page: number) => void;
+    onRetry: () => void;
+  };
 }) {
-  const [selected, setSelected] = useState<ReportFilter>(initialSelected);
-  const [query, setQuery] = useState(initialQuery);
-  const [typeFilter, setTypeFilter] = useState<ContentTypeFilter>(initialTypeFilter);
+  const [localSelected, setSelected] = useState<ReportFilter>(initialSelected);
+  const [localQuery, setQuery] = useState(initialQuery);
+  const [localType, setTypeFilter] = useState<ContentTypeFilter>(initialTypeFilter);
+  const selected = remote?.status ?? localSelected;
+  const query = remote?.query ?? localQuery;
+  const typeFilter = remote?.type ?? localType;
+  const changeQuery = (value: string) =>
+    remote ? remote.onFilter({ query: value }) : setQuery(value);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const refreshLock = useRef(false);
@@ -58,7 +78,7 @@ export function ReportListScreen({
   const [toast, setToast] = useState({ id: 0, isVisible: initialRefreshToast });
   const dismissToast = useCallback(() => setToast((t) => ({ ...t, isVisible: false })), []);
 
-  const counts = countReports(reports);
+  const counts = remote?.counts ?? countReports(reports);
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const candidates = reports.filter(
     (report) =>
@@ -68,7 +88,9 @@ export function ReportListScreen({
           .toLocaleLowerCase()
           .includes(normalizedQuery)),
   );
-  const filtered = candidates.filter((report) => selected === "all" || report.status === selected);
+  const filtered = remote
+    ? reports
+    : candidates.filter((report) => selected === "all" || report.status === selected);
 
   async function refresh() {
     if (refreshLock.current) return;
@@ -105,8 +127,13 @@ export function ReportListScreen({
               신고된 게시글·댓글을 콘텐츠별로 모아 확인하고 처리합니다.
             </p>
           </div>
-          <AdminBtn variant="outline" icon="refresh" disabled={isRefreshing} onClick={refresh}>
-            {isRefreshing ? "새로고침 중…" : "새로고침"}
+          <AdminBtn
+            variant="outline"
+            icon="refresh"
+            disabled={isRefreshing || remote?.isLoading}
+            onClick={remote ? remote.onRetry : refresh}
+          >
+            {isRefreshing || remote?.isLoading ? "새로고침 중…" : "새로고침"}
           </AdminBtn>
         </header>
         <section className="report-summary" aria-label="신고 현황">
@@ -132,7 +159,11 @@ export function ReportListScreen({
         <div className="report-table-scroll" role="region" aria-label="신고 목록 표" tabIndex={0}>
           <section className="report-table">
             <div className="report-toolbar">
-              <FilterTab selected={selected} onChange={setSelected} counts={counts} />
+              <FilterTab
+                selected={selected}
+                onChange={(status) => (remote ? remote.onFilter({ status }) : setSelected(status))}
+                counts={counts}
+              />
               <div className="report-search-controls">
                 <div className={`report-search ${query ? "report-search--filled" : ""}`}>
                   {query ? (
@@ -146,7 +177,8 @@ export function ReportListScreen({
                     type="search"
                     placeholder="콘텐츠 ID, 내용, 작성자 검색"
                     value={query}
-                    onChange={(event) => setQuery(event.target.value)}
+                    maxLength={100}
+                    onChange={(event) => changeQuery(event.target.value)}
                   />
                   {query && (
                     <button
@@ -154,7 +186,7 @@ export function ReportListScreen({
                       type="button"
                       aria-label="검색어 지우기"
                       onClick={() => {
-                        setQuery("");
+                        changeQuery("");
                         searchRef.current?.focus();
                       }}
                     >
@@ -164,7 +196,7 @@ export function ReportListScreen({
                 </div>
                 <ContentTypeSelect
                   value={typeFilter}
-                  onChange={setTypeFilter}
+                  onChange={(type) => (remote ? remote.onFilter({ type }) : setTypeFilter(type))}
                   initialOpen={initialTypeOpen}
                 />
               </div>
@@ -179,6 +211,13 @@ export function ReportListScreen({
               <span />
             </div>
             <div className="report-table__body">
+              {remote && (
+                <QueryState
+                  isLoading={remote.isLoading}
+                  error={remote.error}
+                  onRetry={remote.onRetry}
+                />
+              )}
               {filtered.map((report) => (
                 <ReportRow
                   key={`${report.type}-${report.id}`}
@@ -187,25 +226,34 @@ export function ReportListScreen({
                 />
               ))}
             </div>
-            {filtered.length === 0 && (
+            {filtered.length === 0 && !remote?.isLoading && !remote?.error && (
               <p className="report-table__empty" role="status">
                 조건에 맞는 신고가 없습니다.
               </p>
             )}
-            <footer className="report-table__footer">
-              <p aria-live="polite">{filtered.length}건 표시 중</p>
-              <nav className="report-pagination" aria-label="신고 목록 페이지">
-                <button type="button" aria-label="이전 페이지" disabled>
-                  <AdminIcon asset="pagination-left" size={16} />
-                </button>
-                <button type="button" aria-label="1페이지" aria-current="page">
-                  1
-                </button>
-                <button type="button" aria-label="다음 페이지" disabled>
-                  <AdminIcon asset="pagination-right" size={16} />
-                </button>
-              </nav>
-            </footer>
+            {remote ? (
+              <Pagination
+                page={remote.page}
+                total={remote.total}
+                isLoading={remote.isLoading}
+                onChange={remote.onPage}
+              />
+            ) : (
+              <footer className="report-table__footer">
+                <p aria-live="polite">{filtered.length}건 표시 중</p>
+                <nav className="report-pagination" aria-label="신고 목록 페이지">
+                  <button type="button" aria-label="이전 페이지" disabled>
+                    <AdminIcon asset="pagination-left" size={16} />
+                  </button>
+                  <button type="button" aria-label="1페이지" aria-current="page">
+                    1
+                  </button>
+                  <button type="button" aria-label="다음 페이지" disabled>
+                    <AdminIcon asset="pagination-right" size={16} />
+                  </button>
+                </nav>
+              </footer>
+            )}
           </section>
         </div>
       </main>

@@ -16,6 +16,19 @@ RPT-005~006 구현. Retool 화면 구성은 #115에서 이 API에 연결한다. 
 
 ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID를 만들고, 응답 유실로 같은 동작을 재시도할 때 유지한다. 같은 키로 내용을 바꾸면 400이다. 정상 실패로 종료된 제재 요청을 새로 시도할 때는 새 키를 사용한다.
 
+### 관리자 웹 추가 요청 (#224)
+
+- `action: "console"`, `resource: "session"` → 검증된 관리자 `{id,email,role}`. UI 진입 때 권한을 확인하며 이후 모든 RPC에서도 재검사한다.
+- `resource: "reports"` → `{total,counts,rows}`. `query`(최대 100자, 문자 그대로 부분 검색), `status`(all/received/reviewing/resolved/rejected), `type`(all/post/comment), `page`(1부터, 20건)를 받는다. 전체 요약은 콘텐츠 그룹별이며 필터와 별개다. 그룹 상태 우선순위는 received → reviewing → resolved → rejected다. ID는 모두 문자열로 반환한다.
+- `resource: "report_detail"`, `report_id` → 기존 상세 + `author_name`, `group_status`, `report_count`. 개별 신고는 기존 `report_detail`의 `before_report_id`로 50건씩 추가 조회한다. 콘텐츠 조치 이력은 해당 콘텐츠의 다른 신고에서 수행한 조치도 포함한다.
+- `resource: "members"` → `{total,rows}`. query/page 지원. 이메일·Auth 메타데이터는 노출하지 않고 UUID·닉네임·가입/최근 로그인·활동/신고/보관 제재 수·실효 계정 상태만 반환한다. 기간 만료된 커뮤니티 제한은 정상으로 표시한다.
+- `resource: "sanctions"` → `{total,rows}`. query/page 지원. 제재·사유·기간·해제 여부와 관련 신고 ID를 반환한다. 보관 정책에 따라 삭제된 과거 제재는 집계하지 않는다.
+- `action: "report_group_status"`, `report_id`, `request_id`, `status`, `reason_category`, `reason` → `{action_id}`. 동일 콘텐츠의 미완료 신고를 하나의 트랜잭션으로 상태 변경한다. 접수는 reviewing으로만, 접수가 없는 검토 중 그룹은 resolved/rejected로 변경한다. 이미 완료된 신고는 보존한다. 서버 상태가 달라졌으면 409로 거부한다. 동일 UUID 재시도는 최초 결과를 반환하며 다른 본문은 거부한다. underage는 사용할 수 없다.
+
+조회 RPC `admin_console`과 일괄 상태 RPC `admin_report_group_status`는 기존 패턴대로 public invoker → private definer이며 service_role만 실행한다. 회원·제재·신고 목록 조회는 `private.admin_console_access_logs`에 운영자·화면·시각·실제 반환한 회원 UUID를 기록하고 기존 정리 작업이 1년 후 삭제한다. 상세 조회도 반환한 작성자·신고자 UUID를 기록한다. 두 로그의 `session_ip`는 검증한 Auth 세션의 로그인 당시 IP이며 현재 요청 IP와 다르다. 검색어·비밀번호·토큰은 기록하지 않는다. 요청 IP의 신뢰 가능한 수집 및 최종 접속기록 기준 확정은 남아 있다.
+
+웹 설정·전환 절차와 분석 동의 철회·보관 유지 화면의 신규 추가 범위는 [admin/README.md](../admin/README.md)를 따른다. 두 API는 DIGGIN 서버 코드에 있으며, 사용자 제공 Retool 코드 검색 결과에는 해당 화면·쿼리·호출이 없다.
+
 | action                     | 추가 필드                                                          | 결과                                                                                                                                                        |
 | -------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | list_reports               | before_id?                                                         | 콘텐츠별 신고 수·사유별/상태별 수·최초/최근 시각. 최신 신고 ID 역순 50그룹                                                                                  |
@@ -75,6 +88,7 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 | APPLE_OIDC_AUDIENCES  | 네이티브 Bundle ID, 사용하는 경우 Apple Service ID                       |
 
 3. 프로젝트 담당자가 Supabase Auth에 확인된 운영자 계정을 만들고, 승인된 데이터 등록 절차로 `private.admin_users`에 그 계정 UUID·이메일·operator/super_admin을 등록한다. 이메일 도메인이나 user_metadata로 자동 승격하지 않는다. 앱 일반 사용자 UUID를 운영자로 잘못 등록하지 않는다.
+   - #224 개발용 계정은 `20261121031503_register_development_admin_accounts.sql`로 등록한다. 사용자가 지정한 `diggin.app@gmail.com`(개발 UID `25230b16-95fa-469c-86ef-35ed8cda0f3f`)·`digginmanagertest@gmail.com`(개발 UID `36ff500f-f715-4c06-9dba-904edda79f1c`)을 개발 프로젝트의 Auth Admin API로 별도 생성했다. 지정한 UID·이메일, 이메일 확인 완료·비밀번호 설정까지 검사한 뒤 `operator`로 등록하고 기존 권한·비활성화 상태는 유지한다. 운영 DB에는 해당 개발 UUID가 없어 적용하지 않는다. 비밀번호·서비스 키는 Git에 저장하지 않는다. 승인·개발 배포 후 두 계정으로 권한 확인·목록 조회를 검증한다.
    - #175 Retool 전용 테스트 계정은 `20261102135701_register_retool_test_operator.sql`로 등록한다. UID `95fece6b-9373-430b-8547-61eef81903e1`·이메일 `digginmanagertest@gmail.com`이 일치하고 이메일 확인이 끝난 계정만 `operator`로 추가한다. 기존 권한·비활성화 상태는 보존한다. 앱 심사용 계정은 관리자로 등록하지 않는다. 사용자 지시에 따라 PR #177과 해당 브랜치에 한해 팀원 승인 없이 관리자 병합·배포를 허용한다. 다른 PR의 승인 검사는 유지한다. 배포가 끝나면 테스트 계정으로 로그인하여 `list_reports`를 확인한다.
    - #115 최초 Retool 계정은 `20261021173103_register_retool_operator.sql` 데이터 마이그레이션으로 등록한다. 지정한 UID의 이메일 확인이 완료된 Auth 계정만 `operator`로 추가하며, 계정이 없는 로컬/CI에서는 건너뛴다. 기존 운영자의 권한·비활성화 상태는 바꾸지 않는다. PR 승인·병합 후 자동 배포가 끝나야 Retool에서 관리자 API를 사용할 수 있다.
    - #121은 승인 리뷰 없이 병합되어 배포의 승인 검사에서 중단됐다. 사용자 지시에 따라 복구 PR #122만 팀원 승인 예외로 배포하며 다른 PR의 승인 조건은 유지한다. DB 등록 SQL은 직접 실행하지 않는다. #122의 `deploy` 성공 후 Retool 관리자 로그인과 `list_reports` 성공을 확인한다. 신고가 없어 빈 배열이 반환되어도 정상이며, 403이면 Auth 이메일 확인과 해당 UID의 운영자 등록·비활성화 상태를 확인한다.

@@ -3,6 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { ComponentPreview } from "./ComponentPreview";
 import { AdminBrand } from "./components/AdminBrand";
 import { AdminToast } from "./components/AdminToast";
+import { LiveApp } from "./LiveApp";
 import { OPERATIONS_DESIGN_STATES } from "./preview-data/operations";
 import { DETAIL_DESIGN_STATES, DETAIL_EXAMPLES } from "./preview-data/report-details";
 import { REPORT_ACTION_DESIGN_STATES, REPORT_DESIGN_STATES } from "./preview-data/report-states";
@@ -205,6 +206,18 @@ function LoggedOutScreen({
 }
 
 export function App() {
+  const route = useSyncExternalStore(
+    subscribeRoute,
+    () => window.location.hash.slice(1) || "/reports",
+  );
+  return route.startsWith("/designs") || route.startsWith("/preview") || route === "/components" ? (
+    <DesignApp />
+  ) : (
+    <LiveApp route={route} />
+  );
+}
+
+function DesignApp() {
   const route = useSyncExternalStore(subscribeRoute, readRoute);
   const [isPreviewSignedIn, setIsPreviewSignedIn] = useState(false);
   const [previewEmail, setPreviewEmail] = useState(EXAMPLE_EMAIL);

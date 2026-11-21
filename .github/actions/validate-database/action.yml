@@ -23,6 +23,7 @@ runs:
       run: |
         node --test scripts/shared-db-approval.test.cjs scripts/production-db-approval.test.cjs
         python3 -m unittest discover -s scripts -p 'test_deploy_shared_db.py'
+        python3 -m unittest discover -s scripts -p 'test_configure_auth_security.py'
 
     - name: Remove the disposable local database
       if: always() && steps.local_db.outcome != 'skipped' && steps.local_db.outcome != ''
