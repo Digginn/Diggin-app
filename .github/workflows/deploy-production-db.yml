@@ -46,6 +46,8 @@ jobs:
       - name: Require an approved pull request
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PR230_AUTHORIZED_HEAD: ${{ vars.PR230_AUTHORIZED_HEAD }}
         with:
           script: |
             const pullRequests = await github.paginate(
@@ -60,6 +62,20 @@ jobs:
             );
             if (!mergedPr) {
               core.setFailed("The deploy commit must be a pull request merged into main. Direct pushes cannot deploy.");
+              return;
+            }
+            // 사용자 지시: PR #230 운영 배포 복구에만 허용하고 실행 후 변수를 제거한다.
+            const authorizedHead = process.env.PR230_AUTHORIZED_HEAD ?? "";
+            if (
+              context.repo.owner === "Digginn" && context.repo.repo === "Diggin-app" &&
+              context.ref === "refs/heads/main" && context.actor === "Sonseongoh" &&
+              mergedPr.number === 231 &&
+              mergedPr.base.sha === "5b5324f988ff4fb38fbb3020f600dee070908b99" &&
+              mergedPr.head?.ref === "fix/224-pr230-production-deploy" &&
+              mergedPr.head?.repo?.full_name === "Digginn/Diggin-app" &&
+              /^[a-f0-9]{40}$/.test(authorizedHead) && mergedPr.head.sha === authorizedHead
+            ) {
+              core.info("PR #231: user authorized this exact PR #230 production recovery without a teammate approval.");
               return;
             }
             const { repository } = await github.graphql(`
