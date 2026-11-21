@@ -9,6 +9,47 @@ const actor = {
 };
 const requestId = "11400000-0000-0000-0002-000000000001";
 const userId = "11400000-0000-0000-0000-000000000002";
+
+Deno.test("관리자 웹 조회·그룹 상태 변경은 검증한 actor/session과 필터를 전달", async () => {
+  const calls: string[] = [];
+  const handler = createAdminHandler({
+    authenticate: () => Promise.resolve(actor),
+    updateAuth: () => Promise.resolve(),
+    rpc: (name, args) => {
+      assert(args.actor === actor.userId && args.actor_session === actor.sessionId);
+      calls.push(name);
+      if (name === "admin_console") {
+        assert(
+          args.page_number === 2 && args.search_query === "검색" && args.type_filter === "comment",
+        );
+      }
+      return Promise.resolve({});
+    },
+  });
+  assert(
+    (await handler(
+      request({ action: "console", resource: "reports", page: 2, query: "검색", type: "comment" }),
+    )).status === 200,
+  );
+  assert(
+    (await handler(
+      request({
+        action: "report_group_status",
+        report_id: "9223372036854775807",
+        request_id: requestId,
+        status: "reviewing",
+        reason_category: "other",
+        reason: "확인",
+      }),
+    )).status === 200,
+  );
+  for (const page of [0, -1, 1.5, "2", 100001]) {
+    assert(
+      (await handler(request({ action: "console", resource: "members", page }))).status === 400,
+    );
+  }
+  assert(calls.join(",") === "admin_console,admin_report_group_status");
+});
 const body = {
   action: "sanction",
   request_id: requestId,

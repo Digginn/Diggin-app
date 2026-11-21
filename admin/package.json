@@ -8,18 +8,21 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "review": "node scripts/review.mjs",
+    "test:review": "playwright test --config playwright.review.config.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "playwright test"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.117.3",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
     "@playwright/test": "1.65.1",
+    "@types/node": "^24.0.0",
     "@types/react": "~19.2.2",
     "@types/react-dom": "~19.2.0",
     "@vitejs/plugin-react": "6.3.0",

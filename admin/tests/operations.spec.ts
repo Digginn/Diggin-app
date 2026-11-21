@@ -48,7 +48,7 @@ test("회원 관리는 8명의 활동·신고·누적 제재와 계정 상태를
 test("목차와 사이드 메뉴에서 세 화면을 오가고 현재 메뉴와 미처리 건수를 유지한다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/#/designs");
   const index = page.getByRole("navigation", { name: "기타 메뉴와 새로고침 디자인 상태 선택" });
   await expect(index.getByRole("link")).toHaveCount(4);
   await index.getByRole("link", { name: "제재 이력 7068:143993" }).click();

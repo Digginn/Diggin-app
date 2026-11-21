@@ -2,7 +2,66 @@
 
 모바일 Expo 앱과 같은 저장소에서 관리하되 실행·의존성·빌드는 분리한 React + Vite + TypeScript 웹 앱입니다. 소스는 `admin/`, 배포 결과물은 `admin/dist/`입니다. 별도 npm workspace 전환 없이 `admin/package-lock.json`으로 의존성을 고정합니다.
 
-현재 진입 화면은 관리자 화면 상태를 선택하는 미리보기입니다. 로그인·로그아웃, 신고 목록의 상태 필터·콘텐츠 유형·검색·유형 선택 메뉴, 조치 후 목록과 게시글·댓글 상세의 조치 흐름, 제재 이력·회원 관리 목록과 새로고침 안내를 확인할 수 있습니다. 현재 작업은 전부 화면과 상호작용이며, 실제 운영자 인증·운영 데이터 연결과 Retool에서의 이전은 화면 구현을 마친 뒤 별도 작업으로 진행합니다.
+기본 진입 화면은 실제 관리자 로그인입니다(#224). Supabase Auth와 기존 `admin-moderation` API를 사용해 신고 조회·처리, 콘텐츠 숨김·복구, 작성자 제재·해제, 회원·제재 목록을 연결합니다. 디자인 예시는 `/#/designs`에서 계속 확인할 수 있으며 실제 API를 호출하지 않습니다.
+
+## 실제 데이터 연결 설정
+
+### 머지 전 로그인·처리 검증
+
+공유 DB에 배포하지 않아도 PR 코드의 실제 Supabase Auth·JWT 권한 검사·신고 처리·제재/해제를 로컬에서 확인할 수 있습니다. Docker Desktop을 실행하고 Supabase CLI 2.120.0, Node.js 22.12 이상을 준비한 뒤, PR #225 브랜치에서 실행합니다.
+
+```powershell
+npm ci --prefix admin
+npm --prefix admin run review
+```
+
+- 주소: `http://127.0.0.1:5174/#/login`
+- 가상 관리자: `admin@diggin.local` / `LocalReview!224`
+- 상단에 **로컬 검증 · 예시 데이터**를 표시합니다. 사용자·신고·제재는 생성한 예시이고, 별도 로컬 DB와 PR의 실제 `admin-moderation` 핸들러를 사용합니다. 로그인이나 관리자 권한 검사를 생략하지 않습니다.
+- 팀원도 자기 PC에서 위 명령을 실행하고 같은 주소로 접속하면 됩니다. localhost 주소는 실행한 PC를 가리킵니다.
+- 첫 실행에는 로컬 DB 초기화·이미지 다운로드로 시간이 걸립니다. 재실행할 때 이 검증용 DB만 초기화합니다. 작업 폴더별 별도 project_id와 포트 5174/55421/55422/55425를 사용하며, 공유 개발·운영 프로젝트에는 요청하지 않습니다.
+- 종료는 실행한 터미널에서 `Ctrl+C`입니다. 검증용 서버와 DB를 종료합니다. 기존 개발 서버의 5173 포트와 `admin/.env.local`은 그대로 둡니다.
+- 환경이 켜진 동안 `npm --prefix admin run test:review`로 실제 로컬 로그인·조회·숨김/복구·그룹 상태 변경·제재/해제·일반 회원 접근 차단을 검증합니다. 처리 테스트는 예시 데이터를 변경하므로 처음 상태는 검증 환경을 다시 실행해 만듭니다.
+
+로컬 검증은 `admin/scripts/review.mjs`가 임시 폴더에 복사한 마이그레이션을 적용하고 가상 계정·예시 데이터를 생성합니다. 서버 전용 로컬 service_role 키는 API 프로세스에만 전달하고 Vite에는 로컬 URL·publishable key만 전달합니다. Deno 2.5.6은 npm으로 준비하며 추가 수동 설치는 필요하지 않습니다. 종료하지 않고 두 번 실행하면 포트 확인 단계에서 중단합니다.
+
+### 개발·운영 서버 연결
+
+`admin/.env.example`을 `admin/.env.local`로 복사하고 **개발 프로젝트** 값부터 입력합니다.
+
+```dotenv
+VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+VITE_ADMIN_ENVIRONMENT=development
+```
+
+운영 빌드는 별도 호스트/환경에 운영 프로젝트의 URL·publishable key와 `VITE_ADMIN_ENVIRONMENT=production`을 설정합니다. Vite 변수는 빌드 때 포함되며 EAS 환경변수와 별개입니다. 이 웹에는 service_role/secret key·DB 비밀번호를 등록하지 않습니다. 환경 이름·키·URL이 빠지거나 잘못되면 설정 안내가 표시됩니다. 설정을 바꾸면 서버/빌드를 다시 실행합니다. 상단에 환경 이름과 프로젝트 도메인을 표시하고, 로그인 저장소는 프로젝트 도메인별로 구분합니다.
+
+DB 마이그레이션과 같은 커밋의 `admin-moderation` Edge Function을 저장소의 승인된 배포 경로로 먼저 반영해야 합니다. 이 브랜치에서 공유·운영 DB에 직접 배포하지 않습니다. 기존 `private.admin_users`에 등록되어 있고 비활성화되지 않은 Supabase 이메일/비밀번호 계정으로 로그인합니다. 웹에서 관리자 계정을 새로 발급하거나 권한을 승격하지 않습니다. 등록·비밀번호 설정은 [관리자 API 문서](../docs/MODERATION_API.md)의 기존 절차를 따릅니다.
+
+개발과 운영의 Auth 계정도 별개입니다. 개발에는 사용자가 지정한 `diggin.app@gmail.com`, `digginmanagertest@gmail.com`을 별도로 생성했고, PR #225의 개발 관리자 등록 마이그레이션이 승인·배포된 뒤 권한이 활성화됩니다. 개발 계정의 비밀번호는 운영 계정과 별도로 설정합니다. 비밀번호 불일치는 Auth 단계의 실패이며, 관리자 API 배포나 권한 등록 실패와 구분합니다.
+
+관리자 웹에는 회원가입 화면이 없습니다. 관리자 계정은 서버의 Auth Admin API로 발급합니다. 공개 이메일 가입 API는 `reject_public_email_signup` Auth 훅으로 차단하며, 일반 앱의 소셜 신규 가입과 기존 관리자 비밀번호 로그인은 유지합니다. 로컬 비밀번호는 12자 이상·대소문자·숫자·특수문자를 요구합니다.
+
+원격 보안 설정은 DB 마이그레이션 성공 후 기존 개발·운영 승인 배포에서 `scripts/configure_auth_security.py --environment development|production --apply`가 필요한 Auth 설정만 반영하고 재조회합니다. 실행 토큰에는 Auth 설정 조회·수정 권한이 필요합니다. 다른 소셜 제공자·리다이렉트 설정은 변경하지 않고, 이미 다른 가입 훅이 설정돼 있으면 덮어쓰지 않습니다. 유출 비밀번호 차단은 별도로 활성화를 시도하며 플랜/권한 문제는 배포 경고와 `needs_attention`으로 표시합니다. 유료 업그레이드를 자동 구매하지 않습니다. `--apply`를 빼면 조회만 수행합니다.
+
+기존 관리자 비밀번호가 강화한 기준을 충족하는지는 별도 재설정·확인이 필요합니다. 비밀번호 원문이나 해시는 조회·기록하지 않습니다. MFA, 사용하지 않는 운영자 계정 비활성화, 분석 동의 철회·보관 유지 화면 신규 추가와 현재 요청 IP의 신뢰 가능한 수집 기준은 후속 확인 항목입니다. 조회 로그에는 반환한 회원과 신고 작성자·신고자를 기록하고, `session_ip`는 **로그인 당시 IP**로만 사용합니다. 이 값을 현재 요청 IP로 표시하거나 접속기록 요구가 모두 충족됐다고 간주하지 않습니다.
+
+| 실제 경로             | 기능                                                   |
+| --------------------- | ------------------------------------------------------ |
+| `/#/login`            | 로그인·권한 확인·세션 복원                             |
+| `/#/reports`          | 콘텐츠별 신고 집계, 서버 검색·필터, 20건 페이지        |
+| `/#/reports/{신고ID}` | 원문·작성자·신고/조치 내역, 상태 변경, 숨김·복구, 제재 |
+| `/#/sanctions`        | 보관 중인 제재 이력, 제재 해제                         |
+| `/#/members`          | 회원 UUID·닉네임·활동 집계·계정 상태·최근 로그인       |
+
+신고는 접수 → 검토 중 → 완료/반려 순서로 변경합니다. 같은 콘텐츠의 미완료 신고를 한 트랜잭션으로 변경하고 이미 완료된 신고는 유지합니다. 사유 분류와 조치 사유를 입력해야 숨김·제재도 적용할 수 있습니다. 만 14세 미만 사유는 계정 정지·해제에만 사용합니다. 회원 탈퇴나 작성자 삭제로 사라진 원문은 복구하지 않습니다.
+
+제재와 신고 상태 변경은 별개 단계입니다. 제재가 먼저 성공하고 다음 단계가 실패하면 부분 성공을 안내하고 서버 결과를 다시 조회합니다. 응답을 확인하지 못한 동안 입력을 잠그고 **같은 요청 재시도**로 보존된 UUID와 입력을 재사용합니다. 서버가 실패로 확정한 제재만 새 UUID로 다시 시도합니다. 미확인 요청과 완료한 단계는 프로젝트·관리자·대상별로 `sessionStorage`에 보관하므로 같은 탭에서 화면을 이동하거나 새로고침해도 복구됩니다. 보관에는 요청 본문만 사용하며 인증 토큰은 포함하지 않습니다. 브라우저 저장소에 보관할 수 없으면 조치를 전송하지 않습니다. 탭을 닫으면 기록이 사라지므로 미확인 요청의 결과를 먼저 확인합니다. 제재 해제도 실패·응답 유실 뒤 서버 결과를 다시 조회하며, 해제되지 않았으면 같은 요청으로 재시도합니다.
+
+댓글 신고 내역에는 신고 당시 저장된 원문을 개별 신고별로 표시합니다. 상단의 현재 댓글과 비교해 신고 후 수정된 내용도 확인할 수 있습니다.
+
+Retool 전환 전에는 개발 관리자 계정으로 로그인·모든 신고 유형·제재/해제·권한 회수·조회 실패를 대조한 뒤 운영 환경을 설정합니다. 분석 동의 철회·보관 유지는 DIGGIN 서버 코드에 API가 구현돼 있습니다. 사용자가 제공한 Retool 앱 코드 검색 결과에는 두 기능의 화면·쿼리·API 호출이 없으며, 새 관리자 웹에도 조작 화면이 없습니다. 따라서 화면을 신규 기획·구현하고 연결을 검증해야 합니다. 두 기능을 이유로 Retool 유지를 요구하지 않으며, 기존 신고·제재 업무의 대체 검증 결과를 기준으로 Retool 전환 시점을 결정합니다. 운영 계정의 실제 데이터로 수행하는 인수 확인·호스팅 전환은 별도 단계입니다.
 
 ## 실행과 검증
 
@@ -18,6 +77,14 @@ npm --prefix admin run typecheck
 npm --prefix admin run build
 npm --prefix admin run preview
 ```
+
+브라우저 테스트는 `npm --prefix admin test`입니다. 실제 경로의 테스트는 전용 가짜 API 호스트를 사용하며 운영·개발 DB에 접속하지 않습니다. 실제 Auth·JWT·RPC 통합 검증은 로컬 임시 Supabase만 허용하는 `supabase/functions/admin-moderation/database_test.ts`로 수행합니다. `ADMIN_MODERATION_TEST_DB_URL`, `ADMIN_MODERATION_TEST_API_URL`, `ADMIN_MODERATION_TEST_PUBLIC_KEY`, `ADMIN_MODERATION_TEST_SERVICE_KEY`에 로컬 값만 주입하고 다음 명령을 실행합니다.
+
+```powershell
+npm exec --yes --package=deno@2.5.6 -- deno test --allow-env --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/database_test.ts
+```
+
+스키마·권한·그룹 처리 검증은 `supabase/tests/admin_console.test.sql`과 기존 moderation 테스트에 포함됩니다. 마이그레이션은 CLI 2.120.0의 declarative sync로 생성했고, 기존 함수 41개의 의미 없는 포맷 차이는 검토 후 제외했습니다.
 
 브라우저 검증은 Windows에서 설치된 Microsoft Edge를 사용합니다. 다른 환경에서는 Chromium을 설치합니다.
 

@@ -228,7 +228,7 @@ test("반려를 선택하면 제재 선택을 해제하고 적용 후에도 작�
 });
 
 test("처리 흐름 목차와 작은 화면의 상세·확인 모달을 확인한다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/designs");
   for (const title of ["게시글 #30", "댓글 #112", "게시글 #11", "게시글 #10", "댓글 #98"])
     await expect(
       page

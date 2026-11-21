@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import type * as BrowserHarness from "./browser-harness";
 
 test("디자인 상태 선택에서 로그인과 신고 목록 구역을 확인한다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/designs");
   await expect(page.getByRole("heading", { name: "로그인 · 비로그인 · 로그아웃" })).toBeVisible();
   await expect(page.getByText("실제 계정과 연결되지 않은 미리보기입니다.")).toBeVisible();
   await expect(
@@ -166,7 +166,7 @@ test("신고 필터·유형·검색·빈 결과가 예시 데이터에 적용된
 
 for (const kind of ["login", "logout"] as const) {
   test(`${kind} 대기 중 중복 제출을 막고 실패 후 재시도를 허용한다`, async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/#/designs");
     const control = await page.evaluateHandle(async (mode) => {
       const modulePath = "/tests/browser-harness.tsx";
       const harness: typeof BrowserHarness = await import(modulePath);

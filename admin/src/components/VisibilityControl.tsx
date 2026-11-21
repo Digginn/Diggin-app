@@ -4,9 +4,11 @@ import { AdminIcon } from "./AdminIcon";
 export function VisibilityControl({
   isHidden,
   onChange,
+  disabled = false,
 }: {
   isHidden: boolean;
   onChange: (isHidden: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className={`visibility-control ${isHidden ? "visibility-control--hidden" : ""}`}>
@@ -24,6 +26,7 @@ export function VisibilityControl({
       <AdminBtn
         variant={isHidden ? "primary" : "outline"}
         size="s"
+        disabled={disabled}
         onClick={() => onChange(!isHidden)}
       >
         <AdminIcon asset={isHidden ? "visibility-restore" : "visibility-hide"} size={16} />
