@@ -375,6 +375,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                       comment.authorNickname,
                       comment.isMine,
                       comment.isPostAuthor,
+                      comment.isOperator,
                     )
               }
               body={normalizeText(comment.body ?? "")

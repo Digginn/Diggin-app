@@ -28,6 +28,49 @@ test("닉네임과 본인·글쓴이 라벨을 조합하고 구버전 응답에�
   }
 });
 
+test("활성 관리자 댓글만 Diggin으로 표시하고 실제 닉네임과 본인·글쓴이 구분을 보존한다", () => {
+  const { parseCommunityComment } = load("src/screens/diggle/api/community.ts", {
+    "@/lib/supabase": { supabase: {} },
+  });
+  const row = {
+    id: "1",
+    created_at: "2026-11-21T01:00:00Z",
+    author_nickname: "느긋한디기12",
+    is_operator: true,
+  };
+  const comment = parseCommunityComment(row);
+  assert.equal(comment.authorNickname, "느긋한디기12");
+  assert.equal(
+    formatCommunityAuthor(comment.authorNickname, false, false, comment.isOperator),
+    "Diggin",
+  );
+  assert.equal(
+    formatCommunityAuthor(comment.authorNickname, true, false, comment.isOperator),
+    "Diggin (나)",
+  );
+  assert.equal(
+    formatCommunityAuthor(comment.authorNickname, false, true, comment.isOperator),
+    "Diggin (글쓴이)",
+  );
+  assert.equal(
+    formatCommunityAuthor(comment.authorNickname, true, true, comment.isOperator),
+    "Diggin (나)",
+  );
+  for (const is_operator of [false, undefined, "true"]) {
+    const ordinary = parseCommunityComment({ ...row, is_operator });
+    assert.equal(
+      formatCommunityAuthor(ordinary.authorNickname, false, false, ordinary.isOperator),
+      "느긋한디기12",
+    );
+  }
+  const withdrawn = parseCommunityComment({ ...row, is_withdrawn: true });
+  assert.equal(withdrawn.isOperator, false);
+  assert.equal(
+    formatCommunityAuthor(withdrawn.authorNickname, false, false, withdrawn.isOperator),
+    "사용자",
+  );
+});
+
 test("게시글·댓글 파싱은 닉네임만 추가하며 비회원·탈퇴 응답과 내부 개인정보를 노출하지 않는다", () => {
   const { parsePost, parseCommunityComment } = load("src/screens/diggle/api/community.ts", {
     "@/lib/supabase": { supabase: {} },
