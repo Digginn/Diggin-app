@@ -196,6 +196,7 @@ import_failures
 - `get_community_feed(feed_type = 'all', after_created_at?, after_id?)`: 일반글·투표글 통합 또는 투표글만 최신순 20개를 반환한다. `(created_at, id)` 커서로 같은 시각의 글·앞쪽 신규 삽입에도 중복 페이지를 방지한다. 비회원은 첫 줄 본문과 Snapshot 이미지만 받으며 상품명·브랜드·가격·원본 링크·집계·본인 여부는 받지 않는다. 페이지 경계용 id/type/created_at은 포함한다.
 - `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·차단한 작성자의 글 또는 내가 신고한 해당 글은 null이다. 회원 피드·상세·내 활동은 공통 `community_post_json`에서 작성자 UUID 대신 `author_nickname`과 `is_mine`을 반환한다. 비회원 미리보기에는 닉네임을 반환하지 않는다.
 - `get_community_comments(target_post_id, after_created_at?, after_id?)`: 동일한 게시글 접근 조건을 확인한 뒤 오래된 순 20개를 반환한다. 댓글도 삭제·숨김·작성자 차단과 해당 댓글 신고를 제외한다. UUID 없이 `author_nickname`과 글쓴이/본인/탈퇴 여부를 반환한다. 탈퇴 사용자 본문·닉네임은 항상 null이다. `anon_number`는 구버전 앱 호환용으로만 유지한다.
+- 댓글 조회·등록·수정 JSON은 활성 `private.admin_users`에 등록된 작성자 여부를 `is_operator`로 반환하고, 투표글에서는 해당 댓글 작성자의 현재 투표 선택을 `vote_choice`(`buy`/`not`/null)로 반환한다(#227). 관리자 UUID·이메일·역할이나 전체 투표자 명단은 공개하지 않는다. 관리자 비활성화·투표 변경은 다음 댓글 조회에 반영되며, 탈퇴한 작성자는 false/null이다. 앱은 운영자 라벨을 우선 표시하고, 나머지 댓글에는 투표 선택이 있을 때 BUY/NOT을 표시한다. 기존 `(나)`·`(글쓴이)` 구분은 유지한다. 집계 공개 조건은 바꾸지 않는다.
 - 투표 집계는 참여자·작성자에게 공개하고, 마감 후에는 미참여 회원에게도 공개한다(2026-10-20 사용자 확정). 진행 중 미참여 회원의 집계는 null이다. 비회원에게는 항상 집계를 반환하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
 - definer 구현은 private, invoker 래퍼는 public이다. 비회원 피드 래퍼에 필요한 private 스키마 usage와 피드 함수 execute만 anon에 허용하고 원본·내부 helper·상세·댓글 권한은 주지 않는다.
@@ -228,7 +229,7 @@ import_failures
 #### #97 댓글·익명번호·좋아요
 
 - `create_comment(target_post_id, comment_content, request_id)` / `update_comment(target_comment_id, comment_content)`는 작성자 UUID 없이 조회와 같은 댓글 JSON을 반환한다. `delete_comment(target_comment_id)`는 본인 댓글을 soft delete한다. 수정은 같은 본문도 허용하며 `updated_at`만 갱신하고 정렬용 `created_at`은 보존한다.
-- 댓글 본문은 NFC·CRLF/CR → LF 정규화 후 사용자 인식 문자 1~30자다. 공백·줄바꿈도 세며 공백만 있는 본문은 거부한다. 앱은 초과 입력을 유지하되 전송을 막고, 조회한 줄바꿈은 개수만큼 공백으로 표시한다. HTTP(S)로 해석 가능한 URL만 외부 링크로 만든다.
+- 댓글 본문은 NFC·CRLF/CR → LF 정규화 후 사용자 인식 문자 1~150자다(#227). 공백·줄바꿈도 세며 공백만 있는 본문은 거부한다. 앱은 초과 입력을 유지하되 전송을 막는다. 등록된 댓글을 표시할 때는 연속된 줄바꿈·공백을 한 칸으로 합치고 앞뒤 공백을 제거하며, 저장·수정용 원문은 유지한다. HTTP(S)로 해석 가능한 URL만 외부 링크로 만든다. 작성·수정은 같은 제한을 사용한다. 서버 마이그레이션을 먼저 반영한 뒤 앱을 배포하며, 기존 30자 제한 앱은 계속 사용할 수 있다.
 - 모든 댓글·좋아요 쓰기는 `private.lock_community_post_for_write()`로 인증·제재를 확인하고 부모 글 행을 잠근 뒤 변경한다. 글 삭제도 같은 행을 먼저 잠그므로 삭제 후 댓글이나 좋아요가 추가되는 경합을 막는다. 삭제·숨김·차단/신고로 접근할 수 없는 글은 쓰기도 허용하지 않는다. 댓글 수정·삭제는 글쓴이에게도 타인 댓글 권한을 주지 않는다.
 - `post_anon_numbers`는 구버전 앱 호환을 위해 최초 댓글 때 할당하고 같은 글에서 유지한다. 부모 글 잠금 안에서 `next_anon_number`를 올리므로 동시 참여에도 중복 번호가 없다. 글쓴이는 번호를 소비하지 않는다. 새 앱은 이 번호 대신 프로필 닉네임을 표시하며 본인·글쓴이·탈퇴 라벨과 본문 비공개는 조회 계약을 따른다.
 - `comments.creation_request_id`와 `(author_id, creation_request_id)` unique로 응답 유실·동시 재시도에 같은 댓글을 반환한다. 다른 게시글로 키를 재사용하면 거부한다. 앱은 성공한 댓글을 서버 페이지와 중복 없이 합치며 서버 커서를 바꾸지 않는다. 등록 후 새 댓글까지 남은 페이지를 읽고 이동하고, 실패한 조회는 댓글 영역에서 재시도한다.
@@ -262,7 +263,7 @@ posts
 post_products   (post_id, position 1~4) PK, name, brand, price integer, url, image_url
 vote_responses  id, post_id, user_id null(탈퇴 후), choice, created_at, updated_at, unique (post_id, user_id)
 post_likes      id, post_id, user_id null(탈퇴 후), created_at, unique (post_id, user_id)
-comments        id, post_id, author_id null(탈퇴 후), content 1~30자(줄바꿈 1자) 탈퇴 후 null,
+comments        id, post_id, author_id null(탈퇴 후), content 1~150자(줄바꿈 1자) 탈퇴 후 null,
                 deleted_at, hidden_at, hidden_by, created_at, updated_at,
                 creation_request_id uuid not null, unique (author_id, creation_request_id)
 post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)

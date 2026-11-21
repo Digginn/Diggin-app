@@ -60,7 +60,7 @@ create table private.comments (
   id bigint generated always as identity primary key,
   post_id bigint not null references private.posts(id) on delete cascade,
   author_id uuid references public.profiles(id) on delete set null,
-  content text check (content is null or private.char_count(content) between 1 and 30),
+  content text check (content is null or private.char_count(content) between 1 and 150),
   creation_request_id uuid not null default gen_random_uuid(),
   deleted_at timestamptz,
   hidden_at timestamptz,
@@ -262,7 +262,9 @@ begin
       'content', case when c.author_id is null then null else c.content end,
       'is_post_author', c.author_id = p.author_id,
       'is_mine', c.author_id = (select auth.uid()), 'is_withdrawn', c.author_id is null,
-      'anon_number', a.number, 'author_nickname', author.nickname
+      'anon_number', a.number, 'author_nickname', author.nickname,
+      'is_operator', operator.id is not null,
+      'vote_choice', vote.choice
     ) order by c.created_at, c.id), '[]'::jsonb)
     from (
       select c.* from private.comments c
@@ -275,6 +277,8 @@ begin
     join private.posts p on p.id = c.post_id
     left join public.profiles author on author.id = c.author_id
     left join private.post_anon_numbers a on a.post_id = c.post_id and a.user_id = c.author_id
+    left join private.admin_users operator on operator.id = c.author_id and operator.disabled_at is null
+    left join private.vote_responses vote on p.type = 'vote' and vote.post_id = c.post_id and vote.user_id = c.author_id
   );
 end;
 $$;

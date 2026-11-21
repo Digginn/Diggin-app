@@ -1,4 +1,4 @@
-/* global __dirname, URL */
+/* global __dirname */
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
@@ -52,6 +52,26 @@ const deferred = () => {
   });
   return { promise, resolve, reject };
 };
+
+test("작성 직후 댓글도 재조회한 투표 선택·관리자 상태로 라벨을 갱신한다", () => {
+  const { mergeComments } = load("src/screens/diggle/domain/comments.ts");
+  const previous = { ...row(), voteChoice: "buy", isOperator: true };
+  const fetched = { ...row(), voteChoice: "not", isOperator: false };
+  const merged = mergeComments([fetched], { [previous.id]: { ...previous, body: "고친 본문" } });
+  assert.equal(merged[0].voteChoice, "not");
+  assert.equal(merged[0].isOperator, false);
+  assert.equal(merged[0].body, "고친 본문");
+  assert.equal(mergeComments([], { [previous.id]: previous })[0].voteChoice, "buy");
+  const withdrawn = {
+    ...fetched,
+    isWithdrawn: true,
+    authorNickname: null,
+    body: null,
+    voteChoice: null,
+  };
+  assert.equal(mergeComments([withdrawn], { [previous.id]: previous })[0].isWithdrawn, true);
+  assert.equal(mergeComments([withdrawn], { [previous.id]: previous })[0].body, null);
+});
 
 test("댓글은 공백·줄바꿈을 포함하고 NFC와 이모지를 같은 문자 기준으로 계산한다", () => {
   assert.equal(text.textLength("가\r\n\r\n👍🏽"), 4);
@@ -177,6 +197,7 @@ function harness({
       }),
     },
     "expo-crypto": { randomUUID: () => `request-${++uuid}` },
+    "@/constants/comments": load("src/constants/comments.ts"),
     "@/hooks/useToast": { useToast: () => (message) => toasts.push(message) },
     "@/utils/text": text,
     "../api/community": keys,
@@ -237,6 +258,24 @@ function harness({
       for (const effect of effects.values()) effect.cleanup?.();
     },
   };
+}
+
+for (const editing of [false, true]) {
+  test(`댓글 ${editing ? "수정" : "작성"}은 150자를 허용하고 151자는 초안을 유지하며 차단한다`, async () => {
+    const ui = harness({ create: async (_post, body) => row("90", body) });
+    if (editing) ui.render().startEditing(row("90", "수정 전 댓글"));
+    ui.render().setBody("👍🏽".repeat(151));
+    await ui.render().send();
+    assert.equal(ui.calls.length, 0);
+    assert.equal(ui.render().body, "👍🏽".repeat(151));
+    const boundary = "👍🏽".repeat(149) + "\n";
+    ui.render().setBody(boundary);
+    await ui.render().send();
+    assert.equal(ui.calls.length, 1);
+    assert.equal(ui.calls[0].type, editing ? "update" : "create");
+    assert.equal(ui.calls[0].args[1], boundary);
+    assert.equal(ui.render().changes["90"].body, boundary);
+  });
 }
 
 test("댓글 연타는 한 번만 전송하고 실패 시 본문과 재시도 키를 유지한다", async () => {

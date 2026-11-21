@@ -16,6 +16,9 @@ type CommentProps = {
   author: string;
   body: string;
   timeLabel: string;
+  /** 서버에서 확인한 활성 관리자 여부 */
+  isOperator?: boolean;
+  voteChoice?: "buy" | "not" | null;
   isHighlighted?: boolean;
   /** 삭제된 댓글은 본문을 대체하고 메뉴를 막음 */
   isDeleted?: boolean;
@@ -50,6 +53,8 @@ export function Comment({
   author,
   body,
   timeLabel,
+  isOperator = false,
+  voteChoice = null,
   isHighlighted = false,
   isDeleted = false,
   onPressMenu,
@@ -59,6 +64,7 @@ export function Comment({
 }: CommentProps) {
   const kebabRef = useRef<View>(null);
   const [isReportMenuOpen, setReportMenuOpen] = useState(false);
+  const badge = isDeleted ? null : isOperator ? "운영자" : voteChoice?.toUpperCase();
 
   function handlePressMenu() {
     kebabRef.current?.measureInWindow((x, y, width, height) =>
@@ -78,9 +84,35 @@ export function Comment({
       ) : null}
       <View className="w-full flex-row items-center justify-between pl-margin pr-2">
         <View className="min-w-0 flex-1 flex-row items-center gap-1">
-          <Text numberOfLines={1} className="min-w-0 shrink text-gray-600 font-label-14">
-            {author}
-          </Text>
+          <View className="min-w-0 shrink flex-row items-center gap-1.5">
+            <Text
+              numberOfLines={1}
+              className={clsx(
+                "min-w-0 shrink font-label-14",
+                isOperator && !isDeleted ? "text-gray-800" : "text-gray-600",
+              )}
+            >
+              {author}
+            </Text>
+            {badge ? (
+              <View
+                className={clsx(
+                  "shrink-0 items-center justify-center rounded-sm px-1.5 py-0.5",
+                  badge === "NOT" ? "bg-gray-vote-not" : "h-5 bg-gray-800",
+                )}
+              >
+                <Text
+                  className={clsx(
+                    "font-label-12-semibold",
+                    badge === "NOT" ? "text-gray-800" : "text-gray-0",
+                    isOperator && "!leading-[18px]",
+                  )}
+                >
+                  {badge}
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text className="text-gray-500 font-label-12-regular">·</Text>
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>

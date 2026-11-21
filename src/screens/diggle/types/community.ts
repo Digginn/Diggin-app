@@ -27,6 +27,8 @@ export type CommunityPost = CommunityCursor & {
 };
 
 export type CommunityComment = CommunityCursor & {
+  isOperator: boolean;
+  voteChoice: "buy" | "not" | null;
   body: string | null;
   isPostAuthor: boolean;
   isMine: boolean;

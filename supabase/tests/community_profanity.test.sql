@@ -54,7 +54,7 @@ select throws_ok($$select public.update_comment(current_setting('test.comment'):
 select lives_ok($$select public.update_comment(current_setting('test.comment')::bigint,'예쁜 상품이네요')$$, '정상 댓글 수정 허용');
 select throws_ok($$select public.create_comment(current_setting('test.post')::bigint,'  ',gen_random_uuid())$$,
  '22023','invalid_comment_content','기존 공백 댓글 검증 유지');
-select throws_ok($$select public.update_comment(current_setting('test.comment')::bigint,repeat('가',31))$$,
+select throws_ok($$select public.update_comment(current_setting('test.comment')::bigint,repeat('가',151))$$,
  '22023','invalid_comment_content','기존 댓글 길이 제한 유지');
 reset role;
 select is((select content from private.comments where id=current_setting('test.comment')::bigint),'예쁜 상품이네요','실패한 수정은 저장 본문을 바꾸지 않는다');
