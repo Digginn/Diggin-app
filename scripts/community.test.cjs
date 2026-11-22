@@ -1203,7 +1203,10 @@ test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·�
   state.mocks.react.useState = (initial) => {
     const index = cursor++;
     if (!(index in values)) values[index] = initial;
-    return [values[index], (next) => (values[index] = next)];
+    return [
+      values[index],
+      (next) => (values[index] = typeof next === "function" ? next(values[index]) : next),
+    ];
   };
   const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
   const render = () => {
@@ -1224,4 +1227,53 @@ test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·�
   resolveRefetch();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(control().props.refreshing, false, "다시 불러오면 표시를 끈다");
+});
+
+test("DIGGLE 새로고침 표시는 당긴 탭에만 나오고, 이전 탭의 완료가 새 탭의 새로고침을 끄지 않는다", async () => {
+  const resolvers = [];
+  const params = { tab: "all" };
+  const state = screenMocks({
+    params,
+    feed: {
+      isSuccess: true,
+      data: { pages: [[]] },
+      refetch: () => new Promise((resolve) => resolvers.push(resolve)),
+    },
+  });
+  const values = [];
+  let cursor = 0;
+  state.mocks.react.useState = (initial) => {
+    const index = cursor++;
+    if (!(index in values)) values[index] = initial;
+    return [
+      values[index],
+      (next) => (values[index] = typeof next === "function" ? next(values[index]) : next),
+    ];
+  };
+  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const control = () => {
+    cursor = 0;
+    return nodes(DiggleScreen(), "FlatList")[0].props.refreshControl;
+  };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  control().props.onRefresh();
+  params.tab = "vote";
+  assert.equal(
+    control().props.refreshing,
+    false,
+    "전체 게시글을 당기는 중 투표 탭에는 표시하지 않는다",
+  );
+  control().props.onRefresh();
+  assert.equal(control().props.refreshing, true);
+  resolvers[0]();
+  await flush();
+  assert.equal(
+    control().props.refreshing,
+    true,
+    "전체 게시글 완료가 투표 탭의 새로고침을 끄지 않는다",
+  );
+  resolvers[1]();
+  await flush();
+  assert.equal(control().props.refreshing, false);
 });
