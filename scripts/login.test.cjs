@@ -36,6 +36,7 @@ function load(relativePath, mocks = {}) {
   runInNewContext(compiled, {
     process: { env: {} },
     setTimeout: (callback) => callback(),
+    ...mocks.globals,
     exports: componentModule.exports,
     module: componentModule,
     require: (name) => {
@@ -1214,27 +1215,55 @@ test("회원 전용 화면은 비회원에게 화면 위 로그인 모달을 보
 });
 
 test("권한 오류(42501)가 나면 세션을 확인하고, 동시에 여러 번 나도 확인은 한 번만 보낸다", async () => {
-  let resolveUser;
-  let getUserCalls = 0;
+  const responses = [];
+  let currentToken = "token-a";
+  const signOuts = [];
   const { checkSession } = load("lib/sessionCheck.ts", {
+    "globals": {
+      fetch: (url, options) =>
+        new Promise((resolve) => responses.push({ token: options.headers.Authorization, resolve })),
+    },
     "@/lib/supabase": {
       supabase: {
         auth: {
-          getUser: () => {
-            getUserCalls++;
-            return new Promise((resolve) => (resolveUser = resolve));
-          },
+          getSession: async () => ({
+            data: { session: currentToken ? { access_token: currentToken } : null },
+          }),
+          signOut: async (options) => signOuts.push(options),
         },
       },
     },
   });
+  const sessionGone = { ok: false, status: 403, json: async () => ({ code: "session_not_found" }) };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
   const first = checkSession();
   checkSession();
-  assert.equal(getUserCalls, 1, "확인 중이면 같은 요청을 기다린다");
-  resolveUser({ data: { user: null }, error: null });
+  await flush();
+  assert.equal(responses.length, 1, "확인 중이면 같은 요청을 기다린다");
+  responses[0].resolve({ ok: true, status: 200 });
   await first;
   checkSession();
-  assert.equal(getUserCalls, 2, "끝난 뒤에는 다시 확인할 수 있다");
+  await flush();
+  assert.equal(responses.length, 2, "끝난 뒤에는 다시 확인할 수 있다");
+  responses[1].resolve({ ok: false, status: 503, json: async () => ({}) });
+  await flush();
+  assert.equal(signOuts.length, 0, "서버 오류는 세션을 유지한다");
+
+  // A 확인 중 B로 바뀌면 늦게 온 A의 만료 응답이 B를 로그아웃시키지 않는다.
+  const stale = checkSession();
+  await flush();
+  currentToken = "token-b";
+  const fresh = checkSession();
+  await flush();
+  assert.equal(responses.length, 4, "계정이 바뀌면 새 토큰으로 따로 확인한다");
+  responses[2].resolve(sessionGone);
+  await stale;
+  assert.equal(signOuts.length, 0, "이전 계정의 응답은 새 계정을 로그아웃시키지 않는다");
+  responses[3].resolve(sessionGone);
+  await fresh;
+  assert.equal(signOuts.length, 1, "현재 계정의 세션이 끊겼으면 로그아웃한다");
+  assert.equal(signOuts[0].scope, "local");
 
   const handlers = [];
   const checks = [];
