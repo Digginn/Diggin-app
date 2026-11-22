@@ -12,6 +12,7 @@ import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
 import { FallbackImg } from "@/components/FallbackImg";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
+import { WISH_LEVEL_HINT } from "@/components/ItemInfoFields";
 import { LoadingDialog } from "@/components/Loading";
 import { ActionModal } from "@/components/modal";
 import { requestProductImageNow } from "@/components/ProductImageFiller";
@@ -230,9 +231,7 @@ export function ItemDetailScreen() {
                     },
                   )
                 }
-                hint={
-                  "얼마나 사고 싶은지를 3단계로 기록해두어\nALL 탭에서 빠르게 분류할 수 있습니다."
-                }
+                hint={WISH_LEVEL_HINT}
               />
             )}
           </View>
