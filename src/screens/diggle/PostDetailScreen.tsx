@@ -215,7 +215,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
     if (!result.error || !post || comments.isFetching) return;
     if (toastedPostError.current === result.errorUpdatedAt) return;
     toastedPostError.current = result.errorUpdatedAt;
-    if (!comments.isError) showToast(communityErrorMessage(result.error));
+    if (!comments.isError) showToast(communityErrorMessage(result.error), "error");
   }, [result.error, result.errorUpdatedAt, post, comments.isFetching, comments.isError, showToast]);
 
   useEffect(() => {

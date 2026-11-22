@@ -36,7 +36,7 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"));
 
   useEffect(() => {
-    if (items.isError || counts.isError) showToast(TOAST_MESSAGES.SYS_001);
+    if (items.isError || counts.isError) showToast(TOAST_MESSAGES.SYS_001, "error");
   }, [items.isError, items.errorUpdatedAt, counts.isError, counts.errorUpdatedAt, showToast]);
 
   return (
@@ -120,7 +120,7 @@ function FolderDetailEntry() {
   const folders = useFolders(isPlaceholder);
   const showToast = useToast();
   useEffect(() => {
-    if (isPlaceholder && folders.isError) showToast(TOAST_MESSAGES.SYS_001);
+    if (isPlaceholder && folders.isError) showToast(TOAST_MESSAGES.SYS_001, "error");
   }, [isPlaceholder, folders.isError, folders.errorUpdatedAt, showToast]);
   if (!isPlaceholder) return <FolderDetailContent folderId={id} />;
   const ownedId = folders.data?.find((folder) => folder.isOwnedItems)?.id;

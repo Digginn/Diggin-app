@@ -76,7 +76,7 @@ export function DiggleScreen() {
 
   const refreshFeed = () => {
     if (isOffline) {
-      showToast(TOAST_MESSAGES.SYS_001);
+      showToast(TOAST_MESSAGES.SYS_001, "error");
       return;
     }
     void feed.refetch();
@@ -89,7 +89,7 @@ export function DiggleScreen() {
   );
 
   useEffect(() => {
-    if (feed.error && posts.length > 0) showToast(communityErrorMessage(feed.error));
+    if (feed.error && posts.length > 0) showToast(communityErrorMessage(feed.error), "error");
   }, [feed.error, posts.length, showToast]);
 
   return (
@@ -186,7 +186,7 @@ export function DiggleScreen() {
           onPress={() =>
             requireLogin(() => {
               if (isOffline) {
-                showToast(TOAST_MESSAGES.SYS_001);
+                showToast(TOAST_MESSAGES.SYS_001, "error");
                 return;
               }
               if (isOpeningWriter.current) return;

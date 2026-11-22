@@ -132,7 +132,7 @@ export function ItemDetailScreen() {
       folderIds.data ? folderIds : folderIds.refetch(),
     ]);
     if (!folderResult.data || !folderIdsResult.data) {
-      showToast(TOAST_MESSAGES.SYS_001);
+      showToast(TOAST_MESSAGES.SYS_001, "error");
       return;
     }
     saveFolders.reset();

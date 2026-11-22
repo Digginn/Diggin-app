@@ -99,7 +99,8 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
     }, [isRestoring, viewer, kind, queryClient]),
   );
   useEffect(() => {
-    if (activity.error && rows.length > 0) showToast(communityErrorMessage(activity.error));
+    if (activity.error && rows.length > 0)
+      showToast(communityErrorMessage(activity.error), "error");
   }, [activity.error, rows.length, showToast]);
 
   function openPost(post: CommunityPost) {
