@@ -91,6 +91,11 @@ select is((select (row->>'is_held')::boolean from jsonb_array_elements(current_s
   true,'보관 유지한 제재');
 select is((select (row->>'is_held')::boolean from jsonb_array_elements(current_setting('test.admin235.rows')::jsonb) row where row->>'user_id'='22400000-0000-0000-0000-000000000002'),
   false,'보관 유지하지 않은 제재');
+-- 회원 관리·제재 이력은 한 페이지에 8개(#235).
+insert into auth.users(id,email) select ('22400000-0000-0000-0000-0000000001' || lpad(n::text,2,'0'))::uuid, 'page' || n || '@test.invalid' from generate_series(1,6) n;
+set local role service_role;
+select is(jsonb_array_length(public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','members')->'rows'),8,'회원 목록은 한 페이지에 8개');
+reset role;
 update private.admin_users set disabled_at=now() where id='22400000-0000-0000-0000-000000000001';
 set local role service_role;
 select throws_ok($$select public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','reports')$$,'42501','admin_required','비활성 운영자는 기존 세션으로도 조회 불가');

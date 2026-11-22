@@ -167,7 +167,7 @@ export function LiveOperationsScreen({
                 조건에 맞는 내역이 없습니다.
               </p>
             )}
-            <Pagination page={page} total={result.data.total} onChange={setPage} />
+            <Pagination page={page} total={result.data.total} pageSize={8} onChange={setPage} />
           </>
         )}
       </main>
