@@ -187,7 +187,8 @@ begin
   if cardinality(matches) > 1 then
     raise exception 'user_email_conflict' using errcode = 'P0001';
   end if;
-  -- 고르지 않은 항목은 현재 상태를 유지한다. 동시 변경은 record_analytics_consent가 프로필 행 잠금으로 줄 세운다.
+  -- 고르지 않은 항목은 현재 상태를 유지한다. 읽기 전에 잠가야 앱에서 동시에 철회한 값을 덮어쓰지 않는다.
+  perform 1 from public.profiles where id = matches[1] for update;
   previous := private.analytics_consent_state(matches[1]);
   state := private.record_analytics_consent(
     matches[1],
