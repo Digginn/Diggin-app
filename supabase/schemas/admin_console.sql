@@ -83,7 +83,13 @@ begin
     with filtered as (
       select s.*,p.nickname,a.reason,a.admin_id,a.report_id,a.target_id,
         case when s.released_at is not null then 'released' when s.kind='community_restricted' and s.restricted_until<=now() then 'expired'
-          when s.kind='warning' then 'record' else 'active' end as state
+          when s.kind='warning' then 'record' else 'active' end as state,
+        -- 제재 이력 화면의 보관 열과 처리 열(#235). 해제는 같은 트랜잭션의 조치 기록이 released_at과 같은 시각을 가진다.
+        exists(select 1 from private.retention_holds h where h.target_type='sanction' and h.target_id=s.id) as is_held,
+        coalesce((select ru.email from private.admin_actions r join private.admin_users ru on ru.id=r.admin_id
+            where s.released_at is not null and r.target_type='user' and r.target_id=s.user_id::text and r.created_at=s.released_at
+            order by r.id limit 1),
+          (select au.email from private.admin_users au where au.id=a.admin_id)) as handled_by
       from private.user_sanctions s left join public.profiles p on p.id=s.user_id join private.admin_actions a on a.id=s.action_id
       where search_query='' or position(lower(search_query) in lower(concat_ws(' ',p.nickname,s.user_id,a.target_id)))>0
     ), page as (select * from filtered order by id desc limit 20 offset (page_number-1)*20)
