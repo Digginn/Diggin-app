@@ -487,6 +487,7 @@ function screenMocks({
       View: "View",
       Text: "Text",
       FlatList: "FlatList",
+      RefreshControl: "RefreshControl",
       ScrollView: "ScrollView",
       KeyboardAvoidingView: "KeyboardAvoidingView",
       Pressable: "Pressable",
@@ -1183,4 +1184,42 @@ test("본인 글 상세에서는 좋아요를 누를 수 없다(BUG-074)", async
   const row = nodes(PostDetailScreen({}), "LikeCommentRow")[0];
   assert.equal(row.props.onPressLike, undefined);
   assert.equal(row.props.hasLike, true, "좋아요 수는 계속 보여 준다");
+});
+
+test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·투표 등으로 다시 불러올 때는 켜지 않는다", async () => {
+  let resolveRefetch;
+  const state = screenMocks({
+    feed: {
+      isSuccess: true,
+      isRefetching: true,
+      data: { pages: [[]] },
+      refetch: () => new Promise((resolve) => (resolveRefetch = resolve)),
+    },
+  });
+  state.mocks["react-native"].Platform = { OS: "ios" };
+  const values = [];
+  let cursor = 0;
+  state.mocks.react.useState = (initial) => {
+    const index = cursor++;
+    if (!(index in values)) values[index] = initial;
+    return [values[index], (next) => (values[index] = next)];
+  };
+  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const render = () => {
+    cursor = 0;
+    return DiggleScreen();
+  };
+  const control = () => nodes(render(), "FlatList")[0].props.refreshControl;
+  assert.equal(
+    control().props.refreshing,
+    false,
+    "다른 화면 동작으로 다시 불러오는 중에는 표시하지 않는다",
+  );
+  assert.equal(nodes(render(), "Spinner").length, 0);
+  control().props.onRefresh();
+  assert.equal(control().props.refreshing, true);
+  assert.equal(nodes(render(), "Spinner").length, 1, "iOS는 기본 표시 대신 공통 Spinner를 그린다");
+  resolveRefetch();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(control().props.refreshing, false, "다시 불러오면 표시를 끈다");
 });
