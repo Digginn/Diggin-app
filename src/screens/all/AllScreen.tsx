@@ -108,12 +108,12 @@ export function AllScreen() {
   function handleDelete() {
     deleteProducts.mutate([...selectedIds], {
       onSuccess: () => {
-        showToast(selectDeletedMessage(selectedCount));
+        showToast(selectDeletedMessage(selectedCount), "success");
         exitSelectMode();
       },
       onError: () => {
         setConfirming(null);
-        showToast(TOAST_MESSAGES.ALL_008);
+        showToast(TOAST_MESSAGES.ALL_008, "error");
       },
     });
   }

@@ -78,10 +78,10 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
             try {
               await renameFolder.mutateAsync({ id: folderId, name: nextName });
               setName(nextName);
-              showToast(FOLDER_MESSAGES.renameSuccess);
+              showToast(FOLDER_MESSAGES.renameSuccess, "success");
               return true;
             } catch {
-              showToast(FOLDER_MESSAGES.renameError);
+              showToast(FOLDER_MESSAGES.renameError, "error");
               return false;
             }
           }}
@@ -100,10 +100,10 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
             deleteFolder.mutate(folderId, {
               onSuccess: () => {
                 setIsDeleteConfirmOpen(false);
-                showToast(FOLDER_MESSAGES.deleteSuccess);
+                showToast(FOLDER_MESSAGES.deleteSuccess, "success");
                 goBack();
               },
-              onError: () => showToast(FOLDER_MESSAGES.deleteError),
+              onError: () => showToast(FOLDER_MESSAGES.deleteError, "error"),
             }),
         }}
         primaryAction={{ label: "취소", onPress: () => setIsDeleteConfirmOpen(false) }}

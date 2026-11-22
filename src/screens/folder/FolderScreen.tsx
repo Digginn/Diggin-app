@@ -26,6 +26,7 @@ const INITIAL_FOLDERS: FolderItem[] = [
   { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
 ];
 const TOAST_DURATION_MS = 2000;
+const ERROR_TOAST_DURATION_MS = 4000;
 const MAX_CUSTOM_FOLDERS = 50;
 
 type FolderScreenProps = {
@@ -69,7 +70,9 @@ export function FolderScreen({
   const ownedGuideRef = useRef<View>(null);
   const fabGuideRef = useRef<View>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [toast, setToast] = useState<{ message: string } | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(
+    null,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
   const isDeletingRef = useRef(false);
   const [editingFolder, setEditingFolder] = useState<FolderItem | null>(null);
@@ -98,20 +101,26 @@ export function FolderScreen({
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), TOAST_DURATION_MS);
+    const timer = setTimeout(
+      () => setToast(null),
+      toast.variant === "error" ? ERROR_TOAST_DURATION_MS : TOAST_DURATION_MS,
+    );
     return () => clearTimeout(timer);
   }, [toast]);
 
   async function submitFolderName(name: string, folder?: FolderItem) {
     if (!folder && folders.filter((entry) => !entry.isOwnedItems).length >= MAX_CUSTOM_FOLDERS) {
       Keyboard.dismiss();
-      setToast({ message: FOLDER_MESSAGES.createLimit });
+      setToast({ message: FOLDER_MESSAGES.createLimit, variant: "error" });
       return false;
     }
     try {
       if (folder) await onRenameFolder?.(folder, name);
       else await onCreateFolder?.(name);
-      setToast({ message: folder ? FOLDER_MESSAGES.renameSuccess : FOLDER_MESSAGES.createSuccess });
+      setToast({
+        message: folder ? FOLDER_MESSAGES.renameSuccess : FOLDER_MESSAGES.createSuccess,
+        variant: "success",
+      });
       return true;
     } catch (error) {
       const reason =
@@ -126,6 +135,7 @@ export function FolderScreen({
           : isLimitError
             ? FOLDER_MESSAGES.createLimit
             : FOLDER_MESSAGES.createError,
+        variant: "error",
       });
       return false;
     }
@@ -133,7 +143,7 @@ export function FolderScreen({
 
   const modalToast = toast ? (
     <View pointerEvents="none" className="absolute inset-x-0 bottom-40">
-      <FolderToast message={toast.message} />
+      <FolderToast message={toast.message} variant={toast.variant} />
     </View>
   ) : undefined;
 
@@ -301,7 +311,7 @@ export function FolderScreen({
       )}
       {!isError && !isCreateModalOpen && !editingFolder && !deletingFolder && toast && (
         <View pointerEvents="none" className="absolute inset-x-0 bottom-20 z-30">
-          <FolderToast message={toast.message} />
+          <FolderToast message={toast.message} variant={toast.variant} />
         </View>
       )}
       {!isError && selectedFolderMenu && (
@@ -338,9 +348,9 @@ export function FolderScreen({
               try {
                 await onDeleteFolder(deletingFolder);
                 setDeletingFolder(null);
-                setToast({ message: FOLDER_MESSAGES.deleteSuccess });
+                setToast({ message: FOLDER_MESSAGES.deleteSuccess, variant: "success" });
               } catch {
-                setToast({ message: FOLDER_MESSAGES.deleteError });
+                setToast({ message: FOLDER_MESSAGES.deleteError, variant: "error" });
               } finally {
                 isDeletingRef.current = false;
                 setIsDeleting(false);

@@ -227,7 +227,7 @@ export function ItemDetailScreen() {
                     { wishLevel: level },
                     {
                       onSuccess: () => trackEvent("product_edit", { product_id: id }),
-                      onError: () => showToast(TOAST_MESSAGES.ALL_005),
+                      onError: () => showToast(TOAST_MESSAGES.ALL_005, "error"),
                     },
                   )
                 }
@@ -285,7 +285,7 @@ export function ItemDetailScreen() {
               onSuccess: () => {
                 trackEvent("product_edit", { product_id: id });
                 setEditOpen(false);
-                showToast(TOAST_MESSAGES.ALL_004);
+                showToast(TOAST_MESSAGES.ALL_004, "success");
               },
               onError: (error) =>
                 setEditError(
@@ -341,12 +341,12 @@ export function ItemDetailScreen() {
               },
               onSuccess: () => {
                 setDeleteOpen(false);
-                showToast(TOAST_MESSAGES.ALL_007);
+                showToast(TOAST_MESSAGES.ALL_007, "success");
                 router.back();
               },
               onError: () => {
                 setDeleteOpen(false);
-                showToast(TOAST_MESSAGES.ALL_008);
+                showToast(TOAST_MESSAGES.ALL_008, "error");
               },
             });
           },
@@ -365,7 +365,7 @@ export function ItemDetailScreen() {
           onComplete={(ids) =>
             saveFolders.mutateAsync(ids).then(() => {
               setFolderOpen(false);
-              showToast(selectFolderSavedMessage(ids.length));
+              showToast(selectFolderSavedMessage(ids.length), "success");
             })
           }
         />

@@ -167,7 +167,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           pathname: "/(tabs)/diggle",
           params: { tab: post.type === "vote" ? "vote" : "all" },
         });
-      showToast(post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.");
+      showToast(
+        post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.",
+        "success",
+      );
     } catch (error) {
       if (currentViewer.current === viewer) {
         setDeleteError(communityWriteError(error));

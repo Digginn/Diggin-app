@@ -46,9 +46,9 @@ export function AnalyticsConsentBar({
     onSuccess: (saved, requested) => {
       queryClient.setQueryData(analyticsConsentKeys.detail(userId), saved);
       applyAnalyticsConsent(userId, saved);
-      if (requested[item.key]) showToast(item.toast);
+      if (requested[item.key]) showToast(item.toast, "success");
     },
-    onError: () => showToast(TOAST_MESSAGES.SYS_002),
+    onError: () => showToast(TOAST_MESSAGES.SYS_002, "error"),
   });
   const isChecked = consent.data?.[item.key] ?? false;
 
@@ -59,7 +59,7 @@ export function AnalyticsConsentBar({
       isBusy={save.isPending || consent.isPending}
       onPress={() => {
         if (!consent.data) {
-          showToast(TOAST_MESSAGES.SYS_002);
+          showToast(TOAST_MESSAGES.SYS_002, "error");
           void consent.refetch();
           return;
         }
