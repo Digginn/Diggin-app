@@ -76,6 +76,8 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
   const showToast = useToast();
   const kind: ActivityKind = isLiked ? "liked" : activeKey === "votes" ? "vote" : "post";
   const activity = useCommunityActivity(kind);
+  // 화면에 들어올 때마다 다시 불러온다. 직접 당긴 새로고침에만 표시해야 멈춘 스피너가 뜨지 않는다.
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const rows = activity.data?.pages.flat() ?? [];
   const title = isLiked ? "내가 좋아요한 글" : "내가 쓴 글";
   const emptyState = (
@@ -146,8 +148,11 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
               key={kind}
               data={rows}
               keyExtractor={(item) => item.post.id}
-              refreshing={activity.isRefetching && !activity.isFetchingNextPage}
-              onRefresh={() => void activity.refetch()}
+              refreshing={isRefreshing}
+              onRefresh={() => {
+                setIsRefreshing(true);
+                void activity.refetch().finally(() => setIsRefreshing(false));
+              }}
               onEndReachedThreshold={0.4}
               onEndReached={() => {
                 if (activity.hasNextPage && !activity.isFetching && !activity.isFetchNextPageError)

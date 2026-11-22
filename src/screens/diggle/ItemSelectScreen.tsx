@@ -41,6 +41,8 @@ export function ItemSelectScreen() {
     setSelected([]);
   }
   const products = useProductList("latest", null, searchKeyword, !!session);
+  // 저장·수정 뒤 다시 불러올 때는 표시하지 않고 직접 당긴 새로고침에만 표시한다.
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const counts = useProductCounts(searchKeyword, !!session);
   const results = (products.data?.pages.flat() ?? []).map((item) => ({
     ...item,
@@ -108,8 +110,11 @@ export function ItemSelectScreen() {
 
       <FlatList
         data={products.isPlaceholderData ? [] : gridItems}
-        refreshing={products.isRefetching && !products.isFetchingNextPage}
-        onRefresh={() => void products.refetch()}
+        refreshing={isRefreshing}
+        onRefresh={() => {
+          setIsRefreshing(true);
+          void products.refetch().finally(() => setIsRefreshing(false));
+        }}
         onEndReached={() => {
           if (products.hasNextPage && !products.isFetching && !products.isFetchNextPageError)
             void products.fetchNextPage();

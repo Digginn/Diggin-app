@@ -239,10 +239,13 @@ test("목록의 새로고침·추가 조회와 중복 조회 차단을 연결한
         hasNextPage: true,
         isFetching,
         fetchNextPage: () => next++,
-        refetch: () => refresh++,
+        refetch: async () => refresh++,
+        // 화면 진입 때 다시 불러오는 중이어도 새로고침 표시는 켜지 않는다.
+        isRefetching: true,
       },
     });
     const list = find(Screen(), "FlatList");
+    assert.equal(list.props.refreshing, false);
     list.props.onEndReached();
     list.props.onRefresh();
   }
