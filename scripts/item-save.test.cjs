@@ -460,6 +460,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "./components/DeleteBar": { DeleteBar: "DeleteBar" },
     "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
     "./components/SortLabel": { SortLabel: "SortLabel" },
+    "./constants": { WISH_LEVEL_HINT: "hint" },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
   });
   let tree;
@@ -577,6 +578,7 @@ test("비회원 ALL은 개인 목록을 조회하지 않고 빈 상태를 보이
     "./components/DeleteBar": { DeleteBar: "DeleteBar" },
     "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
     "./components/SortLabel": { SortLabel: "SortLabel" },
+    "./constants": { WISH_LEVEL_HINT: "hint" },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
   });
   const render = () => {
