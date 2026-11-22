@@ -432,7 +432,6 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
     "@/constants/messages": {
-      selectDeletedMessage: () => "",
       STATE_MESSAGES: {},
       TOAST_MESSAGES: {},
     },
@@ -554,7 +553,6 @@ test("비회원 ALL은 개인 목록을 조회하지 않고 빈 상태를 보이
     "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
     "@/constants/messages": {
-      selectDeletedMessage: () => "",
       STATE_MESSAGES: { allEmpty: "빈 ALL" },
       TOAST_MESSAGES: {},
     },

@@ -14,7 +14,7 @@ import { ItemSaveFlow } from "@/components/ItemSaveFlow";
 import { ActionModal } from "@/components/modal";
 import { WishItemGrid } from "@/components/WishItemGrid";
 import { WishLevel } from "@/components/WishLevel";
-import { selectDeletedMessage, STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
+import { STATE_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useItemSave } from "@/hooks/useItemSave";
 import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
@@ -108,12 +108,12 @@ export function AllScreen() {
   function handleDelete() {
     deleteProducts.mutate([...selectedIds], {
       onSuccess: () => {
-        showToast(selectDeletedMessage(selectedCount), "success");
+        showToast(TOAST_MESSAGES.SELECT_DELETED, "success");
         exitSelectMode();
       },
       onError: () => {
         setConfirming(null);
-        showToast(TOAST_MESSAGES.ALL_008, "error");
+        showToast(TOAST_MESSAGES.SELECT_DELETE_FAILED, "error");
       },
     });
   }

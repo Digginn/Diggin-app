@@ -159,7 +159,7 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
       trackEvent(isVote ? "vote_create" : "post_create", { post_id: postId });
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
       setLeaving(true);
-      showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글을 등록했습니다.", "success");
+      showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글이 등록되었습니다.", "success");
     } catch (error) {
       busy.current = false;
       if (mounted.current) {

@@ -388,7 +388,9 @@ export function ItemDetailScreen() {
                   product_id: id,
                   click_source: "my_product",
                 });
-                Linking.openURL(item.sourceUrl).catch(() => showToast(TOAST_MESSAGES.ALL_009));
+                Linking.openURL(item.sourceUrl).catch(() =>
+                  showToast(TOAST_MESSAGES.EXT_001, "error"),
+                );
               }}
             >
               웹사이트 이동
