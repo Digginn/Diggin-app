@@ -123,7 +123,12 @@ export function LiveOperationsScreen({
             }}
           />
         </div>
-        <QueryState isLoading={result.isLoading} error={result.error} onRetry={result.refresh} />
+        {/* 다시 불러오는 동안 표 위에 안내가 끼면 표가 밀려 화면 전체가 깜빡여 보여서, 목록이 없을 때만 띄운다. */}
+        <QueryState
+          isLoading={result.isLoading && !result.data}
+          error={result.error}
+          onRetry={result.refresh}
+        />
         {result.data && (
           <>
             <div className="operations-table-scroll">
