@@ -59,6 +59,9 @@ export type SanctionRecord = {
   state: "record" | "active" | "expired" | "released";
   report_id: string | null;
   admin_id: string;
+  is_held: boolean;
+  /** 해제된 제재는 해제한 운영자, 그 밖에는 제재한 운영자의 이메일 */
+  handled_by: string;
 };
 export type IndividualReport = {
   id: string;
