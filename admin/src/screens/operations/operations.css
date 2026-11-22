@@ -36,6 +36,9 @@
   /* 경로 표시 줄이 없는 시안이라 그 높이만큼 제목을 내린다. */
   padding-top: 23px;
 }
+.operations-table--members {
+  min-width: 1016px;
+}
 .operations-table--members tr {
   grid-template-columns: 190px 120px 110px 100px 100px 130px minmax(0, 1fr);
 }

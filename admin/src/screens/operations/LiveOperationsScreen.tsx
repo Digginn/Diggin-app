@@ -3,7 +3,6 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   ACCOUNT_STATUS,
   REASONS,
-  formatDate,
   type Member,
   type PageResult,
   type SanctionRecord,
@@ -85,31 +84,19 @@ export function LiveOperationsScreen({
     <div className="report-screen operations-screen">
       <AdminSidebar email={email} activePage={view} reportsHref="#/reports" onLogout={onLogout} />
       <main className="report-main">
-        <header className={`report-page-header ${isMembers ? "" : "operations-header--plain"}`}>
+        <header className="report-page-header operations-header--plain">
           <div>
-            {isMembers && <p className="report-breadcrumb">커뮤니티 운영 / {title}</p>}
             <h1>{title}</h1>
-            {!isMembers && (
-              <p className="report-page-description">
-                작성자에게 적용된 제재와 해제 내역을 모아 봅니다.
-              </p>
-            )}
+            <p className="report-page-description">
+              {isMembers
+                ? "커뮤니티 활동 회원의 계정 상태와 신고 현황을 확인합니다."
+                : "작성자에게 적용된 제재와 해제 내역을 모아 봅니다."}
+            </p>
           </div>
-          {isMembers ? (
-            <AdminBtn
-              variant="outline"
-              icon="refresh"
-              disabled={result.isLoading}
-              onClick={result.refresh}
-            >
-              새로고침
-            </AdminBtn>
-          ) : (
-            <AdminBtn variant="outline" disabled={result.isLoading} onClick={result.refresh}>
-              <AdminIcon asset="sanction-refresh-m" size={20} />
-              새로고침
-            </AdminBtn>
-          )}
+          <AdminBtn variant="outline" disabled={result.isLoading} onClick={result.refresh}>
+            <AdminIcon asset="sanction-refresh-m" size={20} />
+            새로고침
+          </AdminBtn>
         </header>
         <div className="live-search">
           <input
@@ -148,16 +135,20 @@ export function LiveOperationsScreen({
                       <tr key={row.id}>
                         <td className="operations-author">
                           <strong>{row.nickname}</strong>
-                          <small>{row.id}</small>
+                          <small title={row.id}>{shortId(row.id)}</small>
                         </td>
-                        <td>{formatDate(row.created_at)}</td>
+                        <td>{dateParts(row.created_at).date}</td>
+                        <td>{row.posts + row.comments}</td>
+                        <td>{row.reports}건</td>
+                        <td>{row.sanctions}회</td>
                         <td>
-                          {row.posts} · {row.comments}
+                          <span
+                            className={`operations-chip operations-chip--${row.status === "active" ? "normal" : "danger"}`}
+                          >
+                            {ACCOUNT_STATUS[row.status]}
+                          </span>
                         </td>
-                        <td>{row.reports}</td>
-                        <td>{row.sanctions}</td>
-                        <td>{ACCOUNT_STATUS[row.status]}</td>
-                        <td>{formatDate(row.last_sign_in_at)}</td>
+                        <td>{row.last_sign_in_at ? dateParts(row.last_sign_in_at).full : "-"}</td>
                       </tr>
                     ) : (
                       <SanctionRow
@@ -220,7 +211,15 @@ function dateParts(value: string) {
       .map((part) => [part.type, part.value]),
   );
   const short = `${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
-  return { full: `${parts.year}.${short}`, short };
+  return {
+    full: `${parts.year}.${short}`,
+    short,
+    date: `${parts.year}.${parts.month}.${parts.day}`,
+  };
+}
+
+function shortId(id: string) {
+  return id.replace(/^(.{4}).*(.{5})$/, "$1…$2");
 }
 
 function sanctionLabel(row: SanctionRecord) {
@@ -253,9 +252,7 @@ function SanctionRow({
     <tr>
       <td className="operations-author">
         <strong>{row.nickname ?? "탈퇴한 회원"}</strong>
-        <small title={row.user_id ?? row.target_id}>
-          {(row.user_id ?? row.target_id).replace(/^(.{4}).*(.{5})$/, "$1…$2")}
-        </small>
+        <small title={row.user_id ?? row.target_id}>{shortId(row.user_id ?? row.target_id)}</small>
       </td>
       <td>{sanctionLabel(row)}</td>
       <td>{REASONS[row.reason_category]}</td>
