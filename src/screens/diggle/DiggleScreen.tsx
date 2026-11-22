@@ -1,7 +1,7 @@
 import { useNetworkState } from "expo-network";
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, Platform, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 
 import { ensureCommunityWriteAllowed, restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
@@ -12,6 +12,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Fab } from "@/components/Fab";
 import { Spinner } from "@/components/Loading";
 import { Post } from "@/components/Post";
+import { REFRESH_TINT, RefreshArea } from "@/components/RefreshArea";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { DIGGLE_EMPTY_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
@@ -124,7 +125,7 @@ export function DiggleScreen() {
           ))}
         </View>
       ) : (
-        <View className="flex-1">
+        <RefreshArea isRefreshing={isRefreshing}>
           <FlatList
             data={posts}
             keyExtractor={(post) => post.id}
@@ -132,8 +133,7 @@ export function DiggleScreen() {
               <RefreshControl
                 refreshing={isRefreshing}
                 onRefresh={refreshFeed}
-                // iOS 기본 표시는 숨기고 공통 Loading/Spinner를 대신 그린다(BUG-131).
-                tintColor={Platform.OS === "ios" ? "transparent" : undefined}
+                tintColor={REFRESH_TINT}
               />
             }
             onEndReached={() => {
@@ -189,13 +189,7 @@ export function DiggleScreen() {
               />
             )}
           />
-          {isRefreshing && Platform.OS === "ios" ? (
-            // iOS 새로고침 영역(약 60) 가운데에 맞춘다.
-            <View pointerEvents="none" className="absolute inset-x-0 top-[14px] items-center">
-              <Spinner />
-            </View>
-          ) : null}
-        </View>
+        </RefreshArea>
       )}
       <View className="absolute bottom-6 right-[27px]">
         <Fab

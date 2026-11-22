@@ -1,12 +1,21 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Text, View } from "react-native";
+import {
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppBar } from "@/components/app-bar";
 import { Button } from "@/components/Button";
 import { SearchField } from "@/components/Field";
 import { Spinner } from "@/components/Loading";
+import { REFRESH_TINT, RefreshArea } from "@/components/RefreshArea";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePostDraft } from "@/contexts/PostDraftContext";
 import { useProductCounts } from "@/hooks/useProductCounts";
@@ -108,60 +117,67 @@ export function ItemSelectScreen() {
         </View>
       ) : null}
 
-      <FlatList
-        data={products.isPlaceholderData ? [] : gridItems}
-        refreshing={isRefreshing}
-        onRefresh={() => {
-          setIsRefreshing(true);
-          void products.refetch().finally(() => setIsRefreshing(false));
-        }}
-        onEndReached={() => {
-          if (products.hasNextPage && !products.isFetching && !products.isFetchNextPageError)
-            void products.fetchNextPage();
-        }}
-        ListEmptyComponent={
-          products.isPending || products.isPlaceholderData ? (
-            <Spinner />
-          ) : (
-            <Text className="py-8 text-center text-gray-500 font-b3">
-              {products.isError ? "아이템을 불러오지 못했습니다." : "선택할 아이템이 없습니다."}
-            </Text>
-          )
-        }
-        ListFooterComponent={
-          products.isError ? (
-            <Button
-              onPress={() => {
-                if (products.isFetchNextPageError) void products.fetchNextPage();
-                else void products.refetch();
+      <RefreshArea isRefreshing={isRefreshing}>
+        <FlatList
+          data={products.isPlaceholderData ? [] : gridItems}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => {
+                setIsRefreshing(true);
+                void products.refetch().finally(() => setIsRefreshing(false));
               }}
-            >
-              다시 시도
-            </Button>
-          ) : products.isFetchingNextPage ? (
-            <Spinner />
-          ) : null
-        }
-        numColumns={COLUMN_COUNT}
-        keyExtractor={(item, index) => item?.id ?? `empty-${index}`}
-        keyboardShouldPersistTaps="handled"
-        columnWrapperStyle={{ gap: COLUMN_GAP, marginBottom: ROW_GAP }}
-        contentContainerStyle={{ paddingHorizontal: SCREEN_PADDING, paddingTop: 8 }}
-        renderItem={({ item }) =>
-          item ? (
-            <SelectCard
-              item={item}
-              name={item.name}
-              price={item.price}
-              brand={item.brand}
-              isSelected={selectedIds.includes(item.id)}
-              onToggle={() => toggle(item)}
+              tintColor={REFRESH_TINT}
             />
-          ) : (
-            <View className="flex-1" />
-          )
-        }
-      />
+          }
+          onEndReached={() => {
+            if (products.hasNextPage && !products.isFetching && !products.isFetchNextPageError)
+              void products.fetchNextPage();
+          }}
+          ListEmptyComponent={
+            products.isPending || products.isPlaceholderData ? (
+              <Spinner />
+            ) : (
+              <Text className="py-8 text-center text-gray-500 font-b3">
+                {products.isError ? "아이템을 불러오지 못했습니다." : "선택할 아이템이 없습니다."}
+              </Text>
+            )
+          }
+          ListFooterComponent={
+            products.isError ? (
+              <Button
+                onPress={() => {
+                  if (products.isFetchNextPageError) void products.fetchNextPage();
+                  else void products.refetch();
+                }}
+              >
+                다시 시도
+              </Button>
+            ) : products.isFetchingNextPage ? (
+              <Spinner />
+            ) : null
+          }
+          numColumns={COLUMN_COUNT}
+          keyExtractor={(item, index) => item?.id ?? `empty-${index}`}
+          keyboardShouldPersistTaps="handled"
+          columnWrapperStyle={{ gap: COLUMN_GAP, marginBottom: ROW_GAP }}
+          contentContainerStyle={{ paddingHorizontal: SCREEN_PADDING, paddingTop: 8 }}
+          renderItem={({ item }) =>
+            item ? (
+              <SelectCard
+                item={item}
+                name={item.name}
+                price={item.price}
+                brand={item.brand}
+                isSelected={selectedIds.includes(item.id)}
+                onToggle={() => toggle(item)}
+              />
+            ) : (
+              <View className="flex-1" />
+            )
+          }
+        />
+      </RefreshArea>
 
       <View
         className="w-full border-t border-gray-200 bg-gray-0 px-margin pt-3"

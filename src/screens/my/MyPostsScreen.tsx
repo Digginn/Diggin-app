@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ImageMyVotePlaceholder } from "@/assets/images/my";
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Spinner } from "@/components/Loading";
 import { LoginRequiredModal } from "@/components/modal";
 import { Post } from "@/components/Post";
+import { REFRESH_TINT, RefreshArea } from "@/components/RefreshArea";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { useAuth } from "@/contexts/AuthContext";
@@ -144,95 +145,106 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
               <Spinner />
             </View>
           ) : (
-            <FlatList
-              key={kind}
-              data={rows}
-              keyExtractor={(item) => item.post.id}
-              refreshing={isRefreshing}
-              onRefresh={() => {
-                setIsRefreshing(true);
-                void activity.refetch().finally(() => setIsRefreshing(false));
-              }}
-              onEndReachedThreshold={0.4}
-              onEndReached={() => {
-                if (activity.hasNextPage && !activity.isFetching && !activity.isFetchNextPageError)
-                  void activity.fetchNextPage();
-              }}
-              renderItem={({ item: { post } }) =>
-                isLiked ? (
-                  <Post
-                    body={post.body}
-                    items={post.items}
-                    timeLabel={formatCommunityTime(post.createdAt)}
-                    authorLabel={formatCommunityAuthor(post.authorNickname, post.isMine)}
-                    likeCount={post.likeCount ?? 0}
-                    commentCount={post.commentCount ?? 0}
-                    onPressReport={
-                      !post.isMine
-                        ? () => setReportTarget({ type: "post", id: post.id })
-                        : undefined
-                    }
-                    onPressBlock={
-                      !post.isMine
-                        ? () => setReportTarget({ type: "post", id: post.id, action: "block" })
-                        : undefined
-                    }
-                    onPress={() => openPost(post)}
-                  />
-                ) : post.type === "post" ? (
-                  <PostRow
-                    item={{
-                      id: post.id,
-                      nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
-                      content: post.body,
-                      dateLabel: formatCommunityTime(post.createdAt),
+            <RefreshArea isRefreshing={isRefreshing}>
+              <FlatList
+                key={kind}
+                data={rows}
+                keyExtractor={(item) => item.post.id}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={() => {
+                      setIsRefreshing(true);
+                      void activity.refetch().finally(() => setIsRefreshing(false));
                     }}
-                    onPress={() => openPost(post)}
+                    tintColor={REFRESH_TINT}
                   />
-                ) : (
-                  <VoteListItem
-                    item={{
-                      id: post.id,
-                      nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
-                      content: post.body,
-                      timeLabel: formatCommunityTime(post.createdAt),
-                      commentCount: post.commentCount ?? 0,
-                      imageSource: post.items[0]?.imageUrl
-                        ? { uri: post.items[0].imageUrl }
-                        : ImageMyVotePlaceholder,
-                    }}
-                    onPress={() => openPost(post)}
-                  />
-                )
-              }
-              ListEmptyComponent={
-                activity.isError ? (
-                  <View className="items-center gap-4 px-margin py-12">
-                    <Text className="text-center text-gray-500 font-b1">
-                      {communityErrorMessage(activity.error)}
-                    </Text>
-                    <Button onPress={() => void activity.refetch()}>다시 시도</Button>
-                  </View>
-                ) : isLiked ? (
-                  <View className="flex-1">{emptyState}</View>
-                ) : null
-              }
-              ListFooterComponent={
-                activity.isFetchingNextPage ? (
-                  <View className="items-center py-5">
-                    <Spinner />
-                  </View>
-                ) : activity.isFetchNextPageError ? (
-                  <Button onPress={() => void activity.fetchNextPage()}>다시 시도</Button>
-                ) : null
-              }
-              className="flex-1"
-              contentContainerStyle={{
-                paddingBottom: insets.bottom,
-                flexGrow: rows.length === 0 ? 1 : undefined,
-              }}
-              showsVerticalScrollIndicator={false}
-            />
+                }
+                onEndReachedThreshold={0.4}
+                onEndReached={() => {
+                  if (
+                    activity.hasNextPage &&
+                    !activity.isFetching &&
+                    !activity.isFetchNextPageError
+                  )
+                    void activity.fetchNextPage();
+                }}
+                renderItem={({ item: { post } }) =>
+                  isLiked ? (
+                    <Post
+                      body={post.body}
+                      items={post.items}
+                      timeLabel={formatCommunityTime(post.createdAt)}
+                      authorLabel={formatCommunityAuthor(post.authorNickname, post.isMine)}
+                      likeCount={post.likeCount ?? 0}
+                      commentCount={post.commentCount ?? 0}
+                      onPressReport={
+                        !post.isMine
+                          ? () => setReportTarget({ type: "post", id: post.id })
+                          : undefined
+                      }
+                      onPressBlock={
+                        !post.isMine
+                          ? () => setReportTarget({ type: "post", id: post.id, action: "block" })
+                          : undefined
+                      }
+                      onPress={() => openPost(post)}
+                    />
+                  ) : post.type === "post" ? (
+                    <PostRow
+                      item={{
+                        id: post.id,
+                        nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
+                        content: post.body,
+                        dateLabel: formatCommunityTime(post.createdAt),
+                      }}
+                      onPress={() => openPost(post)}
+                    />
+                  ) : (
+                    <VoteListItem
+                      item={{
+                        id: post.id,
+                        nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
+                        content: post.body,
+                        timeLabel: formatCommunityTime(post.createdAt),
+                        commentCount: post.commentCount ?? 0,
+                        imageSource: post.items[0]?.imageUrl
+                          ? { uri: post.items[0].imageUrl }
+                          : ImageMyVotePlaceholder,
+                      }}
+                      onPress={() => openPost(post)}
+                    />
+                  )
+                }
+                ListEmptyComponent={
+                  activity.isError ? (
+                    <View className="items-center gap-4 px-margin py-12">
+                      <Text className="text-center text-gray-500 font-b1">
+                        {communityErrorMessage(activity.error)}
+                      </Text>
+                      <Button onPress={() => void activity.refetch()}>다시 시도</Button>
+                    </View>
+                  ) : isLiked ? (
+                    <View className="flex-1">{emptyState}</View>
+                  ) : null
+                }
+                ListFooterComponent={
+                  activity.isFetchingNextPage ? (
+                    <View className="items-center py-5">
+                      <Spinner />
+                    </View>
+                  ) : activity.isFetchNextPageError ? (
+                    <Button onPress={() => void activity.fetchNextPage()}>다시 시도</Button>
+                  ) : null
+                }
+                className="flex-1"
+                contentContainerStyle={{
+                  paddingBottom: insets.bottom,
+                  flexGrow: rows.length === 0 ? 1 : undefined,
+                }}
+                showsVerticalScrollIndicator={false}
+              />
+            </RefreshArea>
           )}
         </>
       )}

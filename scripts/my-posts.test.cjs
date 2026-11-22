@@ -96,11 +96,19 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
           if (name === "@/components/Button") return { Button: "Button" };
           if (name === "@/components/EmptyState") return { EmptyState: "EmptyState" };
           if (name === "@/components/Loading") return { Spinner: "Spinner" };
+          if (name === "@/components/RefreshArea")
+            return { RefreshArea: "RefreshArea", REFRESH_TINT: undefined };
           if (name === "@/components/modal") return { LoginRequiredModal: "LoginRequiredModal" };
           if (name === "@/components/ReportFlow") return { ReportFlow: "ReportFlow" };
           if (name === "@/components/Post") return { Post: "Post" };
           if (name === "react-native")
-            return { FlatList: "FlatList", Pressable: "Pressable", Text: "Text", View: "View" };
+            return {
+              FlatList: "FlatList",
+              Pressable: "Pressable",
+              RefreshControl: "RefreshControl",
+              Text: "Text",
+              View: "View",
+            };
           if (name === "expo-image") return { Image: "Image" };
           if (name === "nativewind") return { cssInterop: (component) => component };
           if (name === "react-native-safe-area-context")
@@ -245,9 +253,9 @@ test("목록의 새로고침·추가 조회와 중복 조회 차단을 연결한
       },
     });
     const list = find(Screen(), "FlatList");
-    assert.equal(list.props.refreshing, false);
+    assert.equal(list.props.refreshControl.props.refreshing, false);
     list.props.onEndReached();
-    list.props.onRefresh();
+    list.props.refreshControl.props.onRefresh();
   }
   assert.equal(next, 1);
   assert.equal(refresh, 2);

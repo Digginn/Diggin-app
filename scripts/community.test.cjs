@@ -558,6 +558,7 @@ function screenMocks({
     "@/components/ErrorState": { ErrorState: "ErrorState" },
     "@/components/Fab": { Fab: "Fab" },
     "@/components/Loading": { Spinner: "Spinner" },
+    "@/components/RefreshArea": { RefreshArea: "RefreshArea", REFRESH_TINT: undefined },
     "@/components/modal": { LoginRequiredModal: "LoginRequiredModal", ActionModal: "ActionModal" },
     "@/components/ToastText": { ToastText: "ToastText" },
     "@tanstack/react-query": { useQueryClient: () => ({ invalidateQueries: () => {} }) },
@@ -1215,10 +1216,11 @@ test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·�
     false,
     "다른 화면 동작으로 다시 불러오는 중에는 표시하지 않는다",
   );
-  assert.equal(nodes(render(), "Spinner").length, 0);
+  const area = () => nodes(render(), "RefreshArea")[0];
+  assert.equal(area().props.isRefreshing, false);
   control().props.onRefresh();
   assert.equal(control().props.refreshing, true);
-  assert.equal(nodes(render(), "Spinner").length, 1, "iOS는 기본 표시 대신 공통 Spinner를 그린다");
+  assert.equal(area().props.isRefreshing, true, "새로고침 중 공통 Spinner를 그린다");
   resolveRefetch();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(control().props.refreshing, false, "다시 불러오면 표시를 끈다");

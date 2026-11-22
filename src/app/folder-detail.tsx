@@ -30,6 +30,8 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const showToast = useToast();
   const items = useFolderItems(folderId, isOldestFirst ? "oldest" : "latest", wishLevel, query);
+  // 아이템 저장·이동 뒤 다시 불러올 때는 표시하지 않고 직접 당긴 새로고침에만 표시한다.
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const counts = useFolderCounts(folderId);
   const renameFolder = useRenameFolder();
   const deleteFolder = useDeleteFolder();
@@ -59,9 +61,12 @@ function FolderDetailContent({ folderId }: { folderId: string }) {
         onEndReached={() => {
           if (items.hasNextPage && !items.isFetchingNextPage) void items.fetchNextPage();
         }}
-        isRefreshing={items.isRefetching && !items.isFetchingNextPage}
+        isRefreshing={isRefreshing}
         onRefresh={() => {
-          void Promise.all([items.refetch(), counts.refetch()]);
+          setIsRefreshing(true);
+          void Promise.all([items.refetch(), counts.refetch()]).finally(() =>
+            setIsRefreshing(false),
+          );
         }}
         onBack={goBack}
         onOpenItem={(item) =>
@@ -118,6 +123,7 @@ function FolderDetailEntry() {
   const router = useRouter();
   const isPlaceholder = id === "owned";
   const folders = useFolders(isPlaceholder);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const showToast = useToast();
   useEffect(() => {
     if (isPlaceholder && folders.isError) showToast(TOAST_MESSAGES.SYS_001, "error");
@@ -131,8 +137,11 @@ function FolderDetailEntry() {
       <FolderDetailScreen
         folderName="나의 소장템"
         isOwnedFolder
-        isRefreshing={folders.isRefetching}
-        onRefresh={() => void folders.refetch()}
+        isRefreshing={isRefreshing}
+        onRefresh={() => {
+          setIsRefreshing(true);
+          void folders.refetch().finally(() => setIsRefreshing(false));
+        }}
         onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/folder"))}
       />
     );
