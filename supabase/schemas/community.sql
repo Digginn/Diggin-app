@@ -59,6 +59,8 @@ create index post_likes_user_idx on private.post_likes(user_id, created_at desc)
 create table private.comments (
   id bigint generated always as identity primary key,
   post_id bigint not null references private.posts(id) on delete cascade,
+  -- 답글(CMT-09)은 원 댓글 ID를 가진다. 1단계까지만 허용해 원 댓글은 parent_id가 없다.
+  parent_id bigint references private.comments(id) on delete cascade,
   author_id uuid references public.profiles(id) on delete set null,
   content text check (content is null or private.char_count(content) between 1 and 150),
   creation_request_id uuid not null default gen_random_uuid(),
@@ -71,6 +73,8 @@ create table private.comments (
 create index comments_post_idx on private.comments(post_id, created_at, id)
   where deleted_at is null and hidden_at is null;
 create index comments_author_idx on private.comments(author_id);
+create index comments_parent_idx on private.comments(parent_id, created_at, id)
+  where parent_id is not null and deleted_at is null and hidden_at is null;
 
 create table private.post_anon_numbers (
   post_id bigint not null references private.posts(id) on delete cascade,
@@ -163,6 +167,19 @@ returns boolean language sql stable set search_path = '' as $$
   );
 $$;
 
+-- 목록에 보이는 댓글. 답글은 원 댓글도 보여야 해서, 원 댓글이 삭제·숨김되거나 차단·신고로 빠지면 답글도 빠진다.
+create or replace function private.community_comment_listed(target_comment_id bigint)
+returns boolean language sql stable set search_path = '' as $$
+  select exists (
+    select 1 from private.comments c
+    left join private.comments parent on parent.id = c.parent_id
+    where c.id = target_comment_id and c.deleted_at is null and c.hidden_at is null
+      and private.community_author_visible(c.author_id) and private.community_content_visible('comment', c.id)
+      and (c.parent_id is null or (parent.deleted_at is null and parent.hidden_at is null
+        and private.community_author_visible(parent.author_id) and private.community_content_visible('comment', parent.id)))
+  );
+$$;
+
 create or replace function private.community_post_json(target_post_id bigint, is_preview boolean)
 returns jsonb language sql stable set search_path = '' as $$
   select case when is_preview then jsonb_build_object(
@@ -182,8 +199,7 @@ returns jsonb language sql stable set search_path = '' as $$
     'like_count', (select count(*) from private.post_likes l where l.post_id = p.id),
     'is_liked', exists(select 1 from private.post_likes l where l.post_id = p.id and l.user_id = (select auth.uid())),
     'comment_count', (select count(*) from private.comments c where c.post_id = p.id
-      and c.deleted_at is null and c.hidden_at is null and private.community_author_visible(c.author_id)
-        and private.community_content_visible('comment', c.id)),
+      and private.community_comment_listed(c.id)),
     'my_choice', (select v.choice from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())),
     'buy_count', case when p.type = 'vote' and (p.author_id = (select auth.uid()) or p.ends_at <= now() or
       exists(select 1 from private.vote_responses v where v.post_id = p.id and v.user_id = (select auth.uid())))
@@ -264,13 +280,15 @@ begin
       'is_mine', c.author_id = (select auth.uid()), 'is_withdrawn', c.author_id is null,
       'anon_number', a.number, 'author_nickname', author.nickname,
       'is_operator', operator.id is not null,
-      'vote_choice', vote.choice
+      'vote_choice', vote.choice,
+      'parent_id', null,
+      -- 커서는 원 댓글 기준이라 답글은 원 댓글 안에 넣는다. 이전 앱은 replies를 무시한다.
+      'replies', coalesce((select jsonb_agg(private.community_comment_json(r.id) order by r.created_at, r.id)
+        from private.comments r where r.parent_id = c.id and private.community_comment_listed(r.id)), '[]'::jsonb)
     ) order by c.created_at, c.id), '[]'::jsonb)
     from (
       select c.* from private.comments c
-      where c.post_id = target_post_id and c.deleted_at is null and c.hidden_at is null
-        and private.community_author_visible(c.author_id)
-        and private.community_content_visible('comment', c.id)
+      where c.post_id = target_post_id and c.parent_id is null and private.community_comment_listed(c.id)
         and (after_created_at is null or (c.created_at, c.id) > (after_created_at, after_id))
       order by c.created_at, c.id limit 20
     ) c
@@ -303,6 +321,7 @@ $$;
 revoke execute on function private.assert_can_write_community() from public, anon, authenticated;
 revoke execute on function private.community_author_visible(uuid) from public, anon, authenticated;
 revoke execute on function private.community_content_visible(public.report_target,bigint) from public, anon, authenticated;
+revoke execute on function private.community_comment_listed(bigint) from public, anon, authenticated;
 revoke execute on function private.community_post_json(bigint, boolean) from public, anon, authenticated;
 revoke execute on function private.get_community_feed(text, timestamptz, bigint) from public, anon, authenticated;
 revoke execute on function private.get_community_post(bigint) from public, anon, authenticated;

@@ -24,7 +24,8 @@ returns jsonb language sql stable set search_path = '' as $$
     'is_mine', c.author_id = (select auth.uid()), 'is_withdrawn', c.author_id is null,
     'anon_number', a.number, 'author_nickname', author.nickname,
     'is_operator', operator.id is not null,
-    'vote_choice', vote.choice
+    'vote_choice', vote.choice,
+    'parent_id', c.parent_id::text
   ) from private.comments c join private.posts p on p.id = c.post_id
   left join public.profiles author on author.id = c.author_id
   left join private.post_anon_numbers a on a.post_id = c.post_id and a.user_id = c.author_id
@@ -49,25 +50,39 @@ begin
 end;
 $$;
 
-create or replace function private.create_comment(target_post_id bigint, comment_content text, request_id uuid)
+-- parent_comment_id를 주면 답글(CMT-09)이다. 원 댓글에만 달 수 있고 답글에는 달 수 없다.
+create or replace function private.create_comment(
+  target_post_id bigint, comment_content text, request_id uuid, parent_comment_id bigint default null
+)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   target private.posts%rowtype;
   viewer_id uuid := (select auth.uid());
   existing private.comments%rowtype;
+  parent private.comments%rowtype;
   clean_content text;
   anon_number integer;
   saved_id bigint;
 begin
+  -- 글 잠금을 먼저 잡아 원 댓글 삭제와 답글 등록을 줄 세운다.
   target := private.lock_community_post_for_write(target_post_id);
   if request_id is null then raise exception 'invalid_request_id' using errcode = '22023'; end if;
   select * into existing from private.comments where author_id = viewer_id and creation_request_id = request_id;
   if found then
-    if existing.post_id <> target.id then raise exception 'invalid_request_id' using errcode = '22023'; end if;
+    if existing.post_id <> target.id or existing.parent_id is distinct from parent_comment_id then
+      raise exception 'invalid_request_id' using errcode = '22023';
+    end if;
     if existing.deleted_at is not null or existing.hidden_at is not null then
       raise exception 'comment_not_found' using errcode = '42501';
     end if;
     return private.community_comment_json(existing.id);
+  end if;
+  if parent_comment_id is not null then
+    select * into parent from private.comments where id = parent_comment_id and post_id = target.id;
+    if not found or not private.community_comment_listed(parent.id) then
+      raise exception 'comment_not_found' using errcode = '42501';
+    end if;
+    if parent.parent_id is not null then raise exception 'invalid_reply_target' using errcode = '22023'; end if;
   end if;
   clean_content := private.normalize_comment_content(comment_content);
   if viewer_id <> target.author_id then
@@ -78,8 +93,8 @@ begin
       insert into private.post_anon_numbers(post_id, user_id, number) values (target.id, viewer_id, anon_number);
     end if;
   end if;
-  insert into private.comments(post_id, author_id, content, creation_request_id)
-  values (target.id, viewer_id, clean_content, request_id) returning id into saved_id;
+  insert into private.comments(post_id, parent_id, author_id, content, creation_request_id)
+  values (target.id, parent_comment_id, viewer_id, clean_content, request_id) returning id into saved_id;
   return private.community_comment_json(saved_id);
 end;
 $$;
@@ -138,9 +153,11 @@ begin
 end;
 $$;
 
-create or replace function public.create_comment(target_post_id bigint, comment_content text, request_id uuid)
+create or replace function public.create_comment(
+  target_post_id bigint, comment_content text, request_id uuid, parent_comment_id bigint default null
+)
 returns jsonb language sql security invoker set search_path = '' as $$
-  select private.create_comment(target_post_id, comment_content, request_id);
+  select private.create_comment(target_post_id, comment_content, request_id, parent_comment_id);
 $$;
 create or replace function public.update_comment(target_comment_id bigint, comment_content text)
 returns jsonb language sql security invoker set search_path = '' as $$
@@ -157,11 +174,11 @@ $$;
 
 revoke execute on function private.lock_community_post_for_write(bigint), private.community_comment_json(bigint),
  private.normalize_comment_content(text) from public, anon, authenticated;
-revoke execute on function private.create_comment(bigint, text, uuid), public.create_comment(bigint, text, uuid),
+revoke execute on function private.create_comment(bigint, text, uuid, bigint), public.create_comment(bigint, text, uuid, bigint),
  private.update_comment(bigint, text), public.update_comment(bigint, text),
  private.delete_comment(bigint), public.delete_comment(bigint),
  private.set_community_like(bigint, boolean), public.set_community_like(bigint, boolean) from public, anon;
-grant execute on function private.create_comment(bigint, text, uuid), public.create_comment(bigint, text, uuid),
+grant execute on function private.create_comment(bigint, text, uuid, bigint), public.create_comment(bigint, text, uuid, bigint),
  private.update_comment(bigint, text), public.update_comment(bigint, text),
  private.delete_comment(bigint), public.delete_comment(bigint),
  private.set_community_like(bigint, boolean), public.set_community_like(bigint, boolean) to authenticated;
