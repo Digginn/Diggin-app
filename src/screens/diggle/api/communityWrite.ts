@@ -79,6 +79,6 @@ export function communityWriteError(
   if (/invalid_post_products/.test(message))
     return "첨부한 아이템을 확인해 주세요. 삭제된 아이템은 다시 선택해 주세요.";
   if (/invalid_post_content/.test(message)) return "본문을 공백 제외 5~50자로 입력해 주세요.";
-  if (/network|failed to fetch/i.test(message)) return "연결 상태를 확인한 후 다시 시도해 주세요.";
+  if (/network|failed to fetch|fetch failed/i.test(message)) return "연결 상태를 확인한 후 다시 시도해 주세요.";
   return fallbackMessage;
 }

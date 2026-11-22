@@ -39,6 +39,10 @@ test("아이템 저장은 통신 오류만 연결 확인 토스트로 구분한�
       TOAST_MESSAGES.SYS_001,
     ],
     [{ message: "Failed to fetch" }, TOAST_MESSAGES.SYS_001],
+    [
+      { message: "Error: fetch failed: The Internet connection appears to be offline." },
+      TOAST_MESSAGES.SYS_001,
+    ],
     [{ message: "permission denied", code: "42501" }, TOAST_MESSAGES.SAVE_012],
     [new Error("invalid_name"), TOAST_MESSAGES.SAVE_012],
     [

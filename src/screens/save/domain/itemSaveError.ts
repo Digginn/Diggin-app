@@ -5,7 +5,7 @@ export function itemSaveErrorMessage(error: unknown) {
   const message =
     typeof error === "object" && error !== null && "message" in error ? String(error.message) : "";
   if (message.includes("restricted_product")) return "이용정책에 따라 저장할 수 없는 상품입니다.";
-  return /network request failed|failed to fetch|networkerror|network_offline/i.test(message)
+  return /network request failed|failed to fetch|fetch failed|networkerror|network_offline/i.test(message)
     ? TOAST_MESSAGES.SYS_001
     : TOAST_MESSAGES.SAVE_012;
 }

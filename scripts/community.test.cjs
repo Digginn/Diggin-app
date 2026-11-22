@@ -211,6 +211,13 @@ test("SYS-009 시간 경계와 네트워크/일반 실패 문구를 구분한다
   ])
     assert.equal(formatCommunityTime(at(seconds), now), expected);
   assert.match(communityErrorMessage(new Error("Network request failed")), /연결 상태/);
+  // iOS 전역 fetch(expo/fetch)는 오프라인을 "fetch failed: …"로 알린다(BUG-130).
+  assert.match(
+    communityErrorMessage({
+      message: "Error: fetch failed: The Internet connection appears to be offline.",
+    }),
+    /연결 상태/,
+  );
   assert.match(communityErrorMessage({ message: "HTTP 500" }), /게시글/);
 });
 
@@ -632,6 +639,10 @@ test("오프라인 첫 진입과 FAB 재시도는 스켈레톤·권한 요청 �
 test("작성 권한 확인 도중 끊긴 연결과 서버 오류는 서로 다른 Toast를 표시한다", async () => {
   for (const [message, expected] of [
     ["TypeError: Network request failed", "연결 상태를 확인한 후 다시 시도해 주세요."],
+    [
+      "Error: fetch failed: The Internet connection appears to be offline.",
+      "연결 상태를 확인한 후 다시 시도해 주세요.",
+    ],
     ["HTTP 500", "요청을 처리하지 못했습니다. 다시 시도해 주세요."],
   ]) {
     const state = screenMocks();
