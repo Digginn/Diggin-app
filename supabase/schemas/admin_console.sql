@@ -88,7 +88,8 @@ begin
         -- 제재 이력 화면의 보관 열과 처리 열(#235). 해제는 같은 트랜잭션의 조치 기록이 released_at과 같은 시각을 가진다.
         exists(select 1 from private.retention_holds h where h.target_type='sanction' and h.target_id=s.id) as is_held,
         coalesce((select ru.email from private.admin_actions r join private.admin_users ru on ru.id=r.admin_id
-            where s.released_at is not null and r.target_type='user' and r.target_id=s.user_id::text and r.created_at=s.released_at
+            -- 탈퇴하면 user_id가 비워지므로 남아 있는 제재 조치의 대상 ID로 해제 조치를 찾는다.
+            where s.released_at is not null and r.target_type='user' and r.target_id=a.target_id and r.created_at=s.released_at
             order by r.id limit 1),
           (select au.email from private.admin_users au where au.id=a.admin_id)) as handled_by
       from private.user_sanctions s left join public.profiles p on p.id=s.user_id join private.admin_actions a on a.id=s.action_id
