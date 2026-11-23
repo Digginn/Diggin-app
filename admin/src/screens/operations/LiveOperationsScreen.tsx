@@ -34,8 +34,9 @@ export function LiveOperationsScreen({
     { keepDataOnRefresh: true },
   );
   const [holdTarget, setHoldTarget] = useState<SanctionRecord | null>(null);
-  // 처리한 행은 다시 불러온 목록이 도착할 때까지 처리 중으로 둔다.
-  const [pendingIds, setPendingIds] = useState<string[]>([]);
+  // 요청 중인 행과, 요청이 끝나 다시 불러온 목록을 기다리는 행을 나눈다.
+  // 목록 조회가 끝나면 기다리던 행만 풀어 요청 중인 버튼이 다시 켜지지 않게 한다.
+  const [pending, setPending] = useState<Record<string, "request" | "refresh">>({});
   const [toast, setToast] = useState({
     id: 0,
     message: "",
@@ -49,7 +50,10 @@ export function LiveOperationsScreen({
   const [wasLoading, setWasLoading] = useState(result.isLoading);
   if (wasLoading !== result.isLoading) {
     setWasLoading(result.isLoading);
-    if (!result.isLoading) setPendingIds([]);
+    if (!result.isLoading)
+      setPending((current) =>
+        Object.fromEntries(Object.entries(current).filter(([, step]) => step === "request")),
+      );
   }
   const isMembers = view === "members";
   const title = isMembers ? "회원 관리" : "제재 이력";
@@ -60,7 +64,7 @@ export function LiveOperationsScreen({
   async function setHold(row: SanctionRecord) {
     const held = !row.is_held;
     setHoldTarget(null);
-    setPendingIds((ids) => [...ids, row.id]);
+    setPending((current) => ({ ...current, [row.id]: "request" }));
     try {
       await adminRequest({
         action: "retention_hold",
@@ -69,9 +73,10 @@ export function LiveOperationsScreen({
         held,
       });
       showToast(held ? "보관 유지를 설정했습니다." : "보관 유지를 해제했습니다.", "success");
+      setPending((current) => ({ ...current, [row.id]: "refresh" }));
       result.refresh();
     } catch {
-      setPendingIds((ids) => ids.filter((id) => id !== row.id));
+      setPending(({ [row.id]: _failed, ...rest }) => rest);
       showToast("보관 유지를 처리하지 못했습니다.", "error");
     }
   }
@@ -154,7 +159,7 @@ export function LiveOperationsScreen({
                       <SanctionRow
                         key={row.id}
                         row={row}
-                        isPending={pendingIds.includes(row.id)}
+                        isPending={row.id in pending}
                         onHold={() => setHoldTarget(row)}
                       />
                     ),

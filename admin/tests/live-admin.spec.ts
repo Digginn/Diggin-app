@@ -389,6 +389,63 @@ test("제재 이력에서 보관 유지를 확인 후 설정·해제하고 실�
   await expect(table.getByRole("button", { name: "보관 유지하기" })).toBeEnabled();
 });
 
+test("보관 유지 요청 중 목록을 새로고침해도 요청이 끝날 때까지 처리 중을 유지한다", async ({
+  page,
+}) => {
+  await signedIn(page);
+  const holds: Body[] = [];
+  let isHeld = false;
+  let finishHold = () => {};
+  await setup(page, async (body, route) => {
+    if (body.resource === "sanctions") {
+      await reply(route, {
+        total: 1,
+        rows: [
+          {
+            id: "71",
+            user_id: group.author_id,
+            target_id: group.author_id,
+            nickname: group.author,
+            kind: "warning",
+            reason_category: "abuse",
+            reason: "정책 위반",
+            restricted_until: null,
+            created_at: group.latest_at,
+            state: "record",
+            released_at: null,
+            is_held: isHeld,
+            handled_by: "diggin.app@gmail.com",
+          },
+        ],
+      });
+      return true;
+    }
+    if (body.action !== "retention_hold") return false;
+    holds.push(body);
+    await new Promise<void>((resolve) => {
+      finishHold = resolve;
+    });
+    isHeld = true;
+    await reply(route, { held: true });
+    return true;
+  });
+  await page.goto("/#/sanctions");
+  const table = page.getByRole("table");
+  await table.getByRole("button", { name: "보관 유지하기" }).click();
+  await page.getByRole("button", { name: "보관을 유지할게요" }).click();
+  await expect(table.getByRole("button", { name: "처리 중" })).toBeVisible();
+
+  await page.getByRole("button", { name: "새로고침" }).click();
+  await expect(page.getByRole("button", { name: "새로고침" })).toBeEnabled();
+  await expect(table.getByRole("button", { name: "처리 중" })).toBeVisible();
+  await expect(table.getByRole("button", { name: "보관 유지하기" })).toHaveCount(0);
+  expect(holds).toHaveLength(1);
+
+  finishHold();
+  await expect(page.locator(".admin-toast")).toHaveText("보관 유지를 설정했습니다.");
+  await expect(table.getByRole("button", { name: "유지 해제하기" })).toBeVisible();
+});
+
 test("수정된 댓글과 개별 신고 당시의 원문을 함께 확인한다", async ({ page }) => {
   await signedIn(page);
   await setup(page, async (body, route) => {
