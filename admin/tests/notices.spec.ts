@@ -75,8 +75,8 @@ const INITIAL: Notice[] = [
     created_at: "2026-10-28T00:40:00Z",
   },
 ];
-async function setup(page: Page, { loseCreateResponse = false } = {}) {
-  const rows = structuredClone(INITIAL);
+async function setup(page: Page, { loseCreateResponse = false, initialRows = INITIAL } = {}) {
+  const rows = structuredClone(initialRows);
   const calls: Record<string, unknown>[] = [];
   const results = new Map<string, Notice>();
   let hasLostResponse = false;
@@ -99,7 +99,10 @@ async function setup(page: Page, { loseCreateResponse = false } = {}) {
     expect(body).not.toHaveProperty("actor");
     expect(route.request().headers().authorization).toBe(`Bearer ${SESSION.access_token}`);
     const payload = body.payload as Record<string, unknown>;
-    if (body.operation === "list") return reply({ total: rows.length, rows });
+    if (body.operation === "list") {
+      const offset = (Number(payload.page) - 1) * 20;
+      return reply({ total: rows.length, rows: rows.slice(offset, offset + 20) });
+    }
     if (body.operation === "get") return reply(rows.find((row) => row.id === body.notice_id));
     calls.push(body);
     const key = String(body.request_id);
@@ -220,3 +223,35 @@ test("기존 공지 수정은 입력값과 revision을 보내고 성공 목록�
   expect(state.rows[0].inbox_only).toBe(true);
   expect(state.rows[0].revision).toBe(2);
 });
+
+for (const total of [21, 41]) {
+  test(`공지 ${total}개의 마지막 페이지에서 한 건을 삭제하면 이전 페이지를 표시한다`, async ({
+    page,
+  }) => {
+    const state = await setup(page, {
+      initialRows: Array.from({ length: total }, (_, index) => ({
+        ...INITIAL[0],
+        id: String(index + 1),
+        title: `공지 ${index + 1}`,
+      })),
+    });
+    await page.goto("/#/notices");
+    const table = page.getByRole("table", { name: "공지 목록" });
+    const pagination = page.getByRole("navigation", { name: "목록 페이지" });
+    const lastPage = Math.ceil(total / 20);
+    for (let current = 1; current < lastPage; current++) {
+      await pagination.getByRole("button", { name: "다음", exact: true }).click();
+      await expect(table.locator("tbody tr").first()).toContainText(`공지 ${current * 20 + 1}`);
+    }
+    await expect(table.locator("tbody tr")).toHaveCount(1);
+    await page.getByRole("button", { name: `공지 ${total} 삭제`, exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "삭제할게요" }).click();
+    await expect(table.locator("tbody tr")).toHaveCount(20);
+    await expect(table.locator("tbody tr").first()).toContainText(`공지 ${total - 20}`);
+    expect(state.rows).toHaveLength(total - 1);
+    if (total === 21) await expect(pagination).toHaveCount(0);
+    else await expect(pagination.getByRole("button", { name: "이전" })).toBeEnabled();
+    await page.getByRole("button", { name: "새로고침", exact: true }).click();
+    await expect(table.locator("tbody tr")).toHaveCount(20);
+  });
+}

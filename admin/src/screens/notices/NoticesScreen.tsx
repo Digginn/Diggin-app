@@ -114,6 +114,9 @@ export function NoticesScreen({
 function NoticeList({ notify }: { notify: (message: string, isRefresh?: boolean) => void }) {
   const [page, setPage] = useState(1);
   const query = useNoticeQuery<PageResult<Notice>>("list", undefined, page);
+  // 삭제나 다른 관리자의 변경으로 페이지 수가 줄면 마지막 유효 페이지를 다시 조회한다.
+  const lastPage = query.data ? Math.max(1, Math.ceil(query.data.total / 20)) : page;
+  if (page > lastPage) setPage(lastPage);
   const [target, setTarget] = useState<Notice | null>(null);
   const [isBusy, setBusy] = useState(false);
   const busy = useRef(false);
