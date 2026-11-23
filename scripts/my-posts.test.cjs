@@ -37,7 +37,8 @@ function loadScreen(screenName = "MyPostsScreen", options = {}) {
               ...React,
               useEffect: (callback) => callback(),
               useCallback: (callback) => callback,
-              useState: (initial) => [initial, options.onReportTarget ?? (() => {})],
+              useState:
+                options.useState ?? ((initial) => [initial, options.onReportTarget ?? (() => {})]),
             };
           if (name === "expo-router")
             return {
@@ -259,6 +260,52 @@ test("목록의 새로고침·추가 조회와 중복 조회 차단을 연결한
   }
   assert.equal(next, 1);
   assert.equal(refresh, 2);
+});
+
+test("여러 탭을 당겨도 탭마다 진행 중인 새로고침만 표시한다", async () => {
+  const resolvers = [];
+  const values = [];
+  let cursor = 0;
+  const options = {
+    result: { refetch: () => new Promise((resolve) => resolvers.push(resolve)) },
+    useState: (initial) => {
+      const index = cursor++;
+      if (!(index in values)) values[index] = initial;
+      return [
+        values[index],
+        (next) => (values[index] = typeof next === "function" ? next(values[index]) : next),
+      ];
+    },
+  };
+  const Screen = loadScreen("MyPostsScreen", options);
+  const control = () => {
+    cursor = 0;
+    return find(Screen(), "FlatList").props.refreshControl;
+  };
+  const tabs = () => {
+    cursor = 0;
+    return find(Screen(), "TopTab");
+  };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  control().props.onRefresh();
+  tabs().props.onChange("votes");
+  assert.equal(control().props.refreshing, false, "게시글을 당기는 중 투표 탭에는 표시하지 않는다");
+  control().props.onRefresh();
+  tabs().props.onChange("posts");
+  assert.equal(
+    control().props.refreshing,
+    true,
+    "투표 탭을 당긴 뒤 돌아와도 게시글 표시는 유지한다",
+  );
+  resolvers[0]();
+  await flush();
+  assert.equal(control().props.refreshing, false);
+  tabs().props.onChange("votes");
+  assert.equal(control().props.refreshing, true, "게시글 완료가 투표 탭 표시를 끄지 않는다");
+  resolvers[1]();
+  await flush();
+  assert.equal(control().props.refreshing, false);
 });
 
 test("비회원은 목록 대신 로그인 안내를 받으며 인증 복원 중에는 목록을 노출하지 않는다", () => {

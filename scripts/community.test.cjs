@@ -1266,8 +1266,16 @@ test("DIGGLE 새로고침 표시는 당긴 탭에만 나오고, 이전 탭의 �
   );
   control().props.onRefresh();
   assert.equal(control().props.refreshing, true);
+  params.tab = "all";
+  assert.equal(
+    control().props.refreshing,
+    true,
+    "투표 탭을 당긴 뒤 돌아와도 진행 중인 전체 게시글 표시는 유지한다",
+  );
   resolvers[0]();
   await flush();
+  assert.equal(control().props.refreshing, false, "전체 게시글 완료는 전체 탭 표시만 끈다");
+  params.tab = "vote";
   assert.equal(
     control().props.refreshing,
     true,

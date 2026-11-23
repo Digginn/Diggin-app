@@ -78,9 +78,9 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
   const kind: ActivityKind = isLiked ? "liked" : activeKey === "votes" ? "vote" : "post";
   const activity = useCommunityActivity(kind);
   // 화면에 들어올 때마다 다시 불러온다. 직접 당긴 새로고침에만 표시해야 멈춘 스피너가 뜨지 않는다.
-  // 당긴 탭을 기억해 다른 탭에 표시하지 않고, 이전 탭의 완료가 새 탭의 새로고침을 끄지 않게 한다.
-  const [refreshingKind, setRefreshingKind] = useState<ActivityKind | null>(null);
-  const isRefreshing = refreshingKind === kind;
+  // 탭마다 진행 중인 새로고침을 따로 기억해, 여러 탭을 당겨도 각 탭의 완료가 자기 표시만 끄게 한다.
+  const [refreshingKinds, setRefreshingKinds] = useState<Partial<Record<ActivityKind, object>>>({});
+  const isRefreshing = kind in refreshingKinds;
   const rows = activity.data?.pages.flat() ?? [];
   const title = isLiked ? "내가 좋아요한 글" : "내가 쓴 글";
   const emptyState = (
@@ -157,12 +157,15 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
                     refreshing={isRefreshing}
                     onRefresh={() => {
                       const target = kind;
-                      setRefreshingKind(target);
-                      void activity
-                        .refetch()
-                        .finally(() =>
-                          setRefreshingKind((current) => (current === target ? null : current)),
-                        );
+                      const token = {};
+                      setRefreshingKinds((current) => ({ ...current, [target]: token }));
+                      void activity.refetch().finally(() =>
+                        setRefreshingKinds((current) => {
+                          if (current[target] !== token) return current;
+                          const { [target]: _done, ...rest } = current;
+                          return rest;
+                        }),
+                      );
                     }}
                     tintColor={REFRESH_TINT}
                   />

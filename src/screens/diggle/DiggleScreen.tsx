@@ -76,9 +76,9 @@ export function DiggleScreen() {
   );
 
   // 좋아요·투표·댓글·앱 복귀도 피드를 다시 불러온다. 직접 당긴 새로고침에만 표시해야 멈춘 스피너가 뜨지 않는다.
-  // 당긴 탭을 기억해 다른 탭에 표시하지 않고, 이전 탭의 완료가 새 탭의 새로고침을 끄지 않게 한다.
-  const [refreshingTab, setRefreshingTab] = useState<string | null>(null);
-  const isRefreshing = refreshingTab === tab;
+  // 탭마다 진행 중인 새로고침을 따로 기억해, 여러 탭을 당겨도 각 탭의 완료가 자기 표시만 끄게 한다.
+  const [refreshingTabs, setRefreshingTabs] = useState<Record<string, object>>({});
+  const isRefreshing = tab in refreshingTabs;
 
   const refreshFeed = () => {
     if (isOffline) {
@@ -86,10 +86,15 @@ export function DiggleScreen() {
       return;
     }
     const target = tab;
-    setRefreshingTab(target);
-    void feed
-      .refetch()
-      .finally(() => setRefreshingTab((current) => (current === target ? null : current)));
+    const token = {};
+    setRefreshingTabs((current) => ({ ...current, [target]: token }));
+    void feed.refetch().finally(() =>
+      setRefreshingTabs((current) => {
+        if (current[target] !== token) return current;
+        const { [target]: _done, ...rest } = current;
+        return rest;
+      }),
+    );
   };
 
   useFocusEffect(
