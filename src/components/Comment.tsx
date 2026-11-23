@@ -20,12 +20,16 @@ type CommentProps = {
   isOperator?: boolean;
   voteChoice?: "buy" | "not" | null;
   isHighlighted?: boolean;
+  /** 원 댓글 아래 들여쓴 답글(CommentReply) */
+  isReply?: boolean;
   /** 삭제된 댓글은 본문을 대체하고 메뉴를 막음 */
   isDeleted?: boolean;
   /** 케밥의 창 기준 좌표를 같이 넘김 */
   onPressMenu?: (anchor: MenuAnchor) => void;
   onPressReport?: () => void;
   onPressBlock?: () => void;
+  /** 답글 버튼은 원 댓글에만 넘김 */
+  onPressReply?: () => void;
   onOpenLink?: (url: string) => void;
 };
 
@@ -56,10 +60,12 @@ export function Comment({
   isOperator = false,
   voteChoice = null,
   isHighlighted = false,
+  isReply = false,
   isDeleted = false,
   onPressMenu,
   onPressReport,
   onPressBlock,
+  onPressReply,
   onOpenLink,
 }: CommentProps) {
   const kebabRef = useRef<View>(null);
@@ -76,13 +82,21 @@ export function Comment({
     <View
       className={clsx(
         "w-full items-start pt-0.5",
-        isHighlighted || isReportMenuOpen ? "bg-gray-50" : "bg-gray-0",
+        isHighlighted || isReportMenuOpen || isReply ? "bg-gray-50" : "bg-gray-0",
       )}
     >
+      {isReply ? (
+        <View className="absolute left-[27px] top-[17px] size-[7.25px] border-b-[1.5px] border-l-[1.5px] border-gray-400" />
+      ) : null}
       {isHighlighted ? (
         <View className="absolute bottom-0 left-0 top-0 w-[3px] bg-gray-900" />
       ) : null}
-      <View className="w-full flex-row items-center justify-between pl-margin pr-2">
+      <View
+        className={clsx(
+          "w-full flex-row items-center justify-between pr-2",
+          isReply ? "pl-10" : "pl-margin",
+        )}
+      >
         <View className="min-w-0 flex-1 flex-row items-center gap-1">
           <View className="min-w-0 shrink flex-row items-center gap-1.5">
             <Text
@@ -117,7 +131,17 @@ export function Comment({
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>
         {/* 케밥(48)이 이 줄의 높이를 만든다. 삭제된 댓글이라 숨겨도 높이는 유지한다. */}
-        <View className="h-12 w-[120px] flex-row items-center justify-end gap-1.5">
+        <View className="h-12 w-[120px] flex-row items-center justify-end">
+          {!isDeleted && onPressReply && (
+            <Pressable
+              accessibilityLabel="답글 달기"
+              accessibilityRole="button"
+              className="h-12 items-center justify-center px-3 active:opacity-75"
+              onPress={onPressReply}
+            >
+              <Text className="text-gray-600 font-label-12-regular">답글</Text>
+            </Pressable>
+          )}
           {!isDeleted && onPressReport && onPressBlock && (
             <ReportBlockMenu
               placement="comment"
@@ -143,7 +167,7 @@ export function Comment({
         </View>
       </View>
 
-      <View className="w-full items-start px-margin">
+      <View className={clsx("w-full items-start pr-margin", isReply ? "pl-10" : "pl-margin")}>
         <View className="w-full items-start border-b border-gray-200 pb-4">
           <Text
             onPress={!isDeleted && onPressMenu ? handlePressMenu : undefined}

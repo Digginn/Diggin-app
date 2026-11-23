@@ -43,6 +43,8 @@ const row = (id = "90", body = "새 댓글") => ({
   isPostAuthor: false,
   isWithdrawn: false,
   anonNumber: 1,
+  parentId: null,
+  replies: [],
 });
 const deferred = () => {
   let resolve, reject;
@@ -411,4 +413,74 @@ test("좋아요 성공은 동시 갱신된 댓글 수를 보존하고 투표글�
   blocked.setPost({ type: "post" });
   await blocked.render("likes", null).toggle();
   assert.equal(blocked.calls.length, 0);
+});
+
+test("답글은 원 댓글 바로 아래 오래된 순으로 펼치고 원 댓글이 빠지면 함께 뺀다", () => {
+  const { mergeComments } = load("src/screens/diggle/domain/comments.ts");
+  const at = (id, minute, parentId = null) => ({
+    ...row(id),
+    parentId,
+    createdAt: `2026-10-20T01:0${minute}:00.000000+00:00`,
+  });
+  const parent = { ...at("1", 1), replies: [at("4", 4, "1")] };
+  const merged = mergeComments([parent, at("2", 2)], { 5: at("5", 5, "1"), 6: at("6", 6, "2") });
+  assert.equal(merged.map((item) => item.id).join(), "1,4,5,2,6");
+  assert.equal(
+    mergeComments([parent, at("2", 2)], { 5: at("5", 5, "1"), 1: null })
+      .map((item) => item.id)
+      .join(),
+    "2",
+  );
+});
+
+test("답글 응답의 원 댓글 ID와 묶인 답글을 읽고 등록 때 원 댓글 ID를 넘긴다", async () => {
+  const calls = [];
+  const api = load("src/screens/diggle/api/community.ts", {
+    "@/lib/supabase": { supabase: {} },
+  });
+  const raw = { id: "1", created_at: row().createdAt, content: "원 댓글", is_mine: false };
+  const parsed = api.parseCommunityComment({
+    ...raw,
+    parent_id: null,
+    replies: [{ ...raw, id: "2", content: "답글", parent_id: "1" }],
+  });
+  assert.equal(parsed.parentId, null);
+  assert.equal(parsed.replies[0].parentId, "1");
+  assert.equal(api.parseCommunityComment(raw).replies.length, 0);
+  const interactions = load("src/screens/diggle/api/communityInteractions.ts", {
+    "@/lib/supabase": {
+      supabase: {
+        rpc: async (name, args) => {
+          calls.push(args);
+          return { data: { ...raw, id: "3", parent_id: "1" }, error: null };
+        },
+      },
+    },
+    "@/utils/text": text,
+    "./community": api,
+  });
+  assert.equal((await interactions.createComment("12", "답글", "request", "1")).parentId, "1");
+  assert.equal(calls[0].parent_comment_id, 1);
+});
+
+test("답글 작성은 댓글 초안과 따로 쓰고 취소하면 비우며 원 댓글에만 시작한다", async () => {
+  const ui = harness({
+    create: async (_post, body, _id, parentId) => ({ ...row("91", body), parentId }),
+  });
+  ui.render().setBody("댓글 초안");
+  ui.render().startReplying({ ...row("1"), parentId: "9" });
+  assert.equal(ui.render().replyTarget, null);
+  ui.render().startReplying({ ...row("1"), parentId: null });
+  assert.equal(ui.render().body, "");
+  ui.render().setBody("취소할 답글");
+  ui.render().cancelReplying();
+  assert.equal(ui.render().body, "댓글 초안");
+  ui.render().startReplying({ ...row("1"), parentId: null });
+  assert.equal(ui.render().body, "");
+  ui.render().setBody("답글");
+  await ui.render().send();
+  assert.equal(ui.calls[0].args[3], "1");
+  assert.equal(ui.render().replyTarget, null);
+  assert.equal(ui.render().body, "댓글 초안");
+  assert.equal(ui.render().changes["91"].parentId, "1");
 });

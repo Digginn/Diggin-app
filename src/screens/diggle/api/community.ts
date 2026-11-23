@@ -146,5 +146,7 @@ export function parseCommunityComment(value: unknown): CommunityComment {
     isWithdrawn: row.is_withdrawn === true,
     authorNickname: row.is_withdrawn === true ? null : optionalText(row.author_nickname),
     anonNumber: count(row.anon_number),
+    parentId: optionalText(row.parent_id),
+    replies: row.replies == null ? [] : rows(row.replies).map(parseCommunityComment),
   };
 }

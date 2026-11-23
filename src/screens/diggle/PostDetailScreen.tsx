@@ -30,6 +30,7 @@ import { ActionModal, LoginRequiredModal } from "@/components/modal";
 import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
+import { COMMENT_MAX_LENGTH } from "@/constants/comments";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
@@ -98,18 +99,20 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const [menu, setMenu] = useState<{ comment: CommunityComment; anchor: MenuAnchor } | null>(null);
   const isBusy = isDeleting || actions.isSending || actions.isDeleting;
   usePreventRemove(isBusy, () => {});
+  // 수정·답글 대상 댓글을 입력창 바로 위로 올린다.
+  const targetId = actions.editing?.id ?? actions.replyTarget?.id;
   const scrollEditing = useCallback(() => {
-    const index = commentRows.findIndex((row) => row.id === actions.editing?.id);
+    const index = commentRows.findIndex((row) => row.id === targetId);
     if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 1 });
-  }, [commentRows, actions.editing?.id]);
+  }, [commentRows, targetId]);
   useEffect(() => {
-    if (!actions.editing) return;
+    if (!targetId) return;
     const frame = requestAnimationFrame(() => {
       inputRef.current?.focus();
       scrollEditing();
     });
     return () => cancelAnimationFrame(frame);
-  }, [actions.editing, scrollEditing]);
+  }, [targetId, scrollEditing]);
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -181,11 +184,12 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
 
   async function sendComment() {
     const viewer = session?.user.id ?? null;
-    const wasEditing = !!actions.editing;
+    const isInPlace = !!actions.editing || !!actions.replyTarget;
     const saved = await actions.send();
     if (!saved || currentViewer.current !== viewer) return;
     Keyboard.dismiss();
-    if (wasEditing) return;
+    // 답글은 이미 보이는 원 댓글 아래에 붙으므로 끝까지 내리지 않는다.
+    if (isInPlace) return;
     shouldRevealNewComment.current = true;
     // 새 댓글까지의 기존 페이지를 먼저 읽어 중간 대화가 생략되지 않게 한다.
     let data = queryClient.getQueryData<InfiniteData<CommunityComment[]>>(
@@ -307,7 +311,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             if (shouldRevealNewComment.current) listRef.current?.scrollToEnd({ animated: true });
           }}
           onLayout={() => {
-            if (actions.editing) scrollEditing();
+            if (targetId) scrollEditing();
             else if (shouldRevealNewComment.current)
               listRef.current?.scrollToEnd({ animated: true });
           }}
@@ -398,7 +402,16 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                   ? () => setReportTarget({ type: "comment", id: comment.id, action: "block" })
                   : undefined
               }
-              isHighlighted={actions.editing?.id === comment.id}
+              isReply={comment.parentId !== null}
+              onPressReply={
+                comment.parentId === null && !comment.isWithdrawn && !isBusy
+                  ? () => {
+                      shouldRevealNewComment.current = false;
+                      actions.startReplying(comment);
+                    }
+                  : undefined
+              }
+              isHighlighted={targetId === comment.id}
               onPressMenu={
                 comment.isMine && !comment.isWithdrawn && !isBusy
                   ? (anchor) => {
@@ -458,6 +471,22 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               }}
             />
           )}
+          {actions.replyTarget && (
+            <CommentEditBanner
+              replyTo={formatCommunityAuthor(
+                actions.replyTarget.authorNickname,
+                false,
+                false,
+                actions.replyTarget.isOperator,
+              )}
+              onCancel={() => {
+                if (!isBusy) {
+                  actions.cancelReplying();
+                  Keyboard.dismiss();
+                }
+              }}
+            />
+          )}
           <CommentInput
             ref={inputRef}
             value={actions.body}
@@ -465,6 +494,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             isDisabled={isBusy}
             bottomInset={isKeyboardVisible ? 12 : Math.max(insets.bottom, 12)}
             isEditing={!!actions.editing}
+            placeholder={
+              actions.replyTarget
+                ? `답글을 입력해 주세요. (최대 ${COMMENT_MAX_LENGTH}자)`
+                : undefined
+            }
             onSend={() => void sendComment()}
           />
         </View>

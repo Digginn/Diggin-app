@@ -516,6 +516,7 @@ function screenMocks({
     "@/components/ReportFlow": { ReportFlow: "ReportFlow" },
     "@/components/CommentInput": { CommentInput: "CommentInput" },
     "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
+    "@/constants/comments": { COMMENT_MAX_LENGTH: 150 },
     "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
     "./domain/comments": load("src/screens/diggle/domain/comments.ts"),
     "./domain/communitySave": communitySaveDomain,
@@ -574,7 +575,10 @@ function screenMocks({
     "./queries/useCommunity": {
       useCommunityFeed: () => feed,
       useCommunityPost: () => ({ data: post, ...postResult }),
-      useCommunityComments: () => ({ data: { pages: [comments] }, ...commentsResult }),
+      useCommunityComments: () => ({
+        data: { pages: [comments.map((row) => ({ parentId: null, replies: [], ...row }))] },
+        ...commentsResult,
+      }),
     },
     "./utils/formatCommunityTime": {
       formatCommunityTime: () => "방금 전",
