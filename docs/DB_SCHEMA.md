@@ -351,7 +351,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 - `admin_users`: Supabase Auth UUID, 이메일, operator/super_admin 역할, 비활성화 시각. 실제 Auth 세션과 ban·프로필 상태를 매 요청에서 검사한다.
 - `admin_actions`: 운영자·request_id(unique)·조치·대상·신고·위반 유형·필수 상세 사유·전후 상태·시각. UPDATE·DELETE·TRUNCATE를 거부하는 감사 기록이다.
-- `user_sanctions`: 제재 건별 유형·종료일·위반 유형·최초 확인 시각·해제 시각. 새 제재는 이전 확인 여부를 공유하지 않는다.
+- `user_sanctions`: 제재 건별 유형·종료일·위반 유형·최초 확인 시각·해제 시각. 새 제재는 이전 확인 여부를 공유하지 않는다. 해제 시각은 운영자가 직접 해제(release)할 때만 남긴다. 새 제재를 줘도 이전 제재는 해제하지 않고, 이미 끝난 7일 제한은 직접 해제해도 해제로 기록하지 않는다(#235).
 - `moderation_requests`: 제재 준비와 Auth 적용 결과(pending/applied/failed), 요청자·대상·사유·감사 ID. 대상별 진행 중 요청은 하나만 허용한다.
 - 모두 RLS를 켜고 service_role을 포함해 직접 테이블 접근을 회수한다. 관리자 API는 `service_role` 전용 public invoker/private definer RPC를 호출하며 검증한 관리자 UUID와 실제 세션을 전달한다. 일반 앱 RPC의 auth.uid() 검사와 구분한다.
 - 신고는 콘텐츠별 그룹·상세·50건 커서 조회를 제공한다. 상태는 received → reviewing → resolved/rejected이며 자동 숨김·자동 제재는 없다. 운영자가 숨긴 콘텐츠만 복구하고 작성자 삭제는 복구하지 않는다.
@@ -372,7 +372,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 ## 7. 제재 (RPT-006)
 
 - warning: 기능 제한 없이 이력과 안내만.
-- community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 모든 쓰기 RPC(본인 게시글 삭제 포함)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. 프로필 행을 잠가 운영자 제재와 변경 요청의 경합을 보호한다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다.
+- community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 모든 쓰기 RPC(본인 게시글 삭제 포함)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. 프로필 행을 잠가 운영자 제재와 변경 요청의 경합을 보호한다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다. 제한 중에 경고를 주면 경고는 기록만 남기고 계정은 제한 상태와 종료일을 유지한다(#235).
 - suspended: profiles.status 변경과 함께 Supabase Auth 계정 정지(ban)와 전체 세션 무효화를 한다. status만으로는 상품·폴더 접근을 못 막기 때문이다. 해제할 때 둘 다 푼다.
 - 만 14세 미만(AUTH-002~004, #164): 운영자가 `underage` 사유로 suspended 처리한다. 앱은 MSG-AUTH-007 이용 중단 안내를 띄운다. 이용 중단일부터 30일 안에 해제(release)되지 않으면 pg_cron `underage-account-cleanup`(매일 03:30 KST)이 대상이 있을 때만 Vault의 `underage_cleanup_url`/`underage_cleanup_secret`으로 `underage-cleanup` Edge Function을 부른다. 함수는 `due_underage_deletions()`(service_role 전용, 50건씩)로 대상을 받아 MY-007 탈퇴와 같은 순서(애플 연결 해제 → 프로필 사진 → auth.users 삭제)로 지운다. 각 계정은 지우기 직전에 `claim_underage_deletion`으로 프로필 행을 잠그고 아직 대상인지, 진행 중인 제재·해제 요청이 없는지 다시 확인한다. 확인되면 `private.underage_deletion_claims`에 표시하고, 이후 한 시간 동안 운영자 해제(release)는 `account_deletion_in_progress`로 거부한다. 목록을 받은 뒤 복구된 계정은 건너뛴다. 애플 해제가 실패한 계정은 지우지 않고 다음 날 다시 시도한다. 저장된 애플 토큰이 없는 계정은 연결 해제 없이 지운다. 함수 secret `UNDERAGE_CLEANUP_SECRET`과 Vault 값이 없으면 호출하지 않는다.
 - 보관기간 경과 기록 삭제(#164, 개인정보 처리방침 제3조): pg_cron `expired-records-cleanup`(매일 03:20 KST)이 `private.delete_expired_records()`를 실행한다. 탈퇴 설문은 30일, 처리 완료(resolved·rejected, 이후 상태가 바뀌지 않아 updated_at이 완료 시각) 신고의 `reported_content` 사본은 30일, 제재 이력은 경고 적용일·7일 제한 종료일·영구 제한 해제일부터 6개월, 운영자 조치 기록(`admin_actions`)과 완료된 `moderation_requests`는 1년 뒤 지운다. 해제되지 않은 영구 제한과 그 조치 기록, `private.retention_holds`로 보관 유지 중인 신고·제재(운영 API `retention_hold`)는 남긴다. `admin_actions`는 append-only 트리거를 유지하고 이 함수의 트랜잭션 설정으로만 삭제를 허용한다. 운영자의 개인정보 "조회" 기록은 아직 따로 저장하지 않는다.

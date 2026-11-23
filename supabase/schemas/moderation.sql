@@ -302,6 +302,10 @@ begin
   if pending.action='release' and new.banned_until > now() then raise exception 'auth_unban_required'; end if;
   next_status := case when pending.action='release' then 'active'::public.account_status else pending.action::public.account_status end;
   if next_status='community_restricted' then until_time := now() + interval '168 hours'; end if;
+  -- 진행 중인 7일 제한은 경고로 풀지 않는다. 경고는 기록만 남기고 계정은 제한 종료일까지 그대로 둔다.
+  if next_status='warning' and profile.status='community_restricted' and profile.restricted_until > now() then
+    next_status := 'community_restricted'; until_time := profile.restricted_until;
+  end if;
   previous := jsonb_build_object('status',profile.status,'restricted_until',profile.restricted_until,'suspended_at',profile.suspended_at);
   next_state := jsonb_build_object('status',next_status,'restricted_until',until_time,'suspended_at',case when next_status='suspended' then now() else null end);
   update public.profiles set status=next_status,restricted_until=until_time,
@@ -310,13 +314,19 @@ begin
     -- Auth 세션 삭제는 같은 트랜잭션에 포함한다. 미만료 JWT는 아래 API 가드로 막는다.
     delete from auth.sessions where user_id=new.id;
   end if;
-  update private.user_sanctions set released_at=now() where user_id=new.id and released_at is null;
+  -- 운영자가 직접 해제할 때만 해제로 기록한다. 새 제재는 이전 제재를 해제하지 않고, 이미 끝난 7일 제한도 해제하지 않는다.
+  if pending.action='release' then
+    update private.user_sanctions set released_at=now() where user_id=new.id and released_at is null
+      and (kind<>'community_restricted' or restricted_until > now());
+  end if;
   insert into private.admin_actions(admin_id,request_id,action,target_type,target_id,report_id,reason_category,reason,before_state,after_state)
     values(pending.admin_id,pending.id,pending.action,'user',new.id::text,pending.report_id,pending.reason_category,pending.reason,previous,next_state)
     returning id into audit_id;
-  if next_status<>'active' then
+  -- 제재 기록은 계정 상태가 아니라 운영자가 준 제재 종류로 남긴다.
+  if pending.action<>'release' then
     insert into private.user_sanctions(user_id,action_id,kind,reason_category,restricted_until)
-      values(new.id,audit_id,next_status,pending.reason_category,until_time);
+      values(new.id,audit_id,pending.action::public.account_status,pending.reason_category,
+        case when pending.action='community_restricted' then until_time end);
   end if;
   update private.moderation_requests set state='applied',applied_at=now(),action_id=audit_id where id=pending.id;
   return new;
@@ -343,13 +353,21 @@ $$;
 create or replace function private.get_account_access()
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare viewer uuid:=(select auth.uid()); profile public.profiles%rowtype; sanction private.user_sanctions%rowtype;
+  effective public.account_status;
 begin
   if viewer is null then raise exception 'not_authenticated' using errcode='42501'; end if;
   select * into profile from public.profiles where id=viewer;
   if not found then raise exception 'not_authorized' using errcode='42501'; end if;
-  select * into sanction from private.user_sanctions where user_id=viewer and released_at is null order by id desc limit 1;
-  return jsonb_build_object('status',case when profile.status='community_restricted' and profile.restricted_until<=now()
-    then 'active'::public.account_status else profile.status end,'restricted_until',profile.restricted_until,
+  effective := profile.status;
+  -- 7일 제한이 끝나면 일반 상태다. 제한 중에 받은 경고 안내를 아직 안 봤으면 그때 경고로 안내한다.
+  if profile.status='community_restricted' and profile.restricted_until<=now() then
+    effective := case when exists(select 1 from private.user_sanctions where user_id=viewer and kind='warning'
+      and released_at is null and notice_seen_at is null) then 'warning'::public.account_status else 'active'::public.account_status end;
+  end if;
+  -- 이전 제재가 해제되지 않고 남으므로 지금 상태에 해당하는 제재의 안내 정보를 준다.
+  select * into sanction from private.user_sanctions where user_id=viewer and released_at is null
+    and kind=effective order by id desc limit 1;
+  return jsonb_build_object('status',effective,'restricted_until',profile.restricted_until,
     'sanction_id',sanction.id::text,'reason_category',sanction.reason_category,'notice_seen_at',sanction.notice_seen_at);
 end;
 $$;
