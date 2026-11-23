@@ -48,6 +48,7 @@ import { VoteBlock } from "./components/VoteBlock";
 import { mergeComments } from "./domain/comments";
 import { takeCommunityItemSaved } from "./domain/communitySave";
 import { useCommentActions } from "./hooks/useCommentActions";
+import { useCommentLikes } from "./hooks/useCommentLikes";
 import { useCommunityLike } from "./hooks/useCommunityLike";
 import { useCommunityVote } from "./hooks/useCommunityVote";
 import { useCommunityVoteTiming } from "./hooks/useCommunityVoteTiming";
@@ -88,6 +89,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
   const comments = useCommunityComments(id, !!post && !isWrongRoute && !areCommentsClosed);
   const actions = useCommentActions(id, session?.user.id ?? null);
   const like = useCommunityLike(post, session?.user.id ?? null);
+  const commentLikes = useCommentLikes(id, session?.user.id ?? null);
   const viewedPostId = post && !isWrongRoute ? post.id : null;
   useEffect(() => {
     if (viewedPostId)
@@ -441,6 +443,12 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                   : undefined
               }
               isReply={comment.parentId !== null}
+              {...commentLikes.likeOf(comment)}
+              onPressLike={
+                !comment.isMine && !comment.isWithdrawn
+                  ? () => void commentLikes.toggle(comment)
+                  : undefined
+              }
               onPressReply={
                 comment.parentId === null && !comment.isWithdrawn && !isBusy
                   ? () => {

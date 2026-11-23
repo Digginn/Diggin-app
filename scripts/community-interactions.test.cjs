@@ -484,6 +484,46 @@ test("답글 응답의 원 댓글 ID와 묶인 답글을 읽고 등록 때 원 �
   assert.equal(calls[0].parent_comment_id, 1);
 });
 
+test("댓글 좋아요 수·상태를 읽고 좋아요 RPC에 댓글 ID와 상태를 넘긴다", async () => {
+  const calls = [];
+  const api = load("src/screens/diggle/api/community.ts", {
+    "@/lib/supabase": { supabase: {} },
+  });
+  const raw = { id: "1", created_at: row().createdAt, content: "댓글" };
+  const parsed = api.parseCommunityComment({ ...raw, like_count: 3, is_liked: true });
+  assert.equal(parsed.likeCount, 3);
+  assert.equal(parsed.isLiked, true);
+  assert.equal(api.parseCommunityComment(raw).likeCount, 0);
+  assert.throws(() => api.parseCommunityComment({ ...raw, like_count: -1 }));
+  const interactions = load("src/screens/diggle/api/communityInteractions.ts", {
+    "@/lib/supabase": {
+      supabase: {
+        rpc: async (name, args) => {
+          calls.push({ name, ...args });
+          return { data: { is_liked: true, like_count: 4 }, error: null };
+        },
+      },
+    },
+    "@/utils/text": text,
+    "./community": api,
+  });
+  const saved = await interactions.setCommentLike("12", true);
+  assert.equal(saved.likeCount, 4);
+  assert.equal(calls[0].name, "set_comment_like");
+  assert.equal(calls[0].target_comment_id, 12);
+  assert.equal(calls[0].is_liked, true);
+});
+
+test("수정 직후 댓글도 다시 받은 좋아요 수를 보여 준다", () => {
+  const { mergeComments } = load("src/screens/diggle/domain/comments.ts");
+  const fetched = { ...row("1"), parentId: null, replies: [], likeCount: 5, isLiked: true };
+  const edited = { ...fetched, body: "수정", likeCount: 0, isLiked: false };
+  const [merged] = mergeComments([fetched], { 1: edited });
+  assert.equal(merged.body, "수정");
+  assert.equal(merged.likeCount, 5);
+  assert.equal(merged.isLiked, true);
+});
+
 test("답글 작성은 댓글 초안과 따로 쓰고 취소하면 비우며 원 댓글에만 시작한다", async () => {
   const ui = harness({
     create: async (_post, body, _id, parentId) => ({ ...row("91", body), parentId }),

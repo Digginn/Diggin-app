@@ -17,13 +17,19 @@ export function mergeComments(
   for (const [id, row] of Object.entries(changes)) {
     if (row) {
       const fetched = merged.get(id);
-      // 작성·수정 직후의 본문은 유지하되 재조회한 관리자·투표 라벨을 반영한다.
+      // 작성·수정 직후의 본문은 유지하되 재조회한 관리자·투표 라벨과 좋아요를 반영한다.
       merged.set(
         id,
         fetched?.isWithdrawn
           ? fetched
           : fetched
-            ? { ...row, isOperator: fetched.isOperator, voteChoice: fetched.voteChoice }
+            ? {
+                ...row,
+                isOperator: fetched.isOperator,
+                voteChoice: fetched.voteChoice,
+                likeCount: fetched.likeCount,
+                isLiked: fetched.isLiked,
+              }
             : row,
       );
     } else merged.delete(id);

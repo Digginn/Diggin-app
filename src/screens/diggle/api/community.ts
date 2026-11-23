@@ -157,6 +157,8 @@ export function parseCommunityComment(value: unknown): CommunityComment {
     authorNickname: row.is_withdrawn === true ? null : optionalText(row.author_nickname),
     anonNumber: count(row.anon_number),
     parentId: optionalText(row.parent_id),
+    likeCount: count(row.like_count) ?? 0,
+    isLiked: row.is_liked === true,
     replies: row.replies == null ? [] : rows(row.replies).map(parseCommunityComment),
   };
 }

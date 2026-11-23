@@ -2,12 +2,15 @@ import { clsx } from "clsx";
 import { useRef, useState } from "react";
 import { Keyboard, Linking, Pressable, Text, View } from "react-native";
 
+import HeartFilledSvg from "@/assets/images/icon-comment-heart-filled.svg";
+import HeartSvg from "@/assets/images/icon-comment-heart.svg";
 import KebabSvg from "@/assets/images/icon-kebab.svg";
 import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { colors } from "@/theme";
 import { httpLinkParts } from "@/utils/httpLinks";
 
 const KEBAB_SIZE = 16;
+const HEART_SIZE = 16;
 
 export type MenuAnchor = { x: number; y: number; width: number; height: number };
 
@@ -30,6 +33,10 @@ type CommentProps = {
   onPressBlock?: () => void;
   /** 답글 버튼은 원 댓글에만 넘김 */
   onPressReply?: () => void;
+  likeCount?: number;
+  isLiked?: boolean;
+  /** 본인·탈퇴 댓글에는 넘기지 않아 하트를 숨김(LIKE-004) */
+  onPressLike?: () => void;
   onOpenLink?: (url: string) => void;
 };
 
@@ -66,6 +73,9 @@ export function Comment({
   onPressReport,
   onPressBlock,
   onPressReply,
+  likeCount = 0,
+  isLiked = false,
+  onPressLike,
   onOpenLink,
 }: CommentProps) {
   const kebabRef = useRef<View>(null);
@@ -131,7 +141,7 @@ export function Comment({
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>
         {/* 케밥(48)이 이 줄의 높이를 만든다. 삭제된 댓글이라 숨겨도 높이는 유지한다. */}
-        <View className="h-12 w-[120px] flex-row items-center justify-end">
+        <View className="h-12 shrink-0 flex-row items-center justify-end">
           {!isDeleted && onPressReply && (
             <Pressable
               accessibilityLabel="답글 달기"
@@ -141,6 +151,28 @@ export function Comment({
             >
               <Text className="text-gray-600 font-label-12-regular">답글</Text>
             </Pressable>
+          )}
+          {!isDeleted && onPressLike && (
+            <View className="w-9 flex-row items-center">
+              <Pressable
+                accessibilityLabel={`좋아요 ${likeCount}개`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isLiked }}
+                className="h-12 flex-row items-center gap-0.5 p-2.5 active:opacity-75"
+                onPress={onPressLike}
+              >
+                {isLiked ? (
+                  <HeartFilledSvg
+                    width={HEART_SIZE}
+                    height={HEART_SIZE}
+                    color={colors.semantic.error}
+                  />
+                ) : (
+                  <HeartSvg width={HEART_SIZE} height={HEART_SIZE} color={colors.gray[500]} />
+                )}
+                <Text className="text-gray-500 font-label-12-semibold">{likeCount}</Text>
+              </Pressable>
+            </View>
           )}
           {!isDeleted && onPressReport && onPressBlock && (
             <ReportBlockMenu

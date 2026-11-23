@@ -25,7 +25,9 @@ returns jsonb language sql stable set search_path = '' as $$
     'anon_number', a.number, 'author_nickname', author.nickname,
     'is_operator', operator.id is not null,
     'vote_choice', vote.choice,
-    'parent_id', c.parent_id::text
+    'parent_id', c.parent_id::text,
+    'like_count', (select count(*) from private.comment_likes l where l.comment_id = c.id),
+    'is_liked', exists(select 1 from private.comment_likes l where l.comment_id = c.id and l.user_id = (select auth.uid()))
   ) from private.comments c join private.posts p on p.id = c.post_id
   left join public.profiles author on author.id = c.author_id
   left join private.post_anon_numbers a on a.post_id = c.post_id and a.user_id = c.author_id
@@ -159,6 +161,38 @@ begin
 end;
 $$;
 
+-- LIKE-004 댓글·답글 좋아요. 알림은 보내지 않고 본인 댓글은 누를 수 없다.
+create or replace function private.set_comment_like(target_comment_id bigint, is_liked boolean)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  parent_id bigint;
+  target private.comments%rowtype;
+begin
+  if is_liked is null then raise exception 'invalid_like_state' using errcode = '22023'; end if;
+  select c.post_id into parent_id from private.comments c where c.id = target_comment_id;
+  if not found then raise exception 'comment_not_found' using errcode = '42501'; end if;
+  -- 댓글 수정·삭제와 같은 부모 글 → 댓글 잠금 순서를 따른다.
+  perform private.lock_community_post_for_write(parent_id);
+  if exists(select 1 from private.posts p where p.id = parent_id and p.notice_title is not null and p.notice_comments_closed) then
+    raise exception 'notice_comments_closed' using errcode = 'P0001';
+  end if;
+  select * into target from private.comments where id = target_comment_id for update;
+  if is_liked then
+    if target.author_id is null or not private.community_comment_listed(target.id) then
+      raise exception 'comment_not_found' using errcode = '42501';
+    end if;
+    if target.author_id = (select auth.uid()) then
+      raise exception 'own_comment_like' using errcode = '42501';
+    end if;
+    insert into private.comment_likes(comment_id, user_id) values (target.id, (select auth.uid())) on conflict do nothing;
+  else
+    delete from private.comment_likes where comment_id = target.id and user_id = (select auth.uid());
+  end if;
+  return jsonb_build_object('is_liked', is_liked,
+    'like_count', (select count(*) from private.comment_likes where comment_id = target.id));
+end;
+$$;
+
 create or replace function public.create_comment(
   target_post_id bigint, comment_content text, request_id uuid, parent_comment_id bigint default null
 )
@@ -177,14 +211,20 @@ create or replace function public.set_community_like(target_post_id bigint, is_l
 returns jsonb language sql security invoker set search_path = '' as $$
   select private.set_community_like(target_post_id, is_liked);
 $$;
+create or replace function public.set_comment_like(target_comment_id bigint, is_liked boolean)
+returns jsonb language sql security invoker set search_path = '' as $$
+  select private.set_comment_like(target_comment_id, is_liked);
+$$;
 
 revoke execute on function private.lock_community_post_for_write(bigint), private.community_comment_json(bigint),
  private.normalize_comment_content(text) from public, anon, authenticated;
 revoke execute on function private.create_comment(bigint, text, uuid, bigint), public.create_comment(bigint, text, uuid, bigint),
  private.update_comment(bigint, text), public.update_comment(bigint, text),
  private.delete_comment(bigint), public.delete_comment(bigint),
- private.set_community_like(bigint, boolean), public.set_community_like(bigint, boolean) from public, anon;
+ private.set_community_like(bigint, boolean), public.set_community_like(bigint, boolean),
+ private.set_comment_like(bigint, boolean), public.set_comment_like(bigint, boolean) from public, anon;
 grant execute on function private.create_comment(bigint, text, uuid, bigint), public.create_comment(bigint, text, uuid, bigint),
  private.update_comment(bigint, text), public.update_comment(bigint, text),
  private.delete_comment(bigint), public.delete_comment(bigint),
- private.set_community_like(bigint, boolean), public.set_community_like(bigint, boolean) to authenticated;
+ private.set_community_like(bigint, boolean), public.set_community_like(bigint, boolean),
+ private.set_comment_like(bigint, boolean), public.set_comment_like(bigint, boolean) to authenticated;

@@ -100,26 +100,22 @@ begin
 end;
 $$;
 
--- NOTI-005 내 일반 게시글에 다른 사람이 좋아요를 처음 눌렀을 때. 이미 누른 상태면 insert가 없어 트리거도 돌지 않는다.
+-- NOTI-005 좋아요는 하나씩 알리지 않고, 내 일반 게시글의 좋아요가 처음 10개가 됐을 때 한 번만 알린다.
+-- 좋아요 쓰기는 글 행을 잠가 줄을 세우므로 10번째 좋아요를 동시에 놓치지 않는다. 취소 후 다시 10개가 돼도 키로 한 번만 만든다.
+-- shortcut: 알림이 30일 뒤 지워진 다음 9개로 줄었다 다시 10개가 되면 한 번 더 간다. 문제가 되면 글에 발송 표시를 둔다.
 create or replace function private.notify_post_liked()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
   target private.posts%rowtype;
 begin
   select * into target from private.posts where id = new.post_id;
-  if target.notice_title is not null then return new; end if;
-  if target.type <> 'post' or target.deleted_at is not null or target.hidden_at is not null or
-     new.user_id is null or new.user_id = target.author_id or
-     not private.notification_actor_visible(target.author_id, new.user_id) then
+  if target.notice_title is not null or target.type <> 'post' or target.deleted_at is not null or
+     target.hidden_at is not null or (select count(*) from private.post_likes l where l.post_id = new.post_id) <> 10 then
     return new;
   end if;
-  insert into private.like_notification_log(post_id, actor_id) values (new.post_id, new.user_id)
-  on conflict do nothing;
-  if not found then return new; end if;
-  insert into private.notifications(recipient_id, type, post_id, actor_id, title, body, event_key)
-  values (target.author_id, 'post_liked', target.id, new.user_id, '내 게시글에 좋아요가 달렸어요.',
-          '''' || private.notification_text(target.content) || ''' 게시글을 누군가 좋아해요.',
-          'like:' || new.post_id || ':' || new.user_id)
+  insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
+  values (target.author_id, 'post_liked', target.id, '내가 작성한 게시물에 10개의 좋아요가 달렸어요.',
+          private.notification_text(target.content), 'like10:' || target.id)
   on conflict (event_key) do nothing;
   return new;
 end;

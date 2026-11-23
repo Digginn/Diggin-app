@@ -65,8 +65,17 @@ select lives_ok($$ select public.set_community_like(current_setting('test.post')
 set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
 select throws_ok($$ select public.set_community_like(current_setting('test.post')::bigint, true) $$, '42501', 'own_post_like', '글쓴이는 자기 글에 좋아요를 누를 수 없다');
 reset role;
-select is((select count(*) from pg_temp.notifications_for('post_liked')), 1::bigint, '같은 사람·같은 글은 취소 후 다시 눌러도 한 번만, 본인 좋아요는 알리지 않는다');
-select is((select body from pg_temp.notifications_for('post_liked')), '''알림 테스트 일반글'' 게시글을 누군가 좋아해요.', '좋아요한 사람을 밝히지 않는다');
+select is((select count(*) from pg_temp.notifications_for('post_liked')), 0::bigint, '좋아요가 10개가 안 되면 알리지 않는다');
+insert into auth.users(id, email) select ('10400000-0000-0000-0001-00000000000' || n)::uuid, 'noti-like' || n || '@test.dev' from generate_series(1, 9) n;
+insert into private.post_likes(post_id, user_id) select current_setting('test.post')::bigint, ('10400000-0000-0000-0001-00000000000' || n)::uuid from generate_series(1, 8) n;
+select is((select count(*) from pg_temp.notifications_for('post_liked')), 0::bigint, '9개까지는 알리지 않는다');
+insert into private.post_likes(post_id, user_id) values (current_setting('test.post')::bigint, '10400000-0000-0000-0001-000000000009');
+select is((select count(*) from pg_temp.notifications_for('post_liked')), 1::bigint, '10개가 되면 한 번 알린다');
+delete from private.post_likes where user_id = '10400000-0000-0000-0001-000000000009';
+insert into private.post_likes(post_id, user_id) values (current_setting('test.post')::bigint, '10400000-0000-0000-0001-000000000009');
+select is((select count(*) from pg_temp.notifications_for('post_liked')), 1::bigint, '취소 후 다시 10개가 돼도 한 번만 알린다');
+select is((select title || ' / ' || body || ' / ' || coalesce(actor_id::text, 'null') from pg_temp.notifications_for('post_liked')),
+  '내가 작성한 게시물에 10개의 좋아요가 달렸어요. / 알림 테스트 일반글 / null', '좋아요한 사람 없이 글 내용만 담는다');
 
 -- 받는 사람이 차단한 사용자의 행동은 알리지 않는다
 insert into private.user_blocks(blocker_id, blocked_id)
@@ -75,7 +84,7 @@ insert into private.comments(post_id, author_id, content, creation_request_id)
  values (current_setting('test.post')::bigint, '10400000-0000-0000-0000-00000000000c', '차단된 사람 댓글', 'a0000000-0000-0000-0000-000000000004');
 insert into private.post_likes(post_id, user_id) values (current_setting('test.post')::bigint, '10400000-0000-0000-0000-00000000000c');
 select is((select count(*) from private.notifications where recipient_id = '10400000-0000-0000-0000-00000000000a' and type <> 'vote_ended'),
-  2::bigint, '차단한 사용자의 댓글·좋아요는 알리지 않는다');
+  2::bigint, '차단한 사용자의 댓글은 알리지 않고 11번째 좋아요도 알리지 않는다');
 
 -- NOTI-003 투표 마감
 select lives_ok($$ select private.create_vote_ended_notifications() $$, '마감 작업이 돈다');
@@ -97,14 +106,14 @@ select is((select count(*) from jsonb_array_elements(public.get_notifications())
 -- 알림을 받은 뒤 차단·신고한 사람의 알림은 목록과 새 알림 점에서 뺀다
 reset role;
 select is((select count(*) from private.notifications where recipient_id = '10400000-0000-0000-0000-00000000000a'
-  and actor_id = '10400000-0000-0000-0000-00000000000b'), 2::bigint, '댓글·좋아요 알림에 행동한 사람을 남긴다');
+  and actor_id = '10400000-0000-0000-0000-00000000000b'), 1::bigint, '댓글 알림에만 행동한 사람을 남긴다');
 savepoint before_block;
 insert into private.user_blocks(blocker_id, blocked_id)
  values ('10400000-0000-0000-0000-00000000000a', '10400000-0000-0000-0000-00000000000b');
 set local role authenticated;
 set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
-select is((select array_agg(x->>'type') from jsonb_array_elements(public.get_notifications()) x), array['vote_ended'],
-  '차단한 사람의 알림은 목록에서 빠지고 투표 마감 알림은 남는다');
+select is((select array_agg(x->>'type') from jsonb_array_elements(public.get_notifications()) x), array['vote_ended', 'post_liked'],
+  '차단한 사람의 알림은 목록에서 빠지고 행동한 사람이 없는 투표 마감·좋아요 10개 알림은 남는다');
 reset role;
 update private.notifications set created_at = now() - interval '1 minute'
  where recipient_id = '10400000-0000-0000-0000-00000000000a' and type = 'vote_ended';
@@ -120,7 +129,7 @@ insert into private.reports(reporter_id, target_type, post_id, reported_user_id,
  values ('10400000-0000-0000-0000-00000000000a', 'post', current_setting('test.post')::bigint, '10400000-0000-0000-0000-00000000000b', 'abuse');
 set local role authenticated;
 set local request.jwt.claims = '{"sub": "10400000-0000-0000-0000-00000000000a", "role": "authenticated"}';
-select is((select array_agg(x->>'type') from jsonb_array_elements(public.get_notifications()) x), array['vote_ended'],
+select is((select array_agg(x->>'type') from jsonb_array_elements(public.get_notifications()) x), array['vote_ended', 'post_liked'],
   '신고한 사람의 알림도 목록에서 빠진다');
 rollback to savepoint before_report;
 set local role authenticated;
@@ -195,8 +204,6 @@ select is(jsonb_array_length(public.get_notifications()), 2, '30일 지난 알�
 reset role;
 select lives_ok($$ select private.delete_old_notifications() $$, '정리 작업이 돈다');
 select is((select count(*) from pg_temp.notifications_for('post_liked')), 0::bigint, '30일 지난 알림을 지운다');
-select is((select count(*) from private.like_notification_log where actor_id = '10400000-0000-0000-0000-00000000000b'), 1::bigint,
-  '좋아요 기록은 남아 알림을 지워도 다시 보내지 않는다');
 
 select * from finish();
 rollback;

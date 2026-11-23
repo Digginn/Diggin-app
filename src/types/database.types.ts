@@ -602,6 +602,7 @@ export type Database = {
         Returns: Json;
       };
       set_avatar: { Args: { new_path: string }; Returns: undefined };
+      set_comment_like: { Args: { is_liked: boolean; target_comment_id: number }; Returns: Json };
       set_community_like: { Args: { is_liked: boolean; target_post_id: number }; Returns: Json };
       set_community_vote: { Args: { target_post_id: number; vote_option: string }; Returns: Json };
       set_owned: {

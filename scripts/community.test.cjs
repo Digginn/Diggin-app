@@ -538,6 +538,12 @@ function screenMocks({
         isDeleting: false,
       }),
     },
+    "./hooks/useCommentLikes": {
+      useCommentLikes: () => ({
+        likeOf: (row) => ({ isLiked: row.isLiked ?? false, likeCount: row.likeCount ?? 0 }),
+        toggle() {},
+      }),
+    },
     "./hooks/useCommunityLike": {
       useCommunityLike: (post) => ({
         likeCount: post?.likeCount ?? 0,
@@ -1238,6 +1244,25 @@ test("운영자 댓글은 신고·차단을 숨기고 본인 댓글 수정·삭�
     assert.equal(comment.props.onPressBlock, undefined);
   }
   assert.equal(typeof comments[1].props.onPressMenu, "function");
+});
+
+test("댓글·답글 좋아요는 남의 댓글에만 하트를 주고 본인·탈퇴 댓글에는 숨긴다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({
+    post,
+    comments: [
+      { id: "1", body: "남의 댓글", likeCount: 2, isLiked: true, createdAt: PREVIEW.created_at },
+      { id: "2", isMine: true, body: "내 댓글", likeCount: 1, createdAt: PREVIEW.created_at },
+      { id: "3", isWithdrawn: true, body: null, createdAt: PREVIEW.created_at },
+    ],
+  });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const comments = nodes(PostDetailScreen({}), "Comment");
+  assert.equal(typeof comments[0].props.onPressLike, "function");
+  assert.equal(comments[0].props.likeCount, 2);
+  assert.equal(comments[0].props.isLiked, true);
+  assert.equal(comments[1].props.onPressLike, undefined);
+  assert.equal(comments[2].props.onPressLike, undefined);
 });
 
 test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·투표 등으로 다시 불러올 때는 켜지 않는다", async () => {

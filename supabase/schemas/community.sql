@@ -84,6 +84,16 @@ create index comments_author_idx on private.comments(author_id);
 -- 삭제·숨김 조건은 함수 안에서 걸러져 부분 인덱스 조건으로 쓰면 플래너가 인덱스를 못 탄다.
 create index comments_parent_idx on private.comments(parent_id, created_at, id) where parent_id is not null;
 
+-- 댓글 좋아요(LIKE-004). 탈퇴해도 좋아요 수는 유지하고 계정 연결만 끊는다(MY-007).
+create table private.comment_likes (
+  id bigint generated always as identity primary key,
+  comment_id bigint not null references private.comments(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (comment_id, user_id)
+);
+create index comment_likes_user_idx on private.comment_likes(user_id);
+
 create table private.post_anon_numbers (
   post_id bigint not null references private.posts(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -131,15 +141,16 @@ alter table private.posts enable row level security;
 alter table private.post_products enable row level security;
 alter table private.vote_responses enable row level security;
 alter table private.post_likes enable row level security;
+alter table private.comment_likes enable row level security;
 alter table private.comments enable row level security;
 alter table private.post_anon_numbers enable row level security;
 alter table private.user_blocks enable row level security;
 alter table private.reports enable row level security;
 revoke all on table private.posts, private.post_products, private.vote_responses,
-  private.post_likes, private.comments, private.post_anon_numbers,
+  private.post_likes, private.comment_likes, private.comments, private.post_anon_numbers,
   private.user_blocks, private.reports from public, anon, authenticated;
 revoke all on sequence private.posts_id_seq, private.vote_responses_id_seq,
-  private.post_likes_id_seq, private.comments_id_seq, private.reports_id_seq
+  private.post_likes_id_seq, private.comment_likes_id_seq, private.comments_id_seq, private.reports_id_seq
   from public, anon, authenticated;
 
 create or replace function private.assert_can_write_community()
@@ -299,6 +310,8 @@ begin
       'is_operator', operator.id is not null,
       'vote_choice', vote.choice,
       'parent_id', null,
+      'like_count', (select count(*) from private.comment_likes l where l.comment_id = c.id),
+      'is_liked', exists(select 1 from private.comment_likes l where l.comment_id = c.id and l.user_id = (select auth.uid())),
       -- 커서는 원 댓글 기준이라 답글은 원 댓글 안에 넣는다. 이전 앱은 replies를 무시한다.
       'replies', coalesce((select jsonb_agg(private.community_comment_json(r.id) order by r.created_at, r.id)
         from private.comments r where r.parent_id = c.id and private.community_comment_listed(r.id)), '[]'::jsonb)
