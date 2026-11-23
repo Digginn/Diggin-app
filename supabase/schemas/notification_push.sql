@@ -33,7 +33,7 @@ returns boolean language sql stable security definer set search_path = '' as $$
       and p.deleted_at is null and p.hidden_at is null
       and (n.type <> 'post_commented' or exists (
         select 1 from private.comments c
-        where c.post_id = n.post_id and n.event_key = 'comment:' || c.id
+        where c.post_id = n.post_id and n.event_key in ('comment:' || c.id, 'reply:' || c.id)
           and c.deleted_at is null
       ))
       and (n.actor_id is null or private.notification_actor_visible(n.recipient_id, n.actor_id))
