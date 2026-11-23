@@ -99,6 +99,28 @@ reset role;
 select is((select count(*)::int from private.notifications where event_key='reply:' || current_setting('test.blocked_reply')),0,'차단한 사람의 답글은 알리지 않는다');
 delete from private.user_blocks where blocker_id='23700000-0000-0000-0000-000000000002';
 
+-- NOTI-010 답글 알림은 투표글에도 간다. 투표글 작성자는 댓글 알림(NOTI-004)이 없어 자기 댓글의 답글 알림을 받는다.
+insert into private.posts(author_id,type,content,ends_at)
+values ('23700000-0000-0000-0000-000000000001','vote','답글 테스트 투표',now()+interval '24 hours');
+select set_config('test.vote',(select id::text from private.posts where content='답글 테스트 투표'),true);
+set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000002","role":"authenticated"}';
+set local role authenticated;
+select set_config('test.vote_parent',public.create_comment(current_setting('test.vote')::bigint,'투표 원 댓글',gen_random_uuid())->>'id',true);
+reset role;
+set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000001","role":"authenticated"}';
+set local role authenticated;
+select set_config('test.vote_reply',public.create_comment(current_setting('test.vote')::bigint,'투표 글쓴이 답글',gen_random_uuid(),current_setting('test.vote_parent')::bigint)->>'id',true);
+select set_config('test.vote_author_comment',public.create_comment(current_setting('test.vote')::bigint,'투표 글쓴이 댓글',gen_random_uuid())->>'id',true);
+reset role;
+set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000003","role":"authenticated"}';
+set local role authenticated;
+select set_config('test.vote_author_reply',public.create_comment(current_setting('test.vote')::bigint,'투표 글쓴이에게 답글',gen_random_uuid(),current_setting('test.vote_author_comment')::bigint)->>'id',true);
+reset role;
+select is((select array_agg(recipient_id::text || ' ' || event_key order by id) from private.notifications where post_id=current_setting('test.vote')::bigint),
+  array['23700000-0000-0000-0000-000000000002 reply:' || current_setting('test.vote_reply'),
+        '23700000-0000-0000-0000-000000000001 reply:' || current_setting('test.vote_author_reply')],
+  '투표글 답글은 원 댓글 작성자에게만 알리고 댓글 알림은 만들지 않는다');
+
 -- 관리자 신고 상세는 신고된 답글의 원 댓글을 함께 준다.
 set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000001","role":"authenticated"}';
 set local role authenticated;
