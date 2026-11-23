@@ -154,7 +154,7 @@ $$;
 -- 호출자가 전달한 viewer ID를 받지 않고 auth.uid()로만 조회 범위를 정한다.
 create or replace function private.community_author_visible(target_author_id uuid)
 returns boolean language sql stable set search_path = '' as $$
-  select not exists (
+  select exists (select 1 from private.admin_users a where a.id=target_author_id and a.disabled_at is null) or not exists (
     select 1 from private.user_blocks b
     where b.blocker_id = (select auth.uid()) and b.blocked_id = target_author_id
   );
@@ -163,7 +163,13 @@ $$;
 -- 신고는 대상 콘텐츠만, 차단은 작성자 전체에 적용한다.
 create or replace function private.community_content_visible(content_type public.report_target, target_id bigint)
 returns boolean language sql stable set search_path = '' as $$
-  select not exists (
+  -- 운영자 콘텐츠의 과거 신고 기록은 보존하되 공식 안내를 숨기는 데 사용하지 않는다.
+  select exists (
+    select 1 from private.admin_users a where a.disabled_at is null and a.id = case content_type
+      when 'post' then (select p.author_id from private.posts p where p.id=target_id)
+      when 'comment' then (select c.author_id from private.comments c where c.id=target_id)
+    end
+  ) or not exists (
     select 1 from private.reports r
     where r.reporter_id = (select auth.uid()) and r.target_type = content_type
       and ((content_type = 'post' and r.post_id = target_id) or

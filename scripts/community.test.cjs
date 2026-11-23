@@ -1212,6 +1212,30 @@ test("공지 상세는 운영자 헤더를 사용하고 댓글 닫기 상태에�
   }
 });
 
+test("운영자 댓글은 신고·차단을 숨기고 본인 댓글 수정·삭제 메뉴는 유지한다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({
+    post,
+    comments: [
+      { id: "1", isOperator: true, body: "운영자 안내", createdAt: PREVIEW.created_at },
+      {
+        id: "2",
+        isOperator: true,
+        isMine: true,
+        body: "내 운영자 댓글",
+        createdAt: PREVIEW.created_at,
+      },
+    ],
+  });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const comments = nodes(PostDetailScreen({}), "Comment");
+  for (const comment of comments) {
+    assert.equal(comment.props.onPressReport, undefined);
+    assert.equal(comment.props.onPressBlock, undefined);
+  }
+  assert.equal(typeof comments[1].props.onPressMenu, "function");
+});
+
 test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·투표 등으로 다시 불러올 때는 켜지 않는다", async () => {
   let resolveRefetch;
   const state = screenMocks({

@@ -424,7 +424,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
               isOperator={comment.isOperator}
               voteChoice={comment.voteChoice}
               onPressReport={
-                !comment.isMine && !comment.isWithdrawn && !isBusy
+                !comment.isOperator && !comment.isMine && !comment.isWithdrawn && !isBusy
                   ? () => {
                       Keyboard.dismiss();
                       setReportTarget({ type: "comment", id: comment.id });
@@ -432,7 +432,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                   : undefined
               }
               onPressBlock={
-                !comment.isMine && !comment.isWithdrawn && !isBusy
+                !comment.isOperator && !comment.isMine && !comment.isWithdrawn && !isBusy
                   ? () => setReportTarget({ type: "comment", id: comment.id, action: "block" })
                   : undefined
               }
