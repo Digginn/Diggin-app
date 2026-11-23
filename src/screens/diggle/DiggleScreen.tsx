@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useNetworkState } from "expo-network";
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,6 +21,8 @@ import { useLoginGate } from "@/hooks/useLoginGate";
 import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
 
+import { communityKeys } from "./api/community";
+import { FeaturedNotice } from "./components/FeaturedNotice";
 import { useCommunityFeed } from "./queries/useCommunity";
 import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
@@ -31,6 +34,7 @@ const TABS = [
 
 export function DiggleScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { tab: requestedTab } = useLocalSearchParams<{ tab?: string }>();
   const tab = requestedTab === "vote" ? "vote" : "all";
   const { session, isRestoring } = useAuth();
@@ -79,6 +83,7 @@ export function DiggleScreen() {
       showToast(TOAST_MESSAGES.SYS_001);
       return;
     }
+    void queryClient.invalidateQueries({ queryKey: [...communityKeys.all, "featured-notice"] });
     void feed.refetch();
   };
 
@@ -99,6 +104,7 @@ export function DiggleScreen() {
         right={<NotificationButton onPress={() => router.push("/notifications")} />}
       />
       <TopTab items={TABS} activeKey={tab} onChange={(key) => router.setParams({ tab: key })} />
+      <FeaturedNotice />
       {isCheckingConnection && posts.length === 0 ? null : (isOffline || feed.isError) &&
         posts.length === 0 ? (
         <ErrorState

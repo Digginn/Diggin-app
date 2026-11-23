@@ -73,10 +73,20 @@ export function parsePost(value: unknown): CommunityPost {
   if (row.type !== "post" && row.type !== "vote") throw new Error("invalid_community_response");
   if (row.my_choice != null && row.my_choice !== "buy" && row.my_choice !== "not")
     throw new Error("invalid_community_response");
+  if (row.notice != null && typeof record(row.notice).comments_closed !== "boolean")
+    throw new Error("invalid_community_response");
   return {
     ...cursor(row),
     type: row.type,
     body: text(row.content),
+    ...(row.notice != null
+      ? {
+          notice: {
+            title: text(record(row.notice).title),
+            commentsClosed: record(row.notice).comments_closed === true,
+          },
+        }
+      : {}),
     isPreview: row.is_mine === undefined,
     isMine: row.is_mine === true,
     authorNickname: row.is_mine === undefined ? null : optionalText(row.author_nickname),

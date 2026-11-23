@@ -12,6 +12,7 @@ export type CommunityItem = {
 export type CommunityPost = CommunityCursor & {
   type: "post" | "vote";
   body: string;
+  notice?: { title: string; commentsClosed: boolean };
   isPreview: boolean;
   isMine: boolean;
   authorNickname: string | null;

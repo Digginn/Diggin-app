@@ -100,6 +100,7 @@ function NotificationsContent() {
           : items.map((notification) => ({
               id: notification.id,
               title: notification.title,
+              isNotice: notification.postType === "notice",
               message: notification.body,
               timeLabel: formatCommunityTime(notification.createdAt),
               // 확인 처리에 실패하면 점이 남아 있으니 목록은 모두 읽은 모양으로 둔다.
@@ -121,7 +122,12 @@ function NotificationsContent() {
           return;
         }
         router.push({
-          pathname: notification.postType === "vote" ? "/votes/[id]" : "/posts/[id]",
+          pathname:
+            notification.postType === "notice"
+              ? "/notices/[id]"
+              : notification.postType === "vote"
+                ? "/votes/[id]"
+                : "/posts/[id]",
           params: { id: notification.postId },
         });
       }}

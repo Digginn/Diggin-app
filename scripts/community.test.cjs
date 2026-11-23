@@ -582,6 +582,8 @@ function screenMocks({
         .communityErrorMessage,
     },
     "./utils/formatCommunityAuthor": load("src/screens/diggle/utils/formatCommunityAuthor.ts"),
+    "./components/FeaturedNotice": { FeaturedNotice: "FeaturedNotice" },
+    "./components/NoticeHeader": { NoticeHeader: "NoticeHeader" },
     "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
     "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
     "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
@@ -1172,4 +1174,27 @@ test("본인 글 상세에서는 좋아요를 누를 수 없다(BUG-074)", async
   const row = nodes(PostDetailScreen({}), "LikeCommentRow")[0];
   assert.equal(row.props.onPressLike, undefined);
   assert.equal(row.props.hasLike, true, "좋아요 수는 계속 보여 준다");
+});
+
+test("공지 상세는 운영자 헤더를 사용하고 댓글 닫기 상태에서는 댓글과 입력창을 숨긴다", async () => {
+  const original = await api(MEMBER).fetchCommunityPost("12");
+  for (const commentsClosed of [false, true]) {
+    const post = { ...original, notice: { title: "운영 공지", commentsClosed } };
+    const state = screenMocks({ post });
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const screen = PostDetailScreen({ type: "notice" });
+    const list = nodes(screen, "FlatList")[0];
+    assert.equal(nodes(list.props.ListHeaderComponent, "NoticeHeader")[0].props.title, "운영 공지");
+    assert.equal(nodes(list.props.ListHeaderComponent, "ProductImgGrid").length, 0);
+    assert.equal(
+      nodes(list.props.ListHeaderComponent, "LikeCommentRow")[0].props.hasComment,
+      !commentsClosed,
+    );
+    assert.equal(nodes(screen, "CommentInput").length, commentsClosed ? 0 : 1);
+    assert.equal(
+      nodes(screen, "ReportBlockMenu").length,
+      0,
+      "공지 헤더는 일반 글 신고·삭제 메뉴를 노출하지 않는다",
+    );
+  }
 });

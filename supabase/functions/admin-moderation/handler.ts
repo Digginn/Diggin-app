@@ -70,12 +70,17 @@ export function createAdminHandler(services: Services) {
       if (!request.headers.get("content-type")?.startsWith("application/json")) {
         return json({ error: "invalid_request" }, 400);
       }
-      if (Number(request.headers.get("content-length")) > 16384) {
+      if (Number(request.headers.get("content-length")) > 262144) {
         return json({ error: "request_too_large" }, 413);
       }
       let body: Record<string, unknown>;
       try {
-        body = object(await readJson(request));
+        body = object(await readJson(request, 262144));
+        if (
+          body.action !== "notice" && new TextEncoder().encode(JSON.stringify(body)).length > 16384
+        ) {
+          return json({ error: "request_too_large" }, 413);
+        }
       } catch (error) {
         if (error instanceof Error && error.message === "request_too_large") {
           return json({ error: "request_too_large" }, 413);
@@ -89,6 +94,18 @@ export function createAdminHandler(services: Services) {
       }
       const rpc = (name: string, args: Record<string, unknown>) =>
         services.rpc(name, { ...args, ...identity });
+      if (body.action === "notice") {
+        const operation = text(body.operation, 20);
+        const isRead = operation === "list" || operation === "get";
+        return json(
+          await rpc("admin_notice", {
+            operation,
+            target_id: id(body.notice_id, true),
+            request_id: isRead ? null : uuid(body.request_id),
+            payload: body.payload === undefined ? {} : object(body.payload),
+          }),
+        );
+      }
       if (body.action === "console") {
         const page = body.page ?? 1;
         const searchQuery = body.query ?? "";

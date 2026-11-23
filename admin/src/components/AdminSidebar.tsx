@@ -20,7 +20,7 @@ export function AdminSidebar({
   initialProfileOpen?: boolean;
   initialLogoutOpen?: boolean;
   reportsHref?: string;
-  activePage?: "reports" | "sanctions" | "members";
+  activePage?: "reports" | "sanctions" | "members" | "notices";
   onLogout: () => Promise<void>;
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(initialProfileOpen);
@@ -95,6 +95,12 @@ export function AdminSidebar({
             icon="user"
             isActive={activePage === "members"}
             iconAsset={activePage === "sanctions" ? "operations-nav-user" : undefined}
+          />
+          <NavItem
+            href={reportsHref.replace(/reports$/, "notices")}
+            label="공지 관리"
+            isActive={activePage === "notices"}
+            iconAsset="notice-nav"
           />
         </nav>
         <div className="admin-profile" ref={profileRef}>

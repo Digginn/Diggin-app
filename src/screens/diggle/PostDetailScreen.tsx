@@ -39,6 +39,7 @@ import { normalizeText } from "@/utils/text";
 import { COMMUNITY_PAGE_SIZE, communityKeys } from "./api/community";
 import { communityWriteError, deleteCommunityPost } from "./api/communityWrite";
 import { LikeCommentRow } from "./components/LikeCommentRow";
+import { NoticeHeader } from "./components/NoticeHeader";
 import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
 import { VoteBlock } from "./components/VoteBlock";
@@ -53,7 +54,7 @@ import type { CommunityComment, CommunityItem } from "./types/community";
 import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
-export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
+export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "notice" }) {
   const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
   const router = useRouter();
   const { session, isRestoring } = useAuth();
@@ -74,10 +75,15 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   }, [session?.user.id]);
   const result = useCommunityPost(id);
   const post = result.data;
-  const isWrongRoute = !!post && post.type !== (type === "vote" ? "vote" : "post");
+  const isWrongRoute =
+    !!post &&
+    (post.notice
+      ? type !== "notice"
+      : type === "notice" || post.type !== (type === "vote" ? "vote" : "post"));
+  const areCommentsClosed = post?.notice?.commentsClosed === true;
   const voteTiming = useCommunityVoteTiming(post, result.dataUpdatedAt);
   const vote = useCommunityVote(post, session?.user.id ?? null, voteTiming?.isClosed ?? false);
-  const comments = useCommunityComments(id, !!post && !isWrongRoute);
+  const comments = useCommunityComments(id, !!post && !isWrongRoute && !areCommentsClosed);
   const actions = useCommentActions(id, session?.user.id ?? null);
   const like = useCommunityLike(post, session?.user.id ?? null);
   const viewedPostId = post && !isWrongRoute ? post.id : null;
@@ -221,7 +227,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   useEffect(() => {
     if (!isRestoring && session && post && isWrongRoute) {
       router.replace({
-        pathname: post.type === "vote" ? "/votes/[id]" : "/posts/[id]",
+        pathname: post.notice
+          ? "/notices/[id]"
+          : post.type === "vote"
+            ? "/votes/[id]"
+            : "/posts/[id]",
         params: { id: post.id, ...(returnTo ? { returnTo } : {}) },
       });
     }
@@ -252,8 +262,9 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         left="back"
         onBack={goBack}
         isDisabled={infoItem !== null || isBusy}
+        title={type === "notice" ? "공지" : undefined}
         right={
-          post?.isMine && !isWrongRoute ? (
+          post?.notice ? null : post?.isMine && !isWrongRoute ? (
             <AppBar.TextButton
               disabled={isBusy || infoItem !== null}
               onPress={() => {
@@ -297,7 +308,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         <FlatList
           ref={listRef}
           className="flex-1"
-          data={commentRows}
+          data={areCommentsClosed ? [] : commentRows}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={() => {
             shouldRevealNewComment.current = false;
@@ -317,44 +328,59 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           keyExtractor={(comment) => comment.id}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
-            if (comments.hasNextPage && !comments.isFetching && !comments.isFetchNextPageError)
+            if (
+              !areCommentsClosed &&
+              comments.hasNextPage &&
+              !comments.isFetching &&
+              !comments.isFetchNextPageError
+            )
               void comments.fetchNextPage({ cancelRefetch: false });
           }}
           ListHeaderComponent={
             <>
-              <View className="gap-3 px-margin pb-4">
-                <Text className="text-gray-500 font-b4">
-                  {formatCommunityAuthor(post.authorNickname, post.isMine)} ·{" "}
-                  {formatCommunityTime(post.createdAt)}
-                </Text>
-                <Text className="text-gray-800 font-b3">{post.body}</Text>
-                <ProductImgGrid
-                  items={post.items}
-                  onPressInfo={(item) =>
-                    setInfoItem(post.items.find((snapshot) => snapshot.id === item.id) ?? null)
-                  }
+              {post.notice ? (
+                <NoticeHeader
+                  title={post.notice.title}
+                  body={post.body}
+                  createdAt={post.createdAt}
                 />
-                {post.type === "vote" && voteTiming && (
-                  <VoteBlock
-                    isReadOnly={vote.isPending}
-                    onChoose={(choice) => void vote.choose(choice)}
-                    isMyVote={post.isMine}
-                    hasResults={post.buyCount !== null && post.notCount !== null}
-                    vote={{
-                      buyCount: post.buyCount ?? 0,
-                      notCount: post.notCount ?? 0,
-                      myChoice:
-                        post.myChoice === "buy" ? "BUY" : post.myChoice === "not" ? "NOT" : null,
-                      ...voteTiming,
-                    }}
+              ) : (
+                <View className="gap-3 px-margin pb-4">
+                  <Text className="text-gray-500 font-b4">
+                    {formatCommunityAuthor(post.authorNickname, post.isMine)} ·{" "}
+                    {formatCommunityTime(post.createdAt)}
+                  </Text>
+                  <Text className="text-gray-800 font-b3">{post.body}</Text>
+                  <ProductImgGrid
+                    items={post.items}
+                    onPressInfo={(item) =>
+                      setInfoItem(post.items.find((snapshot) => snapshot.id === item.id) ?? null)
+                    }
                   />
-                )}
-              </View>
+                  {post.type === "vote" && voteTiming && (
+                    <VoteBlock
+                      isReadOnly={vote.isPending}
+                      onChoose={(choice) => void vote.choose(choice)}
+                      isMyVote={post.isMine}
+                      hasResults={post.buyCount !== null && post.notCount !== null}
+                      vote={{
+                        buyCount: post.buyCount ?? 0,
+                        notCount: post.notCount ?? 0,
+                        myChoice:
+                          post.myChoice === "buy" ? "BUY" : post.myChoice === "not" ? "NOT" : null,
+                        ...voteTiming,
+                      }}
+                    />
+                  )}
+                </View>
+              )}
               <LikeCommentRow
                 likeCount={like.likeCount}
                 commentCount={post.commentCount ?? 0}
                 isLiked={like.isLiked}
                 hasLike={post.type === "post"}
+                hasComment={!areCommentsClosed}
+                isNotice={!!post.notice}
                 // 본인 글은 좋아요를 누를 수 없다(BUG-074). 개수는 계속 보여 준다.
                 onPressLike={
                   post.type === "post" && !post.isMine && !like.isPending
@@ -362,7 +388,15 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                     : undefined
                 }
               />
-              <View className="h-3 bg-gray-100" />
+              <View
+                className={
+                  post.notice
+                    ? areCommentsClosed
+                      ? "mx-margin h-2 bg-gray-100"
+                      : "h-2 bg-gray-100"
+                    : "h-3 bg-gray-100"
+                }
+              />
             </>
           }
           renderItem={({ item: comment }) => (
@@ -417,12 +451,12 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           )}
           ListFooterComponent={
             <>
-              {(comments.isPending || comments.isFetchingNextPage) && (
+              {!areCommentsClosed && (comments.isPending || comments.isFetchingNextPage) && (
                 <View className="items-center py-4">
                   <Spinner />
                 </View>
               )}
-              {comments.isError && (
+              {!areCommentsClosed && comments.isError && (
                 <View className="items-center gap-3 px-margin py-4">
                   <Text className="text-center text-gray-500 font-b3">
                     댓글을 불러올 수 없습니다. 다시 시도해 주세요.
@@ -446,7 +480,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           }
         />
       )}
-      {post && !isWrongRoute && !isRestoring && session && (
+      {post && !isWrongRoute && !isRestoring && session && !areCommentsClosed && (
         <View>
           {actions.editing && (
             <CommentEditBanner

@@ -369,6 +369,17 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - `private.reject_public_email_signup(jsonb)`는 Auth의 before-user-created 전용 invoker 훅이다. 실행 권한은 `supabase_auth_admin`에만 부여한다. Auth가 설정한 `app_metadata.provider`가 email이거나 없으면 공개 가입을 거부하고 사용자 수정 가능한 metadata는 신뢰하지 않는다. 소셜 가입·기존 이메일 로그인·Admin API 발급을 유지한다. 로컬 비밀번호 정책은 12자·대소문자·숫자·특수문자다. 원격은 승인 배포 후 `scripts/configure_auth_security.py`가 해당 설정과 훅만 선택 반영하고 재조회 검증한다. 유출 비밀번호 차단도 시도하되 플랜·권한 제한은 경고와 미완료 상태로 남기며 유료 업그레이드는 하지 않는다. 기존 관리자 비밀번호의 원문은 조회하지 않으며 기존 계정의 정책 충족/재설정과 MFA는 별도 점검한다.
 - 기존 신고 상세는 같은 콘텐츠의 다른 신고에서 수행한 콘텐츠 조치도 반환한다. pgTAP `admin_console.test.sql`, Edge handler 테스트와 로컬 Auth/DB 통합 테스트로 권한 차단·검색/페이지·일괄 상태·중복 요청·실제 Auth 제재를 검증한다. 운영 반영과 Retool 호스팅 전환은 별도 승인 배포를 따른다.
 
+### 6-7. 관리자 공지 (#229)
+
+- 공지는 `private.posts.notice_title`이 있는 일반글(`type=post`)이며 상품 첨부 없이 작성한다. 제목 1~100자, 본문 1~10,000자, 선택 알림함 요약 0~200자는 NFC 정규화 후 `private.char_count` 기준이다. 일반글의 기존 5~50자·상품 첨부 규칙은 유지한다.
+- `notice_inbox_body`, `notice_inbox_only`, `notice_comments_closed`, `notice_revision`을 함께 저장한다. 최신 공개 공지 중 알림함 전용이 아닌 1건을 DIGGLE 두 탭의 상단에 고정한다. 게시글 목록·MY 활동 목록과는 분리한다.
+- `admin_notice(actor,actor_session,operation,target_id?,request_id?,payload?)`는 service_role 전용 public 래퍼/private definer RPC다. `assert_moderator`로 활성 관리자·실제 세션을 확인한다. 목록은 최신순 20건 페이지, 작성·수정·공개/숨김·삭제를 제공하며 `notice_revision`으로 오래된 화면의 덮어쓰기를 거부한다.
+- RLS를 켜고 직접 접근을 회수한 `private.notice_requests`에 관리자·요청 UUID·작업·요청 내용·결과를 저장한다. 동일 UUID를 직렬화해 응답 유실 후 최초 결과를 반환하고 내용 변경은 거부한다. 웹은 기존 관리자 요청 보관 기능으로 미확인 작성·수정을 같은 UUID로 복구한다.
+- 앱 상세는 기존 `get_community_post` 응답의 선택 `notice={title,comments_closed}`로 구분한다. 댓글 150자·운영자 라벨·좋아요·댓글 신고/차단·본인 댓글 수정/삭제는 기존 경로를 재사용한다. 댓글을 닫으면 기존 댓글과 입력창을 숨기며 작성·수정 RPC도 부모 글 잠금 후 거부한다. 본인 댓글 삭제는 허용한다.
+- `get_featured_notice()`와 `get_app_notifications(after_created_at?,after_key?)`를 사용한다. 알림함은 개인 알림과 최근 30일 공개 공지를 합쳐 20건씩 반환한다. 공지 ID는 `notice:<게시글ID>`, 동률 순서는 시각·문자열 키(C collation)로 고정한다. 기존 `get_notifications` 계약은 유지한다. `has_unread_notices()`와 기존 확인 시각으로 빨간 점·읽음 상태를 처리한다.
+- 수정은 기존 알림 내용을 갱신하며 새 알림을 만들지 않는다. 숨김·삭제 후 다음 조회에서 피드·알림함·직접 상세 접근을 제외한다. 삭제는 복구 API가 없는 soft delete다. 공지 게시와 공지 댓글·좋아요는 휴대폰 푸시를 생성하지 않는다(사용자 확인).
+- DB·Edge Function을 기존 승인 경로로 먼저 배포한 뒤 새 앱/OTA와 관리자 웹을 배포한다. 최초 앱 기능 반영 후에는 공지 등록에 추가 앱 업데이트가 필요 없다.
+
 ## 7. 제재 (RPT-006)
 
 - warning: 기능 제한 없이 이력과 안내만.
