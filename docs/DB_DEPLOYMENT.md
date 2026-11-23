@@ -76,6 +76,14 @@ CI의 `validate_csv_migration_recovery.py --profanity`는 차단 우선 이력�
 
 사용자 요청으로 복구 PR #190 (`fix/189-shared-db-migration-recovery`)에 한해서 팀원 승인 없이 병합·Actions 배포한다. 저장소·브랜치·PR 번호·정확한 병합 커밋 검사와 모든 검증 단계는 유지한다. 기존 SQL·원격 이력은 수정하지 않으며 reset·repair·seed는 실행하지 않는다. 완료 후 비속어 두 버전 및 30일 보류 버전의 원격 적용 이력을 확인한다.
 
+### PR #239의 공지 마이그레이션 누락 복구
+
+PR #238의 `20261123111811_keep_sanctions_on_new_sanction.sql`까지 먼저 적용되어 PR #239의 `20261122143516_notice_management.sql`이 과거 순서로 남았다. 배포 스크립트는 이 공지 원본 파일의 정규화된 SHA-256과 위 선행 버전의 적용 이력이 일치할 때만 `--include-all`로 복구한다. 공지 파일은 PR #238의 `admin_console` 정의를 교체하지 않는다. 후속 `20261123144353_protect_operator_content.sql`은 공지 복구 후 시간순으로 적용한다.
+
+CI의 `validate_csv_migration_recovery.py --notices`는 공지 파일을 제외하고 PR #238까지 적용한 이력을 독립 임시 DB에 재현한다. 공지 파일을 원본 그대로 복원해 실제 배포 스크립트로 복구하고, 이후 관리자 콘텐츠 보호 파일을 일반 경로로 적용한 뒤 전체 pgTAP·lint·Advisors를 검증한다. 기존 CSV·비속어 복구 검증도 유지한다.
+
+복구 PR을 승인·병합해 새 develop 배포를 실행한다. 완료 후 공지·관리자 콘텐츠 보호 두 버전의 적용 이력과 Auth·Edge Functions 후속 배포 성공을 확인한다. 기존 실패 실행을 재실행해도 수정 전 스크립트를 사용하므로 복구되지 않는다. 기존 SQL 파일이나 원격 이력을 수정하지 않는다.
+
 ## 실패했을 때
 
 1. 저장소 Actions → 해당 실행 → 실패한 단계를 확인한다. 설정 값이 없으면 Environment에 등록한다.
