@@ -44,7 +44,7 @@ export function CustomerSupportScreen() {
     try {
       await Linking.openURL(url);
     } catch {
-      showToast(TOAST_MESSAGES.SYS_002);
+      showToast(TOAST_MESSAGES.SYS_002, "error");
     }
   };
 

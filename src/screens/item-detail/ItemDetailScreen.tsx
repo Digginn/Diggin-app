@@ -12,6 +12,7 @@ import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
 import { FallbackImg } from "@/components/FallbackImg";
 import { FirstVisitGuide } from "@/components/FirstVisitGuide";
+import { WISH_LEVEL_HINT } from "@/components/ItemInfoFields";
 import { LoadingDialog } from "@/components/Loading";
 import { ActionModal } from "@/components/modal";
 import { requestProductImageNow } from "@/components/ProductImageFiller";
@@ -132,7 +133,7 @@ export function ItemDetailScreen() {
       folderIds.data ? folderIds : folderIds.refetch(),
     ]);
     if (!folderResult.data || !folderIdsResult.data) {
-      showToast(TOAST_MESSAGES.SYS_001);
+      showToast(TOAST_MESSAGES.SYS_001, "error");
       return;
     }
     saveFolders.reset();
@@ -226,13 +227,11 @@ export function ItemDetailScreen() {
                     { wishLevel: level },
                     {
                       onSuccess: () => trackEvent("product_edit", { product_id: id }),
-                      onError: () => showToast(TOAST_MESSAGES.ALL_005),
+                      onError: () => showToast(TOAST_MESSAGES.ALL_005, "error"),
                     },
                   )
                 }
-                hint={
-                  "얼마나 사고 싶은지를 3단계로 기록해두어\nALL 탭에서 빠르게 분류할 수 있습니다."
-                }
+                hint={WISH_LEVEL_HINT}
               />
             )}
           </View>
@@ -286,7 +285,7 @@ export function ItemDetailScreen() {
               onSuccess: () => {
                 trackEvent("product_edit", { product_id: id });
                 setEditOpen(false);
-                showToast(TOAST_MESSAGES.ALL_004);
+                showToast(TOAST_MESSAGES.ALL_004, "success");
               },
               onError: (error) =>
                 setEditError(
@@ -342,12 +341,12 @@ export function ItemDetailScreen() {
               },
               onSuccess: () => {
                 setDeleteOpen(false);
-                showToast(TOAST_MESSAGES.ALL_007);
+                showToast(TOAST_MESSAGES.ALL_007, "success");
                 router.back();
               },
               onError: () => {
                 setDeleteOpen(false);
-                showToast(TOAST_MESSAGES.ALL_008);
+                showToast(TOAST_MESSAGES.ALL_008, "error");
               },
             });
           },
@@ -366,7 +365,7 @@ export function ItemDetailScreen() {
           onComplete={(ids) =>
             saveFolders.mutateAsync(ids).then(() => {
               setFolderOpen(false);
-              showToast(selectFolderSavedMessage(ids.length));
+              showToast(selectFolderSavedMessage(ids.length), "success");
             })
           }
         />
@@ -389,7 +388,9 @@ export function ItemDetailScreen() {
                   product_id: id,
                   click_source: "my_product",
                 });
-                Linking.openURL(item.sourceUrl).catch(() => showToast(TOAST_MESSAGES.ALL_009));
+                Linking.openURL(item.sourceUrl).catch(() =>
+                  showToast(TOAST_MESSAGES.EXT_001, "error"),
+                );
               }}
             >
               웹사이트 이동

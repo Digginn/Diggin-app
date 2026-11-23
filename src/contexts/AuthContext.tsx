@@ -7,6 +7,7 @@ import { syncAnalyticsConsent } from "@/lib/analytics";
 import { GoogleSignin } from "@/lib/googleSignIn";
 import { finishDeviceSignOut, unregisterDevicePush } from "@/lib/pushNotifications";
 import { queryClient } from "@/lib/queryClient";
+import { checkSession } from "@/lib/sessionCheck";
 import { supabase } from "@/lib/supabase";
 
 type Auth = {
@@ -38,6 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionRef.current = data.session;
       setSession(data.session);
       setIsRestoring(false);
+      // 저장된 토큰이 아직 유효해도 다른 곳에서 끊긴 세션일 수 있다.
+      if (data.session) void checkSession();
     });
     // 갱신 토큰이 만료·철회되면 SDK가 SIGNED_OUT을 보낸다. 네트워크 오류는 세션을 유지한다.
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
@@ -81,7 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 운영자가 이메일 철회 요청으로 바꾼 동의는 앱을 다시 열거나 앱으로 돌아올 때 반영한다.
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void syncAnalyticsConsent(sessionRef.current?.user.id ?? null);
+      if (state !== "active") return;
+      void syncAnalyticsConsent(sessionRef.current?.user.id ?? null);
+      if (sessionRef.current) void checkSession();
     });
     return () => subscription.remove();
   }, []);
