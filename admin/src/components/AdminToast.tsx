@@ -11,7 +11,7 @@ export function AdminToast({
   message: string;
   isVisible: boolean;
   onDismiss: () => void;
-  variant?: "success" | "refresh";
+  variant?: "success" | "error" | "refresh";
 }) {
   useEffect(() => {
     if (!isVisible) return;
@@ -21,7 +21,7 @@ export function AdminToast({
 
   return isVisible ? (
     <div className={`admin-toast admin-toast--${variant}`} role="status">
-      <AdminIcon asset={variant === "refresh" ? "toast-refresh" : "toast-check"} size={18} />
+      <AdminIcon asset={`toast-${variant === "success" ? "check" : variant}`} size={16} />
       {message}
     </div>
   ) : null;
