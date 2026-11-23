@@ -248,6 +248,7 @@ test("댓글은 신고 아이콘 대신 신고·차단 메뉴를 쓰고 메뉴�
   let isOpen = false;
   let keyboardDismissed = 0;
   const { Comment } = load("src/components/Comment.tsx", {
+    "@/components/CommentLikeButton": { CommentLikeButton: "CommentLikeButton" },
     "react": {
       useRef: () => ({ current: null }),
       useState: () => [isOpen, (value) => (isOpen = value)],

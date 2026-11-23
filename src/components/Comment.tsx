@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Keyboard, Linking, Pressable, Text, View } from "react-native";
 
 import KebabSvg from "@/assets/images/icon-kebab.svg";
+import { CommentLikeButton } from "@/components/CommentLikeButton";
 import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { colors } from "@/theme";
 import { httpLinkParts } from "@/utils/httpLinks";
@@ -22,6 +23,10 @@ type CommentProps = {
   isHighlighted?: boolean;
   /** 삭제된 댓글은 본문을 대체하고 메뉴를 막음 */
   isDeleted?: boolean;
+  likeCount?: number;
+  isLiked?: boolean;
+  onPressLike?: () => void;
+  onPressReply?: () => void;
   /** 케밥의 창 기준 좌표를 같이 넘김 */
   onPressMenu?: (anchor: MenuAnchor) => void;
   onPressReport?: () => void;
@@ -57,6 +62,10 @@ export function Comment({
   voteChoice = null,
   isHighlighted = false,
   isDeleted = false,
+  likeCount = 0,
+  isLiked = false,
+  onPressLike,
+  onPressReply,
   onPressMenu,
   onPressReport,
   onPressBlock,
@@ -75,14 +84,14 @@ export function Comment({
   return (
     <View
       className={clsx(
-        "w-full items-start pt-0.5",
+        "w-full items-start",
         isHighlighted || isReportMenuOpen ? "bg-gray-50" : "bg-gray-0",
       )}
     >
       {isHighlighted ? (
         <View className="absolute bottom-0 left-0 top-0 w-[3px] bg-gray-900" />
       ) : null}
-      <View className="w-full flex-row items-center justify-between pl-margin pr-2">
+      <View className="h-12 w-full flex-row items-center justify-between pl-margin pr-3">
         <View className="min-w-0 flex-1 flex-row items-center gap-1">
           <View className="min-w-0 shrink flex-row items-center gap-1.5">
             <Text
@@ -113,11 +122,8 @@ export function Comment({
               </View>
             ) : null}
           </View>
-          <Text className="text-gray-500 font-label-12-regular">·</Text>
-          <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>
-        {/* 케밥(48)이 이 줄의 높이를 만든다. 삭제된 댓글이라 숨겨도 높이는 유지한다. */}
-        <View className="h-12 w-[120px] flex-row items-center justify-end gap-1.5">
+        <View className="size-12 flex-row items-center justify-end">
           {!isDeleted && onPressReport && onPressBlock && (
             <ReportBlockMenu
               placement="comment"
@@ -144,7 +150,7 @@ export function Comment({
       </View>
 
       <View className="w-full items-start px-margin">
-        <View className="w-full items-start border-b border-gray-200 pb-4">
+        <View className="w-full items-start pb-1">
           <Text
             onPress={!isDeleted && onPressMenu ? handlePressMenu : undefined}
             className={clsx("w-full font-b3", isDeleted ? "text-gray-500" : "text-gray-800")}
@@ -152,6 +158,26 @@ export function Comment({
             {isDeleted ? "삭제된 댓글입니다." : renderBody(body, onOpenLink)}
           </Text>
         </View>
+      </View>
+      <View className="h-12 w-full px-margin">
+        <View className="mt-0.5 h-11 justify-center border-b border-gray-200">
+          <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
+        </View>
+        {!isDeleted && (
+          <View className="absolute right-3 top-0 h-12 flex-row items-center">
+            <CommentLikeButton isLiked={isLiked} likeCount={likeCount} onPress={onPressLike} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="댓글 답글"
+              accessibilityState={{ disabled: !onPressReply }}
+              disabled={!onPressReply}
+              className="size-12 items-center justify-center active:opacity-75"
+              onPress={onPressReply}
+            >
+              <Text className="text-gray-600 font-label-12-regular">답글</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </View>
   );
