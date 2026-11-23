@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 
 import { AdminIcon } from "./AdminIcon";
 
@@ -7,13 +7,11 @@ export function AdminToast({
   isVisible,
   onDismiss,
   variant = "success",
-  icon,
 }: {
   message: string;
   isVisible: boolean;
   onDismiss: () => void;
-  variant?: "success" | "refresh";
-  icon?: ReactNode;
+  variant?: "success" | "error" | "refresh";
 }) {
   useEffect(() => {
     if (!isVisible) return;
@@ -23,9 +21,7 @@ export function AdminToast({
 
   return isVisible ? (
     <div className={`admin-toast admin-toast--${variant}`} role="status">
-      {icon ?? (
-        <AdminIcon asset={variant === "refresh" ? "toast-refresh" : "toast-check"} size={18} />
-      )}
+      <AdminIcon asset={`toast-${variant === "success" ? "check" : variant}`} size={16} />
       {message}
     </div>
   ) : null;

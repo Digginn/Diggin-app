@@ -211,6 +211,13 @@ test("SYS-009 시간 경계와 네트워크/일반 실패 문구를 구분한다
   ])
     assert.equal(formatCommunityTime(at(seconds), now), expected);
   assert.match(communityErrorMessage(new Error("Network request failed")), /연결 상태/);
+  // iOS 전역 fetch(expo/fetch)는 오프라인을 "fetch failed: …"로 알린다(BUG-130).
+  assert.match(
+    communityErrorMessage({
+      message: "Error: fetch failed: The Internet connection appears to be offline.",
+    }),
+    /연결 상태/,
+  );
   assert.match(communityErrorMessage({ message: "HTTP 500" }), /게시글/);
 });
 
@@ -480,6 +487,7 @@ function screenMocks({
       View: "View",
       Text: "Text",
       FlatList: "FlatList",
+      RefreshControl: "RefreshControl",
       ScrollView: "ScrollView",
       KeyboardAvoidingView: "KeyboardAvoidingView",
       Pressable: "Pressable",
@@ -550,6 +558,7 @@ function screenMocks({
     "@/components/ErrorState": { ErrorState: "ErrorState" },
     "@/components/Fab": { Fab: "Fab" },
     "@/components/Loading": { Spinner: "Spinner" },
+    "@/components/RefreshArea": { RefreshArea: "RefreshArea", REFRESH_TINT: undefined },
     "@/components/modal": { LoginRequiredModal: "LoginRequiredModal", ActionModal: "ActionModal" },
     "@/components/ToastText": { ToastText: "ToastText" },
     "@tanstack/react-query": { useQueryClient: () => ({ invalidateQueries: () => {} }) },
@@ -634,6 +643,10 @@ test("오프라인 첫 진입과 FAB 재시도는 스켈레톤·권한 요청 �
 test("작성 권한 확인 도중 끊긴 연결과 서버 오류는 서로 다른 Toast를 표시한다", async () => {
   for (const [message, expected] of [
     ["TypeError: Network request failed", "연결 상태를 확인한 후 다시 시도해 주세요."],
+    [
+      "Error: fetch failed: The Internet connection appears to be offline.",
+      "연결 상태를 확인한 후 다시 시도해 주세요.",
+    ],
     ["HTTP 500", "요청을 처리하지 못했습니다. 다시 시도해 주세요."],
   ]) {
     const state = screenMocks();
@@ -1197,4 +1210,103 @@ test("공지 상세는 운영자 헤더를 사용하고 댓글 닫기 상태에�
       "공지 헤더는 일반 글 신고·삭제 메뉴를 노출하지 않는다",
     );
   }
+});
+
+test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·투표 등으로 다시 불러올 때는 켜지 않는다", async () => {
+  let resolveRefetch;
+  const state = screenMocks({
+    feed: {
+      isSuccess: true,
+      isRefetching: true,
+      data: { pages: [[]] },
+      refetch: () => new Promise((resolve) => (resolveRefetch = resolve)),
+    },
+  });
+  state.mocks["react-native"].Platform = { OS: "ios" };
+  const values = [];
+  let cursor = 0;
+  state.mocks.react.useState = (initial) => {
+    const index = cursor++;
+    if (!(index in values)) values[index] = initial;
+    return [
+      values[index],
+      (next) => (values[index] = typeof next === "function" ? next(values[index]) : next),
+    ];
+  };
+  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const render = () => {
+    cursor = 0;
+    return DiggleScreen();
+  };
+  const control = () => nodes(render(), "FlatList")[0].props.refreshControl;
+  assert.equal(
+    control().props.refreshing,
+    false,
+    "다른 화면 동작으로 다시 불러오는 중에는 표시하지 않는다",
+  );
+  const area = () => nodes(render(), "RefreshArea")[0];
+  assert.equal(area().props.isRefreshing, false);
+  control().props.onRefresh();
+  assert.equal(control().props.refreshing, true);
+  assert.equal(area().props.isRefreshing, true, "새로고침 중 공통 Spinner를 그린다");
+  resolveRefetch();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(control().props.refreshing, false, "다시 불러오면 표시를 끈다");
+});
+
+test("DIGGLE 새로고침 표시는 당긴 탭에만 나오고, 이전 탭의 완료가 새 탭의 새로고침을 끄지 않는다", async () => {
+  const resolvers = [];
+  const params = { tab: "all" };
+  const state = screenMocks({
+    params,
+    feed: {
+      isSuccess: true,
+      data: { pages: [[]] },
+      refetch: () => new Promise((resolve) => resolvers.push(resolve)),
+    },
+  });
+  const values = [];
+  let cursor = 0;
+  state.mocks.react.useState = (initial) => {
+    const index = cursor++;
+    if (!(index in values)) values[index] = initial;
+    return [
+      values[index],
+      (next) => (values[index] = typeof next === "function" ? next(values[index]) : next),
+    ];
+  };
+  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const control = () => {
+    cursor = 0;
+    return nodes(DiggleScreen(), "FlatList")[0].props.refreshControl;
+  };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  control().props.onRefresh();
+  params.tab = "vote";
+  assert.equal(
+    control().props.refreshing,
+    false,
+    "전체 게시글을 당기는 중 투표 탭에는 표시하지 않는다",
+  );
+  control().props.onRefresh();
+  assert.equal(control().props.refreshing, true);
+  params.tab = "all";
+  assert.equal(
+    control().props.refreshing,
+    true,
+    "투표 탭을 당긴 뒤 돌아와도 진행 중인 전체 게시글 표시는 유지한다",
+  );
+  resolvers[0]();
+  await flush();
+  assert.equal(control().props.refreshing, false, "전체 게시글 완료는 전체 탭 표시만 끈다");
+  params.tab = "vote";
+  assert.equal(
+    control().props.refreshing,
+    true,
+    "전체 게시글 완료가 투표 탭의 새로고침을 끄지 않는다",
+  );
+  resolvers[1]();
+  await flush();
+  assert.equal(control().props.refreshing, false);
 });

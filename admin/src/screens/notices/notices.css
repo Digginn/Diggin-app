@@ -516,11 +516,6 @@
   }
 }
 
-.notice-screen .admin-toast {
-  padding: var(--space-4);
-  font-weight: 600;
-  line-height: 1.5;
-}
 .notice-screen .admin-toast-position {
   left: calc(var(--sidebar-width) + (100vw - var(--sidebar-width)) / 2);
   bottom: 46px;

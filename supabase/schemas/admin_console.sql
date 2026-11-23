@@ -73,7 +73,8 @@ begin
         case when p.status='community_restricted' and p.restricted_until<=now() then 'active' else p.status::text end as status
       from public.profiles p join auth.users u on u.id=p.id
       where search_query='' or position(lower(search_query) in lower(p.nickname || ' ' || p.id::text))>0
-    ), page as (select * from filtered order by created_at desc,id desc limit 20 offset (page_number-1)*20)
+    -- 회원 관리·제재 이력은 한 화면에 8개씩 보여 준다(#235).
+    ), page as (select * from filtered order by created_at desc,id desc limit 8 offset (page_number-1)*8)
     select jsonb_build_object('total',(select count(*) from filtered),'rows',coalesce((select jsonb_agg(to_jsonb(p) || jsonb_build_object(
       'posts',(select count(*) from private.posts x where x.author_id=p.id and x.deleted_at is null),
       'comments',(select count(*) from private.comments x where x.author_id=p.id and x.deleted_at is null),
@@ -83,10 +84,17 @@ begin
     with filtered as (
       select s.*,p.nickname,a.reason,a.admin_id,a.report_id,a.target_id,
         case when s.released_at is not null then 'released' when s.kind='community_restricted' and s.restricted_until<=now() then 'expired'
-          when s.kind='warning' then 'record' else 'active' end as state
+          when s.kind='warning' then 'record' else 'active' end as state,
+        -- 제재 이력 화면의 보관 열과 처리 열(#235). 해제는 같은 트랜잭션의 조치 기록이 released_at과 같은 시각을 가진다.
+        exists(select 1 from private.retention_holds h where h.target_type='sanction' and h.target_id=s.id) as is_held,
+        coalesce((select ru.email from private.admin_actions r join private.admin_users ru on ru.id=r.admin_id
+            -- 탈퇴하면 user_id가 비워지므로 남아 있는 제재 조치의 대상 ID로 해제 조치를 찾는다.
+            where s.released_at is not null and r.action='release' and r.target_type='user' and r.target_id=a.target_id and r.created_at=s.released_at
+            order by r.id limit 1),
+          (select au.email from private.admin_users au where au.id=a.admin_id)) as handled_by
       from private.user_sanctions s left join public.profiles p on p.id=s.user_id join private.admin_actions a on a.id=s.action_id
       where search_query='' or position(lower(search_query) in lower(concat_ws(' ',p.nickname,s.user_id,a.target_id)))>0
-    ), page as (select * from filtered order by id desc limit 20 offset (page_number-1)*20)
+    ), page as (select * from filtered order by id desc limit 8 offset (page_number-1)*8)
     select jsonb_build_object('total',(select count(*) from filtered),'rows',coalesce((select jsonb_agg(to_jsonb(p) ||
       jsonb_build_object('id',p.id::text,'action_id',p.action_id::text,'report_id',p.report_id::text) order by p.id desc) from page p),'[]'::jsonb)) into result;
   end if;

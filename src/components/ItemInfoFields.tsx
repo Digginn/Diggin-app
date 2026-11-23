@@ -15,7 +15,9 @@ const TooltipIcon = cssInterop(TooltipSvg, {
   className: { target: "style", nativeStyleToProp: { width: true, height: true } },
 });
 
-const HINT = "얼마나 사고 싶은지를\n3단계로 기록해두어\nALL 탭에서 빠르게\n분류할 수 있습니다.";
+// MSG-PDT-011. 줄바꿈은 시안 그대로 둔다. iOS는 자동 줄바꿈이 단어 중간에서 끊긴다(BUG-132).
+export const WISH_LEVEL_HINT =
+  "얼마나 사고 싶은지를\n3단계로 기록해두어\nALL 탭에서 빠르게\n분류할 수 있습니다.";
 
 // DB가 거절하는 길이·범위를 입력 단계에서 막는다. 가격은 정수 범위(약 21억) 안의 9자리까지.
 const NAME_MAX_LENGTH = 100;
@@ -159,7 +161,11 @@ export function ItemInfoFields({
             top: hintAnchor.y + HINT_TOP_OFFSET,
           }}
         >
-          <Tooltip arrowPosition="left" message={HINT} onClose={() => onOverlayChange(null)} />
+          <Tooltip
+            arrowPosition="left"
+            message={WISH_LEVEL_HINT}
+            onClose={() => onOverlayChange(null)}
+          />
         </View>
       </Modal>
     </>

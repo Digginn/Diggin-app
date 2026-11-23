@@ -59,6 +59,9 @@ export type SanctionRecord = {
   state: "record" | "active" | "expired" | "released";
   report_id: string | null;
   admin_id: string;
+  is_held: boolean;
+  /** 해제된 제재는 해제한 운영자, 그 밖에는 제재한 운영자의 이메일 */
+  handled_by: string;
 };
 export type IndividualReport = {
   id: string;
@@ -139,4 +142,9 @@ export function reportRow(report: ReportGroup): ReportRowData {
     firstAt: formatDate(report.first_at),
     status: report.status,
   };
+}
+export type AnalyticsConsentItems = { usage_analysis: boolean; overseas_transfer: boolean };
+// true인 항목만 철회한다.
+export function withdrawAnalyticsConsent(email: string, items: AnalyticsConsentItems) {
+  return adminRequest<unknown>({ action: "withdraw_analytics_consent", email, ...items });
 }

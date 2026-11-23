@@ -32,18 +32,21 @@ export function QueryState({
 export function Pagination({
   page,
   total,
+  pageSize = 20,
   isLoading = false,
   onChange,
 }: {
   page: number;
   total: number;
+  /** 서버 조회가 한 페이지에 돌려주는 개수와 같아야 한다. */
+  pageSize?: number;
   isLoading?: boolean;
   onChange: (page: number) => void;
 }) {
   return (
     <footer className="report-table__footer">
       <p>
-        {total}건 · {page} / {Math.max(1, Math.ceil(total / 20))}페이지
+        {total}건 · {page} / {Math.max(1, Math.ceil(total / pageSize))}페이지
       </p>
       <nav className="report-pagination" aria-label="목록 페이지">
         <button type="button" disabled={isLoading || page <= 1} onClick={() => onChange(page - 1)}>
@@ -51,7 +54,7 @@ export function Pagination({
         </button>
         <button
           type="button"
-          disabled={isLoading || page * 20 >= total}
+          disabled={isLoading || page * pageSize >= total}
           onClick={() => onChange(page + 1)}
         >
           다음

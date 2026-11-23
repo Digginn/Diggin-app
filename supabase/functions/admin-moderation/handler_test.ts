@@ -334,4 +334,33 @@ Deno.test("이용 기록 분석 동의 철회는 검증한 운영자와 이메�
   );
   assert(conflict.status === 409);
   assert((await handler(request({ action: "withdraw_analytics_consent" }))).status === 400);
+  const selected = await handler(
+    request({
+      action: "withdraw_analytics_consent",
+      email: "user@test.invalid",
+      usage_analysis: false,
+      overseas_transfer: true,
+    }),
+  );
+  assert(selected.status === 200);
+  assert(
+    JSON.stringify(calls.at(-1)) === JSON.stringify([
+      "admin_withdraw_analytics_consent",
+      {
+        target_email: "user@test.invalid",
+        withdraw_usage_analysis: false,
+        withdraw_overseas_transfer: true,
+        actor: actor.userId,
+        actor_session: actor.sessionId,
+      },
+    ]),
+  );
+  const partial = await handler(
+    request({
+      action: "withdraw_analytics_consent",
+      email: "user@test.invalid",
+      usage_analysis: true,
+    }),
+  );
+  assert(partial.status === 400);
 });

@@ -47,7 +47,14 @@ export type IconAsset =
   | "visibility-hide"
   | "visibility-restore"
   | "toast-check"
+  | "toast-error"
   | "toast-refresh"
+  | "sanction-refresh-m"
+  | "sanction-refresh-s"
+  | "dialog-shield"
+  | "nav-unlock"
+  | "dialog-unlock"
+  | "button-loading"
   | "nav-shield-active"
   | "nav-user-active"
   | "operations-nav-report"
@@ -84,7 +91,9 @@ export function AdminIcon({
   // 슬롯별 SVG의 혼합 색상도 보존한다. 색 전환이 필요한 행 화살표·이력 점만 마스크를 쓴다.
   if (
     asset &&
-    !["history-dot", "row-chevron", "button-refresh-m", "button-refresh-s"].includes(asset)
+    !["history-dot", "row-chevron", "button-refresh-m", "button-refresh-s", "nav-unlock"].includes(
+      asset,
+    )
   ) {
     return (
       <img

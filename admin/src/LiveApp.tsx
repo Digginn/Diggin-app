@@ -14,6 +14,7 @@ import {
 } from "./screens/auth/LoginScreen";
 import { NoticesScreen } from "./screens/notices/NoticesScreen";
 import { LiveOperationsScreen } from "./screens/operations/LiveOperationsScreen";
+import { AnalyticsConsentScreen } from "./screens/privacy/AnalyticsConsentScreen";
 import type { ContentTypeFilter } from "./screens/reports/components/ContentTypeSelect";
 import { LiveReportDetailScreen } from "./screens/reports/LiveReportDetailScreen";
 import { ReportListScreen } from "./screens/reports/ReportListScreen";
@@ -180,11 +181,12 @@ function ProtectedPages({
       <LiveOperationsScreen
         key={route}
         view={route === "/members" ? "members" : "sanctions"}
-        adminId={identity.id}
         email={identity.email}
         onLogout={onLogout}
       />
     );
+  if (route === "/analytics-consent")
+    return <AnalyticsConsentScreen email={identity.email} onLogout={onLogout} />;
   const detailId = /^\/reports\/([1-9][0-9]{0,18})$/.exec(route)?.[1];
   if (detailId)
     return (

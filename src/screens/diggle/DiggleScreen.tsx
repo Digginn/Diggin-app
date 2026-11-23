@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNetworkState } from "expo-network";
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 
 import { ensureCommunityWriteAllowed, restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
@@ -13,6 +13,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Fab } from "@/components/Fab";
 import { Spinner } from "@/components/Loading";
 import { Post } from "@/components/Post";
+import { REFRESH_TINT, RefreshArea } from "@/components/RefreshArea";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { DIGGLE_EMPTY_MESSAGES, TOAST_MESSAGES } from "@/constants/messages";
@@ -78,13 +79,27 @@ export function DiggleScreen() {
     }, [isFeedLoaded]),
   );
 
+  // 좋아요·투표·댓글·앱 복귀도 피드를 다시 불러온다. 직접 당긴 새로고침에만 표시해야 멈춘 스피너가 뜨지 않는다.
+  // 탭마다 진행 중인 새로고침을 따로 기억해, 여러 탭을 당겨도 각 탭의 완료가 자기 표시만 끄게 한다.
+  const [refreshingTabs, setRefreshingTabs] = useState<Record<string, object>>({});
+  const isRefreshing = tab in refreshingTabs;
+
   const refreshFeed = () => {
     if (isOffline) {
-      showToast(TOAST_MESSAGES.SYS_001);
+      showToast(TOAST_MESSAGES.SYS_001, "error");
       return;
     }
     void queryClient.invalidateQueries({ queryKey: [...communityKeys.all, "featured-notice"] });
-    void feed.refetch();
+    const target = tab;
+    const token = {};
+    setRefreshingTabs((current) => ({ ...current, [target]: token }));
+    void feed.refetch().finally(() =>
+      setRefreshingTabs((current) => {
+        if (current[target] !== token) return current;
+        const { [target]: _done, ...rest } = current;
+        return rest;
+      }),
+    );
   };
 
   useFocusEffect(
@@ -94,7 +109,7 @@ export function DiggleScreen() {
   );
 
   useEffect(() => {
-    if (feed.error && posts.length > 0) showToast(communityErrorMessage(feed.error));
+    if (feed.error && posts.length > 0) showToast(communityErrorMessage(feed.error), "error");
   }, [feed.error, posts.length, showToast]);
 
   return (
@@ -126,64 +141,71 @@ export function DiggleScreen() {
           ))}
         </View>
       ) : (
-        <FlatList
-          data={posts}
-          keyExtractor={(post) => post.id}
-          refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-          onRefresh={refreshFeed}
-          onEndReached={() => {
-            if (!isOffline && feed.hasNextPage && !feed.isFetching && !feed.isFetchNextPageError)
-              void feed.fetchNextPage();
-          }}
-          onEndReachedThreshold={0.4}
-          ListEmptyComponent={
-            <View className="h-96">
-              <EmptyState
-                variant={tab === "all" ? "post" : "vote"}
-                message={DIGGLE_EMPTY_MESSAGES[tab]}
+        <RefreshArea isRefreshing={isRefreshing}>
+          <FlatList
+            data={posts}
+            keyExtractor={(post) => post.id}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={refreshFeed}
+                tintColor={REFRESH_TINT}
               />
-            </View>
-          }
-          ListFooterComponent={
-            feed.isFetchingNextPage ? (
-              <View className="items-center py-5">
-                <Spinner />
+            }
+            onEndReached={() => {
+              if (!isOffline && feed.hasNextPage && !feed.isFetching && !feed.isFetchNextPageError)
+                void feed.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.4}
+            ListEmptyComponent={
+              <View className="h-96">
+                <EmptyState
+                  variant={tab === "all" ? "post" : "vote"}
+                  message={DIGGLE_EMPTY_MESSAGES[tab]}
+                />
               </View>
-            ) : feed.isFetchNextPageError ? (
-              <Button onPress={() => void feed.fetchNextPage()}>다시 시도</Button>
-            ) : null
-          }
-          renderItem={({ item }) => (
-            <Post
-              type={item.type === "vote" ? "vote" : "all"}
-              isPreview={item.isPreview}
-              body={item.body}
-              items={item.items}
-              timeLabel={formatCommunityTime(item.createdAt)}
-              authorLabel={formatCommunityAuthor(item.authorNickname, item.isMine)}
-              likeCount={item.type === "post" ? (item.likeCount ?? undefined) : undefined}
-              commentCount={item.commentCount ?? 0}
-              onPressReport={
-                session && !item.isMine
-                  ? () => setReportTarget({ type: "post", id: item.id })
-                  : undefined
-              }
-              onPressBlock={
-                session && !item.isMine
-                  ? () => setReportTarget({ type: "post", id: item.id, action: "block" })
-                  : undefined
-              }
-              onPress={() =>
-                requireLogin(() =>
-                  router.push({
-                    pathname: item.type === "vote" ? "/votes/[id]" : "/posts/[id]",
-                    params: { id: item.id },
-                  }),
-                )
-              }
-            />
-          )}
-        />
+            }
+            ListFooterComponent={
+              feed.isFetchingNextPage ? (
+                <View className="items-center py-5">
+                  <Spinner />
+                </View>
+              ) : feed.isFetchNextPageError ? (
+                <Button onPress={() => void feed.fetchNextPage()}>다시 시도</Button>
+              ) : null
+            }
+            renderItem={({ item }) => (
+              <Post
+                type={item.type === "vote" ? "vote" : "all"}
+                isPreview={item.isPreview}
+                body={item.body}
+                items={item.items}
+                timeLabel={formatCommunityTime(item.createdAt)}
+                authorLabel={formatCommunityAuthor(item.authorNickname, item.isMine)}
+                likeCount={item.type === "post" ? (item.likeCount ?? undefined) : undefined}
+                commentCount={item.commentCount ?? 0}
+                onPressReport={
+                  session && !item.isMine
+                    ? () => setReportTarget({ type: "post", id: item.id })
+                    : undefined
+                }
+                onPressBlock={
+                  session && !item.isMine
+                    ? () => setReportTarget({ type: "post", id: item.id, action: "block" })
+                    : undefined
+                }
+                onPress={() =>
+                  requireLogin(() =>
+                    router.push({
+                      pathname: item.type === "vote" ? "/votes/[id]" : "/posts/[id]",
+                      params: { id: item.id },
+                    }),
+                  )
+                }
+              />
+            )}
+          />
+        </RefreshArea>
       )}
       <View className="absolute bottom-6 right-[27px]">
         <Fab
@@ -192,7 +214,7 @@ export function DiggleScreen() {
           onPress={() =>
             requireLogin(() => {
               if (isOffline) {
-                showToast(TOAST_MESSAGES.SYS_001);
+                showToast(TOAST_MESSAGES.SYS_001, "error");
                 return;
               }
               if (isOpeningWriter.current) return;

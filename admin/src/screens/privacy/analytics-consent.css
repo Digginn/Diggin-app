@@ -1,0 +1,91 @@
+.analytics-consent-header > div {
+  /* 다른 관리 화면의 경로 표시 줄 높이만큼 제목을 내린다. */
+  padding-top: 23px;
+}
+.analytics-consent-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 640px;
+  max-width: 100%;
+  padding: 32px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-l);
+  background: var(--gray-0);
+}
+.analytics-consent-label {
+  padding: 0;
+  font: var(--label-l1);
+  line-height: normal;
+  letter-spacing: 0;
+}
+.analytics-consent-input {
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  /* 시안 값 그대로이며 대응하는 색 토큰이 없다. */
+  border: 1px solid #d9d9d9;
+  border-radius: var(--radius-s);
+  outline: none;
+  background: var(--gray-0);
+  color: var(--gray-900);
+  font: var(--body-b3);
+  line-height: normal;
+  letter-spacing: 0;
+}
+.analytics-consent-input::placeholder {
+  color: var(--gray-500);
+  opacity: 1;
+}
+.analytics-consent-input:focus-visible {
+  border-color: var(--gray-900);
+}
+.analytics-consent-input:disabled {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+.analytics-consent-input--error,
+.analytics-consent-input--error:focus-visible {
+  border-color: var(--error);
+}
+.analytics-consent-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.analytics-consent-items > legend {
+  /* float이 없으면 legend가 테두리 위에 얹혀 gap을 받지 않는다. */
+  float: left;
+}
+.analytics-consent-error {
+  color: var(--error);
+  font: var(--caption-c2);
+  letter-spacing: var(--tracking);
+}
+.analytics-consent-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-3);
+}
+.analytics-consent-loading {
+  display: flex;
+  animation: analytics-consent-spin 2s linear infinite;
+}
+@keyframes analytics-consent-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  75%,
+  100% {
+    transform: rotate(720deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .analytics-consent-loading {
+    animation: none;
+  }
+}

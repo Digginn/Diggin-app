@@ -128,8 +128,8 @@ for (const [path, message] of [
     await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
     await page.goto(`/#/designs/${path}`);
     await expect(page.getByRole("status")).toHaveText(message);
-    await expect(page.locator(".admin-toast img")).toHaveAttribute("width", "18");
-    await expect(page.locator(".admin-toast img")).toHaveAttribute("height", "18");
+    await expect(page.locator(".admin-toast img")).toHaveAttribute("width", "16");
+    await expect(page.locator(".admin-toast img")).toHaveAttribute("height", "16");
     await page.clock.fastForward(2500);
     await expect(page.getByRole("status")).toHaveCount(0);
   });

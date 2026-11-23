@@ -92,19 +92,7 @@ export function NoticesScreen({
           message={toast.message}
           isVisible={toast.isVisible}
           onDismiss={dismiss}
-          icon={
-            <img
-              src={
-                new URL(
-                  `../../assets/notice-toast-${toast.isRefresh ? "refresh" : "check"}.svg`,
-                  import.meta.url,
-                ).href
-              }
-              width={16}
-              height={16}
-              alt=""
-            />
-          }
+          variant={toast.isRefresh ? "refresh" : "success"}
         />
       </div>
     </div>
