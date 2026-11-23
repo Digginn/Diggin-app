@@ -167,7 +167,6 @@ function ProtectedPages({
       <LiveOperationsScreen
         key={route}
         view={route === "/members" ? "members" : "sanctions"}
-        adminId={identity.id}
         email={identity.email}
         onLogout={onLogout}
       />

@@ -21,8 +21,8 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 - `action: "console"`, `resource: "session"` → 검증된 관리자 `{id,email,role}`. UI 진입 때 권한을 확인하며 이후 모든 RPC에서도 재검사한다.
 - `resource: "reports"` → `{total,counts,rows}`. `query`(최대 100자, 문자 그대로 부분 검색), `status`(all/received/reviewing/resolved/rejected), `type`(all/post/comment), `page`(1부터, 20건)를 받는다. 전체 요약은 콘텐츠 그룹별이며 필터와 별개다. 그룹 상태 우선순위는 received → reviewing → resolved → rejected다. ID는 모두 문자열로 반환한다.
 - `resource: "report_detail"`, `report_id` → 기존 상세 + `author_name`, `group_status`, `report_count`. 개별 신고는 기존 `report_detail`의 `before_report_id`로 50건씩 추가 조회한다. 콘텐츠 조치 이력은 해당 콘텐츠의 다른 신고에서 수행한 조치도 포함한다.
-- `resource: "members"` → `{total,rows}`. query/page 지원. 이메일·Auth 메타데이터는 노출하지 않고 UUID·닉네임·가입/최근 로그인·활동/신고/보관 제재 수·실효 계정 상태만 반환한다. 기간 만료된 커뮤니티 제한은 정상으로 표시한다.
-- `resource: "sanctions"` → `{total,rows}`. query/page 지원. 제재·사유·기간·해제 여부와 관련 신고 ID를 반환한다. 보관 정책에 따라 삭제된 과거 제재는 집계하지 않는다.
+- `resource: "members"` → `{total,rows}`. query/page 지원(8건씩, #235). 이메일·Auth 메타데이터는 노출하지 않고 UUID·닉네임·가입/최근 로그인·활동/신고/보관 제재 수·실효 계정 상태만 반환한다. 기간 만료된 커뮤니티 제한은 정상으로 표시한다.
+- `resource: "sanctions"` → `{total,rows}`. query/page 지원(8건씩). 제재·사유·기간·해제 여부와 관련 신고 ID, 보관 유지 여부(`is_held`), 처리한 운영자 이메일(`handled_by`, 운영자가 직접 해제한 제재는 해제한 운영자)을 반환한다(#235). 보관 정책에 따라 삭제된 과거 제재는 집계하지 않는다.
 - `action: "report_group_status"`, `report_id`, `request_id`, `status`, `reason_category`, `reason` → `{action_id}`. 동일 콘텐츠의 미완료 신고를 하나의 트랜잭션으로 상태 변경한다. 접수는 reviewing으로만, 접수가 없는 검토 중 그룹은 resolved/rejected로 변경한다. 이미 완료된 신고는 보존한다. 서버 상태가 달라졌으면 409로 거부한다. 동일 UUID 재시도는 최초 결과를 반환하며 다른 본문은 거부한다. underage는 사용할 수 없다.
 
 조회 RPC `admin_console`과 일괄 상태 RPC `admin_report_group_status`는 기존 패턴대로 public invoker → private definer이며 service_role만 실행한다. 회원·제재·신고 목록 조회는 `private.admin_console_access_logs`에 운영자·화면·시각·실제 반환한 회원 UUID를 기록하고 기존 정리 작업이 1년 후 삭제한다. 상세 조회도 반환한 작성자·신고자 UUID를 기록한다. 두 로그의 `session_ip`는 검증한 Auth 세션의 로그인 당시 IP이며 현재 요청 IP와 다르다. 검색어·비밀번호·토큰은 기록하지 않는다. 요청 IP의 신뢰 가능한 수집 및 최종 접속기록 기준 확정은 남아 있다.
@@ -68,7 +68,7 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 ## 앱 연결
 
 - `get_account_access()`는 본인 상태·종료일·현재 제재 ID·위반 유형·확인 시각만 반환한다. `acknowledge_sanction_notice(sanction_id)`는 본인 현재 경고/기간 제한만 확인하며 최초 확인 시각을 보존한다.
-- `AccountAccessNotice`는 경고/기간 제한을 DIGGLE 최초 진입에 안내한다. 확인 저장 실패 시 모달을 유지한다. 새 제재는 이전 건의 확인 여부와 별개다. 새 조치로 대체되거나 해제된 이전 제재는 다시 안내하지 않는다.
+- `AccountAccessNotice`는 경고/기간 제한을 DIGGLE 최초 진입에 안내한다. 확인 저장 실패 시 모달을 유지한다. 새 제재는 이전 건의 확인 여부와 별개다. 해제된 이전 제재는 다시 안내하지 않는다. 7일 제한 중 받은 경고는 제한이 끝난 뒤 아직 확인하지 않았으면 경고로 안내한다(#235).
 - 기간 제한 중 모든 커뮤니티 변경 RPC는 종료일을 포함한 `community_restricted`를 반환한다. 본인 글 삭제도 포함한다. 조회·신고·차단·상품·폴더·MY는 유지하고 매 요청에 만료를 확인한다.
 - 앱은 변경 전 서버 상태를 확인해 제한 요청을 전송하지 않으며 입력을 유지하고 날짜가 포함된 MSG-REPORT-008을 표시한다. 사전 확인과 실제 변경은 같은 계정 토큰으로 실행한다.
 - 영구 제한은 어느 화면에서든 안내·로컬 세션 종료·비회원 로그인 화면 전환을 처리한다. 화면 이동·앱 복귀 시 상태 재확인과 SDK 세션 종료 이벤트를 사용하며, 주기 조회는 하지 않는다. 재조회 중에도 기존 경고·7일 제한 안내를 유지하고 확인 완료·제한 해제 응답에 따라 닫는다. 이전 JWT가 유효한 동안에는 본인 안내만 조회할 수 있다.
