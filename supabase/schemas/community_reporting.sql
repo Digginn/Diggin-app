@@ -47,9 +47,8 @@ begin
   end if;
   if content_type = 'comment' then
     select * into comment from private.comments where id = target_id for update;
-    if not found or comment.deleted_at is not null or comment.hidden_at is not null or
-      comment.author_id is null or not private.community_author_visible(comment.author_id) or
-      not private.community_content_visible('comment', comment.id) then
+    -- 원 댓글이 빠져 목록에 안 보이는 답글도 신고할 수 없다.
+    if not found or comment.author_id is null or not private.community_comment_listed(comment.id) then
       raise exception 'report_target_not_found' using errcode = '42501';
     end if;
     author := comment.author_id;

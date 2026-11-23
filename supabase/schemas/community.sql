@@ -73,8 +73,8 @@ create table private.comments (
 create index comments_post_idx on private.comments(post_id, created_at, id)
   where deleted_at is null and hidden_at is null;
 create index comments_author_idx on private.comments(author_id);
-create index comments_parent_idx on private.comments(parent_id, created_at, id)
-  where parent_id is not null and deleted_at is null and hidden_at is null;
+-- 삭제·숨김 조건은 함수 안에서 걸러져 부분 인덱스 조건으로 쓰면 플래너가 인덱스를 못 탄다.
+create index comments_parent_idx on private.comments(parent_id, created_at, id) where parent_id is not null;
 
 create table private.post_anon_numbers (
   post_id bigint not null references private.posts(id) on delete cascade,

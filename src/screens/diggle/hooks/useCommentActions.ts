@@ -88,6 +88,16 @@ export function useCommentActions(postId: string, viewer: string | null) {
             ),
           restrictionMessage(error) ? "notice" : "error",
         );
+      // 원 댓글이 그사이 삭제·숨김되면 다시 보내도 실패하므로 답글 작성을 끝내고 목록을 새로 받는다.
+      if (
+        current.active &&
+        parentId &&
+        (error as { message?: unknown })?.message === "comment_not_found"
+      ) {
+        request.current = null;
+        setState((prev) => ({ ...prev, replyTarget: null, replyBody: "" }));
+        void queryClient.invalidateQueries({ queryKey: communityKeys.all });
+      }
       return null;
     } finally {
       if (current.active) {

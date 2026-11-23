@@ -484,3 +484,23 @@ test("답글 작성은 댓글 초안과 따로 쓰고 취소하면 비우며 원
   assert.equal(ui.render().body, "댓글 초안");
   assert.equal(ui.render().changes["91"].parentId, "1");
 });
+
+test("원 댓글이 사라져 답글이 거부되면 답글 작성을 끝내고 댓글을 다시 불러온다", async () => {
+  let message = "offline";
+  const ui = harness({
+    create: async () => {
+      throw new Error(message);
+    },
+  });
+  ui.render().setBody("댓글 초안");
+  ui.render().startReplying({ ...row("1"), parentId: null });
+  ui.render().setBody("답글");
+  await ui.render().send();
+  assert.equal(ui.render().replyTarget.id, "1", "일시적 실패는 답글 작성을 유지한다");
+  assert.equal(ui.render().body, "답글");
+  message = "comment_not_found";
+  await ui.render().send();
+  assert.equal(ui.render().replyTarget, null);
+  assert.equal(ui.render().body, "댓글 초안");
+  assert.equal(ui.invalidations.length, 1);
+});

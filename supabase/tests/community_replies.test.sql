@@ -6,7 +6,10 @@ select no_plan();
 insert into auth.users(id,email) values
  ('23700000-0000-0000-0000-000000000001','reply-author@test.dev'),
  ('23700000-0000-0000-0000-000000000002','reply-a@test.dev'),
- ('23700000-0000-0000-0000-000000000003','reply-b@test.dev');
+ ('23700000-0000-0000-0000-000000000003','reply-b@test.dev'),
+ ('23700000-0000-0000-0000-000000000009','reply-admin@test.dev');
+insert into auth.sessions(id,user_id) values ('23700000-0000-0000-0009-000000000009','23700000-0000-0000-0000-000000000009');
+insert into private.admin_users(id,email,role) values ('23700000-0000-0000-0000-000000000009','reply-admin@test.dev','operator');
 insert into private.posts(author_id,type,content) values
  ('23700000-0000-0000-0000-000000000001','post','답글 테스트 글'),
  ('23700000-0000-0000-0000-000000000001','post','답글 테스트 다른 글');
@@ -96,6 +99,17 @@ reset role;
 select is((select count(*)::int from private.notifications where event_key='reply:' || current_setting('test.blocked_reply')),0,'차단한 사람의 답글은 알리지 않는다');
 delete from private.user_blocks where blocker_id='23700000-0000-0000-0000-000000000002';
 
+-- 관리자 신고 상세는 신고된 답글의 원 댓글을 함께 준다.
+set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000001","role":"authenticated"}';
+set local role authenticated;
+select set_config('test.reply_report',public.report_community_content('comment',current_setting('test.reply')::bigint,'spam'),true);
+reset role;
+select is(public.admin_report_detail('23700000-0000-0000-0000-000000000009','23700000-0000-0000-0009-000000000009',current_setting('test.reply_report')::bigint)->'parent_comment'->>'content',
+  '원 댓글','신고 상세에 원 댓글 노출');
+select is(public.admin_report_detail('23700000-0000-0000-0000-000000000009','23700000-0000-0000-0009-000000000009',current_setting('test.reply_report')::bigint)->'comment'->>'parent_id',
+  current_setting('test.parent'),'신고된 댓글이 답글인지 알 수 있다');
+select set_config('test.author_reply_on_parent',(select id::text from private.comments where content='글쓴이 답글'),true);
+
 -- B가 원 댓글 작성자 A를 차단하면 B에게는 그 아래 답글도 빠진다.
 set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000003","role":"authenticated"}';
 set local role authenticated;
@@ -114,6 +128,8 @@ select is(jsonb_array_length(public.get_community_comments(current_setting('test
 select is(public.get_community_post(current_setting('test.post')::bigint)->>'comment_count','3','삭제한 원 댓글의 답글은 댓글 수에서 제외');
 select throws_ok(format($$select public.create_comment(%s,'삭제 후 답글',gen_random_uuid(),%s)$$,current_setting('test.post'),current_setting('test.parent')),
   '42501','comment_not_found','삭제한 댓글에는 답글을 달 수 없음');
+select throws_ok(format($$select public.report_community_content('comment',%s,'spam')$$,current_setting('test.author_reply_on_parent')),
+  '42501','report_target_not_found','원 댓글이 지워져 안 보이는 답글은 신고할 수 없음');
 reset role;
 select * from finish();
 rollback;

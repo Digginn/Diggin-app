@@ -299,7 +299,7 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 
 #### #112 신고·단방향 차단 (RPT-001~004)
 
-- `report_community_content(target_type, target_id, report_reason, report_detail?)`는 `post`(일반글·투표글) 또는 `comment` ID와 사유만 받는다. 서버가 작성자를 결정하고 신고 ID만 반환한다. 클라이언트는 실제 사용자 UUID와 원문 테이블을 조회하지 않는다.
+- `report_community_content(target_type, target_id, report_reason, report_detail?)`는 `post`(일반글·투표글) 또는 `comment` ID와 사유만 받는다. 서버가 작성자를 결정하고 신고 ID만 반환한다. 클라이언트는 실제 사용자 UUID와 원문 테이블을 조회하지 않는다. 댓글은 목록에 보이는 것만 신고할 수 있어 원 댓글이 빠진 답글은 신고할 수 없다(`community_comment_listed`, #237).
 - 인증·정지·본인·삭제·숨김·차단한 작성자·신고한 해당 콘텐츠를 검증한다. 커뮤니티 작성 제한 중 신고·차단은 허용한다. 사유는 abuse/spam/inappropriate/other 중 하나이며 other만 NFC 정규화한 0~50자 상세를 허용한다. 앱과 DB 모두 사용자 인식 문자 기준이다.
 - 신고자는 같은 콘텐츠를 1건만 신고한다. 계정·종류·대상별 트랜잭션 잠금과 기존 unique 제약으로 동시 재시도를 보호하고 최초 사유·상태·Snapshot을 보존한다. 댓글은 부모 글 → 댓글 행 잠금 안에서 접수 시점 본문을 복사한다. 수정 불가 글은 별도 Snapshot을 만들지 않는다.
 - `block_community_author(target_type, target_id)`는 기존 신고가 있으면 신고에 기록된 작성자를, 없으면 삭제·관리자 숨김이 아닌 글·댓글의 작성자를 서버에서 결정해 단방향 관계를 저장한다(#186). 댓글의 부모 글도 확인하며 본인이 신고해 보이지 않는 부모 글이나 차단한 부모 작성자를 통한 새 댓글 작성자 차단은 허용하지 않는다. 이미 차단한 대상은 재시도할 수 있다. 본인·비회원·정지 계정·없는 대상은 거부하며 차단만으로 신고를 만들지 않는다. 신고로 이미 숨겨진 대상의 차단은 이전 앱과 호환된다. 계정 ID를 임의 입력해 차단하거나 다른 계정의 신고를 사용할 수 없다.
