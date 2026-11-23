@@ -58,7 +58,7 @@ select is(public.get_community_post(current_setting('test.post')::bigint)->>'com
 select is(public.update_comment(current_setting('test.reply')::bigint,'수정한 답글')->>'parent_id',current_setting('test.parent'),'답글 수정');
 reset role;
 select is((select count(*)::int from private.notifications where post_id=current_setting('test.post')::bigint and type='post_commented'
-  and event_key='comment:' || current_setting('test.reply')),1,'답글도 게시글 작성자 댓글 알림');
+  and event_key='comment:' || current_setting('test.reply')),0,'다른 사람 댓글에 단 답글은 글쓴이에게 알리지 않는다');
 
 -- 원 댓글 작성자 A에게 답글 알림. 글쓴이가 단 답글도 알리고, 자기 댓글에 단 답글은 알리지 않는다.
 select is((select array_agg(body order by id) from private.notifications
@@ -77,7 +77,7 @@ reset role;
 select is((select count(*)::int from private.notifications
   where recipient_id='23700000-0000-0000-0000-000000000002' and event_key like 'reply:%'),2,'자기 답글은 알리지 않는다');
 
--- 글쓴이 댓글에 단 답글은 게시글 댓글 알림 하나만 간다.
+-- 글쓴이 댓글에 단 답글은 답글 알림 하나만 간다.
 set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000001","role":"authenticated"}';
 set local role authenticated;
 select set_config('test.author_comment',public.create_comment(current_setting('test.post')::bigint,'글쓴이 댓글',gen_random_uuid())->>'id',true);
@@ -88,7 +88,7 @@ select set_config('test.author_reply',public.create_comment(current_setting('tes
 reset role;
 select is((select array_agg(event_key) from private.notifications where recipient_id='23700000-0000-0000-0000-000000000001'
   and event_key in ('comment:' || current_setting('test.author_reply'),'reply:' || current_setting('test.author_reply'))),
-  array['comment:' || current_setting('test.author_reply')],'글쓴이 댓글의 답글은 알림이 겹치지 않는다');
+  array['reply:' || current_setting('test.author_reply')],'글쓴이 댓글의 답글은 답글 알림 하나만 간다');
 
 -- 원 댓글 작성자가 차단한 사람의 답글은 알리지 않는다.
 insert into private.user_blocks(blocker_id,blocked_id) values ('23700000-0000-0000-0000-000000000002','23700000-0000-0000-0000-000000000003');
