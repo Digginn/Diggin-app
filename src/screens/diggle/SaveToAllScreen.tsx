@@ -154,7 +154,7 @@ export function CommunitySaveForm({
       // 저장은 이미 끝났다. 목록 재조회 실패를 저장 실패로 표시하지 않는다.
       void queryClient.invalidateQueries({ queryKey: productKeys.all });
       void queryClient.invalidateQueries({ queryKey: folderKeys.all });
-      showToast(TOAST_MESSAGES.SAVE_011);
+      showToast(TOAST_MESSAGES.SAVE_011, "success");
       markCommunityItemSaved(item.id);
       onBack();
     },

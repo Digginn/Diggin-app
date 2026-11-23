@@ -79,7 +79,7 @@ declare
 begin
   select * into target from private.posts where id = new.post_id;
   if target.deleted_at is not null or target.hidden_at is not null or new.author_id is null or
-     (new.parent_id is null and target.type <> 'post') then
+     (new.parent_id is null and (target.type <> 'post' or target.notice_title is not null)) then
     return new;
   end if;
   if new.parent_id is null then recipient := target.author_id;
@@ -107,6 +107,7 @@ declare
   target private.posts%rowtype;
 begin
   select * into target from private.posts where id = new.post_id;
+  if target.notice_title is not null then return new; end if;
   if target.type <> 'post' or target.deleted_at is not null or target.hidden_at is not null or
      new.user_id is null or new.user_id = target.author_id or
      not private.notification_actor_visible(target.author_id, new.user_id) then

@@ -204,8 +204,9 @@ function harness({
     "@/utils/text": text,
     "../api/community": keys,
     "../api/communityWrite": {
+      isNoticeCommentsClosedError: (error) => error?.message === "notice_comments_closed",
       communityWriteError: (error, fallback) =>
-        error?.message === "community_profanity"
+        ["community_profanity", "notice_comments_closed"].includes(error?.message)
           ? load("src/screens/diggle/api/communityWrite.ts", {
               "@/lib/supabase": { supabase: {} },
             }).communityWriteError(error, fallback)
@@ -277,6 +278,26 @@ for (const editing of [false, true]) {
     assert.equal(ui.calls[0].type, editing ? "update" : "create");
     assert.equal(ui.calls[0].args[1], boundary);
     assert.equal(ui.render().changes["90"].body, boundary);
+  });
+}
+
+for (const editing of [false, true]) {
+  test(`공지 댓글 ${editing ? "수정" : "작성"} 중 닫힘 오류는 안내 후 상세·댓글을 다시 조회한다`, async () => {
+    const fail = async () => {
+      throw { message: "notice_comments_closed" };
+    };
+    const ui = harness({ create: fail, update: fail });
+    if (editing) ui.render().startEditing(row("90", "수정 전 댓글"));
+    ui.render().setBody("작성하던 댓글");
+    assert.equal(await ui.render().send(), null);
+    assert.equal(ui.toasts[0], "댓글이 닫힌 공지입니다.");
+    assert.equal(ui.render().editing, null);
+    assert.equal(ui.render().isSending, false);
+    assert.deepEqual(
+      ui.invalidations.map(({ queryKey }) => queryKey),
+      [keys.communityKeys.post("viewer", "12"), keys.communityKeys.comments("viewer", "12")],
+    );
+    if (!editing) assert.equal(ui.render().draft, "작성하던 댓글");
   });
 }
 

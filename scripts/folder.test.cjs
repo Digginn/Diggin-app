@@ -391,7 +391,8 @@ test("생성·수정·삭제의 성공과 실패에 맞는 토스트를 표시�
         // Native Modal이 열린 동안은 동일한 토스트를 overlay로 렌더링한다.
         const toast = findAll(isFailure ? remainingModal.props.overlay : tree, "FolderToast")[0];
         assert.equal(toast.props.message, messages[action][Number(isFailure)]);
-        assert.equal(toastTimerDuration, 2000);
+        // Figma ToastText: 실패(Error)는 4초, 완료(Success)는 2초
+        assert.equal(toastTimerDuration, isFailure ? 4000 : 2000);
         toastTimer();
         const next = render();
         assert.equal(findAll(next, "FolderToast").length, 0);

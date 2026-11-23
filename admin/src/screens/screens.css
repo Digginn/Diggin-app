@@ -230,6 +230,16 @@
   color: var(--gray-500);
   font: var(--caption-c2);
 }
+.admin-sidebar__divider {
+  width: 100%;
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--gray-200);
+}
+.admin-sidebar__group--section {
+  padding-top: var(--space-6);
+}
 .admin-sidebar > nav {
   display: flex;
   flex-direction: column;

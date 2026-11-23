@@ -66,6 +66,9 @@ declare
 begin
   -- 글 잠금을 먼저 잡아 원 댓글 삭제와 답글 등록을 줄 세운다.
   target := private.lock_community_post_for_write(target_post_id);
+  if target.notice_title is not null and target.notice_comments_closed then
+    raise exception 'notice_comments_closed' using errcode='P0001';
+  end if;
   if request_id is null then raise exception 'invalid_request_id' using errcode = '22023'; end if;
   select * into existing from private.comments where author_id = viewer_id and creation_request_id = request_id;
   if found then
@@ -109,6 +112,9 @@ begin
   select post_id into parent_id from private.comments where id = target_comment_id and author_id = (select auth.uid());
   if not found then raise exception 'comment_not_found' using errcode = '42501'; end if;
   perform private.lock_community_post_for_write(parent_id);
+  if exists(select 1 from private.posts p where p.id=parent_id and p.notice_title is not null and p.notice_comments_closed) then
+    raise exception 'notice_comments_closed' using errcode='P0001';
+  end if;
   clean_content := private.normalize_comment_content(comment_content);
   update private.comments set content = clean_content, updated_at = now()
   where id = target_comment_id and author_id = (select auth.uid()) and deleted_at is null and hidden_at is null;

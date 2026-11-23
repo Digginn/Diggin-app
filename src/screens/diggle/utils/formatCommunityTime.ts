@@ -21,7 +21,7 @@ export function communityErrorMessage(
       : typeof error === "object" && error !== null && "message" in error
         ? String(error.message)
         : "";
-  return /network request failed|failed to fetch|networkerror|network_offline/i.test(message)
+  return /network request failed|failed to fetch|fetch failed|networkerror|network_offline/i.test(message)
     ? "연결 상태를 확인한 후 다시 시도해 주세요."
     : fallback;
 }

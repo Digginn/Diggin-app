@@ -10,7 +10,7 @@ import { normalizeText, textLength } from "@/utils/text";
 
 import { communityKeys } from "../api/community";
 import { createComment, deleteComment, updateComment } from "../api/communityInteractions";
-import { communityWriteError } from "../api/communityWrite";
+import { communityWriteError, isNoticeCommentsClosedError } from "../api/communityWrite";
 import type { CommunityComment } from "../types/community";
 
 function initialState(scope: string) {
@@ -79,6 +79,17 @@ export function useCommentActions(postId: string, viewer: string | null) {
       await queryClient.invalidateQueries({ queryKey: communityKeys.all });
       return row;
     } catch (error) {
+      if (current.active && isNoticeCommentsClosedError(error)) {
+        setState((prev) => ({
+          ...prev,
+          editing: null,
+          editBody: "",
+          replyTarget: null,
+          replyBody: "",
+        }));
+        void queryClient.invalidateQueries({ queryKey: communityKeys.post(viewer, postId) });
+        void queryClient.invalidateQueries({ queryKey: communityKeys.comments(viewer, postId) });
+      }
       if (current.active)
         showToast(
           restrictionMessage(error) ??

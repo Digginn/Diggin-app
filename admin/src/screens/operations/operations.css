@@ -23,8 +23,21 @@
   padding: 16px 24px;
   border-top: 1px solid var(--gray-200);
 }
+.operations-table--sanctions {
+  min-width: 1114px;
+}
 .operations-table--sanctions tr {
-  grid-template-columns: 170px 170px 110px 220px 80px minmax(0, 1fr);
+  grid-template-columns: 130px 130px 100px 200px 70px 88px 106px 130px;
+}
+.operations-table--sanctions td {
+  white-space: nowrap;
+}
+.operations-header--plain > div {
+  /* 경로 표시 줄이 없는 시안이라 그 높이만큼 제목을 내린다. */
+  padding-top: 23px;
+}
+.operations-table--members {
+  min-width: 1016px;
 }
 .operations-table--members tr {
   grid-template-columns: 190px 120px 110px 100px 100px 130px minmax(0, 1fr);
@@ -76,6 +89,11 @@
 .operations-chip--neutral {
   color: var(--gray-600);
   background: var(--gray-100);
+}
+.operations-chip--held {
+  /* 시안 값 그대로이며 대응하는 색 토큰이 없다. */
+  color: #3b5bdb;
+  background: #e7f0ff;
 }
 .operations-chip--normal {
   color: var(--resolved-text);

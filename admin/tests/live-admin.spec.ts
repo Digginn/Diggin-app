@@ -324,12 +324,13 @@ test("만료된 access token은 refresh token으로 갱신하고 권한 회수 �
   await expect(page.getByRole("table")).toHaveCount(0);
 });
 
-test("제재 해제는 사유를 확인하고 서버가 실패 확정한 요청만 새 ID로 재시도한다", async ({
+test("제재 이력에서 보관 유지를 확인 후 설정·해제하고 실패하면 상태를 유지한다", async ({
   page,
 }) => {
   await signedIn(page);
-  const requests: Body[] = [];
-  let isReleased = false;
+  const holds: Body[] = [];
+  let isHeld = false;
+  let shouldFail = false;
   await setup(page, async (body, route) => {
     if (body.resource === "sanctions") {
       await reply(route, {
@@ -338,45 +339,112 @@ test("제재 해제는 사유를 확인하고 서버가 실패 확정한 요청�
           {
             id: "71",
             user_id: group.author_id,
+            target_id: group.author_id,
             nickname: group.author,
             kind: "suspended",
             reason_category: "abuse",
             reason: "정책 위반",
+            restricted_until: null,
             created_at: group.latest_at,
-            state: isReleased ? "released" : "active",
-            released_at: isReleased ? group.latest_at : null,
+            state: "active",
+            released_at: null,
+            is_held: isHeld,
+            handled_by: "diggin.app@gmail.com",
           },
         ],
       });
       return true;
     }
-    if (body.action === "sanction") {
-      requests.push(body);
-      if (requests.length === 1) await reply(route, { error: "auth_moderation_failed" }, 503);
-      else {
-        isReleased = true;
-        await reply(route, { state: "applied" });
-      }
-      return true;
+    if (body.action !== "retention_hold") return false;
+    holds.push(body);
+    if (shouldFail) await reply(route, { error: "request_failed" }, 503);
+    else {
+      isHeld = body.held === true;
+      await reply(route, { held: isHeld });
     }
-    return false;
+    return true;
   });
   await page.goto("/#/sanctions");
-  await page.getByRole("button", { name: "해제", exact: true }).click();
-  await page.getByRole("textbox", { name: "해제 사유" }).fill("재검토 후 해제");
-  await page.getByRole("button", { name: "해제 확인" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
-  await page.getByRole("button", { name: "같은 요청 재시도" }).click();
-  await expect(
-    page.getByRole("table").getByRole("cell", { name: "해제", exact: true }),
-  ).toBeVisible();
-  expect(requests).toHaveLength(2);
-  expect(requests[0]).toMatchObject({
-    sanction: "release",
-    reason: "재검토 후 해제",
-    reason_category: "abuse",
+  const table = page.getByRole("table");
+  await expect(table.getByRole("cell", { name: "운영자 diggin.app" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "해제", exact: true })).toHaveCount(0);
+
+  await table.getByRole("button", { name: "보관 유지하기" }).click();
+  await page.getByRole("button", { name: "취소할게요" }).click();
+  expect(holds).toHaveLength(0);
+  await table.getByRole("button", { name: "보관 유지하기" }).click();
+  await page.getByRole("button", { name: "보관을 유지할게요" }).click();
+  await expect(page.locator(".admin-toast")).toHaveText("보관 유지를 설정했습니다.");
+  await expect(table.getByText("보관 유지", { exact: true })).toBeVisible();
+  expect(holds[0]).toMatchObject({ target_type: "sanction", target_id: "71", held: true });
+
+  await table.getByRole("button", { name: "유지 해제하기" }).click();
+  await page.getByRole("button", { name: "해제할게요" }).click();
+  await expect(page.locator(".admin-toast")).toHaveText("보관 유지를 해제했습니다.");
+  await expect(table.getByText("삭제 예정")).toBeVisible();
+
+  shouldFail = true;
+  await table.getByRole("button", { name: "보관 유지하기" }).click();
+  await page.getByRole("button", { name: "보관을 유지할게요" }).click();
+  await expect(page.locator(".admin-toast")).toHaveText("보관 유지를 처리하지 못했습니다.");
+  await expect(table.getByRole("button", { name: "보관 유지하기" })).toBeEnabled();
+});
+
+test("보관 유지 요청 중 목록을 새로고침해도 요청이 끝날 때까지 처리 중을 유지한다", async ({
+  page,
+}) => {
+  await signedIn(page);
+  const holds: Body[] = [];
+  let isHeld = false;
+  let finishHold = () => {};
+  await setup(page, async (body, route) => {
+    if (body.resource === "sanctions") {
+      await reply(route, {
+        total: 1,
+        rows: [
+          {
+            id: "71",
+            user_id: group.author_id,
+            target_id: group.author_id,
+            nickname: group.author,
+            kind: "warning",
+            reason_category: "abuse",
+            reason: "정책 위반",
+            restricted_until: null,
+            created_at: group.latest_at,
+            state: "record",
+            released_at: null,
+            is_held: isHeld,
+            handled_by: "diggin.app@gmail.com",
+          },
+        ],
+      });
+      return true;
+    }
+    if (body.action !== "retention_hold") return false;
+    holds.push(body);
+    await new Promise<void>((resolve) => {
+      finishHold = resolve;
+    });
+    isHeld = true;
+    await reply(route, { held: true });
+    return true;
   });
-  expect(requests[0].request_id).not.toBe(requests[1].request_id);
+  await page.goto("/#/sanctions");
+  const table = page.getByRole("table");
+  await table.getByRole("button", { name: "보관 유지하기" }).click();
+  await page.getByRole("button", { name: "보관을 유지할게요" }).click();
+  await expect(table.getByRole("button", { name: "처리 중" })).toBeVisible();
+
+  await page.getByRole("button", { name: "새로고침" }).click();
+  await expect(page.getByRole("button", { name: "새로고침" })).toBeEnabled();
+  await expect(table.getByRole("button", { name: "처리 중" })).toBeVisible();
+  await expect(table.getByRole("button", { name: "보관 유지하기" })).toHaveCount(0);
+  expect(holds).toHaveLength(1);
+
+  finishHold();
+  await expect(page.locator(".admin-toast")).toHaveText("보관 유지를 설정했습니다.");
+  await expect(table.getByRole("button", { name: "유지 해제하기" })).toBeVisible();
 });
 
 test("수정된 댓글과 개별 신고 당시의 원문을 함께 확인한다", async ({ page }) => {
@@ -499,59 +567,6 @@ test("부분 성공 뒤 새로고침해도 완료된 경고를 반복하지 않�
   expect(changes).toHaveLength(2);
   expect(changes[1]).toEqual(changes[0]);
 });
-
-for (const committed of [true, false]) {
-  test(`제재 해제 응답 유실 뒤 서버 ${committed ? "성공" : "미적용"} 결과를 확인한다`, async ({
-    page,
-  }) => {
-    await signedIn(page);
-    const mutations: Body[] = [];
-    let isReleased = false;
-    let queries = 0;
-    await setup(page, async (body, route) => {
-      if (body.resource === "sanctions") {
-        queries++;
-        await reply(route, {
-          total: 1,
-          rows: [
-            {
-              id: "71",
-              user_id: group.author_id,
-              nickname: group.author,
-              kind: "suspended",
-              reason_category: "abuse",
-              reason: "정책 위반",
-              created_at: group.latest_at,
-              state: isReleased ? "released" : "active",
-              released_at: isReleased ? group.latest_at : null,
-            },
-          ],
-        });
-        return true;
-      }
-      if (body.action !== "sanction") return false;
-      mutations.push(body);
-      isReleased = committed || mutations.length > 1;
-      if (mutations.length === 1) await route.abort("failed");
-      else await reply(route, { state: "applied" });
-      return true;
-    });
-    await page.goto("/#/sanctions");
-    await page.getByRole("button", { name: "해제", exact: true }).click();
-    await page.getByRole("textbox", { name: "해제 사유" }).fill("재검토 후 해제");
-    await page.getByRole("button", { name: "해제 확인" }).click();
-    await expect.poll(() => queries).toBeGreaterThan(1);
-    if (!committed) {
-      await page.reload();
-      await expect(page.getByRole("textbox", { name: "해제 사유" })).toHaveValue("재검토 후 해제");
-      await page.getByRole("button", { name: "같은 요청 재시도" }).click();
-      expect(mutations[1]).toEqual(mutations[0]);
-    }
-    await expect(
-      page.getByRole("table").getByRole("cell", { name: "해제", exact: true }),
-    ).toBeVisible();
-  });
-}
 
 test("재시도 정보를 저장할 수 없으면 조치를 전송하지 않는다", async ({ page }) => {
   await signedIn(page);

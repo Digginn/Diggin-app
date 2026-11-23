@@ -70,12 +70,17 @@ export function createAdminHandler(services: Services) {
       if (!request.headers.get("content-type")?.startsWith("application/json")) {
         return json({ error: "invalid_request" }, 400);
       }
-      if (Number(request.headers.get("content-length")) > 16384) {
+      if (Number(request.headers.get("content-length")) > 262144) {
         return json({ error: "request_too_large" }, 413);
       }
       let body: Record<string, unknown>;
       try {
-        body = object(await readJson(request));
+        body = object(await readJson(request, 262144));
+        if (
+          body.action !== "notice" && new TextEncoder().encode(JSON.stringify(body)).length > 16384
+        ) {
+          return json({ error: "request_too_large" }, 413);
+        }
       } catch (error) {
         if (error instanceof Error && error.message === "request_too_large") {
           return json({ error: "request_too_large" }, 413);
@@ -89,6 +94,18 @@ export function createAdminHandler(services: Services) {
       }
       const rpc = (name: string, args: Record<string, unknown>) =>
         services.rpc(name, { ...args, ...identity });
+      if (body.action === "notice") {
+        const operation = text(body.operation, 20);
+        const isRead = operation === "list" || operation === "get";
+        return json(
+          await rpc("admin_notice", {
+            operation,
+            target_id: id(body.notice_id, true),
+            request_id: isRead ? null : uuid(body.request_id),
+            payload: body.payload === undefined ? {} : object(body.payload),
+          }),
+        );
+      }
       if (body.action === "console") {
         const page = body.page ?? 1;
         const searchQuery = body.query ?? "";
@@ -131,9 +148,22 @@ export function createAdminHandler(services: Services) {
         });
       }
       // 이용 기록 분석 동의 철회 요청 메일을 처리한다(#156). 같은 이메일 계정이 둘 이상이면 DB가 거부한다.
+      // 항목을 보내지 않는 이전 화면은 두 항목을 모두 철회한다(#233).
       if (body.action === "withdraw_analytics_consent") {
+        const items = body.usage_analysis === undefined && body.overseas_transfer === undefined
+          ? {}
+          : {
+            withdraw_usage_analysis: body.usage_analysis,
+            withdraw_overseas_transfer: body.overseas_transfer,
+          };
+        if (Object.values(items).some((value) => typeof value !== "boolean")) {
+          return json({ error: "invalid_request" }, 400);
+        }
         return json(
-          await rpc("admin_withdraw_analytics_consent", { target_email: text(body.email, 320) }),
+          await rpc("admin_withdraw_analytics_consent", {
+            target_email: text(body.email, 320),
+            ...items,
+          }),
         );
       }
       const requestId = uuid(body.request_id);

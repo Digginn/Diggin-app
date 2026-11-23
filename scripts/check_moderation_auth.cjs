@@ -44,7 +44,8 @@ const tokenClient = () =>
   });
 async function fixture(label) {
   const email = `${label}-${randomUUID()}@test.invalid`,
-    password = randomUUID();
+    // Auth 비밀번호 규칙(대소문자·숫자·기호)을 맞춘다.
+    password = `${randomUUID()}Aa1!`;
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   assert.equal(created.error, null);
   const client = tokenClient();
@@ -135,6 +136,21 @@ async function main() {
       JSON.parse(deletion.error.details).restricted_until,
       readOnly.data.restricted_until,
     );
+    // 7일 제한 중 경고는 기록만 남기고 제한·종료일을 유지한다(#235).
+    assert.equal((await call(request("warning"))).status, 200);
+    const stillRestricted = await target.client.rpc("get_account_access");
+    assert.equal(stillRestricted.data.status, "community_restricted");
+    assert.equal(stillRestricted.data.restricted_until, readOnly.data.restricted_until);
+    assert.equal(
+      (await target.client.rpc("delete_community_post", { target_post_id: 1 })).error.message,
+      "community_restricted",
+    );
+    assert.equal(
+      sql(
+        `select count(*) from private.user_sanctions where user_id='${target.id}' and released_at is not null`,
+      ),
+      "0",
+    );
     const folder = await target.client.from("folders").insert({ name: "제재테스트" }).select("id");
     assert.equal(folder.error, null);
     assert.equal((await call(request("suspended"))).status, 200);
@@ -161,6 +177,12 @@ async function main() {
     assert.equal(blocked.error.code, "user_banned");
     assert.ok((await tokenClient().auth.refreshSession({ refresh_token: target.refresh })).error);
     assert.equal((await call(request("release"))).status, 200);
+    assert.equal(
+      sql(
+        `select count(*) from private.user_sanctions where user_id='${target.id}' and released_at is null`,
+      ),
+      "0",
+    );
     const oldSession = await stale
       .rpc("update_nickname", { new_nickname: "해제검증114" })
       .setHeader("Authorization", `Bearer ${target.token}`);

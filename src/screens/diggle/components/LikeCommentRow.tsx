@@ -14,6 +14,8 @@ type LikeCommentRowProps = {
   isLiked: boolean;
   onPressLike?: () => void;
   hasLike?: boolean;
+  hasComment?: boolean;
+  isNotice?: boolean;
 };
 
 export function LikeCommentRow({
@@ -22,6 +24,8 @@ export function LikeCommentRow({
   isLiked,
   onPressLike,
   hasLike = true,
+  hasComment = true,
+  isNotice = false,
 }: LikeCommentRowProps) {
   const Heart = isLiked ? LikeHeartFilledSvg : LikeHeartSvg;
 
@@ -37,17 +41,24 @@ export function LikeCommentRow({
             className="-mr-1.5 size-12 items-center justify-center active:opacity-75"
             onPress={onPressLike}
           >
-            <Heart {...HEART} color={isLiked ? colors.semantic.error : colors.gray[500]} />
+            <Heart
+              {...HEART}
+              color={
+                isLiked ? (isNotice ? colors.gray[900] : colors.semantic.error) : colors.gray[500]
+              }
+            />
           </Pressable>
           <Text className="text-gray-500 font-label-14">{likeCount}</Text>
         </View>
       ) : null}
-      <View className="flex-row items-center justify-center">
-        <View className="-mr-1.5 size-12 items-center justify-center">
-          <CommentSvg {...COMMENT} color={colors.gray[500]} />
+      {hasComment && (
+        <View className="flex-row items-center justify-center">
+          <View className="-mr-1.5 size-12 items-center justify-center">
+            <CommentSvg {...COMMENT} color={colors.gray[500]} />
+          </View>
+          <Text className="text-gray-500 font-label-14">{commentCount}</Text>
         </View>
-        <Text className="text-gray-500 font-label-14">{commentCount}</Text>
-      </View>
+      )}
     </View>
   );
 }

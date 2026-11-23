@@ -95,12 +95,12 @@ export function ProfileEditScreen({
       // MY-003 쓸 수 없는 사진이면 기존 사진을 그대로 둔다.
       const imageError = validateProfileImage(asset);
       if (imageError) {
-        showToast(imageError);
+        showToast(imageError, "error");
         return;
       }
       setProfileImageUri(asset.uri);
     } catch {
-      showToast(PROFILE_MESSAGES.photoUnreadable);
+      showToast(PROFILE_MESSAGES.photoUnreadable, "error");
     }
   };
 
@@ -159,14 +159,17 @@ export function ProfileEditScreen({
       failureMessage = PROFILE_MESSAGES.photoFailure;
       if (profileImageUri) await onSavePhoto?.(profileImageUri);
       router.dismissTo("/(tabs)/my" as Href);
-      showToast(nickname ? PROFILE_MESSAGES.nicknameSuccess : PROFILE_MESSAGES.photoSuccess);
+      showToast(
+        nickname ? PROFILE_MESSAGES.nicknameSuccess : PROFILE_MESSAGES.photoSuccess,
+        "success",
+      );
     } catch (error) {
       const isUnreadable =
         typeof error === "object" &&
         error !== null &&
         "message" in error &&
         error.message === AVATAR_UNREADABLE_ERROR;
-      showToast(isUnreadable ? PROFILE_MESSAGES.photoUnreadable : failureMessage);
+      showToast(isUnreadable ? PROFILE_MESSAGES.photoUnreadable : failureMessage, "error");
     } finally {
       setIsSaving(false);
     }
@@ -205,7 +208,7 @@ export function ProfileEditScreen({
               onError={() => {
                 if (!profileImageUri) return;
                 setProfileImageUri(undefined);
-                showToast(PROFILE_MESSAGES.photoUnreadable);
+                showToast(PROFILE_MESSAGES.photoUnreadable, "error");
               }}
             />
             {/* Figma 외곽선은 안쪽 1.5px이라 사진을 줄이지 않고 위에 겹친다(BUG-114). */}

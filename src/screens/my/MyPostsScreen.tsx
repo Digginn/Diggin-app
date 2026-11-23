@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ImageMyVotePlaceholder } from "@/assets/images/my";
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Spinner } from "@/components/Loading";
 import { LoginRequiredModal } from "@/components/modal";
 import { Post } from "@/components/Post";
+import { REFRESH_TINT, RefreshArea } from "@/components/RefreshArea";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { TopTab } from "@/components/TopTab";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,6 +77,10 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
   const showToast = useToast();
   const kind: ActivityKind = isLiked ? "liked" : activeKey === "votes" ? "vote" : "post";
   const activity = useCommunityActivity(kind);
+  // 화면에 들어올 때마다 다시 불러온다. 직접 당긴 새로고침에만 표시해야 멈춘 스피너가 뜨지 않는다.
+  // 탭마다 진행 중인 새로고침을 따로 기억해, 여러 탭을 당겨도 각 탭의 완료가 자기 표시만 끄게 한다.
+  const [refreshingKinds, setRefreshingKinds] = useState<Partial<Record<ActivityKind, object>>>({});
+  const isRefreshing = kind in refreshingKinds;
   const rows = activity.data?.pages.flat() ?? [];
   const title = isLiked ? "내가 좋아요한 글" : "내가 쓴 글";
   const emptyState = (
@@ -99,7 +104,8 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
     }, [isRestoring, viewer, kind, queryClient]),
   );
   useEffect(() => {
-    if (activity.error && rows.length > 0) showToast(communityErrorMessage(activity.error));
+    if (activity.error && rows.length > 0)
+      showToast(communityErrorMessage(activity.error), "error");
   }, [activity.error, rows.length, showToast]);
 
   function openPost(post: CommunityPost) {
@@ -141,92 +147,114 @@ export function MyPostsScreen({ isLiked = false }: { isLiked?: boolean } = {}) {
               <Spinner />
             </View>
           ) : (
-            <FlatList
-              key={kind}
-              data={rows}
-              keyExtractor={(item) => item.post.id}
-              refreshing={activity.isRefetching && !activity.isFetchingNextPage}
-              onRefresh={() => void activity.refetch()}
-              onEndReachedThreshold={0.4}
-              onEndReached={() => {
-                if (activity.hasNextPage && !activity.isFetching && !activity.isFetchNextPageError)
-                  void activity.fetchNextPage();
-              }}
-              renderItem={({ item: { post } }) =>
-                isLiked ? (
-                  <Post
-                    body={post.body}
-                    items={post.items}
-                    timeLabel={formatCommunityTime(post.createdAt)}
-                    authorLabel={formatCommunityAuthor(post.authorNickname, post.isMine)}
-                    likeCount={post.likeCount ?? 0}
-                    commentCount={post.commentCount ?? 0}
-                    onPressReport={
-                      !post.isMine
-                        ? () => setReportTarget({ type: "post", id: post.id })
-                        : undefined
-                    }
-                    onPressBlock={
-                      !post.isMine
-                        ? () => setReportTarget({ type: "post", id: post.id, action: "block" })
-                        : undefined
-                    }
-                    onPress={() => openPost(post)}
-                  />
-                ) : post.type === "post" ? (
-                  <PostRow
-                    item={{
-                      id: post.id,
-                      nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
-                      content: post.body,
-                      dateLabel: formatCommunityTime(post.createdAt),
+            <RefreshArea isRefreshing={isRefreshing}>
+              <FlatList
+                key={kind}
+                data={rows}
+                keyExtractor={(item) => item.post.id}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={() => {
+                      const target = kind;
+                      const token = {};
+                      setRefreshingKinds((current) => ({ ...current, [target]: token }));
+                      void activity.refetch().finally(() =>
+                        setRefreshingKinds((current) => {
+                          if (current[target] !== token) return current;
+                          const { [target]: _done, ...rest } = current;
+                          return rest;
+                        }),
+                      );
                     }}
-                    onPress={() => openPost(post)}
+                    tintColor={REFRESH_TINT}
                   />
-                ) : (
-                  <VoteListItem
-                    item={{
-                      id: post.id,
-                      nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
-                      content: post.body,
-                      timeLabel: formatCommunityTime(post.createdAt),
-                      commentCount: post.commentCount ?? 0,
-                      imageSource: post.items[0]?.imageUrl
-                        ? { uri: post.items[0].imageUrl }
-                        : ImageMyVotePlaceholder,
-                    }}
-                    onPress={() => openPost(post)}
-                  />
-                )
-              }
-              ListEmptyComponent={
-                activity.isError ? (
-                  <View className="items-center gap-4 px-margin py-12">
-                    <Text className="text-center text-gray-500 font-b1">
-                      {communityErrorMessage(activity.error)}
-                    </Text>
-                    <Button onPress={() => void activity.refetch()}>다시 시도</Button>
-                  </View>
-                ) : isLiked ? (
-                  <View className="flex-1">{emptyState}</View>
-                ) : null
-              }
-              ListFooterComponent={
-                activity.isFetchingNextPage ? (
-                  <View className="items-center py-5">
-                    <Spinner />
-                  </View>
-                ) : activity.isFetchNextPageError ? (
-                  <Button onPress={() => void activity.fetchNextPage()}>다시 시도</Button>
-                ) : null
-              }
-              className="flex-1"
-              contentContainerStyle={{
-                paddingBottom: insets.bottom,
-                flexGrow: rows.length === 0 ? 1 : undefined,
-              }}
-              showsVerticalScrollIndicator={false}
-            />
+                }
+                onEndReachedThreshold={0.4}
+                onEndReached={() => {
+                  if (
+                    activity.hasNextPage &&
+                    !activity.isFetching &&
+                    !activity.isFetchNextPageError
+                  )
+                    void activity.fetchNextPage();
+                }}
+                renderItem={({ item: { post } }) =>
+                  isLiked ? (
+                    <Post
+                      body={post.body}
+                      items={post.items}
+                      timeLabel={formatCommunityTime(post.createdAt)}
+                      authorLabel={formatCommunityAuthor(post.authorNickname, post.isMine)}
+                      likeCount={post.likeCount ?? 0}
+                      commentCount={post.commentCount ?? 0}
+                      onPressReport={
+                        !post.isMine
+                          ? () => setReportTarget({ type: "post", id: post.id })
+                          : undefined
+                      }
+                      onPressBlock={
+                        !post.isMine
+                          ? () => setReportTarget({ type: "post", id: post.id, action: "block" })
+                          : undefined
+                      }
+                      onPress={() => openPost(post)}
+                    />
+                  ) : post.type === "post" ? (
+                    <PostRow
+                      item={{
+                        id: post.id,
+                        nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
+                        content: post.body,
+                        dateLabel: formatCommunityTime(post.createdAt),
+                      }}
+                      onPress={() => openPost(post)}
+                    />
+                  ) : (
+                    <VoteListItem
+                      item={{
+                        id: post.id,
+                        nickname: formatCommunityAuthor(post.authorNickname, post.isMine),
+                        content: post.body,
+                        timeLabel: formatCommunityTime(post.createdAt),
+                        commentCount: post.commentCount ?? 0,
+                        imageSource: post.items[0]?.imageUrl
+                          ? { uri: post.items[0].imageUrl }
+                          : ImageMyVotePlaceholder,
+                      }}
+                      onPress={() => openPost(post)}
+                    />
+                  )
+                }
+                ListEmptyComponent={
+                  activity.isError ? (
+                    <View className="items-center gap-4 px-margin py-12">
+                      <Text className="text-center text-gray-500 font-b1">
+                        {communityErrorMessage(activity.error)}
+                      </Text>
+                      <Button onPress={() => void activity.refetch()}>다시 시도</Button>
+                    </View>
+                  ) : isLiked ? (
+                    <View className="flex-1">{emptyState}</View>
+                  ) : null
+                }
+                ListFooterComponent={
+                  activity.isFetchingNextPage ? (
+                    <View className="items-center py-5">
+                      <Spinner />
+                    </View>
+                  ) : activity.isFetchNextPageError ? (
+                    <Button onPress={() => void activity.fetchNextPage()}>다시 시도</Button>
+                  ) : null
+                }
+                className="flex-1"
+                contentContainerStyle={{
+                  paddingBottom: insets.bottom,
+                  flexGrow: rows.length === 0 ? 1 : undefined,
+                }}
+                showsVerticalScrollIndicator={false}
+              />
+            </RefreshArea>
           )}
         </>
       )}

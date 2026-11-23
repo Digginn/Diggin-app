@@ -121,6 +121,22 @@ select is((select array_agg(recipient_id::text || ' ' || event_key order by id) 
         '23700000-0000-0000-0000-000000000001 reply:' || current_setting('test.vote_author_reply')],
   '투표글 답글은 원 댓글 작성자에게만 알리고 댓글 알림은 만들지 않는다');
 
+-- 공지 댓글은 운영자에게 알리지 않고, 공지 댓글의 답글은 원 댓글 작성자에게 알린다(NOTI-010).
+insert into private.posts(author_id,type,content,notice_title)
+values ('23700000-0000-0000-0000-000000000009','post','답글 테스트 공지 본문','답글 테스트 공지');
+select set_config('test.notice',(select id::text from private.posts where notice_title='답글 테스트 공지'),true);
+set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000002","role":"authenticated"}';
+set local role authenticated;
+select set_config('test.notice_parent',public.create_comment(current_setting('test.notice')::bigint,'공지 원 댓글',gen_random_uuid())->>'id',true);
+reset role;
+set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000003","role":"authenticated"}';
+set local role authenticated;
+select set_config('test.notice_reply',public.create_comment(current_setting('test.notice')::bigint,'공지 답글',gen_random_uuid(),current_setting('test.notice_parent')::bigint)->>'id',true);
+reset role;
+select is((select array_agg(recipient_id::text || ' ' || event_key) from private.notifications where post_id=current_setting('test.notice')::bigint),
+  array['23700000-0000-0000-0000-000000000002 reply:' || current_setting('test.notice_reply')],
+  '공지는 답글 알림만 원 댓글 작성자에게 간다');
+
 -- 관리자 신고 상세는 신고된 답글의 원 댓글을 함께 준다.
 set local request.jwt.claims = '{"sub":"23700000-0000-0000-0000-000000000001","role":"authenticated"}';
 set local role authenticated;

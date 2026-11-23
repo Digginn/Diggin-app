@@ -39,6 +39,10 @@ test("아이템 저장은 통신 오류만 연결 확인 토스트로 구분한�
       TOAST_MESSAGES.SYS_001,
     ],
     [{ message: "Failed to fetch" }, TOAST_MESSAGES.SYS_001],
+    [
+      { message: "Error: fetch failed: The Internet connection appears to be offline." },
+      TOAST_MESSAGES.SYS_001,
+    ],
     [{ message: "permission denied", code: "42501" }, TOAST_MESSAGES.SAVE_012],
     [new Error("invalid_name"), TOAST_MESSAGES.SAVE_012],
     [
@@ -428,7 +432,6 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
     "@/constants/messages": {
-      selectDeletedMessage: () => "",
       STATE_MESSAGES: {},
       TOAST_MESSAGES: {},
     },
@@ -456,6 +459,7 @@ test("저장 후 ALL로 오면 정렬·위시레벨 필터를 되돌리고 목�
     "./components/DeleteBar": { DeleteBar: "DeleteBar" },
     "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
     "./components/SortLabel": { SortLabel: "SortLabel" },
+    "./constants": { WISH_LEVEL_HINT: "hint" },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
   });
   let tree;
@@ -549,7 +553,6 @@ test("비회원 ALL은 개인 목록을 조회하지 않고 빈 상태를 보이
     "@/components/WishItemGrid": { WishItemGrid: "WishItemGrid" },
     "@/components/WishLevel": { WishLevel: "WishLevel" },
     "@/constants/messages": {
-      selectDeletedMessage: () => "",
       STATE_MESSAGES: { allEmpty: "빈 ALL" },
       TOAST_MESSAGES: {},
     },
@@ -573,6 +576,7 @@ test("비회원 ALL은 개인 목록을 조회하지 않고 빈 상태를 보이
     "./components/DeleteBar": { DeleteBar: "DeleteBar" },
     "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
     "./components/SortLabel": { SortLabel: "SortLabel" },
+    "./constants": { WISH_LEVEL_HINT: "hint" },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({}) },
   });
   const render = () => {
