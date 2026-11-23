@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, PROFANITY_BASELINE, PROFANITY_RECOVERY, deploy, deployment_plan, parse_history, run_cli
+from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, PROFANITY_BASELINE, PROFANITY_RECOVERY, NOTICE_BASELINE, NOTICE_RECOVERY, deploy, deployment_plan, parse_history, run_cli
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,6 +81,45 @@ class DeploymentTests(unittest.TestCase):
         (self.directory / filename).write_text("select 1;", encoding="utf-8")
         self.local.add(self.future_version)
         self.assertEqual(self.plan(self.local - {self.future_version}), ([filename], False))
+
+    def test_admin_console_first_recovers_notice_and_later_operator_protection(self):
+        remote = {version for version in self.local if version <= NOTICE_BASELINE}
+        remote -= {name.split("_")[0] for name in NOTICE_RECOVERY}
+        pending, include_all = self.plan(remote)
+        later = {path.name for path in self.directory.glob("*.sql") if path.name.split("_")[0] > NOTICE_BASELINE}
+        self.assertEqual(set(pending), set(NOTICE_RECOVERY) | later)
+        self.assertTrue(include_all)
+
+    def test_notice_recovery_resumes_after_notice_was_applied(self):
+        remote = {version for version in self.local if version <= NOTICE_BASELINE}
+        later = sorted(path.name for path in self.directory.glob("*.sql") if path.name.split("_")[0] > NOTICE_BASELINE)
+        self.assertEqual(self.plan(remote), (later, False))
+
+    def test_modified_notice_migration_is_rejected(self):
+        name = next(iter(NOTICE_RECOVERY))
+        with (self.directory / name).open("a", encoding="utf-8") as file:
+            file.write("\nselect 1;\n")
+        with self.assertRaisesRegex(ValueError, "Unreviewed out-of-order"):
+            self.plan(self.local - {name.split("_")[0]})
+
+    def test_admin_sanction_baseline_is_required_for_notice_recovery(self):
+        missing = {name.split("_")[0] for name in NOTICE_RECOVERY} | {NOTICE_BASELINE}
+        with self.assertRaisesRegex(ValueError, "already deployed admin sanction preservation"):
+            self.plan(self.local - missing)
+
+    def test_unreviewed_gap_alongside_notice_is_rejected(self):
+        missing = {name.split("_")[0] for name in NOTICE_RECOVERY} | {"20261123105234"}
+        with self.assertRaisesRegex(ValueError, "Unreviewed out-of-order"):
+            self.plan(self.local - missing)
+
+    def test_notice_recovery_uses_same_flags_for_dry_run_and_push(self):
+        remote = {version for version in self.local if version <= NOTICE_BASELINE}
+        remote -= {name.split("_")[0] for name in NOTICE_RECOVERY}
+        initial = history(self.local, remote)
+        with patch("deploy_shared_db.run_cli", side_effect=[initial, None, initial, None, history(self.local, self.local)]) as cli:
+            deploy(self.root, ["--local"])
+        self.assertIn("--include-all", cli.call_args_list[1].args[0])
+        self.assertIn("--include-all", cli.call_args_list[3].args[0])
 
     def test_unknown_historical_gap_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unreviewed out-of-order"):
