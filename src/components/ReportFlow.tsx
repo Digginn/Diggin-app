@@ -90,7 +90,7 @@ export function ReportDialog({
       if (!current.active) return;
       if (phase === "report") setPhase("block");
       else {
-        showToast(DIGGLE_TOAST_MESSAGES.REPORT_004);
+        showToast(DIGGLE_TOAST_MESSAGES.REPORT_004, "success");
         onClose();
       }
     } catch (failure) {

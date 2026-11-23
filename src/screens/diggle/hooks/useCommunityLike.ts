@@ -49,7 +49,7 @@ export function useCommunityLike(post: CommunityPost | null | undefined, viewer:
     } catch (error) {
       if (current.active)
         showToast(
-          restrictionMessage(error) ?? "좋아요를 처리하지 못했습니다. 다시 시도해 주세요.",
+          restrictionMessage(error) ?? "좋아요를 반영하지 못했습니다. 다시 시도해 주세요.",
           restrictionMessage(error) ? "notice" : "error",
         );
     } finally {

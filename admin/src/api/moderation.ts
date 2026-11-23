@@ -143,3 +143,8 @@ export function reportRow(report: ReportGroup): ReportRowData {
     status: report.status,
   };
 }
+export type AnalyticsConsentItems = { usage_analysis: boolean; overseas_transfer: boolean };
+// true인 항목만 철회한다.
+export function withdrawAnalyticsConsent(email: string, items: AnalyticsConsentItems) {
+  return adminRequest<unknown>({ action: "withdraw_analytics_consent", email, ...items });
+}

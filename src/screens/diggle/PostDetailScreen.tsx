@@ -30,6 +30,7 @@ import { ActionModal, LoginRequiredModal } from "@/components/modal";
 import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
+import { TOAST_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
@@ -167,7 +168,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           pathname: "/(tabs)/diggle",
           params: { tab: post.type === "vote" ? "vote" : "all" },
         });
-      showToast(post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.");
+      showToast(
+        post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.",
+        "success",
+      );
     } catch (error) {
       if (currentViewer.current === viewer) {
         setDeleteError(communityWriteError(error));
@@ -215,7 +219,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
     if (!result.error || !post || comments.isFetching) return;
     if (toastedPostError.current === result.errorUpdatedAt) return;
     toastedPostError.current = result.errorUpdatedAt;
-    if (!comments.isError) showToast(communityErrorMessage(result.error));
+    if (!comments.isError) showToast(communityErrorMessage(result.error), "error");
   }, [result.error, result.errorUpdatedAt, post, comments.isFetching, comments.isError, showToast]);
 
   useEffect(() => {
@@ -409,9 +413,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                   : undefined
               }
               onOpenLink={(url) =>
-                void Linking.openURL(url).catch(() =>
-                  showToast("링크를 열지 못했습니다. 다시 시도해 주세요.", "error"),
-                )
+                void Linking.openURL(url).catch(() => showToast(TOAST_MESSAGES.EXT_001, "error"))
               }
             />
           )}
@@ -498,9 +500,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             product_id: infoItem.id,
             click_source: "community_product",
           });
-          void Linking.openURL(url).catch(() =>
-            showToast("아이템 페이지를 열지 못했습니다. 다시 시도해 주세요."),
-          );
+          void Linking.openURL(url).catch(() => showToast(TOAST_MESSAGES.EXT_001, "error"));
         }}
       />
       <ReportFlow

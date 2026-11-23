@@ -174,6 +174,7 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
         View: "View",
         Text: "Text",
         FlatList: "FlatList",
+        RefreshControl: "RefreshControl",
         KeyboardAvoidingView: "KeyboardAvoidingView",
         Platform: { OS: os },
         Keyboard: {
@@ -196,6 +197,7 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
       },
       "@/components/app-bar": { AppBar: "AppBar" },
       "@/components/Loading": { Spinner: "Spinner" },
+      "@/components/RefreshArea": { RefreshArea: "RefreshArea", REFRESH_TINT: undefined },
       "@/contexts/AuthContext": { useAuth: () => ({ session: { user: { id: "viewer" } } }) },
       "@/hooks/useProductCounts": { useProductCounts: () => ({ data: { total: 9 } }) },
       "@/hooks/useProductList": {

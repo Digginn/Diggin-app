@@ -20,7 +20,7 @@ export function AdminSidebar({
   initialProfileOpen?: boolean;
   initialLogoutOpen?: boolean;
   reportsHref?: string;
-  activePage?: "reports" | "sanctions" | "members";
+  activePage?: "reports" | "sanctions" | "members" | "analytics-consent";
   onLogout: () => Promise<void>;
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(initialProfileOpen);
@@ -95,6 +95,16 @@ export function AdminSidebar({
             icon="user"
             isActive={activePage === "members"}
             iconAsset={activePage === "sanctions" ? "operations-nav-user" : undefined}
+          />
+        </nav>
+        <hr className="admin-sidebar__divider" />
+        <p className="admin-sidebar__group admin-sidebar__group--section">개인정보</p>
+        <nav>
+          <NavItem
+            href={reportsHref.replace(/reports$/, "analytics-consent")}
+            label="분석 동의 철회"
+            isActive={activePage === "analytics-consent"}
+            iconAsset="nav-unlock"
           />
         </nav>
         <div className="admin-profile" ref={profileRef}>

@@ -113,7 +113,7 @@ export function ShareSaveScreen({
     }
     markSharedSave();
     setSaved(true);
-    showToast(TOAST_MESSAGES.SAVE_011);
+    showToast(TOAST_MESSAGES.SAVE_011, "success");
     closeTimer.current = setTimeout(
       () =>
         void flushAnalytics()

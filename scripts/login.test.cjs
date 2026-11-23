@@ -36,6 +36,7 @@ function load(relativePath, mocks = {}) {
   runInNewContext(compiled, {
     process: { env: {} },
     setTimeout: (callback) => callback(),
+    ...mocks.globals,
     exports: componentModule.exports,
     module: componentModule,
     require: (name) => {
@@ -738,6 +739,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
   const analyticsUsers = [];
   let onAppState;
   let googleSignOutFails = false;
+  let sessionChecks = 0;
   const supabase = {
     auth: {
       getSession: () => Promise.resolve({ data: { session: { id: "s", user: { id: "u1" } } } }),
@@ -784,6 +786,7 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     },
     "@/lib/supabase": { supabase },
     "@/lib/queryClient": { queryClient: { clear: () => cacheClears.push(true) } },
+    "@/lib/sessionCheck": { checkSession: () => sessionChecks++ },
     "@/lib/analytics": { syncAnalyticsConsent: async (userId) => analyticsUsers.push(userId) },
     "react-native": {
       AppState: {
@@ -805,6 +808,9 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     refCursor = 0;
     return AuthProvider({ children: null }).props.value;
   };
+  render();
+  await Promise.resolve();
+  assert.ok(sessionChecks > 0, "저장된 세션을 복원하면 서버에서 끊긴 세션인지 확인한다");
   await render().signOut();
   assert.equal(signOutOptions.length, 1);
   assert.equal(signOutOptions[0].scope, "local", "이 기기 세션만 끊는다");
@@ -828,12 +834,14 @@ test("직접 로그아웃은 만료로 보지 않고, 그 외 SIGNED_OUT만 인�
     [null, "u2", null],
     "로그인하면 회원의 분석 동의를 확인하고 로그아웃·만료하면 끈다",
   );
+  const checksBeforeActive = sessionChecks;
   onAppState("active");
   assert.equal(
     analyticsUsers.at(-1),
     "u1",
     "앱으로 돌아오면 현재 세션의 회원 동의를 다시 확인한다",
   );
+  assert.equal(sessionChecks - checksBeforeActive, 1, "앱으로 돌아오면 세션도 다시 확인한다");
   render().confirmSessionExpired();
   assert.equal(render().isSessionExpired, false);
   googleSignOutFails = true;
@@ -1204,4 +1212,74 @@ test("회원 전용 화면은 비회원에게 화면 위 로그인 모달을 보
     ),
     "로그인 복원 중에는 모달을 띄우지 않는다",
   );
+});
+
+test("권한 오류(42501)가 나면 세션을 확인하고, 동시에 여러 번 나도 확인은 한 번만 보낸다", async () => {
+  const responses = [];
+  let currentToken = "token-a";
+  const signOuts = [];
+  const { checkSession } = load("lib/sessionCheck.ts", {
+    "globals": {
+      fetch: (url, options) =>
+        new Promise((resolve) => responses.push({ token: options.headers.Authorization, resolve })),
+    },
+    "@/lib/supabase": {
+      supabase: {
+        auth: {
+          getSession: async () => ({
+            data: { session: currentToken ? { access_token: currentToken } : null },
+          }),
+          signOut: async (options) => signOuts.push(options),
+        },
+      },
+    },
+  });
+  const sessionGone = { ok: false, status: 403, json: async () => ({ code: "session_not_found" }) };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  const first = checkSession();
+  checkSession();
+  await flush();
+  assert.equal(responses.length, 1, "확인 중이면 같은 요청을 기다린다");
+  responses[0].resolve({ ok: true, status: 200 });
+  await first;
+  checkSession();
+  await flush();
+  assert.equal(responses.length, 2, "끝난 뒤에는 다시 확인할 수 있다");
+  responses[1].resolve({ ok: false, status: 503, json: async () => ({}) });
+  await flush();
+  assert.equal(signOuts.length, 0, "서버 오류는 세션을 유지한다");
+
+  // A 확인 중 B로 바뀌면 늦게 온 A의 만료 응답이 B를 로그아웃시키지 않는다.
+  const stale = checkSession();
+  await flush();
+  currentToken = "token-b";
+  const fresh = checkSession();
+  await flush();
+  assert.equal(responses.length, 4, "계정이 바뀌면 새 토큰으로 따로 확인한다");
+  responses[2].resolve(sessionGone);
+  await stale;
+  assert.equal(signOuts.length, 0, "이전 계정의 응답은 새 계정을 로그아웃시키지 않는다");
+  responses[3].resolve(sessionGone);
+  await fresh;
+  assert.equal(signOuts.length, 1, "현재 계정의 세션이 끊겼으면 로그아웃한다");
+  assert.equal(signOuts[0].scope, "local");
+
+  const handlers = [];
+  const checks = [];
+  class Cache {
+    constructor(options) {
+      handlers.push(options.onError);
+    }
+  }
+  load("lib/queryClient.ts", {
+    "@tanstack/react-query": { QueryCache: Cache, MutationCache: Cache, QueryClient: class {} },
+    "@/lib/sessionCheck": { checkSession: () => checks.push(true) },
+  });
+  for (const onError of handlers) {
+    onError({ code: "42501", message: "not_authorized" });
+    onError({ code: "PGRST116" });
+    onError(new Error("offline"));
+  }
+  assert.equal(checks.length, 2, "조회·변경 모두 권한 오류에서만 세션을 확인한다");
 });

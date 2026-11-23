@@ -155,8 +155,10 @@ end;
 $$;
 
 -- 이메일 철회 요청. 운영자는 요청 메일 주소로 회원을 찾는다. 같은 이메일 계정이 둘 이상이면 고르지 않고 거부한다.
+-- 관리자 화면에서 고른 항목만 철회한다(#233). 항목을 넘기지 않는 이전 호출은 두 항목을 모두 철회한다.
 create or replace function private.admin_withdraw_analytics_consent(
-  actor uuid, actor_session uuid, target_email text
+  actor uuid, actor_session uuid, target_email text,
+  withdraw_usage_analysis boolean default true, withdraw_overseas_transfer boolean default true
 )
 returns jsonb
 language plpgsql
@@ -165,11 +167,15 @@ set search_path = ''
 as $$
 declare
   matches uuid[];
+  previous jsonb;
   state jsonb;
 begin
   perform private.assert_moderator(actor, actor_session);
   if target_email is null or btrim(target_email) !~ '^[^[:space:]@]+@[^[:space:]@]+$' then
     raise exception 'invalid_email' using errcode = '22023';
+  end if;
+  if not coalesce(withdraw_usage_analysis or withdraw_overseas_transfer, false) then
+    raise exception 'invalid_analytics_consent' using errcode = '22023';
   end if;
   select array_agg(account.id) into matches
   from auth.users as account
@@ -181,8 +187,16 @@ begin
   if cardinality(matches) > 1 then
     raise exception 'user_email_conflict' using errcode = 'P0001';
   end if;
-  state := private.record_analytics_consent(matches[1], false, false, 'operator', actor);
-  -- 이메일 철회는 동의 이력이 없는 이전 빌드 수집분도 지워야 해 항상 삭제를 요청한다.
+  -- 고르지 않은 항목은 현재 상태를 유지한다. 읽기 전에 잠가야 앱에서 동시에 철회한 값을 덮어쓰지 않는다.
+  perform 1 from public.profiles where id = matches[1] for update;
+  previous := private.analytics_consent_state(matches[1]);
+  state := private.record_analytics_consent(
+    matches[1],
+    (previous ->> 'usage_analysis')::boolean and not coalesce(withdraw_usage_analysis, false),
+    (previous ->> 'overseas_transfer')::boolean and not coalesce(withdraw_overseas_transfer, false),
+    'operator', actor
+  );
+  -- 한 항목만 철회해도 수집이 멈춘다. 동의 이력이 없는 이전 빌드 수집분도 지워야 해 항상 삭제를 요청한다.
   perform private.enqueue_amplitude_deletion(matches[1], 'consent_withdrawn');
   return jsonb_build_object('user_id', matches[1]) || state;
 end;
@@ -278,14 +292,17 @@ as $$
 $$;
 
 create or replace function public.admin_withdraw_analytics_consent(
-  actor uuid, actor_session uuid, target_email text
+  actor uuid, actor_session uuid, target_email text,
+  withdraw_usage_analysis boolean default true, withdraw_overseas_transfer boolean default true
 )
 returns jsonb
 language sql
 security invoker
 set search_path = ''
 as $$
-  select private.admin_withdraw_analytics_consent(actor, actor_session, target_email);
+  select private.admin_withdraw_analytics_consent(
+    actor, actor_session, target_email, withdraw_usage_analysis, withdraw_overseas_transfer
+  );
 $$;
 
 create or replace function public.claim_amplitude_deletions()
@@ -317,13 +334,13 @@ revoke execute on function private.get_analytics_consent(), public.get_analytics
 grant execute on function private.get_analytics_consent(), public.get_analytics_consent(),
   private.set_analytics_consent(boolean, boolean, text), public.set_analytics_consent(boolean, boolean, text)
   to authenticated;
-revoke execute on function private.admin_withdraw_analytics_consent(uuid, uuid, text),
-  public.admin_withdraw_analytics_consent(uuid, uuid, text),
+revoke execute on function private.admin_withdraw_analytics_consent(uuid, uuid, text, boolean, boolean),
+  public.admin_withdraw_analytics_consent(uuid, uuid, text, boolean, boolean),
   private.claim_amplitude_deletions(), public.claim_amplitude_deletions(),
   private.finish_amplitude_deletions(uuid, boolean, text), public.finish_amplitude_deletions(uuid, boolean, text)
   from public, anon, authenticated;
-grant execute on function private.admin_withdraw_analytics_consent(uuid, uuid, text),
-  public.admin_withdraw_analytics_consent(uuid, uuid, text),
+grant execute on function private.admin_withdraw_analytics_consent(uuid, uuid, text, boolean, boolean),
+  public.admin_withdraw_analytics_consent(uuid, uuid, text, boolean, boolean),
   private.claim_amplitude_deletions(), public.claim_amplitude_deletions(),
   private.finish_amplitude_deletions(uuid, boolean, text), public.finish_amplitude_deletions(uuid, boolean, text)
   to service_role;

@@ -438,7 +438,13 @@ export type Database = {
         Returns: boolean;
       };
       admin_withdraw_analytics_consent: {
-        Args: { actor: string; actor_session: string; target_email: string };
+        Args: {
+          actor: string;
+          actor_session: string;
+          target_email: string;
+          withdraw_overseas_transfer?: boolean;
+          withdraw_usage_analysis?: boolean;
+        };
         Returns: Json;
       };
       agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
