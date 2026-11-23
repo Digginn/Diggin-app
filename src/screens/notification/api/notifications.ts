@@ -15,7 +15,7 @@ export type AppNotification = {
   body: string;
   createdAt: string;
   postId: string;
-  postType: "post" | "vote";
+  postType: "post" | "vote" | "notice";
   isPostAvailable: boolean;
 };
 
@@ -26,13 +26,13 @@ function parseNotification(value: unknown): AppNotification {
   const { id, title, body, created_at: createdAt, post_id: postId, post_type: postType } = row;
   if (
     typeof id !== "string" ||
-    !/^\d+$/.test(id) ||
+    !/^(notice:)?[1-9][0-9]*$/.test(id) ||
     typeof title !== "string" ||
     typeof body !== "string" ||
     typeof createdAt !== "string" ||
     !Number.isFinite(Date.parse(createdAt)) ||
     typeof postId !== "string" ||
-    (postType !== "post" && postType !== "vote")
+    (postType !== "post" && postType !== "vote" && postType !== "notice")
   )
     throw new Error("invalid_notification_response");
   return {
@@ -49,8 +49,8 @@ function parseNotification(value: unknown): AppNotification {
 /** NOTI-007 최근 30일 알림을 최신순으로 20개씩 받는다. 커서 시각은 서버 문자열 그대로 돌려준다. */
 export async function fetchNotifications(after: AppNotification | null) {
   const { data, error } = await supabase.rpc(
-    "get_notifications",
-    after ? { after_created_at: after.createdAt, after_id: Number(after.id) } : {},
+    "get_app_notifications",
+    after ? { after_created_at: after.createdAt, after_key: after.id } : {},
   );
   if (error) throw error;
   if (!Array.isArray(data)) throw new Error("invalid_notification_response");
@@ -58,9 +58,13 @@ export async function fetchNotifications(after: AppNotification | null) {
 }
 
 export async function fetchHasUnreadNotifications() {
-  const { data, error } = await supabase.rpc("has_unread_notifications");
-  if (error) throw error;
-  return data === true;
+  const [activity, notices] = await Promise.all([
+    supabase.rpc("has_unread_notifications"),
+    supabase.rpc("has_unread_notices"),
+  ]);
+  if (activity.error) throw activity.error;
+  if (notices.error) throw notices.error;
+  return activity.data === true || notices.data === true;
 }
 
 /** 알림함 확인 시각을 지금으로 바꾸고 이전 시각을 받는다. 처음 열면 null이다. */

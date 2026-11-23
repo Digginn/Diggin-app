@@ -12,6 +12,7 @@ import {
   INVALID_CREDENTIALS_MESSAGE,
   type LoginCredentials,
 } from "./screens/auth/LoginScreen";
+import { NoticesScreen } from "./screens/notices/NoticesScreen";
 import { LiveOperationsScreen } from "./screens/operations/LiveOperationsScreen";
 import { AnalyticsConsentScreen } from "./screens/privacy/AnalyticsConsentScreen";
 import type { ContentTypeFilter } from "./screens/reports/components/ContentTypeSelect";
@@ -162,6 +163,19 @@ function ProtectedPages({
   identity: AdminIdentity;
   onLogout: () => Promise<void>;
 }) {
+  if (
+    route === "/notices" ||
+    route === "/notices/new" ||
+    /^\/notices\/[1-9][0-9]{0,18}\/edit$/.test(route)
+  )
+    return (
+      <NoticesScreen
+        route={route}
+        adminId={identity.id}
+        email={identity.email}
+        onLogout={onLogout}
+      />
+    );
   if (route === "/members" || route === "/sanctions")
     return (
       <LiveOperationsScreen

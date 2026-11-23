@@ -32,6 +32,7 @@ export const ICON_NAMES = [
 export type AdminIconName = (typeof ICON_NAMES)[number];
 export type IconAsset =
   | `icon-${AdminIconName}`
+  | `notice-${"nav" | "trash" | "trash-dialog" | "check" | "help" | "back" | "heart" | "more" | "send"}`
   | "status-received"
   | "status-reviewing"
   | "status-resolved"

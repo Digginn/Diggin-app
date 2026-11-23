@@ -390,6 +390,17 @@ export type Database = {
         };
         Returns: string;
       };
+      admin_notice: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          operation: string;
+          payload?: Json;
+          request_id?: string;
+          target_id?: number;
+        };
+        Returns: Json;
+      };
       admin_prepare_sanction: {
         Args: {
           actor: string;
@@ -501,6 +512,10 @@ export type Database = {
       };
       get_account_access: { Args: Record<PropertyKey, never>; Returns: Json };
       get_analytics_consent: { Args: Record<PropertyKey, never>; Returns: Json };
+      get_app_notifications: {
+        Args: { after_created_at?: string; after_key?: string };
+        Returns: Json;
+      };
       get_community_comments: {
         Args: { after_created_at?: string; after_id?: number; target_post_id: number };
         Returns: Json;
@@ -510,6 +525,7 @@ export type Database = {
         Returns: Json;
       };
       get_community_post: { Args: { target_post_id: number }; Returns: Json };
+      get_featured_notice: { Args: Record<PropertyKey, never>; Returns: Json };
       get_first_visit_guides: { Args: { target_user_id: string }; Returns: string[] };
       get_my_community_activity: {
         Args: { activity_type: string; after_activity_at?: string; after_id?: number };
@@ -535,6 +551,7 @@ export type Database = {
         };
       };
       get_push_enabled: { Args: Record<PropertyKey, never>; Returns: boolean };
+      has_unread_notices: { Args: Record<PropertyKey, never>; Returns: boolean };
       has_unread_notifications: { Args: Record<PropertyKey, never>; Returns: boolean };
       import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
       lookup_suspended_identity: {

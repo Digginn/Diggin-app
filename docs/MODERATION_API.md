@@ -2,6 +2,27 @@
 
 RPT-005~006 구현. Retool 화면 구성은 #115에서 이 API에 연결한다. 선행 구현은 #112(신고·차단), #116(안내 UI)이다.
 
+## 공지 관리 (#229)
+
+동일 `admin-moderation` API에 `action: "notice"`를 보낸다. 관리자 인증과 활성 세션 재검사는 신고·제재 API와 같다. 브라우저에는 공개 키와 로그인 세션만 사용한다.
+
+| operation    | 입력                                                         | 응답                     |
+| ------------ | ------------------------------------------------------------ | ------------------------ |
+| `list`       | `payload: {page: 1}`                                         | `{total, rows}` (20건씩) |
+| `get`        | `notice_id` (문자열)                                         | 공지 1건                 |
+| `create`     | `request_id`, `payload`                                      | 새 공지                  |
+| `update`     | `notice_id`, `request_id`, `payload`                         | 수정 공지                |
+| `visibility` | `notice_id`, `request_id`, `payload: {revision, is_visible}` | 공개/숨김 결과           |
+| `delete`     | `notice_id`, `request_id`, `payload: {revision}`             | 삭제 결과                |
+
+작성·수정 payload는 `title`, `body`, `inbox_body` 문자열과 `inbox_only`, `comments_closed` 불리언을 모두 받는다. 수정 시 조회한 `revision`도 전달한다. 제목 100자, 본문 10,000자, 요약 200자이며 제목·본문은 필수다. 요약을 비우면 앱이 게시글 본문을 두 줄까지 표시한다. 내용은 HTML이 아닌 일반 텍스트다.
+
+공지 요청만 256KiB까지 받고 기존 작업의 16KiB 제한은 유지한다. 수정 충돌은 `notice_revision_conflict`(409), 동일 UUID의 요청 변경은 `notice_request_conflict`(409)다. 응답이 유실되면 같은 UUID·동일 본문으로 결과를 확인한다. 웹은 새로고침 후에도 미확인 작성 요청을 복구하며 중복 등록하지 않는다. 숨김·삭제된 공지는 앱의 다음 조회에서 제외한다.
+
+공지 등록 시 푸시는 발송하지 않는다. 기본은 DIGGLE 상단 최신 공지와 앱 알림함 노출이며, `inbox_only=true`이면 DIGGLE 상단에서 제외한다. `comments_closed=true`이면 댓글·입력창을 숨기고 서버에서 새 댓글·수정을 `notice_comments_closed`로 거부한다. 앱은 이 오류를 받으면 ‘댓글이 닫힌 공지입니다.’를 안내하고 상세·댓글을 다시 조회해 닫힌 상태를 반영한다.
+
+배포는 DB → Edge Function → 앱/OTA·관리자 웹 순서다. 기존 앱이 사용하는 `get_notifications` 응답·커서는 변경하지 않는다.
+
 ## 인증
 
 `POST /functions/v1/admin-moderation`에 `Authorization: Bearer <관리자 Supabase Auth access token>`과 `Content-Type: application/json`을 보낸다. Retool에는 앱의 publishable 키와 관리자 세션만 사용하며 service_role/secret 키를 전달하지 않는다.

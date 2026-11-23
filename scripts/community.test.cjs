@@ -591,6 +591,8 @@ function screenMocks({
         .communityErrorMessage,
     },
     "./utils/formatCommunityAuthor": load("src/screens/diggle/utils/formatCommunityAuthor.ts"),
+    "./components/FeaturedNotice": { FeaturedNotice: "FeaturedNotice" },
+    "./components/NoticeHeader": { NoticeHeader: "NoticeHeader" },
     "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
     "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
     "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
@@ -1185,6 +1187,53 @@ test("본인 글 상세에서는 좋아요를 누를 수 없다(BUG-074)", async
   const row = nodes(PostDetailScreen({}), "LikeCommentRow")[0];
   assert.equal(row.props.onPressLike, undefined);
   assert.equal(row.props.hasLike, true, "좋아요 수는 계속 보여 준다");
+});
+
+test("공지 상세는 운영자 헤더를 사용하고 댓글 닫기 상태에서는 댓글과 입력창을 숨긴다", async () => {
+  const original = await api(MEMBER).fetchCommunityPost("12");
+  for (const commentsClosed of [false, true]) {
+    const post = { ...original, notice: { title: "운영 공지", commentsClosed } };
+    const state = screenMocks({ post });
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const screen = PostDetailScreen({ type: "notice" });
+    const list = nodes(screen, "FlatList")[0];
+    assert.equal(nodes(list.props.ListHeaderComponent, "NoticeHeader")[0].props.title, "운영 공지");
+    assert.equal(nodes(list.props.ListHeaderComponent, "ProductImgGrid").length, 0);
+    assert.equal(
+      nodes(list.props.ListHeaderComponent, "LikeCommentRow")[0].props.hasComment,
+      !commentsClosed,
+    );
+    assert.equal(nodes(screen, "CommentInput").length, commentsClosed ? 0 : 1);
+    assert.equal(
+      nodes(screen, "ReportBlockMenu").length,
+      0,
+      "공지 헤더는 일반 글 신고·삭제 메뉴를 노출하지 않는다",
+    );
+  }
+});
+
+test("운영자 댓글은 신고·차단을 숨기고 본인 댓글 수정·삭제 메뉴는 유지한다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({
+    post,
+    comments: [
+      { id: "1", isOperator: true, body: "운영자 안내", createdAt: PREVIEW.created_at },
+      {
+        id: "2",
+        isOperator: true,
+        isMine: true,
+        body: "내 운영자 댓글",
+        createdAt: PREVIEW.created_at,
+      },
+    ],
+  });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const comments = nodes(PostDetailScreen({}), "Comment");
+  for (const comment of comments) {
+    assert.equal(comment.props.onPressReport, undefined);
+    assert.equal(comment.props.onPressBlock, undefined);
+  }
+  assert.equal(typeof comments[1].props.onPressMenu, "function");
 });
 
 test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·투표 등으로 다시 불러올 때는 켜지 않는다", async () => {

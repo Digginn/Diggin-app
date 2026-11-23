@@ -4,6 +4,14 @@ create table private.posts (
   author_id uuid not null references public.profiles(id) on delete cascade,
   type public.post_type not null,
   content text not null,
+  notice_title text,
+  notice_inbox_body text not null default '',
+  notice_inbox_only boolean not null default false,
+  notice_comments_closed boolean not null default false,
+  notice_revision integer not null default 1 check (notice_revision > 0),
+  constraint posts_notice_content check (notice_title is null or
+    (type='post' and private.char_count(notice_title) between 1 and 100 and
+     private.char_count(content) between 1 and 10000 and private.char_count(notice_inbox_body)<=200)),
   ends_at timestamptz,
   deleted_at timestamptz,
   hidden_at timestamptz,
@@ -12,7 +20,7 @@ create table private.posts (
   creation_request_id uuid not null default gen_random_uuid(),
   constraint posts_author_request_key unique (author_id, creation_request_id),
   constraint posts_content_length check (
-    private.char_count(regexp_replace(content, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]', '', 'g')) between 5 and 50
+    notice_title is not null or private.char_count(regexp_replace(content, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]', '', 'g')) between 5 and 50
   ),
   constraint posts_vote_end check (
     (type = 'post' and ends_at is null) or
@@ -146,7 +154,7 @@ $$;
 -- 호출자가 전달한 viewer ID를 받지 않고 auth.uid()로만 조회 범위를 정한다.
 create or replace function private.community_author_visible(target_author_id uuid)
 returns boolean language sql stable set search_path = '' as $$
-  select not exists (
+  select exists (select 1 from private.admin_users a where a.id=target_author_id and a.disabled_at is null) or not exists (
     select 1 from private.user_blocks b
     where b.blocker_id = (select auth.uid()) and b.blocked_id = target_author_id
   );
@@ -155,7 +163,13 @@ $$;
 -- 신고는 대상 콘텐츠만, 차단은 작성자 전체에 적용한다.
 create or replace function private.community_content_visible(content_type public.report_target, target_id bigint)
 returns boolean language sql stable set search_path = '' as $$
-  select not exists (
+  -- 운영자 콘텐츠의 과거 신고 기록은 보존하되 공식 안내를 숨기는 데 사용하지 않는다.
+  select exists (
+    select 1 from private.admin_users a where a.disabled_at is null and a.id = case content_type
+      when 'post' then (select p.author_id from private.posts p where p.id=target_id)
+      when 'comment' then (select c.author_id from private.comments c where c.id=target_id)
+    end
+  ) or not exists (
     select 1 from private.reports r
     where r.reporter_id = (select auth.uid()) and r.target_type = content_type
       and ((content_type = 'post' and r.post_id = target_id) or
@@ -175,6 +189,8 @@ returns jsonb language sql stable set search_path = '' as $$
     'id', p.id::text, 'type', p.type, 'created_at', p.created_at, 'ends_at', p.ends_at,
     'server_now', now(), 'content', p.content, 'is_mine', p.author_id = (select auth.uid()),
     'author_nickname', author.nickname,
+    'notice', case when p.notice_title is not null then jsonb_build_object(
+      'title',p.notice_title,'comments_closed',p.notice_comments_closed) else null end,
     'items', coalesce((select jsonb_agg(jsonb_build_object(
       'position', i.position, 'name', i.name, 'brand', i.brand, 'price', i.price,
       'url', i.url, 'image_url', i.image_url) order by i.position)
@@ -218,7 +234,7 @@ begin
       order by p.created_at desc, p.id desc), '[]'::jsonb)
     from (
       select p.id, p.created_at from private.posts p
-      where p.deleted_at is null and p.hidden_at is null
+      where p.notice_title is null and p.deleted_at is null and p.hidden_at is null
         and (feed_type = 'all' or p.type = 'vote')
         and private.community_author_visible(p.author_id)
         and private.community_content_visible('post', p.id)
@@ -252,7 +268,8 @@ create or replace function private.get_community_comments(
 )
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 begin
-  if private.get_community_post(target_post_id) is null then return '[]'::jsonb; end if;
+  if private.get_community_post(target_post_id) is null or exists (select 1 from private.posts p
+    where p.id=target_post_id and p.notice_title is not null and p.notice_comments_closed) then return '[]'::jsonb; end if;
   if (after_created_at is null) <> (after_id is null) then
     raise exception 'invalid_comment_cursor' using errcode = '22023';
   end if;

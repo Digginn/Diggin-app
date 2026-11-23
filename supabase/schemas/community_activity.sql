@@ -25,7 +25,7 @@ begin
       from (
         select l.post_id, l.created_at, l.id
         from private.post_likes l join private.posts p on p.id = l.post_id
-        where l.user_id = viewer_id and p.type = 'post' and p.deleted_at is null and p.hidden_at is null
+        where p.notice_title is null and l.user_id = viewer_id and p.type = 'post' and p.deleted_at is null and p.hidden_at is null
           and private.community_author_visible(p.author_id)
           and private.community_content_visible('post', p.id)
           and (after_activity_at is null or (l.created_at, l.id) < (after_activity_at, after_id))
@@ -40,7 +40,7 @@ begin
     ) order by page.created_at desc, page.id desc), '[]'::jsonb)
     from (
       select p.id, p.created_at from private.posts p
-      where p.author_id = viewer_id and p.type = activity_type::public.post_type
+      where p.notice_title is null and p.author_id = viewer_id and p.type = activity_type::public.post_type
         and p.deleted_at is null and p.hidden_at is null and private.community_author_visible(p.author_id)
           and private.community_content_visible('post', p.id)
         and (after_activity_at is null or (p.created_at, p.id) < (after_activity_at, after_id))
