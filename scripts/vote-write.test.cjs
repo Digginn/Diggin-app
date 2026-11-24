@@ -42,6 +42,7 @@ function findAll(node, type) {
 
 test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자는 BUY/NOT, 탈퇴자는 라벨을 숨긴다", () => {
   const { Comment } = load("../src/components/Comment.tsx", {
+    "@/components/CommentLikeButton": { CommentLikeButton: "CommentLikeButton" },
     "react": { useRef: () => ({ current: null }), useState: () => [false, () => {}] },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
     "@/assets/images/icon-kebab.svg": { __esModule: true, default: "KebabSvg" },
@@ -64,8 +65,8 @@ test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자�
   assert.deepEqual(labels({ isOperator: true, voteChoice: "buy" }), [
     "느긋한디기12 (나)",
     "운영자",
-    "·",
     "방금 전",
+    "답글",
   ]);
   assert.ok(labels({ voteChoice: "buy" }).includes("BUY"));
   assert.ok(labels({ voteChoice: "not" }).includes("NOT"));

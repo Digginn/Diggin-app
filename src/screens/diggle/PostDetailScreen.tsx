@@ -66,6 +66,18 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
   const [isDeleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleteIsRestricted, setDeleteRestricted] = useState(false);
+  // 서버 연결 전 UI 확인용. 게시글·계정별 선택을 현재 화면에서만 유지한다.
+  const commentLikeScope = `${id}:${session?.user.id ?? ""}`;
+  const [commentLikePreview, setCommentLikePreview] = useState({
+    scope: commentLikeScope,
+    ids: new Set<string>(),
+  });
+  useFocusEffect(
+    useCallback(
+      () => () => setCommentLikePreview({ scope: commentLikeScope, ids: new Set<string>() }),
+      [commentLikeScope],
+    ),
+  );
   const deleting = useRef(false);
   const currentViewer = useRef(session?.user.id);
   useEffect(() => {
@@ -421,6 +433,31 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                 .trim()}
               timeLabel={formatCommunityTime(comment.createdAt)}
               isDeleted={comment.isWithdrawn}
+              hasLike={!comment.isMine}
+              isLiked={
+                commentLikePreview.scope === commentLikeScope &&
+                commentLikePreview.ids.has(comment.id)
+              }
+              likeCount={
+                commentLikePreview.scope === commentLikeScope &&
+                commentLikePreview.ids.has(comment.id)
+                  ? 1
+                  : 0
+              }
+              onPressLike={
+                !comment.isMine && !comment.isWithdrawn
+                  ? () => {
+                      setCommentLikePreview((previous) => {
+                        const ids = new Set(
+                          previous.scope === commentLikeScope ? previous.ids : [],
+                        );
+                        if (ids.has(comment.id)) ids.delete(comment.id);
+                        else ids.add(comment.id);
+                        return { scope: commentLikeScope, ids };
+                      });
+                    }
+                  : undefined
+              }
               isOperator={comment.isOperator}
               voteChoice={comment.voteChoice}
               onPressReport={
