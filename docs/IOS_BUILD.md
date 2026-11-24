@@ -10,6 +10,8 @@
 - 내려받은 IPA에서 본 앱과 공유 확장이 개발 Supabase 주소를 포함하고 운영 주소는 포함하지 않는 것을 확인했다. 본 앱의 업데이트 채널은 preview다.
 - IPA·빌드 정보·SHA-256은 `Documents/DigginReleases/ios/1.0.2-15-qa/`에 보관한다.
 - [App Store Connect 제출](https://expo.dev/accounts/diggin/projects/Diggin/submissions/26112dec-77c4-46b5-8523-048cf875d3c6)은 빌드와 별도다. 이 QA 빌드는 App Store 정식 출시 대상으로 선택하지 않는다.
+- 2026-11-25 Apple 처리 상태 `VALID`, 내부 테스트 상태 `IN_BETA_TESTING`을 확인했다. 외부 테스터 배포는 별도 베타 심사 상태에 따른다.
+- OTA 기준 커밋은 `33e7038debd2ed1334ccb963b60c97cbf0f56d7f`다. 이후 Android 번호가 바뀐 최신 app.json을 그대로 사용하지 않고 보관한 iOS 빌드 당시 설정을 대조한다.
 
 ## 다음 빌드
 
