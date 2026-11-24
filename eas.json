@@ -16,9 +16,17 @@
       "android": {
         "buildType": "apk"
       }
+    },
+    "qa": {
+      "extends": "production",
+      "environment": "preview",
+      "channel": "preview"
     }
   },
   "submit": {
+    "qa": {
+      "extends": "production"
+    },
     "production": {
       "android": {
         "track": "internal",

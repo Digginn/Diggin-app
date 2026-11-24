@@ -16,9 +16,12 @@
 | 빌드 프로필  | 업데이트 채널 | EAS 환경     | 용도                      |
 | ------------ | ------------- | ------------ | ------------------------- |
 | `preview`    | `preview`     | `preview`    | 내부 배포로 OTA 사전 확인 |
+| `qa`         | `preview`     | `preview`    | 개발 DB로 TestFlight QA   |
 | `production` | `production`  | `production` | 스토어 앱의 운영 OTA      |
 
 환경과 채널은 별개입니다. `channel`은 받을 업데이트를, `environment`는 번들에 들어갈 환경변수를 정합니다. npm 배포 명령에는 둘 다 지정했습니다. 빌드 프로필의 `env`나 로컬 `.env`에만 의존하지 않습니다.
+
+`qa`는 스토어 서명으로 빌드하되 `preview` 환경·채널을 사용합니다. 기존 `preview`의 iOS 내부 배포와 달리 TestFlight에 올릴 수 있습니다. 개발 관리자 웹과 앱을 함께 검증하는 순서는 [개발 QA와 운영 배포](QA_RELEASE.md)를 따릅니다.
 
 각 환경의 값은 EAS 대시보드의 **Environment variables → preview / production**에서 관리합니다. 개발 DB를 사용할 경우 preview에 개발용 연결 값을 등록합니다.
 
