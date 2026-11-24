@@ -1,3 +1,4 @@
+import { useRouter, type Href } from "expo-router";
 import { Text, View } from "react-native";
 
 import documents from "@/constants/policyDocuments.json";
@@ -14,7 +15,8 @@ type ContentBlock = {
   paddingBottom?: number;
   isListItem?: boolean;
   /** isLabel은 MY-17 선택 동의 전문의 항목명(14px 진한 글씨)이다. */
-  segments?: { text: string; isStrong?: boolean; isLabel?: boolean }[];
+  /** href는 MY-09 하단 '이전 버전 확인하기'처럼 밑줄 링크로 보여 줄 조각이다. */
+  segments?: { text: string; isStrong?: boolean; isLabel?: boolean; href?: string }[];
   children?: ContentBlock[];
 };
 
@@ -34,6 +36,20 @@ const GAP_CLASSES: Record<number, string> = {
 };
 const SPACER_CLASSES: Record<number, string> = { 4: "h-1", 16: "h-4", 24: "h-6", 100: "h-[100px]" };
 
+function LinkSegment({ text, href }: { text: string; href: string }) {
+  const router = useRouter();
+  return (
+    <Text
+      selectable
+      accessibilityRole="link"
+      onPress={() => router.push(href as Href)}
+      className="font-pretendard underline"
+    >
+      {text}
+    </Text>
+  );
+}
+
 function DocumentContent({ block, isSheet }: { block: ContentBlock; isSheet: boolean }) {
   if (block.children) {
     const gap = (isSheet ? block.sheetGap : undefined) ?? block.gap ?? 0;
@@ -48,21 +64,25 @@ function DocumentContent({ block, isSheet }: { block: ContentBlock; isSheet: boo
   if (block.spacer !== undefined) return <View className={SPACER_CLASSES[block.spacer]} />;
   const textClassName = TEXT_CLASSES[block.variant ?? "body"];
   const content = block.segments
-    ? block.segments.map((segment, index) => (
-        <Text
-          key={index}
-          selectable
-          className={
-            segment.isLabel
-              ? "text-gray-900 font-label-14"
-              : segment.isStrong
-                ? "font-pretendard-semibold"
-                : "font-pretendard"
-          }
-        >
-          {segment.text}
-        </Text>
-      ))
+    ? block.segments.map((segment, index) =>
+        segment.href ? (
+          <LinkSegment key={index} text={segment.text} href={segment.href} />
+        ) : (
+          <Text
+            key={index}
+            selectable
+            className={
+              segment.isLabel
+                ? "text-gray-900 font-label-14"
+                : segment.isStrong
+                  ? "font-pretendard-semibold"
+                  : "font-pretendard"
+            }
+          >
+            {segment.text}
+          </Text>
+        ),
+      )
     : block.text;
   if (block.isListItem) {
     return (
