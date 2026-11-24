@@ -42,11 +42,10 @@ function findAll(node, type) {
 
 test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자는 BUY/NOT, 탈퇴자는 라벨을 숨긴다", () => {
   const { Comment } = load("../src/components/Comment.tsx", {
+    "@/components/CommentLikeButton": { CommentLikeButton: "CommentLikeButton" },
     "react": { useRef: () => ({ current: null }), useState: () => [false, () => {}] },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
     "@/assets/images/icon-kebab.svg": { __esModule: true, default: "KebabSvg" },
-    "@/assets/images/icon-comment-heart.svg": { __esModule: true, default: "HeartSvg" },
-    "@/assets/images/icon-comment-heart-filled.svg": { __esModule: true, default: "HeartFilledSvg" },
     "@/components/ReportBlockMenu": { ReportBlockMenu: "ReportBlockMenu" },
     "@/theme": { colors: { gray: { 500: "gray" } } },
     "@/utils/httpLinks": { httpLinkParts: (body) => [{ text: body }] },
@@ -66,8 +65,8 @@ test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자�
   assert.deepEqual(labels({ isOperator: true, voteChoice: "buy" }), [
     "느긋한디기12 (나)",
     "운영자",
-    "·",
     "방금 전",
+    "답글",
   ]);
   assert.ok(labels({ voteChoice: "buy" }).includes("BUY"));
   assert.ok(labels({ voteChoice: "not" }).includes("NOT"));
@@ -77,25 +76,35 @@ test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자�
   assert.equal(withdrawn.includes("BUY"), false);
 });
 
-test("댓글 하트는 좋아요를 누를 수 있을 때만 보이고 누른 상태는 빨간 하트로 표시한다", () => {
+test("댓글 하트에 서버 좋아요 값을 넘기고 답글 줄에는 답글 버튼을 숨긴다", () => {
   const { Comment } = load("../src/components/Comment.tsx", {
+    "@/components/CommentLikeButton": { CommentLikeButton: "CommentLikeButton" },
     "react": { useRef: () => ({ current: null }), useState: () => [false, () => {}] },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
     "@/assets/images/icon-kebab.svg": { __esModule: true, default: "KebabSvg" },
-    "@/assets/images/icon-comment-heart.svg": { __esModule: true, default: "HeartSvg" },
-    "@/assets/images/icon-comment-heart-filled.svg": { __esModule: true, default: "HeartFilledSvg" },
     "@/components/ReportBlockMenu": { ReportBlockMenu: "ReportBlockMenu" },
-    "@/theme": { colors: { gray: { 500: "gray" }, semantic: { error: "red" } } },
+    "@/theme": { colors: { gray: { 500: "gray" } } },
     "@/utils/httpLinks": { httpLinkParts: (body) => [{ text: body }] },
   });
-  const base = { author: "느긋한디기12", body: "댓글", timeLabel: "방금 전" };
-  assert.equal(findAll(Comment(base), "HeartSvg").length, 0);
-  const empty = Comment({ ...base, likeCount: 0, onPressLike() {} });
-  assert.equal(findAll(empty, "HeartSvg")[0].props.color, "gray");
-  assert.ok(findAll(empty, "Text").some((node) => node.props.children === 0));
-  const liked = Comment({ ...base, likeCount: 3, isLiked: true, onPressLike() {} });
-  assert.equal(findAll(liked, "HeartFilledSvg")[0].props.color, "red");
-  assert.equal(findAll(Comment({ ...base, isDeleted: true, onPressLike() {} }), "HeartSvg").length, 0);
+  const onPressLike = () => {};
+  const base = { author: "느긋한디기12", body: "댓글", timeLabel: "방금 전", onPressReply() {} };
+  const heart = findAll(
+    Comment({ ...base, likeCount: 3, isLiked: true, onPressLike }),
+    "CommentLikeButton",
+  )[0];
+  assert.equal(heart.props.isLiked, true);
+  assert.equal(heart.props.likeCount, 3);
+  assert.equal(heart.props.onPress, onPressLike);
+  const replyButtons = (props) =>
+    findAll(Comment(props), "Pressable").filter(
+      (node) => node.props.accessibilityLabel === "댓글 답글",
+    );
+  assert.equal(replyButtons(base).length, 1);
+  assert.equal(replyButtons({ ...base, isReply: true }).length, 0);
+  assert.equal(
+    findAll(Comment({ ...base, isReply: true, onPressLike }), "CommentLikeButton").length,
+    1,
+  );
 });
 
 test("댓글 150자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {

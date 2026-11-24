@@ -2,15 +2,13 @@ import { clsx } from "clsx";
 import { useRef, useState } from "react";
 import { Keyboard, Linking, Pressable, Text, View } from "react-native";
 
-import HeartFilledSvg from "@/assets/images/icon-comment-heart-filled.svg";
-import HeartSvg from "@/assets/images/icon-comment-heart.svg";
 import KebabSvg from "@/assets/images/icon-kebab.svg";
+import { CommentLikeButton } from "@/components/CommentLikeButton";
 import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { colors } from "@/theme";
 import { httpLinkParts } from "@/utils/httpLinks";
 
 const KEBAB_SIZE = 16;
-const HEART_SIZE = 16;
 
 export type MenuAnchor = { x: number; y: number; width: number; height: number };
 
@@ -27,16 +25,15 @@ type CommentProps = {
   isReply?: boolean;
   /** 삭제된 댓글은 본문을 대체하고 메뉴를 막음 */
   isDeleted?: boolean;
+  likeCount?: number;
+  isLiked?: boolean;
+  hasLike?: boolean;
+  onPressLike?: () => void;
+  onPressReply?: () => void;
   /** 케밥의 창 기준 좌표를 같이 넘김 */
   onPressMenu?: (anchor: MenuAnchor) => void;
   onPressReport?: () => void;
   onPressBlock?: () => void;
-  /** 답글 버튼은 원 댓글에만 넘김 */
-  onPressReply?: () => void;
-  likeCount?: number;
-  isLiked?: boolean;
-  /** 본인·탈퇴 댓글에는 넘기지 않아 하트를 숨김(LIKE-004) */
-  onPressLike?: () => void;
   onOpenLink?: (url: string) => void;
 };
 
@@ -69,13 +66,14 @@ export function Comment({
   isHighlighted = false,
   isReply = false,
   isDeleted = false,
+  likeCount = 0,
+  isLiked = false,
+  hasLike = true,
+  onPressLike,
+  onPressReply,
   onPressMenu,
   onPressReport,
   onPressBlock,
-  onPressReply,
-  likeCount = 0,
-  isLiked = false,
-  onPressLike,
   onOpenLink,
 }: CommentProps) {
   const kebabRef = useRef<View>(null);
@@ -91,19 +89,19 @@ export function Comment({
   return (
     <View
       className={clsx(
-        "w-full items-start pt-0.5",
+        "w-full items-start",
         isHighlighted || isReportMenuOpen || isReply ? "bg-gray-50" : "bg-gray-0",
       )}
     >
       {isReply ? (
-        <View className="absolute left-[27px] top-[17px] size-[7.25px] border-b-[1.5px] border-l-[1.5px] border-gray-400" />
+        <View className="absolute left-[27px] top-[15px] size-[7.25px] border-b-[1.5px] border-l-[1.5px] border-gray-400" />
       ) : null}
       {isHighlighted ? (
         <View className="absolute bottom-0 left-0 top-0 w-[3px] bg-gray-900" />
       ) : null}
       <View
         className={clsx(
-          "w-full flex-row items-center justify-between pr-2",
+          "h-12 w-full flex-row items-center justify-between pr-3",
           isReply ? "pl-10" : "pl-margin",
         )}
       >
@@ -137,43 +135,8 @@ export function Comment({
               </View>
             ) : null}
           </View>
-          <Text className="text-gray-500 font-label-12-regular">·</Text>
-          <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>
-        {/* 케밥(48)이 이 줄의 높이를 만든다. 삭제된 댓글이라 숨겨도 높이는 유지한다. */}
-        <View className="h-12 shrink-0 flex-row items-center justify-end">
-          {!isDeleted && onPressReply && (
-            <Pressable
-              accessibilityLabel="답글 달기"
-              accessibilityRole="button"
-              className="h-12 items-center justify-center px-3 active:opacity-75"
-              onPress={onPressReply}
-            >
-              <Text className="text-gray-600 font-label-12-regular">답글</Text>
-            </Pressable>
-          )}
-          {!isDeleted && onPressLike && (
-            <View className="w-9 flex-row items-center">
-              <Pressable
-                accessibilityLabel={`좋아요 ${likeCount}개`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isLiked }}
-                className="h-12 flex-row items-center gap-0.5 p-2.5 active:opacity-75"
-                onPress={onPressLike}
-              >
-                {isLiked ? (
-                  <HeartFilledSvg
-                    width={HEART_SIZE}
-                    height={HEART_SIZE}
-                    color={colors.semantic.error}
-                  />
-                ) : (
-                  <HeartSvg width={HEART_SIZE} height={HEART_SIZE} color={colors.gray[500]} />
-                )}
-                <Text className="text-gray-500 font-label-12-semibold">{likeCount}</Text>
-              </Pressable>
-            </View>
-          )}
+        <View className="size-12 flex-row items-center justify-end">
           {!isDeleted && onPressReport && onPressBlock && (
             <ReportBlockMenu
               placement="comment"
@@ -200,7 +163,7 @@ export function Comment({
       </View>
 
       <View className={clsx("w-full items-start pr-margin", isReply ? "pl-10" : "pl-margin")}>
-        <View className="w-full items-start border-b border-gray-200 pb-4">
+        <View className="w-full items-start pb-1">
           <Text
             onPress={!isDeleted && onPressMenu ? handlePressMenu : undefined}
             className={clsx("w-full font-b3", isDeleted ? "text-gray-500" : "text-gray-800")}
@@ -208,6 +171,31 @@ export function Comment({
             {isDeleted ? "삭제된 댓글입니다." : renderBody(body, onOpenLink)}
           </Text>
         </View>
+      </View>
+      <View className={clsx("h-12 w-full pr-margin", isReply ? "pl-10" : "pl-margin")}>
+        <View className="mt-0.5 h-11 justify-center border-b border-gray-200">
+          <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
+        </View>
+        {!isDeleted && (
+          <View className="absolute right-3 top-0 h-12 flex-row items-center">
+            {hasLike && (
+              <CommentLikeButton isLiked={isLiked} likeCount={likeCount} onPress={onPressLike} />
+            )}
+            {/* 답글에는 다시 답글을 달 수 없다. */}
+            {!isReply && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="댓글 답글"
+                accessibilityState={{ disabled: !onPressReply }}
+                disabled={!onPressReply}
+                className="size-12 items-center justify-center active:opacity-75"
+                onPress={onPressReply}
+              >
+                <Text className="text-gray-600 font-label-12-regular">답글</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
       </View>
     </View>
   );

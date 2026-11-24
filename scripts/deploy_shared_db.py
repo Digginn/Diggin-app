@@ -18,6 +18,10 @@ PROFANITY_RECOVERY = {
     "20261104134530_community_profanity_words.sql": "1670e11301b9b54819a266b6060adda8bf7e898582bca96559063a8c84540788",
     "20261104134619_community_profanity_bypass.sql": "c8bc586cb1a9ddf029a5b8b18e083a61e5b43fd2b05f62de2f6df038075d891d",
 }
+NOTICE_BASELINE = "20261123111811"
+NOTICE_RECOVERY = {
+    "20261122143516_notice_management.sql": "6262d6f5b847569d891376c51bf8f4d4b66784b27a9dfda0717b25cf449acec5",
+}
 
 
 def migration_files(directory):
@@ -79,6 +83,8 @@ def deployment_plan(directory, history):
                 baseline, label = RECOVERY_BASELINE, "folder"
             elif PROFANITY_RECOVERY.get(path.name) == digest:
                 baseline, label = PROFANITY_BASELINE, "direct-block"
+            elif NOTICE_RECOVERY.get(path.name) == digest:
+                baseline, label = NOTICE_BASELINE, "admin sanction preservation"
             else:
                 raise ValueError(f"Unreviewed out-of-order migration: {path.name}")
             if baseline not in remote:
