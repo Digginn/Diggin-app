@@ -433,6 +433,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                 .trim()}
               timeLabel={formatCommunityTime(comment.createdAt)}
               isDeleted={comment.isWithdrawn}
+              hasLike={!comment.isMine}
               isLiked={
                 commentLikePreview.scope === commentLikeScope &&
                 commentLikePreview.ids.has(comment.id)
@@ -444,7 +445,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                   : 0
               }
               onPressLike={
-                !comment.isWithdrawn
+                !comment.isMine && !comment.isWithdrawn
                   ? () => {
                       setCommentLikePreview((previous) => {
                         const ids = new Set(

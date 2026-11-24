@@ -287,6 +287,13 @@ test("댓글은 신고 아이콘 대신 신고·차단 메뉴를 쓰고 메뉴�
   menu.props.onOpenChange(false);
   assert.match(Comment(props).props.className, /bg-gray-0/);
   assert.equal(nodes(Comment({ ...props, isDeleted: true }), "ReportBlockMenu").length, 0);
+  assert.equal(nodes(Comment(props), "CommentLikeButton").length, 1);
+  assert.equal(nodes(Comment({ ...props, hasLike: false }), "CommentLikeButton").length, 0);
+  assert.equal(nodes(Comment({ ...props, isDeleted: true }), "CommentLikeButton").length, 0);
+  assert.equal(
+    nodes(Comment({ ...props, hasLike: false }), "Pressable")[0].props.accessibilityLabel,
+    "댓글 답글",
+  );
   const mine = Comment({
     author: "나",
     body: "내 댓글",

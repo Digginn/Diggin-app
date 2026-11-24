@@ -25,6 +25,7 @@ type CommentProps = {
   isDeleted?: boolean;
   likeCount?: number;
   isLiked?: boolean;
+  hasLike?: boolean;
   onPressLike?: () => void;
   onPressReply?: () => void;
   /** 케밥의 창 기준 좌표를 같이 넘김 */
@@ -64,6 +65,7 @@ export function Comment({
   isDeleted = false,
   likeCount = 0,
   isLiked = false,
+  hasLike = true,
   onPressLike,
   onPressReply,
   onPressMenu,
@@ -165,7 +167,9 @@ export function Comment({
         </View>
         {!isDeleted && (
           <View className="absolute right-3 top-0 h-12 flex-row items-center">
-            <CommentLikeButton isLiked={isLiked} likeCount={likeCount} onPress={onPressLike} />
+            {hasLike && (
+              <CommentLikeButton isLiked={isLiked} likeCount={likeCount} onPress={onPressLike} />
+            )}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="댓글 답글"
