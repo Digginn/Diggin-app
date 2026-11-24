@@ -1246,7 +1246,7 @@ test("운영자 댓글은 신고·차단을 숨기고 본인 댓글 수정·삭�
   assert.equal(typeof comments[1].props.onPressMenu, "function");
 });
 
-test("댓글·답글 좋아요는 남의 댓글에만 하트를 주고 본인·탈퇴 댓글에는 숨긴다", async () => {
+test("댓글·답글 좋아요는 남의 댓글만 누를 수 있고 본인 댓글은 수만 보여 준다(LIKE-004)", async () => {
   const post = await api(MEMBER).fetchCommunityPost("12");
   const state = screenMocks({
     post,
@@ -1262,6 +1262,8 @@ test("댓글·답글 좋아요는 남의 댓글에만 하트를 주고 본인·�
   assert.equal(comments[0].props.likeCount, 2);
   assert.equal(comments[0].props.isLiked, true);
   assert.equal(comments[1].props.onPressLike, undefined);
+  assert.notEqual(comments[1].props.hasLike, false, "본인 댓글도 하트와 수를 보여 준다");
+  assert.equal(comments[1].props.likeCount, 1);
   assert.equal(comments[2].props.onPressLike, undefined);
 });
 

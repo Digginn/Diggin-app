@@ -427,7 +427,6 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                 .trim()}
               timeLabel={formatCommunityTime(comment.createdAt)}
               isDeleted={comment.isWithdrawn}
-              hasLike={!comment.isMine}
               isOperator={comment.isOperator}
               voteChoice={comment.voteChoice}
               onPressReport={
