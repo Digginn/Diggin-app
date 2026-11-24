@@ -3,7 +3,7 @@
     "name": "Diggin",
     "owner": "diggin",
     "slug": "Diggin",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -15,7 +15,7 @@
     "scheme": "diggin",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "buildNumber": "5",
+      "buildNumber": "14",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "ITSAppUsesNonExemptEncryption": false
