@@ -37,6 +37,8 @@ VITE_ADMIN_ENVIRONMENT=development
 
 운영 빌드는 별도 호스트/환경에 운영 프로젝트의 URL·publishable key와 `VITE_ADMIN_ENVIRONMENT=production`을 설정합니다. Vite 변수는 빌드 때 포함되며 EAS 환경변수와 별개입니다. 이 웹에는 service_role/secret key·DB 비밀번호를 등록하지 않습니다. 환경 이름·키·URL이 빠지거나 잘못되면 설정 안내가 표시됩니다. 설정을 바꾸면 서버/빌드를 다시 실행합니다. 상단에 환경 이름과 프로젝트 도메인을 표시하고, 로그인 저장소는 프로젝트 도메인별로 구분합니다.
 
+Vercel에서는 같은 `diggin-admin` 프로젝트의 Preview에 개발 DB, Production에 운영 DB 값을 등록합니다. Production Branch는 main으로 유지합니다. develop의 Preview와 개발 DB용 TestFlight 앱으로 QA한 뒤 main을 병합합니다. 전체 순서는 [개발 QA와 운영 배포](../docs/QA_RELEASE.md)를 참고합니다.
+
 DB 마이그레이션과 같은 커밋의 `admin-moderation` Edge Function을 저장소의 승인된 배포 경로로 먼저 반영해야 합니다. 이 브랜치에서 공유·운영 DB에 직접 배포하지 않습니다. 기존 `private.admin_users`에 등록되어 있고 비활성화되지 않은 Supabase 이메일/비밀번호 계정으로 로그인합니다. 웹에서 관리자 계정을 새로 발급하거나 권한을 승격하지 않습니다. 등록·비밀번호 설정은 [관리자 API 문서](../docs/MODERATION_API.md)의 기존 절차를 따릅니다.
 
 개발과 운영의 Auth 계정도 별개입니다. 개발에는 사용자가 지정한 `diggin.app@gmail.com`, `digginmanagertest@gmail.com`을 별도로 생성했고, PR #225의 개발 관리자 등록 마이그레이션이 승인·배포된 뒤 권한이 활성화됩니다. 개발 계정의 비밀번호는 운영 계정과 별도로 설정합니다. 비밀번호 불일치는 Auth 단계의 실패이며, 관리자 API 배포나 권한 등록 실패와 구분합니다.
