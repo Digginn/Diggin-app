@@ -16,8 +16,6 @@ export type AppNotification = {
   createdAt: string;
   postId: string;
   postType: "post" | "vote" | "notice";
-  /** NOTI-011 댓글 좋아요 알림만 있다. 누르면 이 댓글로 스크롤한다. */
-  commentId: string | null;
   isPostAvailable: boolean;
 };
 
@@ -25,15 +23,7 @@ function parseNotification(value: unknown): AppNotification {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("invalid_notification_response");
   const row = value as Record<string, unknown>;
-  const {
-    id,
-    title,
-    body,
-    created_at: createdAt,
-    post_id: postId,
-    post_type: postType,
-    comment_id: commentId = null,
-  } = row;
+  const { id, title, body, created_at: createdAt, post_id: postId, post_type: postType } = row;
   if (
     typeof id !== "string" ||
     !/^(notice:)?[1-9][0-9]*$/.test(id) ||
@@ -42,8 +32,7 @@ function parseNotification(value: unknown): AppNotification {
     typeof createdAt !== "string" ||
     !Number.isFinite(Date.parse(createdAt)) ||
     typeof postId !== "string" ||
-    (postType !== "post" && postType !== "vote" && postType !== "notice") ||
-    (commentId !== null && (typeof commentId !== "string" || !/^[1-9][0-9]*$/.test(commentId)))
+    (postType !== "post" && postType !== "vote" && postType !== "notice")
   )
     throw new Error("invalid_notification_response");
   return {
@@ -53,7 +42,6 @@ function parseNotification(value: unknown): AppNotification {
     createdAt,
     postId,
     postType,
-    commentId,
     isPostAvailable: row.is_post_available === true,
   };
 }

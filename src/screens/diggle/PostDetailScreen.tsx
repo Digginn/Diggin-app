@@ -58,11 +58,7 @@ import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "notice" }) {
-  const { id, returnTo, commentId } = useLocalSearchParams<{
-    id: string;
-    returnTo?: string;
-    commentId?: string;
-  }>();
+  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
   const router = useRouter();
   const { session, isRestoring } = useAuth();
   const showToast = useToast();
@@ -118,25 +114,6 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
     const index = commentRows.findIndex((row) => row.id === targetId);
     if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 1 });
   }, [commentRows, targetId]);
-  // NOTI-011 댓글 좋아요 알림으로 들어오면 그 댓글이 있는 페이지까지 읽고 스크롤해 강조한다. 직접 스크롤하면 강조를 끈다.
-  const [focusedCommentId, setFocusedCommentId] = useState(commentId);
-  const isFocusPending = useRef(!!commentId);
-  const focusRetry = useRef({ index: -1, count: 0 });
-  useEffect(() => {
-    if (!isFocusPending.current || !focusedCommentId || !comments.data) return;
-    const index = commentRows.findIndex((row) => row.id === focusedCommentId);
-    if (index >= 0) {
-      isFocusPending.current = false;
-      focusRetry.current = { index, count: 0 };
-      requestAnimationFrame(() =>
-        listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }),
-      );
-    } else if (!comments.hasNextPage || comments.isFetchNextPageError) {
-      isFocusPending.current = false;
-    } else if (!comments.isFetching) {
-      void comments.fetchNextPage({ cancelRefetch: false });
-    }
-  }, [focusedCommentId, commentRows, comments]);
   useEffect(() => {
     if (!targetId) return;
     const frame = requestAnimationFrame(() => {
@@ -265,14 +242,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
           : post.type === "vote"
             ? "/votes/[id]"
             : "/posts/[id]",
-        params: {
-          id: post.id,
-          ...(returnTo ? { returnTo } : {}),
-          ...(commentId ? { commentId } : {}),
-        },
+        params: { id: post.id, ...(returnTo ? { returnTo } : {}) },
       });
     }
-  }, [isRestoring, session, post, isWrongRoute, router, returnTo, commentId]);
+  }, [isRestoring, session, post, isWrongRoute, router, returnTo]);
 
   if (!isRestoring && !session)
     return (
@@ -350,7 +323,6 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
           onScrollBeginDrag={() => {
             shouldRevealNewComment.current = false;
             setMenu(null);
-            setFocusedCommentId(undefined);
           }}
           onContentSizeChange={() => {
             if (shouldRevealNewComment.current) listRef.current?.scrollToEnd({ animated: true });
@@ -360,16 +332,9 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
             else if (shouldRevealNewComment.current)
               listRef.current?.scrollToEnd({ animated: true });
           }}
-          onScrollToIndexFailed={({ averageItemLength, index }) => {
-            listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true });
-            // 알림으로 들어온 댓글이 아직 그려지지 않았으면 근처로 옮긴 뒤 몇 번 다시 맞춘다.
-            if (focusRetry.current.index !== index || focusRetry.current.count >= 5) return;
-            focusRetry.current.count += 1;
-            setTimeout(
-              () => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }),
-              150,
-            );
-          }}
+          onScrollToIndexFailed={({ averageItemLength, index }) =>
+            listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })
+          }
           keyExtractor={(comment) => comment.id}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
@@ -492,7 +457,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                     }
                   : undefined
               }
-              isHighlighted={targetId === comment.id || focusedCommentId === comment.id}
+              isHighlighted={targetId === comment.id}
               onPressMenu={
                 comment.isMine && !comment.isWithdrawn && !isBusy
                   ? (anchor) => {

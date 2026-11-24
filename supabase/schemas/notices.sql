@@ -166,7 +166,7 @@ begin
   return (with entries as (
     select n.id::text as key,n.created_at,jsonb_build_object(
       'id',n.id::text,'title',n.title,'body',n.body,'created_at',n.created_at,
-      'post_id',p.id::text,'post_type',p.type,'comment_id',n.comment_id::text,'is_post_available',
+      'post_id',p.id::text,'post_type',p.type,'is_post_available',
       p.deleted_at is null and p.hidden_at is null and private.community_author_visible(p.author_id)
       and private.community_content_visible('post',p.id)) as data
     from private.notifications n join private.posts p on p.id=n.post_id

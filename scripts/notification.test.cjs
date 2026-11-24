@@ -501,7 +501,6 @@ test("운영 알림 목록은 실제 알림과 지난 확인 뒤 새 알림을 �
             createdAt: "2026-10-21T00:00:00.000000+00:00",
             postId: "41",
             postType: "vote",
-            commentId: "7",
             isPostAvailable: true,
           },
           {
@@ -586,7 +585,7 @@ test("운영 알림 목록은 실제 알림과 지난 확인 뒤 새 알림을 �
   props.onPressNotification(props.notifications[1]);
   props.onPressNotification(props.notifications[2]);
   assert.deepEqual(JSON.parse(JSON.stringify(pushed)), [
-    { pathname: "/votes/[id]", params: { id: "41", commentId: "7" } },
+    { pathname: "/votes/[id]", params: { id: "41" } },
   ]);
   assert.deepEqual(
     toasts,
@@ -639,16 +638,6 @@ test("공지 알림과 일반 알림은 새 RPC의 문자열 커서를 보존하
                   post_type: "notice",
                   is_post_available: true,
                 },
-                {
-                  id: "8",
-                  title: "내 댓글에 10개 이상의 좋아요가 달렸어요.",
-                  body: "'댓글' 댓글에 달린 좋아요를 확인해 보세요.",
-                  created_at: "2026-11-22T09:00:00Z",
-                  post_id: "42",
-                  post_type: "post",
-                  comment_id: "77",
-                  is_post_available: true,
-                },
               ],
             };
           },
@@ -659,8 +648,6 @@ test("공지 알림과 일반 알림은 새 RPC의 문자열 커서를 보존하
   const page = await fetchNotifications(null);
   assert.equal(page[0].postType, "notice");
   assert.equal(page[0].postId, "42");
-  assert.equal(page[0].commentId, null);
-  assert.equal(page[1].commentId, "77", "댓글 좋아요 알림은 댓글 위치를 받는다");
   await fetchNotifications(page[0]);
   assert.equal(calls[1][0], "get_app_notifications");
   assert.equal(calls[1][1].after_key, "notice:42");

@@ -642,7 +642,7 @@ export type Database = {
         | "FOLDER_LIMIT_EXCEEDED"
         | "FOLDER_SAVE_FAILED";
       import_status: "processing" | "completed" | "failed";
-      notification_type: "vote_ended" | "post_commented" | "post_liked" | "comment_liked";
+      notification_type: "vote_ended" | "post_commented" | "post_liked";
       post_type: "post" | "vote";
       report_reason: "abuse" | "spam" | "inappropriate" | "other" | "underage";
       report_status: "received" | "reviewing" | "resolved" | "rejected";
@@ -778,7 +778,7 @@ export const Constants = {
         "FOLDER_SAVE_FAILED",
       ],
       import_status: ["processing", "completed", "failed"],
-      notification_type: ["vote_ended", "post_commented", "post_liked", "comment_liked"],
+      notification_type: ["vote_ended", "post_commented", "post_liked"],
       post_type: ["post", "vote"],
       report_reason: ["abuse", "spam", "inappropriate", "other", "underage"],
       report_status: ["received", "reviewing", "resolved", "rejected"],

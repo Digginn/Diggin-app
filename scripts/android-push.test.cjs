@@ -119,11 +119,7 @@ test("Android 종료 상태 알림과 실행 중 선택을 연결하고 같은 �
   h.press(response({ ...payload, post_type: "vote", post_id: "9007199254740993" }, "push-2"));
   assert.equal(h.calls.routes[1].pathname, "/votes/[id]");
   assert.equal(h.calls.routes[1].params.id, "9007199254740993", "큰 ID를 Number로 바꾸지 않는다");
-  assert.equal(h.calls.routes[0].params.commentId, undefined);
-  h.press(response({ ...payload, comment_id: "77" }, "push-3"));
-  assert.equal(h.calls.routes[2].params.commentId, "77", "댓글 좋아요 알림은 댓글 위치를 넘긴다");
-  h.press(response({ ...payload, comment_id: "0" }, "push-4"));
-  assert.equal(h.calls.routes[3].params.commentId, undefined, "잘못된 댓글 ID는 버린다");
+  assert.equal(h.calls.cleared, 2);
 });
 
 test("다른 계정 알림은 무시하고 비회원·알 수 없는 payload는 알림 목록으로 보낸다", () => {
