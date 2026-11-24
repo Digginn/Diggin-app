@@ -75,7 +75,17 @@ delete from private.post_likes where user_id = '10400000-0000-0000-0001-00000000
 insert into private.post_likes(post_id, user_id) values (current_setting('test.post')::bigint, '10400000-0000-0000-0001-000000000009');
 select is((select count(*) from pg_temp.notifications_for('post_liked')), 1::bigint, '취소 후 다시 10개가 돼도 한 번만 알린다');
 select is((select title || ' / ' || body || ' / ' || coalesce(actor_id::text, 'null') from pg_temp.notifications_for('post_liked')),
-  '내가 작성한 게시물에 10개의 좋아요가 달렸어요. / 알림 테스트 일반글 / null', '좋아요한 사람 없이 글 내용만 담는다');
+  '내 게시글에 10개 이상의 좋아요가 달렸어요. / ''알림 테스트 일반글'' 게시글에 달린 좋아요를 확인해 보세요. / null', '좋아요한 사람 없이 글 앞부분과 안내 문장을 담는다');
+-- 20자를 넘는 글은 앞 20자 뒤에 ...을 붙이고, 줄바꿈은 공백으로 바꾼다.
+insert into private.posts(author_id, type, content)
+ values ('10400000-0000-0000-0000-00000000000a', 'post', E'둘 다 너무 예뻐서\n고민 중이에요 어떤 게 나을까요');
+insert into private.post_likes(post_id, user_id)
+ select (select max(id) from private.posts), ('10400000-0000-0000-0001-00000000000' || n)::uuid from generate_series(1, 9) n
+ union all select (select max(id) from private.posts), '10400000-0000-0000-0000-00000000000b';
+select is((select body from private.notifications where post_id = (select max(id) from private.posts)),
+  '''둘 다 너무 예뻐서 고민 중이에요 어...'' 게시글에 달린 좋아요를 확인해 보세요.', '20자를 넘는 글은 ...으로 줄인다');
+delete from private.notifications where post_id = (select max(id) from private.posts);
+delete from private.posts where id = (select max(id) from private.posts);
 
 -- 받는 사람이 차단한 사용자의 행동은 알리지 않는다
 insert into private.user_blocks(blocker_id, blocked_id)

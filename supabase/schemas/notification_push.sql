@@ -78,8 +78,7 @@ begin
     'expired', n.created_at <= now() - interval '24 hours',
     'token', t.token, 'recipient_id', n.recipient_id, 'post_id', p.id::text, 'post_type', p.type,
     'title', case when n.type = 'vote_ended' then '투표가 종료됐어요.' else n.title end,
-    'body', case when n.type = 'vote_ended' then '내 투표 결과를 확인해 보세요.'
-      when n.type = 'post_liked' then private.notification_text(p.content) else n.body end
+    'body', case when n.type = 'vote_ended' then '내 투표 결과를 확인해 보세요.' else n.body end
   ) order by d.id), '[]'::jsonb) into jobs
   from claimed d join private.notifications n on n.id = d.notification_id
   join private.posts p on p.id = n.post_id join public.push_tokens t on t.id = d.token_id;

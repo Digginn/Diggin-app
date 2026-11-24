@@ -113,9 +113,14 @@ begin
      target.hidden_at is not null or (select count(*) from private.post_likes l where l.post_id = new.post_id) <> 10 then
     return new;
   end if;
+  -- 목록과 Push 본문은 글 앞 20자에 안내 문장을 붙인다. 20자를 넘으면 ...으로 줄인다.
+  -- shortcut: 코드포인트로 잘라 20자 경계의 조합 이모지가 깨질 수 있다. 문제가 되면 grapheme 기준으로 자른다.
   insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
-  values (target.author_id, 'post_liked', target.id, '내가 작성한 게시물에 10개의 좋아요가 달렸어요.',
-          private.notification_text(target.content), 'like10:' || target.id)
+  values (target.author_id, 'post_liked', target.id, '내 게시글에 10개 이상의 좋아요가 달렸어요.',
+          '''' || case when char_length(private.notification_text(target.content)) > 20
+                       then rtrim(left(private.notification_text(target.content), 20)) || '...'
+                       else private.notification_text(target.content) end ||
+          ''' 게시글에 달린 좋아요를 확인해 보세요.', 'like10:' || target.id)
   on conflict (event_key) do nothing;
   return new;
 end;
