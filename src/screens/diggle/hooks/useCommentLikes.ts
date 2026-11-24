@@ -57,7 +57,16 @@ export function useCommentLikes(postId: string, viewer: string | null) {
           previous && {
             ...previous,
             pages: previous.pages.map((page) =>
-              page.map((item) => (item.id === row.id ? { ...item, ...saved } : item)),
+              page.map((item) =>
+                item.id === row.id
+                  ? { ...item, ...saved }
+                  : {
+                      ...item,
+                      replies: item.replies.map((reply) =>
+                        reply.id === row.id ? { ...reply, ...saved } : reply,
+                      ),
+                    },
+              ),
             ),
           },
       );

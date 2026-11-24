@@ -5,6 +5,7 @@ const path = require("node:path");
 const { test } = require("node:test");
 const { runInNewContext } = require("node:vm");
 const ts = require("typescript");
+const { QueryClient, QueryObserver } = require("@tanstack/react-query");
 
 const analyticsEvents = [];
 const analytics = {
@@ -157,6 +158,7 @@ function harness({
   update = async (id, body) => row(id, body),
   remove = async () => {},
   like = async (_id, liked) => ({ isLiked: liked, likeCount: 4 }),
+  queryClient,
 } = {}) {
   const slots = [],
     effects = new Map();
@@ -191,12 +193,13 @@ function harness({
       },
     },
     "@tanstack/react-query": {
-      useQueryClient: () => ({
-        invalidateQueries: (input) => invalidations.push(input),
-        setQueryData: (_key, updater) => {
-          post = updater(post);
+      useQueryClient: () =>
+        queryClient ?? {
+          invalidateQueries: (input) => invalidations.push(input),
+          setQueryData: (_key, updater) => {
+            post = updater(post);
+          },
         },
-      }),
     },
     "expo-crypto": { randomUUID: () => `request-${++uuid}` },
     "@/constants/comments": load("src/constants/comments.ts"),
@@ -229,17 +232,27 @@ function harness({
         calls.push({ type: "like", args });
         return like(...args);
       },
+      setCommentLike: (...args) => {
+        calls.push({ type: "commentLike", args });
+        return like(...args);
+      },
     },
   };
   const comments = load("src/screens/diggle/hooks/useCommentActions.ts", mocks).useCommentActions;
   const likes = load("src/screens/diggle/hooks/useCommunityLike.ts", mocks).useCommunityLike;
+  const commentLikes = load("src/screens/diggle/hooks/useCommentLikes.ts", mocks).useCommentLikes;
   function render(kind = "comments", viewer = "viewer") {
     let result;
     for (let attempt = 0; attempt < 3; attempt++) {
       index = 0;
       pending = [];
       dirty = false;
-      result = kind === "comments" ? comments("12", viewer) : likes(post, viewer);
+      result =
+        kind === "comments"
+          ? comments("12", viewer)
+          : kind === "commentLikes"
+            ? commentLikes("12", viewer)
+            : likes(post, viewer);
       if (!dirty) break;
     }
     for (const { slot, callback, deps } of pending) {
@@ -261,6 +274,60 @@ function harness({
       for (const effect of effects.values()) effect.cleanup?.();
     },
   };
+}
+
+for (const isReply of [false, true]) {
+  test(`${isReply ? "답글" : "댓글"} 좋아요 저장 후 재조회가 실패해도 상태를 유지하고 다음 클릭은 취소한다`, async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const key = keys.communityKeys.comments("viewer", "12");
+    const target = {
+      ...row("2"),
+      isMine: false,
+      parentId: isReply ? "1" : null,
+      isLiked: false,
+      likeCount: 0,
+    };
+    queryClient.setQueryData(key, {
+      pages: [[], [isReply ? { ...row("1"), replies: [target] } : target]],
+      pageParams: [null, { id: "1" }],
+    });
+    const observer = new QueryObserver(queryClient, {
+      queryKey: key,
+      queryFn: async () => {
+        throw new Error("offline");
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    const ui = harness({
+      queryClient,
+      like: async (_id, isLiked) => ({ isLiked, likeCount: isLiked ? 1 : 0 }),
+    });
+    const cachedRow = () => {
+      const parent = queryClient.getQueryData(key).pages[1][0];
+      return isReply ? parent.replies[0] : parent;
+    };
+    try {
+      await ui.render("commentLikes").toggle(cachedRow());
+      assert.equal(queryClient.getQueryState(key).status, "error");
+      assert.equal(ui.render("commentLikes").likeOf(cachedRow()).isLiked, true);
+      assert.equal(ui.render("commentLikes").likeOf(cachedRow()).likeCount, 1);
+      await ui.render("commentLikes").toggle(cachedRow());
+      assert.deepEqual(
+        ui.calls.map((call) => call.args[1]),
+        [true, false],
+      );
+      assert.equal(ui.render("commentLikes").likeOf(cachedRow()).isLiked, false);
+      assert.equal(ui.render("commentLikes").likeOf(cachedRow()).likeCount, 0);
+    } finally {
+      ui.unmount();
+      unsubscribe();
+      queryClient.clear();
+    }
+  });
 }
 
 for (const editing of [false, true]) {
