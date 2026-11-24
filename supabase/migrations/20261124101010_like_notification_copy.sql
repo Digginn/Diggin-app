@@ -50,12 +50,13 @@ begin
      target.hidden_at is not null or (select count(*) from private.post_likes l where l.post_id = new.post_id) <> 10 then
     return new;
   end if;
-  -- 목록과 Push 본문은 글 앞 20자에 안내 문장을 붙인다. 20자를 넘으면 ...으로 줄인다.
-  -- shortcut: 코드포인트로 잘라 20자 경계의 조합 이모지가 깨질 수 있다. 문제가 되면 grapheme 기준으로 자른다.
+  -- 목록과 Push 본문은 글 앞 20자에 안내 문장을 붙인다. 20자를 넘으면 ...으로 줄이고,
+  -- 잘린 끝에 걸린 이모지는 깨지지 않게 그 이모지부터 뺀다.
   insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
   values (target.author_id, 'post_liked', target.id, '내 게시글에 10개 이상의 좋아요가 달렸어요.',
           '''' || case when char_length(private.notification_text(target.content)) > 20
-                       then rtrim(left(private.notification_text(target.content), 20)) || '...'
+                       then rtrim(regexp_replace(left(private.notification_text(target.content), 20),
+                         '[\u00A9\u00AE\u203C\u2049\u2122\u2139\u2194-\u21AA\u231A-\u23FF\u24C2\u25AA-\u27BF\u2934\u2935\u2B05-\u2B55\u3030\u303D\u3297\u3299\uFE0F\u200D\U0001F000-\U0001FAFF\U000E0020-\U000E007F]+$', '')) || '...'
                        else private.notification_text(target.content) end ||
           ''' 게시글에 달린 좋아요를 확인해 보세요.', 'like10:' || target.id)
   on conflict (event_key) do nothing;

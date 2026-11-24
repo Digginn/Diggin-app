@@ -86,6 +86,17 @@ select is((select body from private.notifications where post_id = (select max(id
   '''둘 다 너무 예뻐서 고민 중이에요 어...'' 게시글에 달린 좋아요를 확인해 보세요.', '20자를 넘는 글은 ...으로 줄인다');
 delete from private.notifications where post_id = (select max(id) from private.posts);
 delete from private.posts where id = (select max(id) from private.posts);
+select is(regexp_replace('고민 중ㅋㅋ', '[\u00A9\u00AE\u203C\u2049\u2122\u2139\u2194-\u21AA\u231A-\u23FF\u24C2\u25AA-\u27BF\u2934\u2935\u2B05-\u2B55\u3030\u303D\u3297\u3299\uFE0F\u200D\U0001F000-\U0001FAFF\U000E0020-\U000E007F]+$', ''), '고민 중ㅋㅋ', '한글 자모는 이모지로 보지 않는다');
+-- 20자째에 이모지가 걸리면 그 이모지부터 자른다.
+insert into private.posts(author_id, type, content)
+ values ('10400000-0000-0000-0000-00000000000a', 'post', '가나다라마바사아자차카타파하가나다라마👍🏻 이거 어때요');
+insert into private.post_likes(post_id, user_id)
+ select (select max(id) from private.posts), ('10400000-0000-0000-0001-00000000000' || n)::uuid from generate_series(1, 9) n
+ union all select (select max(id) from private.posts), '10400000-0000-0000-0000-00000000000b';
+select is((select body from private.notifications where post_id = (select max(id) from private.posts)),
+  '''가나다라마바사아자차카타파하가나다라마...'' 게시글에 달린 좋아요를 확인해 보세요.', '경계에 걸린 이모지는 빼고 자른다');
+delete from private.notifications where post_id = (select max(id) from private.posts);
+delete from private.posts where id = (select max(id) from private.posts);
 
 -- 받는 사람이 차단한 사용자의 행동은 알리지 않는다
 insert into private.user_blocks(blocker_id, blocked_id)
