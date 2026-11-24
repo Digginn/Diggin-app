@@ -30,6 +30,12 @@ create table private.like_notification_log (
 );
 create index like_notification_log_actor_idx on private.like_notification_log(actor_id);
 
+-- NOTI-005 좋아요 10개 알림 발송 이력. 알림은 30일 뒤 지워져도 이 기록이 남아 게시글당 한 번만 보낸다.
+create table private.post_like_notifications (
+  post_id bigint primary key references private.posts(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 -- 알림함을 마지막으로 연 시각. 이보다 뒤에 온 알림이 안 읽은 알림이다(종 아이콘 점, 목록 Gray50 배경).
 -- 알림마다 읽음을 두지 않고 열면 전부 읽음으로 본다(개인정보처리방침 "알림함 마지막 확인 시각").
 create table private.notification_checks (
@@ -46,10 +52,11 @@ create table private.notification_settings (
 
 alter table private.notifications enable row level security;
 alter table private.like_notification_log enable row level security;
+alter table private.post_like_notifications enable row level security;
 alter table private.notification_checks enable row level security;
 alter table private.notification_settings enable row level security;
-revoke all on table private.notifications, private.like_notification_log, private.notification_checks,
-  private.notification_settings from public, anon, authenticated;
+revoke all on table private.notifications, private.like_notification_log, private.post_like_notifications,
+  private.notification_checks, private.notification_settings from public, anon, authenticated;
 revoke all on sequence private.notifications_id_seq from public, anon, authenticated;
 
 -- 받는 사람이 차단했거나 신고한 사람의 행동은 알리지 않는다. 트리거는 행동한 사람 권한으로 돌아 auth.uid()를 쓸 수 없다.
@@ -101,8 +108,8 @@ end;
 $$;
 
 -- NOTI-005 좋아요는 하나씩 알리지 않고, 내 일반 게시글의 좋아요가 처음 10개가 됐을 때 한 번만 알린다.
--- 좋아요 쓰기는 글 행을 잠가 줄을 세우므로 10번째 좋아요를 동시에 놓치지 않는다. 취소 후 다시 10개가 돼도 키로 한 번만 만든다.
--- shortcut: 알림이 30일 뒤 지워진 다음 9개로 줄었다 다시 10개가 되면 한 번 더 간다. 문제가 되면 글에 발송 표시를 둔다.
+-- 좋아요 쓰기는 글 행을 잠가 줄을 세우므로 10번째 좋아요를 동시에 놓치지 않는다.
+-- 취소 후 다시 10개가 돼도 발송 이력(post_like_notifications)으로 게시글당 한 번만 만든다.
 create or replace function private.notify_post_liked()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
@@ -113,6 +120,8 @@ begin
      target.hidden_at is not null or (select count(*) from private.post_likes l where l.post_id = new.post_id) <> 10 then
     return new;
   end if;
+  insert into private.post_like_notifications(post_id) values (target.id) on conflict do nothing;
+  if not found then return new; end if;
   -- 목록과 Push 본문은 글 앞 20자에 안내 문장을 붙인다. 20자를 넘으면 ...으로 줄이고,
   -- 잘린 끝에 걸린 이모지는 깨지지 않게 그 이모지부터 뺀다.
   insert into private.notifications(recipient_id, type, post_id, title, body, event_key)

@@ -84,6 +84,12 @@ insert into private.post_likes(post_id, user_id)
  union all select (select max(id) from private.posts), '10400000-0000-0000-0000-00000000000b';
 select is((select body from private.notifications where post_id = (select max(id) from private.posts)),
   '''둘 다 너무 예뻐서 고민 중이에요 어...'' 게시글에 달린 좋아요를 확인해 보세요.', '20자를 넘는 글은 ...으로 줄인다');
+-- 30일이 지나 알림이 지워진 뒤 다시 10개가 돼도 발송 이력으로 다시 보내지 않는다.
+delete from private.notifications where post_id = (select max(id) from private.posts);
+delete from private.post_likes where post_id = (select max(id) from private.posts) and user_id = '10400000-0000-0000-0000-00000000000b';
+insert into private.post_likes(post_id, user_id) values ((select max(id) from private.posts), '10400000-0000-0000-0000-00000000000b');
+select is((select count(*) from private.notifications where post_id = (select max(id) from private.posts)), 0::bigint,
+  '알림이 지워진 뒤 다시 10개가 돼도 게시글당 한 번만 보낸다');
 delete from private.notifications where post_id = (select max(id) from private.posts);
 delete from private.posts where id = (select max(id) from private.posts);
 select is(regexp_replace('고민 중ㅋㅋ', '[\u00A9\u00AE\u203C\u2049\u2122\u2139\u2194-\u21AA\u231A-\u23FF\u24C2\u25AA-\u27BF\u2934\u2935\u2B05-\u2B55\u3030\u303D\u3297\u3299\uFE0F\u200D\U0001F000-\U0001FAFF\U000E0020-\U000E007F]+$', ''), '고민 중ㅋㅋ', '한글 자모는 이모지로 보지 않는다');
@@ -226,5 +232,7 @@ reset role;
 select lives_ok($$ select private.delete_old_notifications() $$, '정리 작업이 돈다');
 select is((select count(*) from pg_temp.notifications_for('post_liked')), 0::bigint, '30일 지난 알림을 지운다');
 
+select ok(not has_table_privilege('authenticated', 'private.post_like_notifications', 'SELECT')
+  and not has_table_privilege('anon', 'private.post_like_notifications', 'INSERT'), '앱은 좋아요 알림 발송 이력에 접근하지 못한다');
 select * from finish();
 rollback;
