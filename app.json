@@ -15,7 +15,7 @@
     "scheme": "diggin",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "buildNumber": "14",
+      "buildNumber": "15",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "ITSAppUsesNonExemptEncryption": false
