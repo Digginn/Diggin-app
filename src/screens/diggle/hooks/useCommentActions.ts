@@ -130,7 +130,7 @@ export function useCommentActions(postId: string, viewer: string | null) {
       setState((prev) => ({
         ...prev,
         deleteTarget: null,
-        editing: prev.editing?.id === id ? null : prev.editing,
+        editing: prev.editing?.id === id || prev.editing?.parentId === id ? null : prev.editing,
         replyTarget: prev.replyTarget?.id === id ? null : prev.replyTarget,
         changes: { ...prev.changes, [id]: null },
       }));
