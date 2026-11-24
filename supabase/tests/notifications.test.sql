@@ -92,7 +92,7 @@ select is((select count(*) from private.notifications where post_id = (select ma
   '알림이 지워진 뒤 다시 10개가 돼도 게시글당 한 번만 보낸다');
 delete from private.notifications where post_id = (select max(id) from private.posts);
 delete from private.posts where id = (select max(id) from private.posts);
-select is(regexp_replace('고민 중ㅋㅋ', '[\u00A9\u00AE\u203C\u2049\u2122\u2139\u2194-\u21AA\u231A-\u23FF\u24C2\u25AA-\u27BF\u2934\u2935\u2B05-\u2B55\u3030\u303D\u3297\u3299\uFE0F\u200D\U0001F000-\U0001FAFF\U000E0020-\U000E007F]+$', ''), '고민 중ㅋㅋ', '한글 자모는 이모지로 보지 않는다');
+select is(private.notification_excerpt('고민 중이에요ㅋㅋㅋ', 8), '고민 중이에요ㅋ...', '한글 자모는 이모지로 보지 않는다');
 -- 20자째에 이모지가 걸리면 그 이모지부터 자른다.
 insert into private.posts(author_id, type, content)
  values ('10400000-0000-0000-0000-00000000000a', 'post', '가나다라마바사아자차카타파하가나다라마👍🏻 이거 어때요');

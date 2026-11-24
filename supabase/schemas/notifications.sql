@@ -7,6 +7,8 @@ create table private.notifications (
   recipient_id uuid not null references public.profiles(id) on delete cascade,
   type public.notification_type not null,
   post_id bigint not null references private.posts(id) on delete cascade,
+  -- NOTI-011 댓글 좋아요 알림은 누르면 이 댓글로 스크롤한다. 다른 알림은 비워 둔다.
+  comment_id bigint references private.comments(id) on delete cascade,
   -- 댓글·좋아요를 한 사람. 나중에 차단·신고하면 목록과 새 알림 점에서 뺀다. 투표 마감은 없다.
   actor_id uuid references public.profiles(id) on delete set null,
   title text not null,
@@ -20,6 +22,7 @@ create index notifications_recipient_idx on private.notifications(recipient_id, 
 create index notifications_push_pending_idx on private.notifications(created_at) where push_sent_at is null;
 create index notifications_post_idx on private.notifications(post_id);
 create index notifications_actor_idx on private.notifications(actor_id);
+create index notifications_comment_idx on private.notifications(comment_id) where comment_id is not null;
 
 -- 좋아요는 취소 후 다시 눌러도 같은 사람·같은 글에 한 번만 알린다. 취소해도 지우지 않는다.
 create table private.like_notification_log (
@@ -33,6 +36,12 @@ create index like_notification_log_actor_idx on private.like_notification_log(ac
 -- NOTI-005 좋아요 10개 알림 발송 이력. 알림은 30일 뒤 지워져도 이 기록이 남아 게시글당 한 번만 보낸다.
 create table private.post_like_notifications (
   post_id bigint primary key references private.posts(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+-- NOTI-011 댓글·답글 좋아요 10개 알림 발송 이력. 댓글당 한 번만 보낸다.
+create table private.comment_like_notifications (
+  comment_id bigint primary key references private.comments(id) on delete cascade,
   created_at timestamptz not null default now()
 );
 
@@ -53,10 +62,12 @@ create table private.notification_settings (
 alter table private.notifications enable row level security;
 alter table private.like_notification_log enable row level security;
 alter table private.post_like_notifications enable row level security;
+alter table private.comment_like_notifications enable row level security;
 alter table private.notification_checks enable row level security;
 alter table private.notification_settings enable row level security;
 revoke all on table private.notifications, private.like_notification_log, private.post_like_notifications,
-  private.notification_checks, private.notification_settings from public, anon, authenticated;
+  private.comment_like_notifications, private.notification_checks, private.notification_settings
+  from public, anon, authenticated;
 revoke all on sequence private.notifications_id_seq from public, anon, authenticated;
 
 -- 받는 사람이 차단했거나 신고한 사람의 행동은 알리지 않는다. 트리거는 행동한 사람 권한으로 돌아 auth.uid()를 쓸 수 없다.
@@ -73,6 +84,15 @@ $$;
 create or replace function private.notification_text(value text)
 returns text language sql immutable set search_path = '' as $$
   select regexp_replace(coalesce(value, ''), '\r\n|\r|\n', ' ', 'g');
+$$;
+
+-- 알림 본문에 넣을 인용. 길면 앞부분만 남기고 ...을 붙인다. 잘린 끝에 걸린 이모지는 깨지지 않게 그 이모지부터 뺀다.
+create or replace function private.notification_excerpt(value text, max_length integer)
+returns text language sql immutable set search_path = '' as $$
+  select case when char_length(private.notification_text(value)) > max_length
+    then rtrim(regexp_replace(left(private.notification_text(value), max_length),
+      '[\u00A9\u00AE\u203C\u2049\u2122\u2139\u2194-\u21AA\u231A-\u23FF\u24C2\u25AA-\u27BF\u2934\u2935\u2B05-\u2B55\u3030\u303D\u3297\u3299\uFE0F\u200D\U0001F000-\U0001FAFF\U000E0020-\U000E007F]+$', '')) || '...'
+    else private.notification_text(value) end;
 $$;
 
 -- NOTI-004 내 일반 게시글에 다른 사람이 댓글을 처음 등록했을 때. 재시도는 기존 댓글을 돌려주고 insert가 없다.
@@ -122,15 +142,11 @@ begin
   end if;
   insert into private.post_like_notifications(post_id) values (target.id) on conflict do nothing;
   if not found then return new; end if;
-  -- 목록과 Push 본문은 글 앞 20자에 안내 문장을 붙인다. 20자를 넘으면 ...으로 줄이고,
-  -- 잘린 끝에 걸린 이모지는 깨지지 않게 그 이모지부터 뺀다.
+  -- 목록과 Push 본문은 글 앞 20자에 안내 문장을 붙인다.
   insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
   values (target.author_id, 'post_liked', target.id, '내 게시글에 10개 이상의 좋아요가 달렸어요.',
-          '''' || case when char_length(private.notification_text(target.content)) > 20
-                       then rtrim(regexp_replace(left(private.notification_text(target.content), 20),
-                         '[\u00A9\u00AE\u203C\u2049\u2122\u2139\u2194-\u21AA\u231A-\u23FF\u24C2\u25AA-\u27BF\u2934\u2935\u2B05-\u2B55\u3030\u303D\u3297\u3299\uFE0F\u200D\U0001F000-\U0001FAFF\U000E0020-\U000E007F]+$', '')) || '...'
-                       else private.notification_text(target.content) end ||
-          ''' 게시글에 달린 좋아요를 확인해 보세요.', 'like10:' || target.id)
+          '''' || private.notification_excerpt(target.content, 20) || ''' 게시글에 달린 좋아요를 확인해 보세요.',
+          'like10:' || target.id)
   on conflict (event_key) do nothing;
   return new;
 end;
@@ -143,6 +159,35 @@ for each row execute function private.notify_post_commented();
 create trigger post_likes_notify_post_author
 after insert on private.post_likes
 for each row execute function private.notify_post_liked();
+
+-- NOTI-011 내 댓글·답글의 좋아요가 처음 10개가 되면 한 번 알린다. 일반글·투표글·공지 댓글 모두 해당한다.
+-- 댓글 좋아요 쓰기는 댓글 행을 잠가 줄을 세우므로 10번째를 동시에 놓치지 않는다. 발송 이력으로 댓글당 한 번만 만든다.
+-- 문구는 Figma 시안이 없어 게시글 좋아요(MSG-NOTI-003)를 따랐다.
+create or replace function private.notify_comment_liked()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  target private.comments%rowtype;
+begin
+  select * into target from private.comments where id = new.comment_id;
+  if target.author_id is null or target.deleted_at is not null or target.hidden_at is not null or
+     exists(select 1 from private.posts p where p.id = target.post_id and (p.deleted_at is not null or p.hidden_at is not null)) or
+     (select count(*) from private.comment_likes l where l.comment_id = new.comment_id) <> 10 then
+    return new;
+  end if;
+  insert into private.comment_like_notifications(comment_id) values (target.id) on conflict do nothing;
+  if not found then return new; end if;
+  insert into private.notifications(recipient_id, type, post_id, comment_id, title, body, event_key)
+  values (target.author_id, 'comment_liked', target.post_id, target.id, '내 댓글에 10개 이상의 좋아요가 달렸어요.',
+          '''' || private.notification_excerpt(target.content, 20) || ''' 댓글에 달린 좋아요를 확인해 보세요.',
+          'commentlike10:' || target.id)
+  on conflict (event_key) do nothing;
+  return new;
+end;
+$$;
+
+create trigger comment_likes_notify_author
+after insert on private.comment_likes
+for each row execute function private.notify_comment_liked();
 
 -- NOTI-003 마감된 투표를 작성자에게 한 번 알린다. 알림을 만들 때 지워졌거나 숨겨진 투표는 알리지 않는다.
 -- 삭제 시 투표 응답도 지워져(VOTE-012) 보여 줄 결과가 없다. 알림을 받은 뒤 지워지면 누를 때 NOTI-006 안내를 띄운다.
@@ -299,6 +344,7 @@ returns timestamptz language sql security invoker set search_path = '' as $$
 $$;
 
 revoke execute on function private.notification_actor_visible(uuid, uuid), private.notification_text(text),
+  private.notification_excerpt(text, integer), private.notify_comment_liked(),
   private.notify_post_commented(), private.notify_post_liked(), private.create_vote_ended_notifications(),
   private.delete_old_notifications(), private.notification_viewer() from public, anon, authenticated;
 revoke execute on function private.get_notifications(timestamptz, bigint), public.get_notifications(timestamptz, bigint),

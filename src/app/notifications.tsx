@@ -127,7 +127,10 @@ function NotificationsContent() {
               : notification.postType === "vote"
                 ? "/votes/[id]"
                 : "/posts/[id]",
-          params: { id: notification.postId },
+          params: {
+            id: notification.postId,
+            ...(notification.commentId ? { commentId: notification.commentId } : {}),
+          },
         });
       }}
       onBack={() => {

@@ -13,6 +13,7 @@ const job: PushJob = {
   recipient_id: "user-a",
   post_id: "9007199254740994",
   post_type: "post",
+  comment_id: null,
   title: "알림",
   body: "본문",
 };
@@ -58,12 +59,16 @@ Deno.test("전용 secret 없는 앱 요청은 큐나 Expo에 접근하지 못한
   assert(h.requests.length === 0 && h.finished.length === 0);
 });
 Deno.test("기기별 ticket 성공과 폐기 토큰을 나눠 기록하고 큰 ID를 문자열로 보낸다", async () => {
-  const h = setup([job, { ...job, id: "2" }]);
+  const h = setup([job, { ...job, id: "2", comment_id: "9007199254740995" }]);
   assert((await h.run()).status === 200);
   assert(h.finished[0].result.outcome === "accepted");
   assert(h.finished[1].result.outcome === "unregistered");
-  const body = h.requests[0].body as { data: { post_id: string }; channelId: string }[];
+  const body = h.requests[0].body as {
+    data: { post_id: string; comment_id: string | null };
+    channelId: string;
+  }[];
   assert(body[0].data.post_id === job.post_id && body[0].channelId === "default");
+  assert(body[0].data.comment_id === null && body[1].data.comment_id === "9007199254740995");
 });
 Deno.test("설정 끔·차단·계정 전환으로 취소된 작업은 외부 발송하지 않는다", async () => {
   const h = setup([{ ...job, allowed: false }, { ...job, expired: true, id: "2" }]);

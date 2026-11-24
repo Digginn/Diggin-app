@@ -48,7 +48,12 @@ export function PushNotifications() {
       }
       router.push({
         pathname: data.post_type === "vote" ? "/votes/[id]" : "/posts/[id]",
-        params: { id: data.post_id },
+        params: {
+          id: data.post_id,
+          ...(typeof data.comment_id === "string" && /^[1-9]\d*$/.test(data.comment_id)
+            ? { commentId: data.comment_id }
+            : {}),
+        },
       });
     };
     const responseListener = Notifications.addNotificationResponseReceivedListener(handle);

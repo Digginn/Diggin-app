@@ -8,6 +8,7 @@ export type PushJob = {
   recipient_id: string;
   post_id: string;
   post_type: string;
+  comment_id: string | null;
   title: string;
   body: string;
 };
@@ -54,7 +55,12 @@ export function pushMessage(job: PushJob) {
     sound: "default",
     channelId: "default",
     ttl: 3600,
-    data: { recipient_id: job.recipient_id, post_id: job.post_id, post_type: job.post_type },
+    data: {
+      recipient_id: job.recipient_id,
+      post_id: job.post_id,
+      post_type: job.post_type,
+      comment_id: job.comment_id,
+    },
   };
   // 목록 원문은 보존하고, 푸시는 data를 포함한 전체 4KB 제한 안에서 본문만 줄인다.
   const characters = Array.from(message.body);

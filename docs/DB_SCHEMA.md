@@ -83,7 +83,7 @@ report_target       post | comment
 report_reason       abuse | spam | inappropriate | other | underage
 report_status       received | reviewing | resolved | rejected
 account_status      active | warning | community_restricted | suspended   (구현)
-notification_type   vote_ended | post_commented | post_liked
+notification_type   vote_ended | post_commented | post_liked | comment_liked
 import_status       processing | completed | failed                     (구현)
 import_fail_reason  EMPTY_PRODUCT_NAME | EMPTY_PRODUCT_URL | INVALID_PRODUCT_URL | CSV_ROW_PARSE_ERROR | INVALID_PRODUCT_DATA | RESTRICTED_PRODUCT | FOLDER_LIMIT_EXCEEDED | FOLDER_SAVE_FAILED (구현)
 withdrawal_reason   rarely_used | missing_feature | other_service | hard_to_use | frequent_error   (구현)
@@ -317,10 +317,11 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 ```
 private.notifications
   id, recipient_id FK profiles cascade, type notification_type, post_id FK posts cascade,
-  actor_id FK profiles set null, title, body, event_key text unique, created_at, push_sent_at null
+  comment_id FK comments cascade null (comment_liked만), actor_id FK profiles set null, title, body, event_key text unique, created_at, push_sent_at null
 
 private.like_notification_log  (post_id, actor_id) PK, created_at
 private.post_like_notifications  post_id PK, created_at  — NOTI-005 좋아요 10개 알림 발송 이력
+private.comment_like_notifications  comment_id PK, created_at  — NOTI-011 댓글 좋아요 10개 알림 발송 이력
 private.notification_checks    user_id PK FK profiles cascade, checked_at
 private.notification_settings  user_id PK FK profiles cascade, push_enabled default true, updated_at
 ```
@@ -332,9 +333,10 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - 답글(NOTI-010, #237)은 원 댓글 작성자에게 같은 `post_commented` 유형으로 "내 댓글에 답글이 달렸어요."를 보낸다. 본문은 댓글 알림과 같은 `{닉네임}: {내용}`이고 Push 조건도 댓글 알림과 같다. 게시글 작성자에게 가는 댓글 알림(NOTI-004)은 원 댓글에만 보내고, 다른 사람 댓글에 달린 답글은 글쓴이에게 알리지 않는다(2026-11-24 확정). 답글 알림은 투표글에도 보낸다. 자기 댓글에 단 답글은 알리지 않는다. 새 enum 값을 만들지 않아 앱과 Push 제목 처리는 그대로다.
 - 알림을 받은 뒤 그 사람을 차단·신고하면 목록과 새 알림 점에서 뺀다. 커뮤니티 조회는 신고한 콘텐츠만 빼지만(#112), 알림은 신고한 사람의 알림을 모두 뺀다. 그래서 댓글·좋아요 알림에 행동한 사람(actor_id)을 남긴다. 투표 마감은 행동한 사람이 없어 항상 보인다. 명세(RPT-004)는 Feed·상세만 정하고 있어 알림함도 같은 기준으로 맞췄다.
 - 좋아요는 한 건씩 알리지 않고 일반 게시글의 좋아요가 처음 10개가 될 때 "내 게시글에 10개 이상의 좋아요가 달렸어요."를 한 번 보낸다(2026-11-24 확정, #237). 행동한 사람은 남기지 않는다. 본문은 `'{글 앞 20자}' 게시글에 달린 좋아요를 확인해 보세요.`이고 20자를 넘으면 `...`을 붙인다(NOTI-05·NOTI-07 시안). 잘린 끝에 이모지가 걸리면 그 이모지부터 뺀다. Push도 같은 본문을 쓴다. 보낸 글은 `post_like_notifications`에 남겨, 취소 후 다시 10개가 되거나 알림이 30일 뒤 지워져도 다시 보내지 않는다(게시글당 1회). `like_notification_log`는 더 이상 쓰지 않는다.
+- 댓글 좋아요(NOTI-011, #237)도 댓글·답글의 좋아요가 처음 10개가 될 때 작성자에게 `comment_liked` 유형으로 한 번 보낸다. 일반글·투표글·공지 댓글 모두 해당하고, 지운 댓글이나 지워진 글에는 만들지 않는다. 문구는 Figma 시안이 없어 게시글 좋아요를 따라 "내 댓글에 10개 이상의 좋아요가 달렸어요." / `'{댓글 앞 20자}' 댓글에 달린 좋아요를 확인해 보세요.`로 했다. 발송 이력은 `comment_like_notifications`이고 event_key는 `commentlike10:{comment_id}`다. 알림에 `comment_id`를 남겨 목록(`get_app_notifications`)과 Push data로 내려주고, 앱은 그 댓글까지 페이지를 읽어 스크롤하고 강조한다.
 - 투표 마감은 pg_cron `notifications-vote-ended`가 1분마다 `ends_at`이 지난 투표를 찾아 작성자에게 만든다(NOTI-003). 알림을 만들 때 지워졌거나 숨겨진 투표는 건너뛴다(NOTI-003). 삭제 시 투표 응답도 지워져(VOTE-012) 보여 줄 결과가 없다. 알림을 받은 뒤 지워지면 누를 때 NOTI-006 안내를 띄운다. 작업이 밀려도 놓치지 않게 시각 범위가 아니라 event_key로 중복을 막는다.
-- event_key는 `comment:{comment_id}`, `reply:{comment_id}`(원 댓글 작성자에게 가는 답글 알림), `like10:{post_id}`(이전 `like:{post_id}:{actor_id}`), `vote_ended:{post_id}`. Push는 두 댓글 키 모두 댓글이 지워지지 않았을 때만 보낸다. 앱에는 주지 않는다.
-- 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 좋아요 알림의 글 인용(20자)만 자른다. Push 줄 수는 OS에 맡긴다.
+- event_key는 `comment:{comment_id}`, `reply:{comment_id}`(원 댓글 작성자에게 가는 답글 알림), `like10:{post_id}`(이전 `like:{post_id}:{actor_id}`), `commentlike10:{comment_id}`, `vote_ended:{post_id}`. Push는 두 댓글 키와 댓글 좋아요 알림 모두 댓글이 지워지지 않았을 때만 보낸다. 앱에는 주지 않는다.
+- 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 좋아요 알림의 글·댓글 인용(20자)만 자른다(`private.notification_excerpt`). 답글 Push는 발송할 때 `{닉네임}: ` 뒤 본문을 42자로 줄인다(NOTI-010). 댓글 Push는 명세(NOTI-004)대로 자르지 않고 OS에 맡긴다.
 - 목록은 최근 30일, 최신순 20개씩. 알림은 항상 받는 사람 자신의 글이라 `is_post_available`은 삭제·숨김만 본다.
 - 읽음은 알림마다 두지 않고 알림함을 마지막으로 연 시각(notification_checks) 하나로 본다. 명세(NOTI-007)는 개발 검토로 남겨 뒀고, 시안의 종 아이콘 점(Dot=On), 목록 주석 "읽지 않은 알림은 배경(Gray50)으로 구분", 개인정보처리방침의 "알림함 마지막 확인 시각"에 맞췄다.
   - `has_unread_notifications()`: 확인 시각 뒤에 온 최근 30일 알림이 있으면 true. 종 아이콘 점.

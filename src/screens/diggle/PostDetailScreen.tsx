@@ -58,7 +58,11 @@ import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
 export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "notice" }) {
-  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
+  const { id, returnTo, commentId } = useLocalSearchParams<{
+    id: string;
+    returnTo?: string;
+    commentId?: string;
+  }>();
   const router = useRouter();
   const { session, isRestoring } = useAuth();
   const showToast = useToast();
@@ -114,6 +118,23 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
     const index = commentRows.findIndex((row) => row.id === targetId);
     if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 1 });
   }, [commentRows, targetId]);
+  // NOTI-011 댓글 좋아요 알림으로 들어오면 그 댓글이 있는 페이지까지 읽고 스크롤해 강조한다. 직접 스크롤하면 강조를 끈다.
+  const [focusedCommentId, setFocusedCommentId] = useState(commentId);
+  const isFocusPending = useRef(!!commentId);
+  useEffect(() => {
+    if (!isFocusPending.current || !focusedCommentId || !comments.data) return;
+    const index = commentRows.findIndex((row) => row.id === focusedCommentId);
+    if (index >= 0) {
+      isFocusPending.current = false;
+      requestAnimationFrame(() =>
+        listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }),
+      );
+    } else if (!comments.hasNextPage || comments.isFetchNextPageError) {
+      isFocusPending.current = false;
+    } else if (!comments.isFetching) {
+      void comments.fetchNextPage({ cancelRefetch: false });
+    }
+  }, [focusedCommentId, commentRows, comments]);
   useEffect(() => {
     if (!targetId) return;
     const frame = requestAnimationFrame(() => {
@@ -242,10 +263,14 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
           : post.type === "vote"
             ? "/votes/[id]"
             : "/posts/[id]",
-        params: { id: post.id, ...(returnTo ? { returnTo } : {}) },
+        params: {
+          id: post.id,
+          ...(returnTo ? { returnTo } : {}),
+          ...(commentId ? { commentId } : {}),
+        },
       });
     }
-  }, [isRestoring, session, post, isWrongRoute, router, returnTo]);
+  }, [isRestoring, session, post, isWrongRoute, router, returnTo, commentId]);
 
   if (!isRestoring && !session)
     return (
@@ -323,6 +348,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
           onScrollBeginDrag={() => {
             shouldRevealNewComment.current = false;
             setMenu(null);
+            setFocusedCommentId(undefined);
           }}
           onContentSizeChange={() => {
             if (shouldRevealNewComment.current) listRef.current?.scrollToEnd({ animated: true });
@@ -457,7 +483,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                     }
                   : undefined
               }
-              isHighlighted={targetId === comment.id}
+              isHighlighted={targetId === comment.id || focusedCommentId === comment.id}
               onPressMenu={
                 comment.isMine && !comment.isWithdrawn && !isBusy
                   ? (anchor) => {
