@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { type InfiniteData, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { restrictionMessage } from "@/api/accountAccess";
@@ -50,6 +50,17 @@ export function useCommentLikes(postId: string, viewer: string | null) {
       const saved = await setCommentLike(row.id, isLiked);
       if (!current.active) return;
       setRow(row.id, saved);
+      // 다시 받기가 실패해도 저장한 값이 남도록 캐시에 먼저 넣는다.
+      queryClient.setQueryData<InfiniteData<CommunityComment[]>>(
+        communityKeys.comments(viewer, postId),
+        (previous) =>
+          previous && {
+            ...previous,
+            pages: previous.pages.map((page) =>
+              page.map((item) => (item.id === row.id ? { ...item, ...saved } : item)),
+            ),
+          },
+      );
       await queryClient.invalidateQueries({ queryKey: communityKeys.comments(viewer, postId) });
     } catch (error) {
       if (!current.active) return;
