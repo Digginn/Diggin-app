@@ -30,6 +30,12 @@ create table private.like_notification_log (
 );
 create index like_notification_log_actor_idx on private.like_notification_log(actor_id);
 
+-- NOTI-005 좋아요 10개 알림 발송 이력. 알림은 30일 뒤 지워져도 이 기록이 남아 게시글당 한 번만 보낸다.
+create table private.post_like_notifications (
+  post_id bigint primary key references private.posts(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 -- 알림함을 마지막으로 연 시각. 이보다 뒤에 온 알림이 안 읽은 알림이다(종 아이콘 점, 목록 Gray50 배경).
 -- 알림마다 읽음을 두지 않고 열면 전부 읽음으로 본다(개인정보처리방침 "알림함 마지막 확인 시각").
 create table private.notification_checks (
@@ -46,10 +52,11 @@ create table private.notification_settings (
 
 alter table private.notifications enable row level security;
 alter table private.like_notification_log enable row level security;
+alter table private.post_like_notifications enable row level security;
 alter table private.notification_checks enable row level security;
 alter table private.notification_settings enable row level security;
-revoke all on table private.notifications, private.like_notification_log, private.notification_checks,
-  private.notification_settings from public, anon, authenticated;
+revoke all on table private.notifications, private.like_notification_log, private.post_like_notifications,
+  private.notification_checks, private.notification_settings from public, anon, authenticated;
 revoke all on sequence private.notifications_id_seq from public, anon, authenticated;
 
 -- 받는 사람이 차단했거나 신고한 사람의 행동은 알리지 않는다. 트리거는 행동한 사람 권한으로 돌아 auth.uid()를 쓸 수 없다.
@@ -68,50 +75,67 @@ returns text language sql immutable set search_path = '' as $$
   select regexp_replace(coalesce(value, ''), '\r\n|\r|\n', ' ', 'g');
 $$;
 
+-- 알림 본문에 넣을 인용. 길면 앞부분만 남기고 ...을 붙인다. 잘린 끝에 걸린 이모지는 깨지지 않게 그 이모지부터 뺀다.
+create or replace function private.notification_excerpt(value text, max_length integer)
+returns text language sql immutable set search_path = '' as $$
+  select case when char_length(private.notification_text(value)) > max_length
+    then rtrim(regexp_replace(left(private.notification_text(value), max_length),
+      '[\u00A9\u00AE\u203C\u2049\u2122\u2139\u2194-\u21AA\u231A-\u23FF\u24C2\u25AA-\u27BF\u2934\u2935\u2B05-\u2B55\u3030\u303D\u3297\u3299\uFE0F\u200D\U0001F000-\U0001FAFF\U000E0020-\U000E007F]+$', '')) || '...'
+    else private.notification_text(value) end;
+$$;
+
 -- NOTI-004 내 일반 게시글에 다른 사람이 댓글을 처음 등록했을 때. 재시도는 기존 댓글을 돌려주고 insert가 없다.
+-- NOTI-010 답글은 글쓴이가 아니라 원 댓글 작성자에게만 알린다. 투표글 답글도 알린다.
 create or replace function private.notify_post_commented()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
   target private.posts%rowtype;
   actor_nickname text;
+  recipient uuid;
 begin
   select * into target from private.posts where id = new.post_id;
-  if target.notice_title is not null then return new; end if;
-  if target.type <> 'post' or target.deleted_at is not null or target.hidden_at is not null or
-     new.author_id is null or new.author_id = target.author_id or
-     not private.notification_actor_visible(target.author_id, new.author_id) then
+  if target.deleted_at is not null or target.hidden_at is not null or new.author_id is null or
+     (new.parent_id is null and (target.type <> 'post' or target.notice_title is not null)) then
+    return new;
+  end if;
+  if new.parent_id is null then recipient := target.author_id;
+  else select author_id into recipient from private.comments where id = new.parent_id;
+  end if;
+  if recipient is null or recipient = new.author_id or
+     not private.notification_actor_visible(recipient, new.author_id) then
     return new;
   end if;
   select nickname into actor_nickname from public.profiles where id = new.author_id;
   insert into private.notifications(recipient_id, type, post_id, actor_id, title, body, event_key)
-  values (target.author_id, 'post_commented', target.id, new.author_id, '내 게시글에 댓글이 달렸어요.',
+  values (recipient, 'post_commented', target.id, new.author_id,
+          case when new.parent_id is null then '내 게시글에 댓글이 달렸어요.' else '내 댓글에 답글이 달렸어요.' end,
           coalesce(actor_nickname, '사용자') || ': ' || private.notification_text(new.content),
-          'comment:' || new.id)
+          case when new.parent_id is null then 'comment:' else 'reply:' end || new.id)
   on conflict (event_key) do nothing;
   return new;
 end;
 $$;
 
--- NOTI-005 내 일반 게시글에 다른 사람이 좋아요를 처음 눌렀을 때. 이미 누른 상태면 insert가 없어 트리거도 돌지 않는다.
+-- NOTI-005 좋아요는 하나씩 알리지 않고, 내 일반 게시글의 좋아요가 처음 10개가 됐을 때 한 번만 알린다.
+-- 좋아요 쓰기는 글 행을 잠가 줄을 세우므로 10번째 좋아요를 동시에 놓치지 않는다.
+-- 취소 후 다시 10개가 돼도 발송 이력(post_like_notifications)으로 게시글당 한 번만 만든다.
 create or replace function private.notify_post_liked()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
   target private.posts%rowtype;
 begin
   select * into target from private.posts where id = new.post_id;
-  if target.notice_title is not null then return new; end if;
-  if target.type <> 'post' or target.deleted_at is not null or target.hidden_at is not null or
-     new.user_id is null or new.user_id = target.author_id or
-     not private.notification_actor_visible(target.author_id, new.user_id) then
+  if target.notice_title is not null or target.type <> 'post' or target.deleted_at is not null or
+     target.hidden_at is not null or (select count(*) from private.post_likes l where l.post_id = new.post_id) <> 10 then
     return new;
   end if;
-  insert into private.like_notification_log(post_id, actor_id) values (new.post_id, new.user_id)
-  on conflict do nothing;
+  insert into private.post_like_notifications(post_id) values (target.id) on conflict do nothing;
   if not found then return new; end if;
-  insert into private.notifications(recipient_id, type, post_id, actor_id, title, body, event_key)
-  values (target.author_id, 'post_liked', target.id, new.user_id, '내 게시글에 좋아요가 달렸어요.',
-          '''' || private.notification_text(target.content) || ''' 게시글을 누군가 좋아해요.',
-          'like:' || new.post_id || ':' || new.user_id)
+  -- 목록과 Push 본문은 글 앞 20자에 안내 문장을 붙인다.
+  insert into private.notifications(recipient_id, type, post_id, title, body, event_key)
+  values (target.author_id, 'post_liked', target.id, '내 게시글에 10개 이상의 좋아요가 달렸어요.',
+          '''' || private.notification_excerpt(target.content, 20) || ''' 게시글에 달린 좋아요를 확인해 보세요.',
+          'like10:' || target.id)
   on conflict (event_key) do nothing;
   return new;
 end;
@@ -280,6 +304,7 @@ returns timestamptz language sql security invoker set search_path = '' as $$
 $$;
 
 revoke execute on function private.notification_actor_visible(uuid, uuid), private.notification_text(text),
+  private.notification_excerpt(text, integer),
   private.notify_post_commented(), private.notify_post_liked(), private.create_vote_ended_notifications(),
   private.delete_old_notifications(), private.notification_viewer() from public, anon, authenticated;
 revoke execute on function private.get_notifications(timestamptz, bigint), public.get_notifications(timestamptz, bigint),

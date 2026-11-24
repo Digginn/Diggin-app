@@ -524,6 +524,7 @@ function screenMocks({
     "@/components/ReportFlow": { ReportFlow: "ReportFlow" },
     "@/components/CommentInput": { CommentInput: "CommentInput" },
     "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
+    "@/constants/comments": { COMMENT_MAX_LENGTH: 150 },
     "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
     "./domain/comments": load("src/screens/diggle/domain/comments.ts"),
     "./domain/communitySave": communitySaveDomain,
@@ -535,6 +536,12 @@ function screenMocks({
         deleteTarget: null,
         isSending: false,
         isDeleting: false,
+      }),
+    },
+    "./hooks/useCommentLikes": {
+      useCommentLikes: () => ({
+        likeOf: (row) => ({ isLiked: row.isLiked ?? false, likeCount: row.likeCount ?? 0 }),
+        toggle() {},
       }),
     },
     "./hooks/useCommunityLike": {
@@ -583,7 +590,10 @@ function screenMocks({
     "./queries/useCommunity": {
       useCommunityFeed: () => feed,
       useCommunityPost: () => ({ data: post, ...postResult }),
-      useCommunityComments: () => ({ data: { pages: [comments] }, ...commentsResult }),
+      useCommunityComments: () => ({
+        data: { pages: [comments.map((row) => ({ parentId: null, replies: [], ...row }))] },
+        ...commentsResult,
+      }),
     },
     "./utils/formatCommunityTime": {
       formatCommunityTime: () => "방금 전",
@@ -1234,6 +1244,27 @@ test("운영자 댓글은 신고·차단을 숨기고 본인 댓글 수정·삭�
     assert.equal(comment.props.onPressBlock, undefined);
   }
   assert.equal(typeof comments[1].props.onPressMenu, "function");
+});
+
+test("댓글·답글 좋아요는 남의 댓글만 누를 수 있고 본인 댓글은 수만 보여 준다(LIKE-004)", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({
+    post,
+    comments: [
+      { id: "1", body: "남의 댓글", likeCount: 2, isLiked: true, createdAt: PREVIEW.created_at },
+      { id: "2", isMine: true, body: "내 댓글", likeCount: 1, createdAt: PREVIEW.created_at },
+      { id: "3", isWithdrawn: true, body: null, createdAt: PREVIEW.created_at },
+    ],
+  });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const comments = nodes(PostDetailScreen({}), "Comment");
+  assert.equal(typeof comments[0].props.onPressLike, "function");
+  assert.equal(comments[0].props.likeCount, 2);
+  assert.equal(comments[0].props.isLiked, true);
+  assert.equal(comments[1].props.onPressLike, undefined);
+  assert.notEqual(comments[1].props.hasLike, false, "본인 댓글도 하트와 수를 보여 준다");
+  assert.equal(comments[1].props.likeCount, 1);
+  assert.equal(comments[2].props.onPressLike, undefined);
 });
 
 test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·투표 등으로 다시 불러올 때는 켜지 않는다", async () => {

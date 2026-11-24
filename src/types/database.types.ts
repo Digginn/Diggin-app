@@ -467,7 +467,12 @@ export type Database = {
       claim_notification_pushes: { Args: { receipts?: boolean }; Returns: Json };
       claim_underage_deletion: { Args: { target: string }; Returns: boolean };
       create_comment: {
-        Args: { comment_content: string; request_id: string; target_post_id: number };
+        Args: {
+          comment_content: string;
+          parent_comment_id?: number;
+          request_id: string;
+          target_post_id: number;
+        };
         Returns: Json;
       };
       create_post: {
@@ -597,6 +602,7 @@ export type Database = {
         Returns: Json;
       };
       set_avatar: { Args: { new_path: string }; Returns: undefined };
+      set_comment_like: { Args: { is_liked: boolean; target_comment_id: number }; Returns: Json };
       set_community_like: { Args: { is_liked: boolean; target_post_id: number }; Returns: Json };
       set_community_vote: { Args: { target_post_id: number; vote_option: string }; Returns: Json };
       set_owned: {

@@ -59,6 +59,7 @@ function detail(status = "reviewing") {
     ],
     post: content,
     comment: null,
+    parent_comment: null,
     author_name: group.author,
     author: { id: group.author_id, status: "active", restricted_until: null },
     group_status: status,
@@ -467,6 +468,30 @@ test("수정된 댓글과 개별 신고 당시의 원문을 함께 확인한다"
   await expect(page.getByText("신고 후 수정된 댓글", { exact: true })).toBeVisible();
   await expect(page.getByText("최신 신고 당시 원문", { exact: true })).toBeVisible();
   await expect(page.getByText("이전 신고 당시 원문", { exact: true })).toBeVisible();
+});
+
+test("신고된 답글은 원 댓글과 함께 답글임을 표시한다", async ({ page }) => {
+  await signedIn(page);
+  await setup(page, async (body, route) => {
+    if (body.resource !== "report_detail") return false;
+    const value = detail();
+    await reply(route, {
+      ...value,
+      report: { ...value.report, target_type: "comment" },
+      comment: { ...value.post, id: "99", content: "신고된 답글", parent_id: "98" },
+      parent_comment: {
+        ...value.post,
+        id: "98",
+        content: "원 댓글 본문",
+        deleted_at: "2026-11-01T00:00:00Z",
+      },
+    });
+    return true;
+  });
+  await page.goto(`/#/reports/${group.id}`);
+  await expect(page.getByText("원 댓글 #98 · 삭제됨")).toBeVisible();
+  await expect(page.getByText("원 댓글 본문", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "현재 답글" })).toBeVisible();
 });
 
 for (const leave of ["목록 이동", "새로고침", "같은 콘텐츠의 다른 신고로 이동"] as const) {

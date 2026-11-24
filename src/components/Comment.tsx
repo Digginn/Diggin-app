@@ -21,6 +21,8 @@ type CommentProps = {
   isOperator?: boolean;
   voteChoice?: "buy" | "not" | null;
   isHighlighted?: boolean;
+  /** 원 댓글 아래 들여쓴 답글(CommentReply) */
+  isReply?: boolean;
   /** 삭제된 댓글은 본문을 대체하고 메뉴를 막음 */
   isDeleted?: boolean;
   likeCount?: number;
@@ -62,6 +64,7 @@ export function Comment({
   isOperator = false,
   voteChoice = null,
   isHighlighted = false,
+  isReply = false,
   isDeleted = false,
   likeCount = 0,
   isLiked = false,
@@ -87,13 +90,21 @@ export function Comment({
     <View
       className={clsx(
         "w-full items-start",
-        isHighlighted || isReportMenuOpen ? "bg-gray-50" : "bg-gray-0",
+        isHighlighted || isReportMenuOpen || isReply ? "bg-gray-50" : "bg-gray-0",
       )}
     >
+      {isReply ? (
+        <View className="absolute left-[27px] top-[15px] size-[7.25px] border-b-[1.5px] border-l-[1.5px] border-gray-400" />
+      ) : null}
       {isHighlighted ? (
         <View className="absolute bottom-0 left-0 top-0 w-[3px] bg-gray-900" />
       ) : null}
-      <View className="h-12 w-full flex-row items-center justify-between pl-margin pr-3">
+      <View
+        className={clsx(
+          "h-12 w-full flex-row items-center justify-between pr-3",
+          isReply ? "pl-10" : "pl-margin",
+        )}
+      >
         <View className="min-w-0 flex-1 flex-row items-center gap-1">
           <View className="min-w-0 shrink flex-row items-center gap-1.5">
             <Text
@@ -151,7 +162,7 @@ export function Comment({
         </View>
       </View>
 
-      <View className="w-full items-start px-margin">
+      <View className={clsx("w-full items-start pr-margin", isReply ? "pl-10" : "pl-margin")}>
         <View className="w-full items-start pb-1">
           <Text
             onPress={!isDeleted && onPressMenu ? handlePressMenu : undefined}
@@ -161,7 +172,7 @@ export function Comment({
           </Text>
         </View>
       </View>
-      <View className="h-12 w-full px-margin">
+      <View className={clsx("h-12 w-full pr-margin", isReply ? "pl-10" : "pl-margin")}>
         <View className="mt-0.5 h-11 justify-center border-b border-gray-200">
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>
@@ -170,16 +181,19 @@ export function Comment({
             {hasLike && (
               <CommentLikeButton isLiked={isLiked} likeCount={likeCount} onPress={onPressLike} />
             )}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="댓글 답글"
-              accessibilityState={{ disabled: !onPressReply }}
-              disabled={!onPressReply}
-              className="size-12 items-center justify-center active:opacity-75"
-              onPress={onPressReply}
-            >
-              <Text className="text-gray-600 font-label-12-regular">답글</Text>
-            </Pressable>
+            {/* 답글에는 다시 답글을 달 수 없다. */}
+            {!isReply && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="댓글 답글"
+                accessibilityState={{ disabled: !onPressReply }}
+                disabled={!onPressReply}
+                className="size-12 items-center justify-center active:opacity-75"
+                onPress={onPressReply}
+              >
+                <Text className="text-gray-600 font-label-12-regular">답글</Text>
+              </Pressable>
+            )}
           </View>
         )}
       </View>

@@ -36,4 +36,9 @@ export type CommunityComment = CommunityCursor & {
   isWithdrawn: boolean;
   authorNickname: string | null;
   anonNumber: number | null;
+  parentId: string | null;
+  likeCount: number;
+  isLiked: boolean;
+  /** 원 댓글에만 서버가 오래된 순으로 담아 준다. */
+  replies: CommunityComment[];
 };

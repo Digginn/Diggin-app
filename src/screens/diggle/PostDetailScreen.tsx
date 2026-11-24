@@ -30,6 +30,7 @@ import { ActionModal, LoginRequiredModal } from "@/components/modal";
 import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
+import { COMMENT_MAX_LENGTH } from "@/constants/comments";
 import { TOAST_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
@@ -47,6 +48,7 @@ import { VoteBlock } from "./components/VoteBlock";
 import { mergeComments } from "./domain/comments";
 import { takeCommunityItemSaved } from "./domain/communitySave";
 import { useCommentActions } from "./hooks/useCommentActions";
+import { useCommentLikes } from "./hooks/useCommentLikes";
 import { useCommunityLike } from "./hooks/useCommunityLike";
 import { useCommunityVote } from "./hooks/useCommunityVote";
 import { useCommunityVoteTiming } from "./hooks/useCommunityVoteTiming";
@@ -66,18 +68,6 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
   const [isDeleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleteIsRestricted, setDeleteRestricted] = useState(false);
-  // 서버 연결 전 UI 확인용. 게시글·계정별 선택을 현재 화면에서만 유지한다.
-  const commentLikeScope = `${id}:${session?.user.id ?? ""}`;
-  const [commentLikePreview, setCommentLikePreview] = useState({
-    scope: commentLikeScope,
-    ids: new Set<string>(),
-  });
-  useFocusEffect(
-    useCallback(
-      () => () => setCommentLikePreview({ scope: commentLikeScope, ids: new Set<string>() }),
-      [commentLikeScope],
-    ),
-  );
   const deleting = useRef(false);
   const currentViewer = useRef(session?.user.id);
   useEffect(() => {
@@ -99,6 +89,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
   const comments = useCommunityComments(id, !!post && !isWrongRoute && !areCommentsClosed);
   const actions = useCommentActions(id, session?.user.id ?? null);
   const like = useCommunityLike(post, session?.user.id ?? null);
+  const commentLikes = useCommentLikes(id, session?.user.id ?? null);
   const viewedPostId = post && !isWrongRoute ? post.id : null;
   useEffect(() => {
     if (viewedPostId)
@@ -117,18 +108,20 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
   const [menu, setMenu] = useState<{ comment: CommunityComment; anchor: MenuAnchor } | null>(null);
   const isBusy = isDeleting || actions.isSending || actions.isDeleting;
   usePreventRemove(isBusy, () => {});
+  // 수정·답글 대상 댓글을 입력창 바로 위로 올린다.
+  const targetId = actions.editing?.id ?? actions.replyTarget?.id;
   const scrollEditing = useCallback(() => {
-    const index = commentRows.findIndex((row) => row.id === actions.editing?.id);
+    const index = commentRows.findIndex((row) => row.id === targetId);
     if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 1 });
-  }, [commentRows, actions.editing?.id]);
+  }, [commentRows, targetId]);
   useEffect(() => {
-    if (!actions.editing) return;
+    if (!targetId) return;
     const frame = requestAnimationFrame(() => {
       inputRef.current?.focus();
       scrollEditing();
     });
     return () => cancelAnimationFrame(frame);
-  }, [actions.editing, scrollEditing]);
+  }, [targetId, scrollEditing]);
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -203,11 +196,12 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
 
   async function sendComment() {
     const viewer = session?.user.id ?? null;
-    const wasEditing = !!actions.editing;
+    const isInPlace = !!actions.editing || !!actions.replyTarget;
     const saved = await actions.send();
     if (!saved || currentViewer.current !== viewer) return;
     Keyboard.dismiss();
-    if (wasEditing) return;
+    // 답글은 이미 보이는 원 댓글 아래에 붙으므로 끝까지 내리지 않는다.
+    if (isInPlace) return;
     shouldRevealNewComment.current = true;
     // 새 댓글까지의 기존 페이지를 먼저 읽어 중간 대화가 생략되지 않게 한다.
     let data = queryClient.getQueryData<InfiniteData<CommunityComment[]>>(
@@ -334,7 +328,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
             if (shouldRevealNewComment.current) listRef.current?.scrollToEnd({ animated: true });
           }}
           onLayout={() => {
-            if (actions.editing) scrollEditing();
+            if (targetId) scrollEditing();
             else if (shouldRevealNewComment.current)
               listRef.current?.scrollToEnd({ animated: true });
           }}
@@ -433,31 +427,6 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                 .trim()}
               timeLabel={formatCommunityTime(comment.createdAt)}
               isDeleted={comment.isWithdrawn}
-              hasLike={!comment.isMine}
-              isLiked={
-                commentLikePreview.scope === commentLikeScope &&
-                commentLikePreview.ids.has(comment.id)
-              }
-              likeCount={
-                commentLikePreview.scope === commentLikeScope &&
-                commentLikePreview.ids.has(comment.id)
-                  ? 1
-                  : 0
-              }
-              onPressLike={
-                !comment.isMine && !comment.isWithdrawn
-                  ? () => {
-                      setCommentLikePreview((previous) => {
-                        const ids = new Set(
-                          previous.scope === commentLikeScope ? previous.ids : [],
-                        );
-                        if (ids.has(comment.id)) ids.delete(comment.id);
-                        else ids.add(comment.id);
-                        return { scope: commentLikeScope, ids };
-                      });
-                    }
-                  : undefined
-              }
               isOperator={comment.isOperator}
               voteChoice={comment.voteChoice}
               onPressReport={
@@ -473,7 +442,22 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                   ? () => setReportTarget({ type: "comment", id: comment.id, action: "block" })
                   : undefined
               }
-              isHighlighted={actions.editing?.id === comment.id}
+              isReply={comment.parentId !== null}
+              {...commentLikes.likeOf(comment)}
+              onPressLike={
+                !comment.isMine && !comment.isWithdrawn
+                  ? () => void commentLikes.toggle(comment)
+                  : undefined
+              }
+              onPressReply={
+                comment.parentId === null && !comment.isWithdrawn && !isBusy
+                  ? () => {
+                      shouldRevealNewComment.current = false;
+                      actions.startReplying(comment);
+                    }
+                  : undefined
+              }
+              isHighlighted={targetId === comment.id}
               onPressMenu={
                 comment.isMine && !comment.isWithdrawn && !isBusy
                   ? (anchor) => {
@@ -531,6 +515,22 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
               }}
             />
           )}
+          {actions.replyTarget && (
+            <CommentEditBanner
+              replyTo={formatCommunityAuthor(
+                actions.replyTarget.authorNickname,
+                false,
+                false,
+                actions.replyTarget.isOperator,
+              )}
+              onCancel={() => {
+                if (!isBusy) {
+                  actions.cancelReplying();
+                  Keyboard.dismiss();
+                }
+              }}
+            />
+          )}
           <CommentInput
             ref={inputRef}
             value={actions.body}
@@ -538,6 +538,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
             isDisabled={isBusy}
             bottomInset={isKeyboardVisible ? 12 : Math.max(insets.bottom, 12)}
             isEditing={!!actions.editing}
+            placeholder={
+              actions.replyTarget
+                ? `답글을 입력해 주세요. (최대 ${COMMENT_MAX_LENGTH}자)`
+                : undefined
+            }
             onSend={() => void sendComment()}
           />
         </View>

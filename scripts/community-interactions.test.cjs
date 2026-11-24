@@ -5,6 +5,7 @@ const path = require("node:path");
 const { test } = require("node:test");
 const { runInNewContext } = require("node:vm");
 const ts = require("typescript");
+const { QueryClient, QueryObserver } = require("@tanstack/react-query");
 
 const analyticsEvents = [];
 const analytics = {
@@ -43,6 +44,8 @@ const row = (id = "90", body = "새 댓글") => ({
   isPostAuthor: false,
   isWithdrawn: false,
   anonNumber: 1,
+  parentId: null,
+  replies: [],
 });
 const deferred = () => {
   let resolve, reject;
@@ -155,6 +158,7 @@ function harness({
   update = async (id, body) => row(id, body),
   remove = async () => {},
   like = async (_id, liked) => ({ isLiked: liked, likeCount: 4 }),
+  queryClient,
 } = {}) {
   const slots = [],
     effects = new Map();
@@ -189,12 +193,13 @@ function harness({
       },
     },
     "@tanstack/react-query": {
-      useQueryClient: () => ({
-        invalidateQueries: (input) => invalidations.push(input),
-        setQueryData: (_key, updater) => {
-          post = updater(post);
+      useQueryClient: () =>
+        queryClient ?? {
+          invalidateQueries: (input) => invalidations.push(input),
+          setQueryData: (_key, updater) => {
+            post = updater(post);
+          },
         },
-      }),
     },
     "expo-crypto": { randomUUID: () => `request-${++uuid}` },
     "@/constants/comments": load("src/constants/comments.ts"),
@@ -227,17 +232,27 @@ function harness({
         calls.push({ type: "like", args });
         return like(...args);
       },
+      setCommentLike: (...args) => {
+        calls.push({ type: "commentLike", args });
+        return like(...args);
+      },
     },
   };
   const comments = load("src/screens/diggle/hooks/useCommentActions.ts", mocks).useCommentActions;
   const likes = load("src/screens/diggle/hooks/useCommunityLike.ts", mocks).useCommunityLike;
+  const commentLikes = load("src/screens/diggle/hooks/useCommentLikes.ts", mocks).useCommentLikes;
   function render(kind = "comments", viewer = "viewer") {
     let result;
     for (let attempt = 0; attempt < 3; attempt++) {
       index = 0;
       pending = [];
       dirty = false;
-      result = kind === "comments" ? comments("12", viewer) : likes(post, viewer);
+      result =
+        kind === "comments"
+          ? comments("12", viewer)
+          : kind === "commentLikes"
+            ? commentLikes("12", viewer)
+            : likes(post, viewer);
       if (!dirty) break;
     }
     for (const { slot, callback, deps } of pending) {
@@ -259,6 +274,60 @@ function harness({
       for (const effect of effects.values()) effect.cleanup?.();
     },
   };
+}
+
+for (const isReply of [false, true]) {
+  test(`${isReply ? "답글" : "댓글"} 좋아요 저장 후 재조회가 실패해도 상태를 유지하고 다음 클릭은 취소한다`, async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const key = keys.communityKeys.comments("viewer", "12");
+    const target = {
+      ...row("2"),
+      isMine: false,
+      parentId: isReply ? "1" : null,
+      isLiked: false,
+      likeCount: 0,
+    };
+    queryClient.setQueryData(key, {
+      pages: [[], [isReply ? { ...row("1"), replies: [target] } : target]],
+      pageParams: [null, { id: "1" }],
+    });
+    const observer = new QueryObserver(queryClient, {
+      queryKey: key,
+      queryFn: async () => {
+        throw new Error("offline");
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    const ui = harness({
+      queryClient,
+      like: async (_id, isLiked) => ({ isLiked, likeCount: isLiked ? 1 : 0 }),
+    });
+    const cachedRow = () => {
+      const parent = queryClient.getQueryData(key).pages[1][0];
+      return isReply ? parent.replies[0] : parent;
+    };
+    try {
+      await ui.render("commentLikes").toggle(cachedRow());
+      assert.equal(queryClient.getQueryState(key).status, "error");
+      assert.equal(ui.render("commentLikes").likeOf(cachedRow()).isLiked, true);
+      assert.equal(ui.render("commentLikes").likeOf(cachedRow()).likeCount, 1);
+      await ui.render("commentLikes").toggle(cachedRow());
+      assert.deepEqual(
+        ui.calls.map((call) => call.args[1]),
+        [true, false],
+      );
+      assert.equal(ui.render("commentLikes").likeOf(cachedRow()).isLiked, false);
+      assert.equal(ui.render("commentLikes").likeOf(cachedRow()).likeCount, 0);
+    } finally {
+      ui.unmount();
+      unsubscribe();
+      queryClient.clear();
+    }
+  });
 }
 
 for (const editing of [false, true]) {
@@ -432,4 +501,134 @@ test("좋아요 성공은 동시 갱신된 댓글 수를 보존하고 투표글�
   blocked.setPost({ type: "post" });
   await blocked.render("likes", null).toggle();
   assert.equal(blocked.calls.length, 0);
+});
+
+test("답글은 원 댓글 바로 아래 오래된 순으로 펼치고 원 댓글이 빠지면 함께 뺀다", () => {
+  const { mergeComments } = load("src/screens/diggle/domain/comments.ts");
+  const at = (id, minute, parentId = null) => ({
+    ...row(id),
+    parentId,
+    createdAt: `2026-10-20T01:0${minute}:00.000000+00:00`,
+  });
+  const parent = { ...at("1", 1), replies: [at("4", 4, "1")] };
+  const merged = mergeComments([parent, at("2", 2)], { 5: at("5", 5, "1"), 6: at("6", 6, "2") });
+  assert.equal(merged.map((item) => item.id).join(), "1,4,5,2,6");
+  assert.equal(
+    mergeComments([parent, at("2", 2)], { 5: at("5", 5, "1"), 1: null })
+      .map((item) => item.id)
+      .join(),
+    "2",
+  );
+});
+
+test("답글 응답의 원 댓글 ID와 묶인 답글을 읽고 등록 때 원 댓글 ID를 넘긴다", async () => {
+  const calls = [];
+  const api = load("src/screens/diggle/api/community.ts", {
+    "@/lib/supabase": { supabase: {} },
+  });
+  const raw = { id: "1", created_at: row().createdAt, content: "원 댓글", is_mine: false };
+  const parsed = api.parseCommunityComment({
+    ...raw,
+    parent_id: null,
+    replies: [{ ...raw, id: "2", content: "답글", parent_id: "1" }],
+  });
+  assert.equal(parsed.parentId, null);
+  assert.equal(parsed.replies[0].parentId, "1");
+  assert.equal(api.parseCommunityComment(raw).replies.length, 0);
+  const interactions = load("src/screens/diggle/api/communityInteractions.ts", {
+    "@/lib/supabase": {
+      supabase: {
+        rpc: async (name, args) => {
+          calls.push(args);
+          return { data: { ...raw, id: "3", parent_id: "1" }, error: null };
+        },
+      },
+    },
+    "@/utils/text": text,
+    "./community": api,
+  });
+  assert.equal((await interactions.createComment("12", "답글", "request", "1")).parentId, "1");
+  assert.equal(calls[0].parent_comment_id, 1);
+});
+
+test("댓글 좋아요 수·상태를 읽고 좋아요 RPC에 댓글 ID와 상태를 넘긴다", async () => {
+  const calls = [];
+  const api = load("src/screens/diggle/api/community.ts", {
+    "@/lib/supabase": { supabase: {} },
+  });
+  const raw = { id: "1", created_at: row().createdAt, content: "댓글" };
+  const parsed = api.parseCommunityComment({ ...raw, like_count: 3, is_liked: true });
+  assert.equal(parsed.likeCount, 3);
+  assert.equal(parsed.isLiked, true);
+  assert.equal(api.parseCommunityComment(raw).likeCount, 0);
+  assert.throws(() => api.parseCommunityComment({ ...raw, like_count: -1 }));
+  const interactions = load("src/screens/diggle/api/communityInteractions.ts", {
+    "@/lib/supabase": {
+      supabase: {
+        rpc: async (name, args) => {
+          calls.push({ name, ...args });
+          return { data: { is_liked: true, like_count: 4 }, error: null };
+        },
+      },
+    },
+    "@/utils/text": text,
+    "./community": api,
+  });
+  const saved = await interactions.setCommentLike("12", true);
+  assert.equal(saved.likeCount, 4);
+  assert.equal(calls[0].name, "set_comment_like");
+  assert.equal(calls[0].target_comment_id, 12);
+  assert.equal(calls[0].is_liked, true);
+});
+
+test("수정 직후 댓글도 다시 받은 좋아요 수를 보여 준다", () => {
+  const { mergeComments } = load("src/screens/diggle/domain/comments.ts");
+  const fetched = { ...row("1"), parentId: null, replies: [], likeCount: 5, isLiked: true };
+  const edited = { ...fetched, body: "수정", likeCount: 0, isLiked: false };
+  const [merged] = mergeComments([fetched], { 1: edited });
+  assert.equal(merged.body, "수정");
+  assert.equal(merged.likeCount, 5);
+  assert.equal(merged.isLiked, true);
+});
+
+test("답글 작성은 댓글 초안과 따로 쓰고 취소하면 비우며 원 댓글에만 시작한다", async () => {
+  const ui = harness({
+    create: async (_post, body, _id, parentId) => ({ ...row("91", body), parentId }),
+  });
+  ui.render().setBody("댓글 초안");
+  ui.render().startReplying({ ...row("1"), parentId: "9" });
+  assert.equal(ui.render().replyTarget, null);
+  ui.render().startReplying({ ...row("1"), parentId: null });
+  assert.equal(ui.render().body, "");
+  ui.render().setBody("취소할 답글");
+  ui.render().cancelReplying();
+  assert.equal(ui.render().body, "댓글 초안");
+  ui.render().startReplying({ ...row("1"), parentId: null });
+  assert.equal(ui.render().body, "");
+  ui.render().setBody("답글");
+  await ui.render().send();
+  assert.equal(ui.calls[0].args[3], "1");
+  assert.equal(ui.render().replyTarget, null);
+  assert.equal(ui.render().body, "댓글 초안");
+  assert.equal(ui.render().changes["91"].parentId, "1");
+});
+
+test("원 댓글이 사라져 답글이 거부되면 답글 작성을 끝내고 댓글을 다시 불러온다", async () => {
+  let message = "offline";
+  const ui = harness({
+    create: async () => {
+      throw new Error(message);
+    },
+  });
+  ui.render().setBody("댓글 초안");
+  ui.render().startReplying({ ...row("1"), parentId: null });
+  ui.render().setBody("답글");
+  await ui.render().send();
+  assert.equal(ui.render().replyTarget.id, "1", "일시적 실패는 답글 작성을 유지한다");
+  assert.equal(ui.render().body, "답글");
+  message = "comment_not_found";
+  await ui.render().send();
+  assert.equal(ui.render().replyTarget, null);
+  assert.equal(ui.render().body, "댓글 초안");
+  assert.equal(ui.invalidations.length, 1);
 });

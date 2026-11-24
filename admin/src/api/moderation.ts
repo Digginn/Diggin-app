@@ -83,6 +83,8 @@ export type Content = {
   hidden_at: string | null;
   created_at: string;
   type?: "post" | "vote";
+  /** 댓글이 답글이면 원 댓글 ID */
+  parent_id?: string | null;
 };
 export type AuditAction = {
   id: string;
@@ -101,6 +103,7 @@ export type ReportDetail = {
   report_count: number;
   post: Content | null;
   comment: Content | null;
+  parent_comment: Content | null;
   author_name: string | null;
   author: { id: string; status: AccountStatus; restricted_until: string | null } | null;
   products: { name: string; brand: string | null; url: string; image_url: string | null }[];

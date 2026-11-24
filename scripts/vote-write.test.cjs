@@ -76,6 +76,37 @@ test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자�
   assert.equal(withdrawn.includes("BUY"), false);
 });
 
+test("댓글 하트에 서버 좋아요 값을 넘기고 답글 줄에는 답글 버튼을 숨긴다", () => {
+  const { Comment } = load("../src/components/Comment.tsx", {
+    "@/components/CommentLikeButton": { CommentLikeButton: "CommentLikeButton" },
+    "react": { useRef: () => ({ current: null }), useState: () => [false, () => {}] },
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+    "@/assets/images/icon-kebab.svg": { __esModule: true, default: "KebabSvg" },
+    "@/components/ReportBlockMenu": { ReportBlockMenu: "ReportBlockMenu" },
+    "@/theme": { colors: { gray: { 500: "gray" } } },
+    "@/utils/httpLinks": { httpLinkParts: (body) => [{ text: body }] },
+  });
+  const onPressLike = () => {};
+  const base = { author: "느긋한디기12", body: "댓글", timeLabel: "방금 전", onPressReply() {} };
+  const heart = findAll(
+    Comment({ ...base, likeCount: 3, isLiked: true, onPressLike }),
+    "CommentLikeButton",
+  )[0];
+  assert.equal(heart.props.isLiked, true);
+  assert.equal(heart.props.likeCount, 3);
+  assert.equal(heart.props.onPress, onPressLike);
+  const replyButtons = (props) =>
+    findAll(Comment(props), "Pressable").filter(
+      (node) => node.props.accessibilityLabel === "댓글 답글",
+    );
+  assert.equal(replyButtons(base).length, 1);
+  assert.equal(replyButtons({ ...base, isReply: true }).length, 0);
+  assert.equal(
+    findAll(Comment({ ...base, isReply: true, onPressLike }), "CommentLikeButton").length,
+    1,
+  );
+});
+
 test("댓글 150자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {
   let isFocused = false;
   const { CommentInput } = load("../src/components/CommentInput.tsx", {

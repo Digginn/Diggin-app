@@ -14,8 +14,8 @@
 | 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                                  |
 | 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다                 |
 | 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69)        |
-| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)               |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 생성·목록 (#104), Push 발송 (#131) |
+| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, comment_likes, post_anon_numbers                                   | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)               |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, post_like_notifications, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 생성·목록 (#104), Push 발송 (#131) |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -196,6 +196,7 @@ import_failures
 - `get_community_feed(feed_type = 'all', after_created_at?, after_id?)`: 일반글·투표글 통합 또는 투표글만 최신순 20개를 반환한다. `(created_at, id)` 커서로 같은 시각의 글·앞쪽 신규 삽입에도 중복 페이지를 방지한다. 비회원은 첫 줄 본문과 Snapshot 이미지만 받으며 상품명·브랜드·가격·원본 링크·집계·본인 여부는 받지 않는다. 페이지 경계용 id/type/created_at은 포함한다.
 - `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·차단한 작성자의 글 또는 내가 신고한 해당 글은 null이다. 회원 피드·상세·내 활동은 공통 `community_post_json`에서 작성자 UUID 대신 `author_nickname`과 `is_mine`을 반환한다. 비회원 미리보기에는 닉네임을 반환하지 않는다.
 - `get_community_comments(target_post_id, after_created_at?, after_id?)`: 동일한 게시글 접근 조건을 확인한 뒤 오래된 순 20개를 반환한다. 댓글도 삭제·숨김·작성자 차단과 해당 댓글 신고를 제외한다. UUID 없이 `author_nickname`과 글쓴이/본인/탈퇴 여부를 반환한다. 탈퇴 사용자 본문·닉네임은 항상 null이다. `anon_number`는 구버전 앱 호환용으로만 유지한다.
+- 답글(CMT-09, #237): 원 댓글만 20개씩 페이지로 자르고, 각 원 댓글의 `replies`에 보이는 답글을 오래된 순으로 모두 넣는다. 커서는 원 댓글 기준이고 이전 앱은 `replies`를 무시한다. 원 댓글이 삭제·숨김되거나 작성자 차단·신고로 빠지면 그 답글도 목록과 `comment_count`에서 빠진다(`community_comment_listed`). `comment_count`는 보이는 원 댓글과 답글을 모두 센다. 답글은 게시글 작성자가 아니라 원 댓글 작성자에게만 "내 댓글에 답글이 달렸어요." 알림을 보낸다(아래 알림 참고).
 - 댓글 조회·등록·수정 JSON은 활성 `private.admin_users`에 등록된 작성자 여부를 `is_operator`로 반환하고, 투표글에서는 해당 댓글 작성자의 현재 투표 선택을 `vote_choice`(`buy`/`not`/null)로 반환한다(#227). 관리자 UUID·이메일·역할이나 전체 투표자 명단은 공개하지 않는다. 관리자 비활성화·투표 변경은 다음 댓글 조회에 반영되며, 탈퇴한 작성자는 false/null이다. 앱은 운영자 라벨을 우선 표시하고, 나머지 댓글에는 투표 선택이 있을 때 BUY/NOT을 표시한다. 활성 운영자의 댓글에는 신고·차단 메뉴를 숨기고 본인 댓글의 수정·삭제 메뉴는 유지한다(#229). 기존 `(나)`·`(글쓴이)` 구분은 유지한다. 집계 공개 조건은 바꾸지 않는다.
 - 투표 집계는 참여자·작성자에게 공개하고, 마감 후에는 미참여 회원에게도 공개한다(2026-10-20 사용자 확정). 진행 중 미참여 회원의 집계는 null이다. 비회원에게는 항상 집계를 반환하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
@@ -228,12 +229,13 @@ import_failures
 
 #### #97 댓글·익명번호·좋아요
 
-- `create_comment(target_post_id, comment_content, request_id)` / `update_comment(target_comment_id, comment_content)`는 작성자 UUID 없이 조회와 같은 댓글 JSON을 반환한다. `delete_comment(target_comment_id)`는 본인 댓글을 soft delete한다. 수정은 같은 본문도 허용하며 `updated_at`만 갱신하고 정렬용 `created_at`은 보존한다.
+- `create_comment(target_post_id, comment_content, request_id, parent_comment_id?)` / `update_comment(target_comment_id, comment_content)`는 작성자 UUID 없이 조회와 같은 댓글 JSON(`parent_id` 포함)을 반환한다. `parent_comment_id`를 주면 답글이며, 같은 글의 보이는 원 댓글에만 달 수 있다(아니면 `comment_not_found`). 답글에 답글은 `invalid_reply_target`으로 거부한다. 같은 `request_id`를 다른 원 댓글이나 원 댓글 작성에 재사용하면 `invalid_request_id`다. 답글 수정·삭제·신고·차단은 댓글 RPC를 그대로 쓴다. `delete_comment(target_comment_id)`는 본인 댓글을 soft delete한다. 수정은 같은 본문도 허용하며 `updated_at`만 갱신하고 정렬용 `created_at`은 보존한다.
 - 댓글 본문은 NFC·CRLF/CR → LF 정규화 후 사용자 인식 문자 1~150자다(#227). 공백·줄바꿈도 세며 공백만 있는 본문은 거부한다. 앱은 초과 입력을 유지하되 전송을 막는다. 등록된 댓글을 표시할 때는 연속된 줄바꿈·공백을 한 칸으로 합치고 앞뒤 공백을 제거하며, 저장·수정용 원문은 유지한다. HTTP(S)로 해석 가능한 URL만 외부 링크로 만든다. 작성·수정은 같은 제한을 사용한다. 서버 마이그레이션을 먼저 반영한 뒤 앱을 배포하며, 기존 30자 제한 앱은 계속 사용할 수 있다.
 - 모든 댓글·좋아요 쓰기는 `private.lock_community_post_for_write()`로 인증·제재를 확인하고 부모 글 행을 잠근 뒤 변경한다. 글 삭제도 같은 행을 먼저 잠그므로 삭제 후 댓글이나 좋아요가 추가되는 경합을 막는다. 삭제·숨김·차단/신고로 접근할 수 없는 글은 쓰기도 허용하지 않는다. 댓글 수정·삭제는 글쓴이에게도 타인 댓글 권한을 주지 않는다.
 - `post_anon_numbers`는 구버전 앱 호환을 위해 최초 댓글 때 할당하고 같은 글에서 유지한다. 부모 글 잠금 안에서 `next_anon_number`를 올리므로 동시 참여에도 중복 번호가 없다. 글쓴이는 번호를 소비하지 않는다. 새 앱은 이 번호 대신 프로필 닉네임을 표시하며 본인·글쓴이·탈퇴 라벨과 본문 비공개는 조회 계약을 따른다.
 - `comments.creation_request_id`와 `(author_id, creation_request_id)` unique로 응답 유실·동시 재시도에 같은 댓글을 반환한다. 다른 게시글로 키를 재사용하면 거부한다. 앱은 성공한 댓글을 서버 페이지와 중복 없이 합치며 서버 커서를 바꾸지 않는다. 등록 후 새 댓글까지 남은 페이지를 읽고 이동하고, 실패한 조회는 댓글 영역에서 재시도한다.
 - `set_community_like(target_post_id, is_liked)`는 일반글에만 적용하고 `{is_liked, like_count}`를 반환한다. 본인 글 좋아요 등록은 `own_post_like`(42501)로 거부하고, 취소는 예전에 눌러 둔 좋아요를 지울 수 있게 허용한다(BUG-074). 계정당 한 행이며 원하는 상태를 지정하므로 재시도해도 토글되지 않는다. 댓글 작성과 독립적으로 실행하며 앱의 낙관적 아이콘·개수는 실패 시 원상 복구한다.
+- `set_comment_like(target_comment_id, is_liked)`(LIKE-004, #237)는 일반글·투표글·공지의 댓글과 답글에 적용하고 `{is_liked, like_count}`를 반환한다. 목록에 보이는 댓글에만 누를 수 있고(`comment_not_found`), 본인 댓글은 `own_comment_like`(42501), 댓글을 닫은 공지는 `notice_comments_closed`로 거부한다. 취소는 안 보이게 된 댓글에서도 허용한다. 기간 제한 중에는 글 좋아요처럼 막는다. 알림은 보내지 않는다. 댓글 JSON에 `like_count`, `is_liked`를 담는다.
 - 등록·수정·삭제·좋아요 성공은 `community` 캐시를 갱신한다. 후속 내 활동도 같은 키 아래에 두어 함께 갱신한다. 계정이 바뀌거나 화면을 떠난 후 도착한 응답으로 새 계정의 초안·캐시를 변경하지 않는다.
 - 알림 연동 계약: 댓글 등록 성공 트랜잭션에서 `comment:{comment_id}`를 이벤트 키로 사용하고 본인 댓글은 알리지 않는다. 수정·삭제·재시도는 새 등록 이벤트가 아니다. 좋아요 알림은 `(post_id, actor_id)`를 `like_notification_log`에 최초 한 번 기록하는 계약이며 취소·재등록으로 다시 발송하지 않는다. 수신자는 서버가 글에서 결정하고 UUID를 앱에 반환하지 않는다. 알림 테이블·실제 이벤트 저장·Push 발송은 알림 작업에서 이 RPC에 연결한다.
 - 로컬 검증: 전체 pgTAP, DB lint·Advisors와 `scripts/check_community_concurrency.py --container supabase_db_diggin-97`로 실제 동시 요청을 확인한다. 테스트 데이터만 사용하는 임시 DB에서 실행한다.
@@ -263,7 +265,8 @@ posts
 post_products   (post_id, position 1~4) PK, name, brand, price integer, url, image_url
 vote_responses  id, post_id, user_id null(탈퇴 후), choice, created_at, updated_at, unique (post_id, user_id)
 post_likes      id, post_id, user_id null(탈퇴 후), created_at, unique (post_id, user_id)
-comments        id, post_id, author_id null(탈퇴 후), content 1~150자(줄바꿈 1자) 탈퇴 후 null,
+comment_likes   id, comment_id FK cascade, user_id null(탈퇴 후), created_at, unique (comment_id, user_id) (#237)
+comments        id, post_id, parent_id null(답글이면 원 댓글, #237), author_id null(탈퇴 후), content 1~150자(줄바꿈 1자) 탈퇴 후 null,
                 deleted_at, hidden_at, hidden_by, created_at, updated_at,
                 creation_request_id uuid not null, unique (author_id, creation_request_id)
 post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)
@@ -298,7 +301,7 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 
 #### #112 신고·단방향 차단 (RPT-001~004)
 
-- `report_community_content(target_type, target_id, report_reason, report_detail?)`는 `post`(일반글·투표글) 또는 `comment` ID와 사유만 받는다. 서버가 작성자를 결정하고 신고 ID만 반환한다. 클라이언트는 실제 사용자 UUID와 원문 테이블을 조회하지 않는다.
+- `report_community_content(target_type, target_id, report_reason, report_detail?)`는 `post`(일반글·투표글) 또는 `comment` ID와 사유만 받는다. 서버가 작성자를 결정하고 신고 ID만 반환한다. 클라이언트는 실제 사용자 UUID와 원문 테이블을 조회하지 않는다. 댓글은 목록에 보이는 것만 신고할 수 있어 원 댓글이 빠진 답글은 신고할 수 없다(`community_comment_listed`, #237).
 - 인증·정지·본인·삭제·숨김·차단한 작성자·신고한 해당 콘텐츠를 검증한다. 커뮤니티 작성 제한 중 신고·차단은 허용한다. 사유는 abuse/spam/inappropriate/other 중 하나이며 other만 NFC 정규화한 0~50자 상세를 허용한다. 앱과 DB 모두 사용자 인식 문자 기준이다.
 - 신고자는 같은 콘텐츠를 1건만 신고한다. 계정·종류·대상별 트랜잭션 잠금과 기존 unique 제약으로 동시 재시도를 보호하고 최초 사유·상태·Snapshot을 보존한다. 댓글은 부모 글 → 댓글 행 잠금 안에서 접수 시점 본문을 복사한다. 수정 불가 글은 별도 Snapshot을 만들지 않는다.
 - 활성 운영자의 글·댓글은 신고·작성자 차단 RPC에서 `operator_content_protected`로 거부한다(#229). 과거 신고 이력과 차단 관계가 있어도 활성 운영자의 콘텐츠는 숨기지 않는다. 마이그레이션은 활성 운영자를 대상으로 한 기존 차단만 정리하고 신고 이력은 보존한다. 운영자 비활성화 후에는 일반 신고·차단 규칙을 적용한다.
@@ -317,6 +320,7 @@ private.notifications
   actor_id FK profiles set null, title, body, event_key text unique, created_at, push_sent_at null
 
 private.like_notification_log  (post_id, actor_id) PK, created_at
+private.post_like_notifications  post_id PK, created_at  — NOTI-005 좋아요 10개 알림 발송 이력
 private.notification_checks    user_id PK FK profiles cascade, checked_at
 private.notification_settings  user_id PK FK profiles cascade, push_enabled default true, updated_at
 ```
@@ -325,11 +329,12 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 - 알림은 쓰기 RPC를 고치지 않고 트리거로 만든다. 댓글은 `comments` insert, 좋아요는 `post_likes` insert 때 돈다. 댓글 재시도는 기존 댓글을 돌려줘 insert가 없고, 좋아요는 on conflict do nothing이라 이미 누른 상태면 트리거가 돌지 않는다.
 - 일반 게시글만 알린다(NOTI-004·005). 본인 댓글·본인 좋아요, 받는 사람이 차단·신고한 사용자의 행동, 지워지거나 숨겨진 글은 알리지 않는다.
+- 답글(NOTI-010, #237)은 원 댓글 작성자에게 같은 `post_commented` 유형으로 "내 댓글에 답글이 달렸어요."를 보낸다. 본문은 댓글 알림과 같은 `{닉네임}: {내용}`이고 Push 조건도 댓글 알림과 같다. 게시글 작성자에게 가는 댓글 알림(NOTI-004)은 원 댓글에만 보내고, 다른 사람 댓글에 달린 답글은 글쓴이에게 알리지 않는다(2026-11-24 확정). 답글 알림은 투표글에도 보낸다. 자기 댓글에 단 답글은 알리지 않는다. 새 enum 값을 만들지 않아 앱과 Push 제목 처리는 그대로다.
 - 알림을 받은 뒤 그 사람을 차단·신고하면 목록과 새 알림 점에서 뺀다. 커뮤니티 조회는 신고한 콘텐츠만 빼지만(#112), 알림은 신고한 사람의 알림을 모두 뺀다. 그래서 댓글·좋아요 알림에 행동한 사람(actor_id)을 남긴다. 투표 마감은 행동한 사람이 없어 항상 보인다. 명세(RPT-004)는 Feed·상세만 정하고 있어 알림함도 같은 기준으로 맞췄다.
-- 좋아요는 같은 사람·같은 글에 최초 1회. like_notification_log에 on conflict do nothing으로 넣고 들어갔을 때만 알림을 만든다. 취소하거나 알림이 30일 지나 지워져도 기록은 남겨 다시 보내지 않는다.
+- 좋아요는 한 건씩 알리지 않고 일반 게시글의 좋아요가 처음 10개가 될 때 "내 게시글에 10개 이상의 좋아요가 달렸어요."를 한 번 보낸다(2026-11-24 확정, #237). 행동한 사람은 남기지 않는다. 본문은 `'{글 앞 20자}' 게시글에 달린 좋아요를 확인해 보세요.`이고 20자를 넘으면 `...`을 붙인다(NOTI-05·NOTI-07 시안). 잘린 끝에 이모지가 걸리면 그 이모지부터 뺀다. Push도 같은 본문을 쓴다. 보낸 글은 `post_like_notifications`에 남겨, 취소 후 다시 10개가 되거나 알림이 30일 뒤 지워져도 다시 보내지 않는다(게시글당 1회). `like_notification_log`는 더 이상 쓰지 않는다.
 - 투표 마감은 pg_cron `notifications-vote-ended`가 1분마다 `ends_at`이 지난 투표를 찾아 작성자에게 만든다(NOTI-003). 알림을 만들 때 지워졌거나 숨겨진 투표는 건너뛴다(NOTI-003). 삭제 시 투표 응답도 지워져(VOTE-012) 보여 줄 결과가 없다. 알림을 받은 뒤 지워지면 누를 때 NOTI-006 안내를 띄운다. 작업이 밀려도 놓치지 않게 시각 범위가 아니라 event_key로 중복을 막는다.
-- event_key는 `comment:{comment_id}`, `like:{post_id}:{actor_id}`, `vote_ended:{post_id}`. 앱에는 주지 않는다.
-- 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 글자 수는 자르지 않는다(Push 줄 수는 OS에 맡긴다).
+- event_key는 `comment:{comment_id}`, `reply:{comment_id}`(원 댓글 작성자에게 가는 답글 알림), `like10:{post_id}`(이전 `like:{post_id}:{actor_id}`), `vote_ended:{post_id}`. Push는 두 댓글 키 모두 댓글이 지워지지 않았을 때만 보낸다. 앱에는 주지 않는다.
+- 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 좋아요 알림의 글 인용(20자)만 자른다(`private.notification_excerpt`). 답글 Push는 발송할 때 `{닉네임}: ` 뒤 본문을 42자로 줄인다(NOTI-010). 댓글 Push는 명세(NOTI-004)대로 자르지 않고 OS에 맡긴다. 댓글·답글 Push는 보내기 직전에 그 댓글과 원 댓글이 지워지거나 숨겨졌는지 다시 확인한다. 댓글 좋아요는 알리지 않는다(2026-11-24 확정).
 - 목록은 최근 30일, 최신순 20개씩. 알림은 항상 받는 사람 자신의 글이라 `is_post_available`은 삭제·숨김만 본다.
 - 읽음은 알림마다 두지 않고 알림함을 마지막으로 연 시각(notification_checks) 하나로 본다. 명세(NOTI-007)는 개발 검토로 남겨 뒀고, 시안의 종 아이콘 점(Dot=On), 목록 주석 "읽지 않은 알림은 배경(Gray50)으로 구분", 개인정보처리방침의 "알림함 마지막 확인 시각"에 맞췄다.
   - `has_unread_notifications()`: 확인 시각 뒤에 온 최근 30일 알림이 있으면 true. 종 아이콘 점.
@@ -398,7 +403,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 1. Storage avatars/{user_id}/ 파일을 지운다. 실패하면 계정을 지우지 않는다.
 2. auth.users를 지운다. 세션·리프레시 토큰이 함께 지워지고, 나머지는 FK가 처리한다. 이미 발급된 access token은 만료 전까지 남지만 프로필이 없어 쓸 데이터가 없다.
    - cascade: profiles, products, folders, product_folders, import_*, posts(와 그 글의 하위 데이터), notifications, push_tokens, user_policy_consents, user_blocks, like_notification_log
-   - set null: comments.author_id, vote_responses.user_id, post_likes.user_id, reports.reporter_id
+   - set null: comments.author_id, vote_responses.user_id, post_likes.user_id, comment_likes.user_id, reports.reporter_id
    - profiles 삭제 전 트리거(`profiles_clear_withdrawn_comments`)가 같은 트랜잭션에서 사용자 글을 먼저 지우고(그 글의 댓글도 함께 지워짐), 남은 사용자 댓글 content를 null로 바꾼다. 글을 FK 연쇄에 맡기면 본인 글에 단 본인 댓글이 먼저 수정된 뒤 글이 지워져 comments_post_id_fkey 위반으로 탈퇴가 실패했다.
 3. 계정이 지워진 뒤 설문을 private.withdrawal_surveys에 저장한다(user_id 없음). 재시도로 중복되지 않게 마지막에 두고, 실패해도 탈퇴는 성공으로 본다. 설문은 선택 응답이라(#159) 사유와 직접 작성이 모두 비어 있으면 저장하지 않는다. 직접 작성만 고른 경우는 앱이 내용 입력 전까지 탈퇴하기를 막는다.
 
