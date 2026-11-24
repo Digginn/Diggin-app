@@ -25,5 +25,13 @@ select is((select j->>'body' from jsonb_array_elements(current_setting('test.job
   current_setting('test.nickname') || ': ' || repeat('나', 50), '댓글 Push는 자르지 않는다');
 select is((select body from private.notifications where event_key like 'reply:%'),
   current_setting('test.nickname') || ': ' || repeat('가', 50), '알림함 답글 본문은 자르지 않는다');
+update private.comments set deleted_at = now()
+ where id = (select parent_id from private.comments where content = repeat('가', 50));
+update private.notification_push_deliveries set leased_until = null;
+set local role service_role;
+select set_config('test.jobs', public.claim_notification_pushes(false)::text, true);
+reset role;
+select is((select (j->>'allowed')::boolean from jsonb_array_elements(current_setting('test.jobs')::jsonb) j where j->>'body' like '%가가%'),
+  false, '원 댓글을 지우면 대기 중인 답글 Push는 보내지 않는다');
 select * from finish();
 rollback;
