@@ -30,7 +30,7 @@ type CommentProps = {
   hasLike?: boolean;
   onPressLike?: () => void;
   onPressReply?: () => void;
-  /** 케밥의 창 기준 좌표를 같이 넘김 */
+  /** 댓글 전체의 창 기준 좌표를 같이 넘김. 메뉴를 댓글 세로 가운데에 띄운다(BUG-151). */
   onPressMenu?: (anchor: MenuAnchor) => void;
   onPressReport?: () => void;
   onPressBlock?: () => void;
@@ -76,18 +76,19 @@ export function Comment({
   onPressBlock,
   onOpenLink,
 }: CommentProps) {
-  const kebabRef = useRef<View>(null);
+  const rootRef = useRef<View>(null);
   const [isReportMenuOpen, setReportMenuOpen] = useState(false);
   const badge = isDeleted ? null : isOperator ? "운영자" : voteChoice?.toUpperCase();
 
   function handlePressMenu() {
-    kebabRef.current?.measureInWindow((x, y, width, height) =>
+    rootRef.current?.measureInWindow((x, y, width, height) =>
       onPressMenu?.({ x, y, width, height }),
     );
   }
 
   return (
     <View
+      ref={rootRef}
       className={clsx(
         "w-full items-start",
         isHighlighted || isReportMenuOpen || isReply ? "bg-gray-50" : "bg-gray-0",
@@ -150,7 +151,6 @@ export function Comment({
           )}
           {isDeleted || !onPressMenu ? null : (
             <Pressable
-              ref={kebabRef}
               accessibilityLabel="댓글 메뉴"
               accessibilityRole="button"
               className="size-12 items-center justify-center active:opacity-75"

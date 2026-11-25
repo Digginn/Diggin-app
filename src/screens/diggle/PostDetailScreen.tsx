@@ -646,7 +646,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
             style={{
               top: Math.max(
                 insets.top + 56,
-                Math.min(menu.anchor.y - 44, height - insets.bottom - 96),
+                // BUG-151 높이 96인 메뉴의 가운데를 댓글 가운데에 맞춘다.
+                Math.min(menu.anchor.y + menu.anchor.height / 2 - 48, height - insets.bottom - 96),
               ),
             }}
           >
