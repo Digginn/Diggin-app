@@ -119,15 +119,15 @@ export function Comment({
             {badge ? (
               <View
                 className={clsx(
-                  "shrink-0 items-center justify-center rounded-sm px-1.5 py-0.5",
-                  badge === "NOT" ? "bg-gray-vote-not" : "h-5 bg-gray-800",
+                  "shrink-0 items-center justify-center rounded-sm px-1.5",
+                  // BUG-143 높이 20 라벨에 위아래 여백까지 주면 글자가 아래로 밀린다(공지 상세 라벨과 같게).
+                  badge === "NOT" ? "bg-gray-vote-not py-0.5" : "h-5 bg-gray-800",
                 )}
               >
                 <Text
                   className={clsx(
                     "font-label-12-semibold",
                     badge === "NOT" ? "text-gray-800" : "text-gray-0",
-                    isOperator && "!leading-[18px]",
                   )}
                 >
                   {badge}
