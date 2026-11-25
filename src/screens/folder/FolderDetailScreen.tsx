@@ -234,7 +234,7 @@ export function FolderDetailScreen({
                   <Card
                     {...item}
                     hasOwnedDim={!isOwnedFolder}
-                    className="h-40 flex-1"
+                    className="flex-1"
                     onPress={onOpenItem ? () => onOpenItem(item) : undefined}
                   />
                 ) : (
