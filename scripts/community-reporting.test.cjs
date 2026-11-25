@@ -75,7 +75,11 @@ function harness({
     },
     useEffect: (callback, deps) => {
       const i = index++;
-      if (!effects.has(i) || deps.some((value, j) => !Object.is(value, effects.get(i).deps[j])))
+      if (
+        !deps ||
+        !effects.has(i) ||
+        deps.some((value, j) => !Object.is(value, effects.get(i).deps[j]))
+      )
         pending.push({ i, callback, deps });
     },
   };
@@ -168,41 +172,33 @@ test("신고·차단 API는 글/댓글 ID만 보내고 작성자 UUID를 받거�
   await assert.rejects(api.reportCommunityContent({ type: "post", id: "bad" }, "spam", ""));
 });
 
-test("독립 차단은 신고를 만들지 않고 확인 후 차단·캐시 갱신하며 취소·실패를 처리한다", async () => {
-  const cancelled = harness({ initialPhase: "block" });
-  assert.equal(nodes(cancelled.render(), "ReportForm").length, 0);
-  assert.equal(
-    nodes(cancelled.render(), "Text")[0].props.children,
-    constants.REPORT_MESSAGES.directBlockTitle,
-  );
-  nodes(cancelled.render(), "ModalButton")[0].props.action.onPress();
-  assert.equal(cancelled.closed(), 1);
-  assert.equal(cancelled.calls.length, 0);
-  let fail = true;
-  const ui = harness({
-    initialPhase: "block",
-    block: async () => {
-      if (fail) throw Error("offline");
-    },
-  });
-  nodes(ui.render(), "ModalButton")[1].props.action.onPress();
-  await settle();
-  assert.equal(ui.closed(), 0);
-  assert.equal(ui.render().props.toastMessage, constants.REPORT_MESSAGES.blockFailed);
-  fail = false;
-  nodes(ui.render(), "ModalButton")[1].props.action.onPress();
+test("메뉴 차단은 재확인 Modal 없이 바로 차단·캐시 갱신하고 실패는 토스트로 알린다(BUG-153)", async () => {
+  const ui = harness({ initialPhase: "block" });
+  const tree = ui.render();
+  assert.equal(tree.props.visible, false, "확인 Modal을 띄우지 않는다");
+  ui.render();
   await settle();
   assert.deepEqual(
     ui.calls.map((c) => c.type),
-    ["block", "block"],
+    ["block"],
+    "신고를 만들지 않고 한 번만 차단한다",
   );
   assert.equal(ui.invalidations(), 1);
   assert.equal(ui.closed(), 1);
-});
-
-test("직접 차단 취소 버튼은 취소로 표시한다", () => {
-  const ui = harness({ initialPhase: "block" });
-  assert.equal(nodes(ui.render(), "ModalButton")[0].props.action.label, "취소");
+  assert.deepEqual(ui.toasts, [messages.DIGGLE_TOAST_MESSAGES.REPORT_004]);
+  const failed = harness({
+    initialPhase: "block",
+    block: async () => {
+      throw Error("offline");
+    },
+  });
+  failed.render();
+  await settle();
+  assert.equal(failed.closed(), 1);
+  assert.equal(failed.invalidations(), 0);
+  assert.deepEqual(failed.toasts, [
+    communityWrite.communityWriteError(Error("offline"), constants.REPORT_MESSAGES.blockFailed),
+  ]);
 });
 
 test("차단 대상이 삭제되면 모달을 닫고 목록을 갱신하며 차단 성공으로 알리지 않는다", async () => {
@@ -214,7 +210,7 @@ test("차단 대상이 삭제되면 모달을 닫고 목록을 갱신하며 차�
         throw { message: "report_target_not_found", code: "42501" };
       },
     });
-    nodes(ui.render(), "ModalButton")[1].props.action.onPress();
+    ui.render();
     await settle();
     assert.equal(ui.closed(), 1);
     assert.equal(ui.invalidations(), 1);
@@ -222,7 +218,7 @@ test("차단 대상이 삭제되면 모달을 닫고 목록을 갱신하며 차�
   }
 });
 
-test("차단 실패는 이용 제한·정책·네트워크를 구분하고 일반 실패만 차단 실패 문구를 사용한다", async () => {
+test("메뉴 차단 실패는 이용 제한·정책·네트워크를 구분해 토스트로 알리고 일반 실패만 차단 실패 문구를 사용한다", async () => {
   for (const message of [
     "community_restricted",
     "not_authorized",
@@ -236,13 +232,12 @@ test("차단 실패는 이용 제한·정책·네트워크를 구분하고 일�
         throw { message };
       },
     });
-    nodes(ui.render(), "ModalButton")[1].props.action.onPress();
+    ui.render();
     await settle();
-    assert.equal(
-      ui.render().props.toastMessage,
+    assert.deepEqual(ui.toasts, [
       communityWrite.communityWriteError({ message }, constants.REPORT_MESSAGES.blockFailed),
-    );
-    assert.equal(ui.closed(), 0);
+    ]);
+    assert.equal(ui.closed(), 1);
     assert.equal(ui.invalidations(), 0);
   }
 });
@@ -257,7 +252,7 @@ test("삭제 대상 처리 후 재조회가 실패해도 모달을 다시 열거
       throw Error("Failed to fetch");
     },
   });
-  nodes(ui.render(), "ModalButton")[1].props.action.onPress();
+  ui.render();
   await settle();
   assert.equal(ui.closed(), 1);
   assert.equal(ui.invalidations(), 1);
@@ -275,7 +270,7 @@ test("차단 대상 삭제 응답도 계정 변경·화면 이탈 후에는 목�
           reject = fail;
         }),
     });
-    nodes(ui.render(), "ModalButton")[1].props.action.onPress();
+    ui.render();
     if (unmount) ui.unmount();
     else ui.render("other");
     const closed = ui.closed();
