@@ -542,8 +542,10 @@ function expand(element) {
 test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다", () => {
   const context = setup("PolicyDocumentScreen");
   for (const [document, title, lastText] of [
-    ["terms", "이용약관", "고객지원: diggin.app@gmail.com"],
-    ["privacy", "개인정보 처리방침", "개인정보 관련 문의처: diggin.app@gmail.com"],
+    ["terms", "이용약관", "이전 버전 확인하기: v1.0 (2026.11.18)"],
+    ["privacy", "개인정보 처리방침", "이전 버전 확인하기: v1.0 (2026.11.18)"],
+    ["terms-v1.0", "이용약관", "고객지원: diggin.app@gmail.com"],
+    ["privacy-v1.0", "개인정보 처리방침", "개인정보 관련 문의처: diggin.app@gmail.com"],
     [
       "community",
       "커뮤니티 이용정책",
@@ -562,6 +564,26 @@ test("약관 상세는 세 문서 전체를 스크롤 영역 안에 표시한다
     assert.ok(textNodes.every((node) => node.props.selectable));
     assert.ok(textNodes.every((node) => node.props.className));
   }
+});
+
+test("이용약관·개인정보 처리방침 하단 v1.0 링크는 이전 버전 전문으로 이동한다", () => {
+  const context = setup("PolicyDocumentScreen");
+  for (const document of ["terms", "privacy"]) {
+    const link = expand(context.Screen({ document })).find(
+      (node) => node.props.accessibilityRole === "link",
+    );
+    assert.equal(link.props.children, "v1.0 (2026.11.18)");
+    link.props.onPress();
+  }
+  assert.deepEqual(context.routes, ["/policies/terms-v1.0", "/policies/privacy-v1.0"]);
+  const text = (document) =>
+    expand(context.Screen({ document }))
+      .filter((node) => typeof node.props.children === "string")
+      .map((node) => node.props.children)
+      .join("\n");
+  assert.ok(text("terms").includes("본 약관은 2026년 11월 25일부터 시행합니다."));
+  assert.ok(text("terms-v1.0").includes("본 약관은 2026년 11월 18일부터 시행합니다."));
+  assert.ok(!text("terms-v1.0").includes("이전 버전 확인하기"));
 });
 
 test("약관 상세 체크박스는 회원에게만 하단에 띄우고, 필수 약관은 누를 수 없는 회색으로 둔다", () => {
@@ -591,11 +613,13 @@ test("커뮤니티 이용정책 마지막 두 문단은 바텀시트에서만 �
       module: content,
       exports: content.exports,
       require: (name) =>
-        name === "react-native"
-          ? { View: "View", Text: "Text" }
-          : name === "@/constants/policyDocuments.json"
-            ? require("../src/constants/policyDocuments.json")
-            : require(name),
+        name === "expo-router"
+          ? { useRouter: () => ({ push() {} }) }
+          : name === "react-native"
+            ? { View: "View", Text: "Text" }
+            : name === "@/constants/policyDocuments.json"
+              ? require("../src/constants/policyDocuments.json")
+              : require(name),
     },
   );
   const lastGroup = (isSheet) => {

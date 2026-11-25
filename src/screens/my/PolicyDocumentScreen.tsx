@@ -15,12 +15,16 @@ const DOCUMENT_TITLES: Record<PolicyDocument, string> = {
   "community": "커뮤니티 이용정책",
   "usage-analysis": "서비스 이용 기록 분석",
   "overseas-transfer": "이용 기록의 국외 이전",
+  "terms-v1.0": "이용약관",
+  "privacy-v1.0": "개인정보 처리방침",
 };
 
 // MY-009 필수 약관은 해제할 수 없어 체크된 회색 체크박스만 보여 준다.
 const REQUIRED_CONSENT_LABELS: Partial<Record<PolicyDocument, string>> = {
-  terms: "(필수) 이용약관 동의",
-  privacy: "(필수) 개인정보 처리방침 동의",
+  "terms": "(필수) 이용약관 동의",
+  "privacy": "(필수) 개인정보 처리방침 동의",
+  "terms-v1.0": "(필수) 이용약관 동의",
+  "privacy-v1.0": "(필수) 개인정보 처리방침 동의",
 };
 
 /**
@@ -48,9 +52,7 @@ export function PolicyDocumentScreen({ document }: { document: PolicyDocument })
         contentContainerClassName="px-margin pt-6"
         // 이용약관·개인정보 시안의 하단 여백은 문서 마지막 Spacer에 포함돼 있다.
         contentContainerStyle={{
-          paddingBottom:
-            (consentBar ? 0 : insets.bottom) +
-            (document === "terms" || document === "privacy" ? 0 : 24),
+          paddingBottom: (consentBar ? 0 : insets.bottom) + (requiredLabel ? 0 : 24),
         }}
       >
         <PolicyDocumentContent document={document} />
