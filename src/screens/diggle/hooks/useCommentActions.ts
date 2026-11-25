@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { restrictionMessage } from "@/api/accountAccess";
 import { COMMENT_MAX_LENGTH } from "@/constants/comments";
+import { whenNativeModalIdle } from "@/hooks/useNativeModalVisible";
 import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
 import { normalizeText, textLength } from "@/utils/text";
@@ -135,6 +136,9 @@ export function useCommentActions(postId: string, viewer: string | null) {
         changes: { ...prev.changes, [id]: null },
       }));
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
+      whenNativeModalIdle(() => {
+        if (current.active) showToast("댓글을 삭제했습니다.", "success");
+      });
       return true;
     } catch (error) {
       if (current.active)

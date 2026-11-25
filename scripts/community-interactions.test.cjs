@@ -159,6 +159,7 @@ function harness({
   remove = async () => {},
   like = async (_id, liked) => ({ isLiked: liked, likeCount: 4 }),
   queryClient,
+  onModalIdle = (callback) => callback(),
 } = {}) {
   const slots = [],
     effects = new Map();
@@ -168,7 +169,8 @@ function harness({
     uuid = 0;
   const calls = [],
     invalidations = [],
-    toasts = [];
+    toasts = [],
+    toastVariants = [];
   let post = { id: "12", type: "post", isLiked: false, likeCount: 3, commentCount: 2 };
   const useState = (initial) => {
     const slot = index++;
@@ -203,7 +205,13 @@ function harness({
     },
     "expo-crypto": { randomUUID: () => `request-${++uuid}` },
     "@/constants/comments": load("src/constants/comments.ts"),
-    "@/hooks/useToast": { useToast: () => (message) => toasts.push(message) },
+    "@/hooks/useToast": {
+      useToast: () => (message, variant) => {
+        toasts.push(message);
+        toastVariants.push(variant);
+      },
+    },
+    "@/hooks/useNativeModalVisible": { whenNativeModalIdle: onModalIdle },
     "@/utils/text": text,
     "../api/community": keys,
     "../api/communityWrite": {
@@ -266,6 +274,7 @@ function harness({
     calls,
     invalidations,
     toasts,
+    toastVariants,
     setPost: (values) => {
       post = { ...post, ...values };
     },
@@ -446,10 +455,30 @@ test("댓글 삭제 실패는 확인창·목록을 유지하고 재시도 성공
   assert.equal(ui.render().deleteTarget.id, "90");
   assert.equal(ui.render().deleteError, "요청 실패");
   assert.equal("90" in ui.render().changes, false);
+  assert.deepEqual(ui.toasts, []);
   shouldFail = false;
   await ui.render().remove();
   assert.equal(ui.render().deleteTarget, null);
   assert.equal(ui.render().changes["90"], null);
+  assert.deepEqual(ui.toasts, ["댓글을 삭제했습니다."]);
+});
+
+test("댓글·답글 삭제 성공 토스트는 모달이 닫힌 뒤 표시하고 계정 변경·화면 이탈 시 생략한다", async () => {
+  for (const parentId of [null, "88"]) {
+    for (const leave of ["stay", "account", "unmount"]) {
+      let onIdle;
+      const ui = harness({ onModalIdle: (callback) => (onIdle = callback) });
+      ui.render().confirmDelete({ ...row(), parentId });
+      assert.equal(await ui.render().remove(), true);
+      assert.equal(ui.render().deleteTarget, null);
+      assert.deepEqual(ui.toasts, [], "닫힘 대기 중에는 토스트 타이머가 시작되지 않는다");
+      if (leave === "account") ui.render("comments", "other");
+      if (leave === "unmount") ui.unmount();
+      onIdle();
+      assert.deepEqual(ui.toasts, leave === "stay" ? ["댓글을 삭제했습니다."] : []);
+      assert.deepEqual(ui.toastVariants, leave === "stay" ? ["success"] : []);
+    }
+  }
 });
 
 test("이전 계정의 늦은 댓글 응답이 새 계정의 초안·캐시를 변경하지 않는다", async () => {

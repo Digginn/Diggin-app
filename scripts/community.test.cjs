@@ -1139,6 +1139,36 @@ test("게시글·투표·댓글·답글 삭제 모달은 왼쪽 삭제하기·�
   }
 });
 
+test("답글이 있는 원댓글만 함께 삭제 안내를 표시하고 삭제 모달은 시안의 36% 배경을 사용한다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const reply = { id: "90", parentId: "88", replies: [], createdAt: "2026-11-26T00:00:01Z" };
+  const parent = { id: "88", parentId: null, replies: [], createdAt: "2026-11-26T00:00:00Z" };
+  for (const [target, comments, expected] of [
+    [parent, [parent], "삭제한 댓글은 복구할 수 없습니다."],
+    [
+      parent,
+      [{ ...parent, replies: [reply] }],
+      "삭제한 댓글은 복구할 수 없으며,\n댓글에 달린 답글도 함께 삭제됩니다.",
+    ],
+    [reply, [{ ...parent, replies: [reply] }], "삭제한 댓글은 복구할 수 없습니다."],
+  ]) {
+    const state = screenMocks({ post, comments });
+    state.mocks["./hooks/useCommentActions"].useCommentActions = () => ({
+      changes: {},
+      body: "",
+      deleteTarget: target,
+      isSending: false,
+      isDeleting: false,
+    });
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const modal = nodes(PostDetailScreen({ type: "all" }), "ActionModal").find(
+      (node) => node.props.title === "댓글을 삭제하시겠습니까?",
+    );
+    assert.equal(modal.props.description, expected);
+    assert.equal(modal.props.scrimOpacity, 0.36);
+  }
+});
+
 test("삭제 성공은 진입 목록과 탭으로 복귀하며 일반 DIGGLE 진입은 기존 경로를 유지한다", async () => {
   for (const [returnTo, type, pathname, tab] of [
     ["my-posts", "post", "/my-posts", "posts"],
