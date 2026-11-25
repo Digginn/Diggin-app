@@ -17,6 +17,8 @@ let screenCursor = 0;
 let toastTimer;
 let toastTimerDuration;
 let isGuideVisible = false;
+const globalToasts = [];
+const showGlobalToast = (message, variant) => globalToasts.push({ message, variant });
 runInNewContext(compiled, {
   exports: screenModule.exports,
   module: screenModule,
@@ -27,6 +29,14 @@ runInNewContext(compiled, {
   },
   clearTimeout: () => {},
   require: (name) => {
+    if (name.endsWith("useToast")) return { useToast: () => showGlobalToast };
+    if (name.endsWith("useNativeModalVisible"))
+      return {
+        whenNativeModalIdle: (callback) => {
+          callback();
+          return () => {};
+        },
+      };
     if (name.endsWith("useFirstVisitGuide"))
       return {
         useFirstVisitGuide: (_kind, isEnabled = true) => ({
@@ -121,8 +131,9 @@ test("초기 폴더는 나의 소장템 하나만 표시한다", () => {
   );
 });
 
-test("폴더 생성 완료 토스트는 모달 닫힌 뒤 표시되고 2초 후 사라진다", async () => {
+test("폴더 생성 완료 토스트는 모달이 닫힌 뒤 탭바 밖 전역 Toast에 표시한다", async () => {
   screenState = [];
+  globalToasts.length = 0;
   let submitted;
   const render = () => {
     screenCursor = 0;
@@ -143,18 +154,19 @@ test("폴더 생성 완료 토스트는 모달 닫힌 뒤 표시되고 2초 후 
     await modal.props.onSubmit("여행");
     assert.equal(submitted, "여행");
     assert.equal(hasToast(render()), false);
+    assert.equal(globalToasts.length, 0, "모달이 열린 동안 전역 Toast를 뒤에 띄우지 않는다");
     modal.props.onClose();
     tree = render();
     assert.equal(findAll(tree, "FolderNameModal").length, 0);
-    assert.equal(hasToast(tree), true);
-    const toastLayer = findAll(tree, "View").find((view) =>
-      React.Children.toArray(view.props.children).some((child) => child.type === "FolderToast"),
+    assert.equal(
+      hasToast(tree),
+      false,
+      "탭 화면의 높이에 의존하는 로컬 Toast를 중복 표시하지 않는다",
     );
-    const fabLayer = findAll(tree, "View").find((view) =>
-      view.props.className?.includes("size-[200px]"),
-    );
-    const zIndex = (view) => Number(view.props.className.match(/(?:^| )z-(\d+)/)?.[1] ?? 0);
-    assert.ok(zIndex(toastLayer) > zIndex(fabLayer), "토스트가 FAB의 흰 효과 위에 표시되어야 한다");
+    assert.deepEqual(globalToasts.at(-1), {
+      message: "폴더가 생성되었습니다.",
+      variant: "success",
+    });
     assert.equal(toastTimerDuration, 2000);
     toastTimer();
     assert.equal(hasToast(render()), false);
@@ -197,7 +209,7 @@ test("일반 폴더 49개는 생성하고 50개부터는 모달 안에 제한 �
           findAll(modal().props.overlay, "FolderToast")[0].props.message,
           "폴더는 최대 50개까지 만들 수 있습니다.",
         );
-        assert.equal(modal().props.overlay.props.className, "absolute inset-x-0 bottom-40");
+        assert.equal(modal().props.overlay.props.className, "absolute inset-x-0 bottom-[160px]");
         toastTimer();
         assert.equal(modal().props.overlay, undefined, "토스트만 자동으로 사라진다");
       }
@@ -353,6 +365,7 @@ test("생성·수정·삭제의 성공과 실패에 맞는 토스트를 표시�
   for (const action of Object.keys(messages)) {
     for (const isFailure of [false, true]) {
       screenState = [];
+      globalToasts.length = 0;
       const callback = async () => {
         if (isFailure) throw new Error("미리보기 실패");
       };
@@ -388,9 +401,18 @@ test("생성·수정·삭제의 성공과 실패에 맞는 토스트를 표시�
         const tree = render();
         const remainingModal = findAll(tree, modalType)[0];
         assert.equal(!!remainingModal, isFailure);
-        // Native Modal이 열린 동안은 동일한 토스트를 overlay로 렌더링한다.
-        const toast = findAll(isFailure ? remainingModal.props.overlay : tree, "FolderToast")[0];
-        assert.equal(toast.props.message, messages[action][Number(isFailure)]);
+        // Native Modal의 오류는 overlay에, 완료 메시지는 전역 영역에 표시한다.
+        if (isFailure) {
+          const toast = findAll(remainingModal.props.overlay, "FolderToast")[0];
+          assert.equal(toast.props.message, messages[action][1]);
+          assert.equal(globalToasts.length, 0);
+        } else {
+          assert.deepEqual(globalToasts.at(-1), {
+            message: messages[action][0],
+            variant: "success",
+          });
+          assert.equal(findAll(tree, "FolderToast").length, 0);
+        }
         // Figma ToastText: 실패(Error)는 4초, 완료(Success)는 2초
         assert.equal(toastTimerDuration, isFailure ? 4000 : 2000);
         toastTimer();
