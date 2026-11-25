@@ -173,7 +173,8 @@ export function Comment({
         </View>
       </View>
       <View className={clsx("h-12 w-full pr-margin", isReply ? "pl-10" : "pl-margin")}>
-        <View className="mt-0.5 h-11 justify-center border-b border-gray-200">
+        {/* BUG-144 구분선을 댓글 맨 아래에 붙여 다음 답글 배경이 구분선에서 바로 시작하게 한다. */}
+        <View className="h-12 justify-center border-b border-gray-200">
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>
         {!isDeleted && (
