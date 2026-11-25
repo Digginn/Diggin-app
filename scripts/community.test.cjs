@@ -524,6 +524,7 @@ function screenMocks({
     "@/components/ReportFlow": { ReportFlow: "ReportFlow" },
     "@/components/CommentInput": { CommentInput: "CommentInput" },
     "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
+    "@/theme": load("src/theme/colors.ts"),
     "@/constants/comments": { COMMENT_MAX_LENGTH: 150 },
     "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
     "./domain/comments": load("src/screens/diggle/domain/comments.ts"),

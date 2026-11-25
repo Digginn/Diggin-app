@@ -36,6 +36,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
 import { startLogin } from "@/lib/loginIntent";
+import { colors } from "@/theme";
 import { normalizeText } from "@/utils/text";
 
 import { COMMUNITY_PAGE_SIZE, communityKeys } from "./api/community";
@@ -504,7 +505,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
         />
       )}
       {post && !isWrongRoute && !isRestoring && session && !areCommentsClosed && (
-        <View>
+        <View
+          className="z-10 bg-gray-0"
+          style={{ boxShadow: `0px -4px 10px ${colors.gray[1000]}1A` }}
+        >
           {actions.editing && (
             <CommentEditBanner
               onCancel={() => {
