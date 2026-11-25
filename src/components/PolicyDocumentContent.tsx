@@ -1,7 +1,9 @@
 import { useRouter, type Href } from "expo-router";
-import { Text, View } from "react-native";
+import { Linking, Text, View } from "react-native";
 
+import { TOAST_MESSAGES } from "@/constants/messages";
 import documents from "@/constants/policyDocuments.json";
+import { useToast } from "@/hooks/useToast";
 
 export type PolicyDocument = keyof typeof documents;
 
@@ -38,12 +40,20 @@ const SPACER_CLASSES: Record<number, string> = { 4: "h-1", 16: "h-4", 24: "h-6",
 
 function LinkSegment({ text, href }: { text: string; href: string }) {
   const router = useRouter();
+  const showToast = useToast();
+  const isEmail = href.startsWith("mailto:");
   return (
     <Text
       selectable
       accessibilityRole="link"
-      onPress={() => router.push(href as Href)}
-      className="font-pretendard underline"
+      onPress={() => {
+        if (isEmail)
+          return Linking.openURL(href).catch(() => showToast(TOAST_MESSAGES.EXT_001, "error"));
+        router.push(href as Href);
+      }}
+      className={
+        isEmail ? "font-pretendard text-semantic-link underline" : "font-pretendard underline"
+      }
     >
       {text}
     </Text>

@@ -72,7 +72,7 @@ export function FloatingToolbar({ onEdit, onDelete, onReport, onBlock }: Floatin
 
   return (
     <View
-      className="items-center justify-center"
+      className="items-center justify-center rounded-field bg-gray-0"
       style={{ boxShadow: `0px 0px 10px ${colors.gray[1000]}33` }}
     >
       {rows.map((row, index) => (
@@ -81,9 +81,9 @@ export function FloatingToolbar({ onEdit, onDelete, onReport, onBlock }: Floatin
             accessibilityRole="button"
             className={clsx(
               "w-full flex-row items-center justify-between bg-gray-0 pl-2.5 pr-3 active:opacity-75",
-              isReportOnly ? "h-10 rounded border-b border-gray-300" : "h-12",
-              !isReportOnly && index === 0 && "rounded-t py-1",
-              !isReportOnly && index === rows.length - 1 && "rounded-b",
+              isReportOnly ? "h-10 rounded-field border-b border-gray-300" : "h-12",
+              !isReportOnly && index === 0 && "rounded-t-field py-1",
+              !isReportOnly && index === rows.length - 1 && "rounded-b-field",
             )}
             onPress={(event) => {
               event.stopPropagation();

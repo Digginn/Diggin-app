@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import { Pressable, Text, View } from "react-native";
 
 import MiniCloseSvg from "@/assets/images/icon-mini-close-light.svg";
+import { colors } from "@/theme";
 
 const ICON_SIZE = 24;
 
@@ -29,7 +30,7 @@ export function CommentEditBanner({ onCancel, replyTo }: CommentEditBannerProps)
         className="absolute right-3 size-12 items-center justify-center p-2.5 active:opacity-75"
         onPress={onCancel}
       >
-        <MiniCloseSvg width={ICON_SIZE} height={ICON_SIZE} />
+        <MiniCloseSvg width={ICON_SIZE} height={ICON_SIZE} color={colors.gray[800]} />
       </Pressable>
     </View>
   );
