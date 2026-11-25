@@ -1,3 +1,4 @@
+import { getNetworkStateAsync } from "expo-network";
 import { Redirect, useFocusEffect, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -9,9 +10,11 @@ import BackIcon from "@/assets/images/icon-login-back.svg";
 import DigginLogo from "@/assets/images/icon-login-diggin.svg";
 import { AppBar } from "@/components/app-bar";
 import { LoadingDialog } from "@/components/LoadingDialog";
-import { ToastText } from "@/components/ToastText";
 import { UnderageNoticeModal } from "@/components/UnderageNoticeModal";
+import { TOAST_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
+import { whenNativeModalIdle } from "@/hooks/useNativeModalVisible";
+import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
 import { keepLoginIntent, takeLoginIntent } from "@/lib/loginIntent";
 import { discardShareLink } from "@/lib/pendingShareLink";
@@ -29,7 +32,31 @@ import {
 
 const LOGIN_PROVIDERS: LoginProvider[] =
   Platform.OS === "ios" ? ["google", "kakao", "apple"] : ["google", "kakao"];
-const LOGIN_ERROR_MESSAGE = "로그인에 실패했습니다. 다시 시도해 주세요.";
+const LOGIN_ERROR_MESSAGE = "로그인에 실패했습니다. 다시 시도해 주세요."; // MSG-AUTH-001
+
+async function isOffline() {
+  try {
+    const network = await getNetworkStateAsync();
+    return network.isConnected === false || network.isInternetReachable === false;
+  } catch {
+    // 연결 상태 조회 실패만으로 오프라인으로 단정하지 않는다.
+    return false;
+  }
+}
+
+function isNetworkFailure(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const details = error as Record<string, unknown>;
+  return (
+    details.code === 7 ||
+    details.code === "7" ||
+    ["code", "name", "message", "reason"].some((key) =>
+      /network|failed to fetch|fetch failed|fetcherror|retryablefetch|internet|네트워크|인터넷/i.test(
+        String(details[key] ?? ""),
+      ),
+    )
+  );
+}
 
 type LoginScreenProps = {
   isLoginError?: boolean;
@@ -48,7 +75,9 @@ export function LoginScreen({
   const insets = useSafeAreaInsets();
   const [hasError, setHasError] = useState(isLoginError);
   const [isLoading, setIsLoading] = useState(isLoginLoading);
-  const [loginErrorMessage, setLoginErrorMessage] = useState(LOGIN_ERROR_MESSAGE);
+  const [loginToast, setLoginToast] = useState<{ message: string } | null>(
+    isLoginError ? { message: LOGIN_ERROR_MESSAGE } : null,
+  );
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
   const [consent, setConsent] = useState<TermsConsent>(EMPTY_TERMS_CONSENT);
   const [isConsentSheetOpen, setIsConsentSheetOpen] = useState(false);
@@ -62,6 +91,7 @@ export function LoginScreen({
   const [hasAttemptedLogin, setHasAttemptedLogin] = useState(false);
   const [didSignIn, setDidSignIn] = useState(false);
   const { session, signOut } = useAuth();
+  const showToast = useToast();
   const shouldRedirect =
     isRedirectedWhenSignedIn && !!session && !hasAttemptedLogin && !isLoading && !didSignIn;
 
@@ -69,6 +99,12 @@ export function LoginScreen({
   useEffect(() => {
     if (shouldRedirect) hasSignedIn.current = true;
   }, [shouldRedirect]);
+
+  useEffect(() => {
+    if (!loginToast || isLoading || isStartingLogin || isConsentSheetOpen) return;
+    // 네이티브 로딩·약관 모달 뒤에 가려지지 않게 닫힘을 기다린다. 전역 Error Toast는 하단 160px·4초다.
+    return whenNativeModalIdle(() => showToast(loginToast.message, "error"));
+  }, [loginToast, isLoading, isStartingLogin, isConsentSheetOpen, showToast]);
 
   // AUTH-001 로그인하지 않고 나가면 이어 할 동작과 맡긴 공유 링크를 버린다.
   useEffect(() => {
@@ -112,7 +148,16 @@ export function LoginScreen({
     isSigningIn.current = true;
     setHasAttemptedLogin(true);
     setHasError(false);
+    setLoginToast(null);
     try {
+      if (await isOffline()) {
+        if (isMounted.current) {
+          setHasError(true);
+          setLoginToast({ message: TOAST_MESSAGES.SYS_001 });
+        }
+        return;
+      }
+      if (!isMounted.current) return;
       const agreement: { current: TermsConsent | null } = { current: null };
       // iOS는 화면이 떠오르는 중에 다른 화면을 띄우지 않는다. 로딩 창을 먼저 띄우면 로그인 창이 안 열린다.
       const result = await signIn(
@@ -121,7 +166,6 @@ export function LoginScreen({
         async () => {
           if (!isMounted.current) return null;
           setIsLoading(false);
-          setConsent(EMPTY_TERMS_CONSENT);
           setIsConsentSheetOpen(true);
           agreement.current = await new Promise<TermsConsent | null>((resolve) => {
             consentResolver.current = resolve;
@@ -164,19 +208,25 @@ export function LoginScreen({
       router.replace("/(tabs)/all" as Href);
     } catch (error) {
       console.warn("소셜 로그인에 실패했습니다.");
+      const offline = isNetworkFailure(error) || (await isOffline());
+      if (!isMounted.current) return;
       setIsConsentSheetOpen(false);
       const message =
         error && typeof error === "object" && "message" in error ? error.message : null;
-      setLoginErrorMessage(
-        message === "login_policy_update_required"
-          ? "최신 버전으로 업데이트한 후 다시 로그인해 주세요."
-          : LOGIN_ERROR_MESSAGE,
-      );
+      setLoginToast({
+        message: offline
+          ? TOAST_MESSAGES.SYS_001
+          : message === "login_policy_update_required"
+            ? "최신 버전으로 업데이트한 후 다시 로그인해 주세요."
+            : LOGIN_ERROR_MESSAGE,
+      });
       setHasError(true);
     } finally {
       isSigningIn.current = false;
-      setIsLoading(false);
-      setIsStartingLogin(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+        setIsStartingLogin(false);
+      }
     }
   }
 
@@ -223,14 +273,6 @@ export function LoginScreen({
           </Text>
         </View>
         <View className="mt-[60px] w-full gap-[10px] px-margin">
-          {hasError && (
-            <View
-              pointerEvents="none"
-              className="absolute inset-x-0 top-[-54px] items-center px-margin"
-            >
-              <ToastText message={loginErrorMessage} />
-            </View>
-          )}
           {LOGIN_PROVIDERS.map((provider) => (
             <SocialLoginButton
               key={provider}

@@ -9,6 +9,8 @@ const ts = require("typescript");
 
 const loginConsents = [];
 const analyticsEvents = [];
+const loginToasts = [];
+const showLoginToast = (message, variant) => loginToasts.push({ message, variant });
 const analytics = {
   trackEvent: (name, properties) => analyticsEvents.push([name, properties]),
   flushAnalytics: async () => {},
@@ -46,6 +48,19 @@ function load(relativePath, mocks = {}) {
       if (name === "expo-router" && mocks["expo-router"])
         return { useFocusEffect: () => {}, ...mocks["expo-router"] };
       if (name in mocks) return mocks[name];
+      if (name === "expo-network")
+        return {
+          getNetworkStateAsync: async () => ({ isConnected: true, isInternetReachable: true }),
+        };
+      if (name === "@/hooks/useToast") return { useToast: () => showLoginToast };
+      if (name === "@/hooks/useNativeModalVisible")
+        return {
+          whenNativeModalIdle: (callback) => {
+            callback();
+            return () => {};
+          },
+        };
+      if (name === "@/constants/messages") return load("constants/messages.ts");
       if (name === "./components/TermsConsentSheet")
         return {
           TermsConsentSheet: "TermsConsentSheet",
@@ -143,13 +158,148 @@ async function pressSocialAfterConsent(hooks, screen, consent = ALL_AGREED, inde
     .filter((node) => node.type === "SocialLoginButton")
     [index].props.onPress();
   const sheet = () => hooks.render(screen).find((node) => node.type === "TermsConsentSheet");
-  await Promise.resolve();
+  await new Promise(setImmediate);
   if (sheet().props.visible) {
     sheet().props.onChange(consent);
     sheet().props.onConfirm();
   }
   await login;
 }
+
+function loginNetworkScreen({ getNetwork, signIn, os = "ios" }) {
+  const hooks = stateHooks();
+  const toasts = [];
+  const routes = [];
+  const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
+    "react": { useState: hooks.useState, useRef: hooks.useRef, useEffect: (effect) => effect() },
+    "expo-network": { getNetworkStateAsync: getNetwork },
+    "./api/signIn": { signIn },
+    "@/hooks/useToast": { useToast: () => (message, variant) => toasts.push({ message, variant }) },
+    "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
+    "@/lib/pendingShareLink": { discardShareLink() {} },
+    "expo-router": {
+      useRouter: () => ({ replace: (route) => routes.push(route), canGoBack: () => false }),
+    },
+    "expo-status-bar": { StatusBar: "StatusBar" },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+    "react-native": {
+      View: "View",
+      Text: "Text",
+      Pressable: "Pressable",
+      ScrollView: "ScrollView",
+      Platform: { OS: os },
+      useWindowDimensions: () => ({ height: 812 }),
+    },
+    "@/components/app-bar": { AppBar: "AppBar" },
+    "@/components/LoadingDialog": { LoadingDialog: "LoadingDialog" },
+    "@/components/ToastText": { ToastText: "ToastText" },
+    "@/components/UnderageNoticeModal": { UnderageNoticeModal: "UnderageNoticeModal" },
+    "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
+  });
+  const render = () => hooks.render(LoginScreen);
+  return {
+    render,
+    toasts,
+    routes,
+    press: (provider) =>
+      render()
+        .find((node) => node.type === "SocialLoginButton" && node.props.provider === provider)
+        .props.onPress(),
+    sheet: () => render().find((node) => node.type === "TermsConsentSheet"),
+  };
+}
+
+test("오프라인 소셜 로그인은 세 SDK를 실행하지 않고 연결 안내 후 재시도할 수 있다", async () => {
+  for (const os of ["ios", "android"]) {
+    let online = false;
+    const calls = [];
+    const ui = loginNetworkScreen({
+      os,
+      getNetwork: async () => ({ isConnected: online, isInternetReachable: online }),
+      signIn: async (provider) => {
+        calls.push(provider);
+        return { status: "cancelled" };
+      },
+    });
+    for (const provider of os === "ios" ? ["google", "kakao", "apple"] : ["google", "kakao"]) {
+      for (let retry = 0; retry < 2; retry++) {
+        await ui.press(provider);
+        const tree = ui.render();
+        assert.deepEqual(ui.toasts.at(-1), {
+          message: "연결 상태를 확인한 후 다시 시도해 주세요.",
+          variant: "error",
+        });
+        assert.equal(
+          tree.some((node) => node.type === "LoadingDialog"),
+          false,
+        );
+        assert.equal(ui.sheet().props.visible, false);
+      }
+    }
+    assert.deepEqual(calls, []);
+    assert.deepEqual(ui.routes, []);
+    online = true;
+    await ui.press("google");
+    assert.deepEqual(calls, ["google"], "연결 복구 후 로그인 잠금이 남지 않는다");
+  }
+});
+
+test("소셜 SDK의 연결 오류·일반 실패는 구분된 전역 Error Toast로 알린다", async () => {
+  for (const error of [new Error("Network request failed"), new Error("provider_failed")]) {
+    const ui = loginNetworkScreen({
+      getNetwork: async () => ({ isConnected: true }),
+      signIn: async (_provider, onAuthorized) => {
+        onAuthorized();
+        throw error;
+      },
+    });
+    for (const provider of ["google", "kakao", "apple"]) {
+      await ui.press(provider);
+      const tree = ui.render();
+      assert.deepEqual(ui.toasts.at(-1), {
+        message: error.message.includes("Network")
+          ? "연결 상태를 확인한 후 다시 시도해 주세요."
+          : "로그인에 실패했습니다. 다시 시도해 주세요.",
+        variant: "error",
+      });
+      assert.equal(
+        tree.some((node) => node.type === "LoadingDialog"),
+        false,
+      );
+      assert.equal(
+        tree.some((node) => node.type === "ToastText"),
+        false,
+        "버튼 위의 로컬 Toast를 중복 표시하지 않는다",
+      );
+    }
+  }
+});
+
+test("동의 후 로그인 실패 시 체크한 항목을 유지하며 재시도에서도 확인을 다시 받는다", async () => {
+  const ui = loginNetworkScreen({
+    getNetwork: async () => ({ isConnected: true }),
+    signIn: async (_provider, onAuthorized, requestConsent) => {
+      onAuthorized();
+      const agreed = await requestConsent();
+      if (!agreed) return { status: "cancelled" };
+      throw new Error("Network request failed");
+    },
+  });
+  const first = ui.press("apple");
+  await new Promise(setImmediate);
+  const selected = { ...ALL_AGREED, overseasTransfer: false };
+  ui.sheet().props.onChange(selected);
+  ui.sheet().props.onConfirm();
+  await first;
+  assert.equal(ui.sheet().props.visible, false);
+  const retry = ui.press("apple");
+  await new Promise(setImmediate);
+  assert.equal(ui.sheet().props.visible, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.sheet().props.consent)), selected);
+  ui.sheet().props.onClose();
+  await retry;
+  assert.deepEqual(ui.routes, []);
+});
 
 test("소셜 버튼이 공통 Button과 지정 로고·색상·콜백을 사용한다", () => {
   const { colors } = load("theme/colors.ts");
@@ -254,7 +404,7 @@ for (const os of ["ios", "android"]) {
       "react": {
         useState: hooks.useState,
         useRef: hooks.useRef,
-        useEffect: () => {},
+        useEffect: (effect) => effect(),
       },
       "@/lib/pendingShareLink": { discardShareLink: () => {} },
       "./api/signIn": {
@@ -319,6 +469,7 @@ for (const os of ["ios", "android"]) {
         .render(LoginScreen)
         .filter((node) => node.type === "SocialLoginButton")
         [index].props.onPress();
+      await new Promise(setImmediate);
       assert.equal(sheet().props.visible, true, "계정 확인 결과 동의가 필요하면 시트를 띄운다");
       assert.equal(signIns.length, index + 1, "소셜 계정 선택을 먼저 진행한다");
       sheet().props.onChange({ ...ALL_AGREED, usageAnalysis: false });
@@ -351,6 +502,7 @@ for (const os of ["ios", "android"]) {
       .render(LoginScreen)
       .find((node) => node.type === "SocialLoginButton")
       .props.onPress();
+    await new Promise(setImmediate);
     sheet().props.onOpenDocument("terms");
     assert.equal(routes.at(-1), "/policies/terms");
     assert.equal(sheet().props.visible, false, "약관 전문을 열면 시트를 닫는다");
@@ -368,15 +520,21 @@ for (const os of ["ios", "android"]) {
     assert.equal(routes.at(-1), "/browse");
     assert.equal(alerts.length, 0);
     hooks.reset();
+    loginToasts.length = 0;
     const errorTree = hooks.render(() => LoginScreen({ isLoginError: true }));
-    const toast = errorTree.find((node) => node.type === "ToastText");
-    assert.equal(toast.props.message, "로그인에 실패했습니다. 다시 시도해 주세요.");
+    assert.deepEqual(loginToasts.at(-1), {
+      message: "로그인에 실패했습니다. 다시 시도해 주세요.",
+      variant: "error",
+    });
     assert.equal(errorTree.find((node) => node.type === "AppBar").props.left, "none");
     assert.equal(
       errorTree.filter((node) => node.type === "SocialLoginButton").length,
       os === "ios" ? 3 : 2,
     );
-    assert.ok(errorTree.some((node) => node.props.className?.includes("top-[-54px]")));
+    assert.equal(
+      errorTree.some((node) => node.type === "ToastText"),
+      false,
+    );
     hooks.reset();
     const loadingTree = hooks.render(() => LoginScreen({ isLoginLoading: true }));
     const loadingDialog = loadingTree.find((node) => node.type === "LoadingDialog");
