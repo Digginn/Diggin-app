@@ -63,6 +63,7 @@ export function TermsConsentSheet({
   onConfirm,
   onClose,
   loadingMessage,
+  isAnimated,
 }: {
   visible: boolean;
   consent: TermsConsent;
@@ -72,6 +73,8 @@ export function TermsConsentSheet({
   onClose: () => void;
   /** 확인 후 로그인 창이 뜨기 전까지 시트 위에 띄우는 문구. 있는 동안 시트를 닫을 수 없다. */
   loadingMessage?: string;
+  /** 약관 전문을 보러 가고 돌아올 때는 시트를 움직이지 않는다(BUG-145). */
+  isAnimated?: boolean;
 }) {
   const isSigningIn = !!loadingMessage;
   const isAllChecked = ROWS.every(({ key }) => consent[key]);
@@ -79,6 +82,7 @@ export function TermsConsentSheet({
   return (
     <BottomSheet
       visible={visible}
+      isAnimated={isAnimated}
       onRequestClose={() => {
         if (!isSigningIn) onClose();
       }}
