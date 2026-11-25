@@ -157,8 +157,10 @@ export function DiggleScreen() {
                 void feed.fetchNextPage();
             }}
             onEndReachedThreshold={0.4}
+            // BUG-136 빈 안내는 탭 아래부터 하단 바 위까지의 세로 가운데에 둔다.
+            contentContainerStyle={posts.length === 0 ? { flexGrow: 1 } : undefined}
             ListEmptyComponent={
-              <View className="h-96">
+              <View className="flex-1">
                 <EmptyState
                   variant={tab === "all" ? "post" : "vote"}
                   message={DIGGLE_EMPTY_MESSAGES[tab]}
