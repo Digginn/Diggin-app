@@ -301,11 +301,11 @@ test("신고 성공 뒤 차단 확인을 한 번 표시하고 확인은 차단�
   assert.ok(
     nodes(tree, "Text").some((node) => node.props.children === constants.REPORT_MESSAGES.title),
   );
-  // BUG-071 RPT-03 MSG-REPORT-001 문구·정렬·색·여백
+  // BUG-071 RPT-03 MSG-REPORT-001 문구·정렬·색·여백, BUG-153 '해당 사용자의' 뒤 줄바꿈
   const body = nodes(tree, "Text").find(
     (node) =>
       node.props.children ===
-      "이 사용자를 차단하면 나에게 해당 사용자의 게시글·투표글·댓글·답글이 보이지 않습니다.",
+      "이 사용자를 차단하면 나에게 해당 사용자의\n게시글·투표글·댓글·답글이 보이지 않습니다.",
   );
   assert.equal(body.props.className, "text-center text-gray-700 font-b3");
   assert.equal(tree.props.className, "px-2.5 pb-4 pt-2");
