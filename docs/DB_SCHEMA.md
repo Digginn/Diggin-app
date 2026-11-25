@@ -97,11 +97,13 @@ report_reason의 앞 4개는 `src/components/modal/ReportModal.tsx`의 사유 �
 자세한 정의는 `supabase/schemas/`를 본다.
 
 - 가입 트리거 `private.handle_new_user()`: auth.users insert 시 profiles(랜덤 닉네임)와 나의 소장템 폴더를 만든다.
+- ONB-004(#249): `profiles.signup_completed_at`과 `claim_signup_completion()`으로 가입 완료 안내를 계정별 한 번만 선점한다. 인증·현재 세션·계정 상태를 확인한 뒤 본인 프로필의 null 값만 현재 시각으로 바꾸고 최초 호출만 true를 반환한다. 재로그인·재설치·다른 기기에서는 false이며 앱의 직접 변경은 금지한다. 전환 마이그레이션은 기존 회원을 처리 완료로 보정해 재노출을 막는다. 앱은 서버 미배포·통신 실패를 신규 가입으로 간주하지 않는다. 이 시각은 안내 선점 시각이며 필수 약관 동의 증빙이나 실제 화면 열람 완료 기록은 아니다. `is_new_user` 사전 조회도 함께 확인해, 구버전 앱에서 가입해 선점 기록이 없는 기존 계정도 신규로 안내하지 않는다.
 - 랜덤 닉네임 `private.generate_nickname()`: 형용사 + 디기 + 숫자(예: 느긋한디기12). 형용사 40개(2~4자), 숫자 1~9999라 2~10자 안에 들어간다. 직접 변경과 같은 검사를 통과한 후보만 쓴다(AUTH-005).
 - 닉네임 검사 `private.nickname_error()`: 글자 수 → 공백 → 특수문자·이모지 → 금칙어 → 사칭 → 중복(AUTH-008). 사칭 규칙은 명세 문구대로 함수에 있고, 금칙어는 `private.nickname_banned_words`, 오탐 보정은 `nickname_allowed_words`다. 둘 다 korcen(MIT) 목록 중 닉네임에 쓸 수 있는 형태(한글 완성형·영문 소문자·숫자)만 마이그레이션으로 넣었다(#120). 금칙어 단계는 커뮤니티 본문과 같은 `private.contains_community_profanity()`를 쓴다(#182). 사칭·중복 검사는 그대로 닉네임 전용이다.
 - profiles: 앱은 본인 행 select만. 닉네임은 `update_nickname`, 이미지는 `set_avatar`, 제재 상태는 운영 API만 바꾼다.
 - folders: 사용자별 이름 중복 금지, 일반 폴더 최대 50개(프로필 행을 잠근 뒤 센다), 나의 소장템은 만들기·고치기·지우기 불가. `last_added_at`은 상품을 담을 때 트리거로 갱신한다(#78).
 - legal_policies(public, 비회원도 조회) / user_policy_consents(private): `get_pending_policies()`, `accept_policy(policy_id)`.
+- 로그인 약관(#249): `account-restriction`의 `operation: login-consent`는 소셜 ID token 서명·issuer·audience·만료 검증 후 서비스 전용 `lookup_login_policy_status(provider, subject)`로 현재 시행 약관과 동의 필요 여부만 반환한다. 클라이언트가 준 UUID·이메일로 조회하지 않는다. 소셜 계정 선택 → 동의 필요 시에만 시트 → 필수 3개 확인 → Supabase 가입·인증 → 본인 전용 `complete_login_consent(terms_policy_id, privacy_policy_id, age_confirmed)` 순서다. 이 RPC는 현재 버전 ID를 재검사하고 프로필 행 잠금 안에서 필수 두 약관 이력과 `profiles.age_confirmed_at`을 저장한다. 기존 동의자는 이력을 덧쓰지 않고 확인만 한다. 재동의가 필요한 버전 변경·만 14세 이상 확인 누락·저장 실패를 건너뛰지 않는다. 동의 중 버전이 바뀌거나 저장이 실패하면 중간 세션을 로그아웃한다. 기존 계정의 동의를 추정하여 보정하지 않으므로 기록이 없던 회원은 한 번 동의해야 한다. 앱 전문과 일치하는 v1.1(2026.11.25) 정책을 등록하며 `document_url`은 해당 원문이 있는 불변 Git 커밋을 가리킨다. 재동의가 불필요한 새 버전은 과거 같은 종류의 동의를 인정하고, 재동의 대상인데 앱에 해당 전문이 없으면 업데이트를 안내한다.
 - push_tokens: 등록은 `register_push_token(token, platform)`만(같은 토큰은 마지막 로그인 계정으로 옮김), 앱은 본인 토큰 select·delete.
 - withdrawal_surveys(private, user_id 없음): 탈퇴 Edge Function이 service_role 전용 `record_withdrawal_survey(reasons, custom_text)`로만 쓴다. 직접 작성은 앱 화면처럼 조합 이모지를 1자로 세(`private.char_count`, Edge는 grapheme) 100자까지 받는다.
 - Storage avatars 버킷: 비공개, WebP, 512KB 이하, 경로 `{user_id}/파일명`, 본인 폴더만 select·insert·update·delete.
@@ -430,7 +432,6 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 ## 10. 확인 필요 (PM·팀 결정 대기)
 
-- 가입 시 약관 동의 화면이 명세에 없다. 처음 동의 기록을 언제 만들지(MY-009)
 - 닉네임 "한글"에 자음·모음 단독(ㄱ, ㅏ)을 허용할지. 지금은 허용하지 않는다
 - 차단 해제 화면 없음. 차단 방향은 RPT-004 단방향으로 확정했으며, 앱 모달의 "서로의 게시글" 문구는 후속 작업에서 맞춘다.
 - 영구 제한 상태에서 JWT가 이미 만료된 경우의 안내 흐름은 사용자 확인으로 유지한다. [MODERATION_API.md](MODERATION_API.md)의 실기기 QA가 남아 있다.

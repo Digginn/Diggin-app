@@ -22,19 +22,14 @@ import { signIn } from "./api/signIn";
 import { SocialLoginButton, type LoginProvider } from "./components/SocialLoginButton";
 import {
   EMPTY_TERMS_CONSENT,
+  isRequiredConsented,
   TermsConsentSheet,
   type TermsConsent,
 } from "./components/TermsConsentSheet";
 
-// 확인 직후에는 아직 로그인이 아니라 제공자의 계정 선택 화면으로 넘어가는 중이다.
-const PROVIDER_NAMES: Record<LoginProvider, string> = {
-  google: "Google",
-  kakao: "Kakao",
-  apple: "Apple",
-};
-
 const LOGIN_PROVIDERS: LoginProvider[] =
   Platform.OS === "ios" ? ["google", "kakao", "apple"] : ["google", "kakao"];
+const LOGIN_ERROR_MESSAGE = "로그인에 실패했습니다. 다시 시도해 주세요.";
 
 type LoginScreenProps = {
   isLoginError?: boolean;
@@ -53,20 +48,22 @@ export function LoginScreen({
   const insets = useSafeAreaInsets();
   const [hasError, setHasError] = useState(isLoginError);
   const [isLoading, setIsLoading] = useState(isLoginLoading);
+  const [loginErrorMessage, setLoginErrorMessage] = useState(LOGIN_ERROR_MESSAGE);
   const [suspension, setSuspension] = useState<AccountAccess | null>(null);
   const [consent, setConsent] = useState<TermsConsent>(EMPTY_TERMS_CONSENT);
   const [isConsentSheetOpen, setIsConsentSheetOpen] = useState(false);
-  // 시트를 띄운 제공자. 확인하면 시트가 사라진 뒤 바로 이 제공자로 로그인한다.
-  const [pendingProvider, setPendingProvider] = useState<LoginProvider | null>(null);
-  // 확인부터 로그인 창이 뜨기 전까지 멈춘 것처럼 보이지 않게 시트 위에 로그인 중 표시를 띄운다.
+  const consentResolver = useRef<((value: TermsConsent | null) => void) | null>(null);
+  const isMounted = useRef(true);
   const [isStartingLogin, setIsStartingLogin] = useState(false);
   // 약관 전문을 보고 돌아오면 체크한 그대로 시트를 다시 연다.
   const isReturningToSheet = useRef(false);
   const hasSignedIn = useRef(false);
   const isSigningIn = useRef(false);
+  const [hasAttemptedLogin, setHasAttemptedLogin] = useState(false);
   const [didSignIn, setDidSignIn] = useState(false);
-  const { session } = useAuth();
-  const shouldRedirect = isRedirectedWhenSignedIn && !!session && !isLoading && !didSignIn;
+  const { session, signOut } = useAuth();
+  const shouldRedirect =
+    isRedirectedWhenSignedIn && !!session && !hasAttemptedLogin && !isLoading && !didSignIn;
 
   // 복원된 세션으로 자동 이동할 때도 ALL이 공유 링크를 이어 받아야 한다.
   useEffect(() => {
@@ -74,15 +71,18 @@ export function LoginScreen({
   }, [shouldRedirect]);
 
   // AUTH-001 로그인하지 않고 나가면 이어 할 동작과 맡긴 공유 링크를 버린다.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      consentResolver.current?.(null);
+      consentResolver.current = null;
       if (!hasSignedIn.current) {
         takeLoginIntent();
         discardShareLink();
       }
-    },
-    [],
-  );
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -92,47 +92,62 @@ export function LoginScreen({
     }, []),
   );
 
-  // AUTH-02 소셜 로그인 버튼을 누르면 이용약관 동의 시트를 먼저 띄운다.
-  function openConsentSheet(provider: LoginProvider) {
-    if (isSigningIn.current) return;
-    setPendingProvider(provider);
-    setIsConsentSheetOpen(true);
-  }
-
-  /**
-   * 확인하면 다시 버튼을 누르지 않아도 고른 소셜 로그인을 바로 시작한다.
-   * iOS는 닫히는 중인 시트 위에 로그인 창을 띄우지 않아, 시트를 연 채로 그 위에 띄우고 인증이 끝나면 닫는다.
-   * 로그인을 취소하면 체크한 그대로 시트가 남아 다시 확인하거나 닫을 수 있다.
-   */
   function confirmConsent() {
-    if (!pendingProvider || isSigningIn.current) return;
+    if (!isRequiredConsented(consent) || !consentResolver.current) return;
     setIsStartingLogin(true);
-    return handleLogin(pendingProvider, consent).finally(() => setIsStartingLogin(false));
+    const resolve = consentResolver.current;
+    consentResolver.current = null;
+    resolve(consent);
   }
 
-  async function handleLogin(provider: LoginProvider, agreed: TermsConsent) {
+  function closeConsentSheet() {
+    if (isStartingLogin) return;
+    consentResolver.current?.(null);
+    consentResolver.current = null;
+    setIsConsentSheetOpen(false);
+  }
+
+  async function handleLogin(provider: LoginProvider) {
     if (isSigningIn.current) return;
     isSigningIn.current = true;
+    setHasAttemptedLogin(true);
     setHasError(false);
     try {
+      const agreement: { current: TermsConsent | null } = { current: null };
       // iOS는 화면이 떠오르는 중에 다른 화면을 띄우지 않는다. 로딩 창을 먼저 띄우면 로그인 창이 안 열린다.
-      const result = await signIn(provider, () => {
-        setIsConsentSheetOpen(false);
-        setIsLoading(true);
-      });
+      const result = await signIn(
+        provider,
+        () => setIsLoading(true),
+        async () => {
+          if (!isMounted.current) return null;
+          setIsLoading(false);
+          setConsent(EMPTY_TERMS_CONSENT);
+          setIsConsentSheetOpen(true);
+          agreement.current = await new Promise<TermsConsent | null>((resolve) => {
+            consentResolver.current = resolve;
+          });
+          return agreement.current;
+        },
+        signOut,
+      );
+      if (!isMounted.current) return;
       if (result.status === "cancelled") return;
-      setIsConsentSheetOpen(false);
       if (result.status === "suspended") {
+        setIsConsentSheetOpen(false);
         setSuspension(result.access);
         return;
       }
       hasSignedIn.current = true;
       setDidSignIn(true);
       // 가입 완료 이벤트가 동의 여부에 따라 전송되도록 선택 동의를 먼저 저장한다. 실패해도 로그인은 이어 간다.
-      await saveLoginAnalyticsConsent(result.isNewUser, {
-        usage_analysis: agreed.usageAnalysis,
-        overseas_transfer: agreed.overseasTransfer,
-      }).catch(() => console.warn("선택 동의를 저장하지 못했습니다."));
+      // 시트를 생략한 기존 회원의 선택 동의는 변경하지 않는다.
+      const agreed = agreement.current;
+      if (agreed)
+        await saveLoginAnalyticsConsent(result.isNewUser, {
+          usage_analysis: agreed.usageAnalysis,
+          overseas_transfer: agreed.overseasTransfer,
+        }).catch(() => console.warn("선택 동의를 저장하지 못했습니다."));
+      setIsConsentSheetOpen(false);
       const resume = takeLoginIntent();
       // ONB-004 가입 완료 안내는 신규 회원에게만 보여준다. 이어 할 동작은 안내를 지난 뒤에 한다.
       if (result.isNewUser) {
@@ -147,13 +162,21 @@ export function LoginScreen({
         return;
       }
       router.replace("/(tabs)/all" as Href);
-    } catch {
+    } catch (error) {
       console.warn("소셜 로그인에 실패했습니다.");
       setIsConsentSheetOpen(false);
+      const message =
+        error && typeof error === "object" && "message" in error ? error.message : null;
+      setLoginErrorMessage(
+        message === "login_policy_update_required"
+          ? "최신 버전으로 업데이트한 후 다시 로그인해 주세요."
+          : LOGIN_ERROR_MESSAGE,
+      );
       setHasError(true);
     } finally {
       isSigningIn.current = false;
       setIsLoading(false);
+      setIsStartingLogin(false);
     }
   }
 
@@ -205,14 +228,14 @@ export function LoginScreen({
               pointerEvents="none"
               className="absolute inset-x-0 top-[-54px] items-center px-margin"
             >
-              <ToastText message="로그인에 실패했습니다. 다시 시도해 주세요." />
+              <ToastText message={loginErrorMessage} />
             </View>
           )}
           {LOGIN_PROVIDERS.map((provider) => (
             <SocialLoginButton
               key={provider}
               provider={provider}
-              onPress={() => openConsentSheet(provider)}
+              onPress={() => handleLogin(provider)}
             />
           ))}
         </View>
@@ -235,12 +258,8 @@ export function LoginScreen({
           router.push(`/policies/${document}` as Href);
         }}
         onConfirm={confirmConsent}
-        onClose={() => setIsConsentSheetOpen(false)}
-        loadingMessage={
-          isStartingLogin && pendingProvider
-            ? `${PROVIDER_NAMES[pendingProvider]} 로그인으로 이동 중입니다.`
-            : undefined
-        }
+        onClose={closeConsentSheet}
+        loadingMessage={isStartingLogin ? "로그인 중입니다." : undefined}
       />
       {suspension &&
         (suspension.reasonCategory === "underage" ? (

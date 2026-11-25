@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.117.3";
 
-import { readJson } from "../_shared/readJson.ts";
+import { createRestrictionHandler } from "./handler.ts";
 import { createIdentityVerifier, type IdentityProvider } from "./identity.ts";
 
 const PROVIDERS = {
@@ -35,47 +35,25 @@ const client = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
-const headers = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Cache-Control": "no-store",
-};
-
-// Auth ban으로 세션을 받지 못해도 유효한 제공자 ID token으로 본인 안내만 조회한다.
-Deno.serve(async (request: Request) => {
-  const reply = (value: unknown, status = 200) => Response.json(value, { status, headers });
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
-  if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
-  try {
-    if (!request.headers.get("content-type")?.startsWith("application/json")) {
-      return reply({ error: "invalid_request" }, 400);
-    }
-    if (Number(request.headers.get("content-length")) > 16384) {
-      return reply({ error: "invalid_request" }, 413);
-    }
-    const input = await readJson(request) as Record<string, unknown>;
-    const provider = input?.provider as keyof typeof PROVIDERS;
-    if (
-      !Object.hasOwn(PROVIDERS, provider) || typeof input?.id_token !== "string" ||
-      input.id_token.length > 12000
-    ) return reply({ error: "invalid_request" }, 400);
-    const config = PROVIDERS[provider];
-    const audience = Deno.env.get(config.env)?.split(",").map((value) => value.trim()).filter(
-      Boolean,
-    );
-    if (!audience?.length) return reply({ error: "provider_not_configured" }, 503);
-    const subject = await verifyIdentity(provider, input.id_token);
+// 서명 검증 후에만 서비스 권한 RPC를 호출한다. 기존 제재 안내 호출은 그대로 지원한다.
+Deno.serve(createRestrictionHandler({
+  isConfigured: (provider) =>
+    !!Deno.env.get(PROVIDERS[provider].env)?.split(",").some((value) => value.trim()),
+  verifyIdentity,
+  lookupNotice: async (provider, subject) => {
     const { data, error } = await client.rpc("lookup_suspended_identity", {
       identity_provider: provider,
       identity_subject: subject,
     });
-    if (error) return reply({ error: "request_failed" }, 503);
-    return reply({ notice: data });
-  } catch (error) {
-    if (error instanceof Error && error.message === "request_too_large") {
-      return reply({ error: "request_too_large" }, 413);
-    }
-    return reply({ error: "invalid_identity" }, 401);
-  }
-});
+    if (error) throw error;
+    return data;
+  },
+  lookupPolicies: async (provider, subject) => {
+    const { data, error } = await client.rpc("lookup_login_policy_status", {
+      identity_provider: provider,
+      identity_subject: subject,
+    });
+    if (error) throw error;
+    return data;
+  },
+}));

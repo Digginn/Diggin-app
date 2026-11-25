@@ -56,6 +56,7 @@ function load(relativePath, mocks = {}) {
             usageAnalysis: false,
             overseasTransfer: false,
           },
+          isRequiredConsented: (consent) => consent.age && consent.terms && consent.privacy,
         };
       if (name === "./api/loginConsent")
         return {
@@ -99,8 +100,14 @@ function nodes(root) {
 
 function stateHooks() {
   const states = [];
+  const refs = [];
   let cursor = 0;
+  let refCursor = 0;
   return {
+    useRef(current) {
+      const index = refCursor++;
+      return refs[index] ?? (refs[index] = { current });
+    },
     useState(initial) {
       const index = cursor++;
       if (!(index in states)) states[index] = initial;
@@ -111,10 +118,12 @@ function stateHooks() {
     },
     render(screen) {
       cursor = 0;
+      refCursor = 0;
       return nodes(screen());
     },
     reset() {
       states.length = 0;
+      refs.length = 0;
     },
   };
 }
@@ -127,15 +136,19 @@ const ALL_AGREED = {
   overseasTransfer: true,
 };
 
-/** 소셜 버튼 → 이용약관 동의 시트 체크 → 확인. iOS는 시트가 닫힌 뒤(onDismiss) 로그인을 시작한다. */
+/** 계정 확인 후 필요한 경우에만 표시되는 동의 시트를 완료한다. */
 async function pressSocialAfterConsent(hooks, screen, consent = ALL_AGREED, index = 0) {
-  hooks
+  const login = hooks
     .render(screen)
     .filter((node) => node.type === "SocialLoginButton")
     [index].props.onPress();
   const sheet = () => hooks.render(screen).find((node) => node.type === "TermsConsentSheet");
-  sheet().props.onChange(consent);
-  await sheet().props.onConfirm();
+  await Promise.resolve();
+  if (sheet().props.visible) {
+    sheet().props.onChange(consent);
+    sheet().props.onConfirm();
+  }
+  await login;
 }
 
 test("소셜 버튼이 공통 Button과 지정 로고·색상·콜백을 사용한다", () => {
@@ -235,18 +248,21 @@ for (const os of ["ios", "android"]) {
     const alerts = [];
     const signIns = [];
     let canGoBack = false;
+    let session = null;
     const hooks = stateHooks();
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
       "react": {
         useState: hooks.useState,
-        useRef: (current) => ({ current }),
+        useRef: hooks.useRef,
         useEffect: () => {},
       },
       "@/lib/pendingShareLink": { discardShareLink: () => {} },
       "./api/signIn": {
-        signIn: (provider) => {
+        signIn: async (provider, onAuthorized, requestConsent) => {
           signIns.push(provider);
-          return Promise.resolve({ status: "cancelled" });
+          onAuthorized();
+          const agreed = await requestConsent();
+          return agreed ? { status: "success", isNewUser: false } : { status: "cancelled" };
         },
       },
       "expo-router": {
@@ -275,7 +291,7 @@ for (const os of ["ios", "android"]) {
       "@/components/UnderageNoticeModal": { UnderageNoticeModal: "UnderageNoticeModal" },
       "@/components/ToastText": { ToastText: "ToastText" },
       "./components/SocialLoginButton": { SocialLoginButton: "SocialLoginButton" },
-      "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
+      "@/contexts/AuthContext": { useAuth: () => ({ session }) },
     });
     const tree = hooks.render(LoginScreen);
     const bar = tree.find((node) => node.type === "AppBar");
@@ -299,20 +315,27 @@ for (const os of ["ios", "android"]) {
     const sheet = () => hooks.render(LoginScreen).find((node) => node.type === "TermsConsentSheet");
     assert.equal(sheet().props.visible, false);
     for (const [index, provider] of expectedProviders.split(",").entries()) {
-      hooks
+      const login = hooks
         .render(LoginScreen)
         .filter((node) => node.type === "SocialLoginButton")
         [index].props.onPress();
-      assert.equal(sheet().props.visible, true, "소셜 버튼을 누르면 동의 시트를 띄운다");
-      assert.equal(signIns.length, index, "동의를 확인하기 전에는 SDK 인증을 시작하지 않는다");
+      assert.equal(sheet().props.visible, true, "계정 확인 결과 동의가 필요하면 시트를 띄운다");
+      assert.equal(signIns.length, index + 1, "소셜 계정 선택을 먼저 진행한다");
       sheet().props.onChange({ ...ALL_AGREED, usageAnalysis: false });
-      const login = sheet().props.onConfirm();
-      const name = { google: "Google", kakao: "Kakao", apple: "Apple" }[provider];
+      sheet().props.onConfirm();
       assert.equal(
         sheet().props.loadingMessage,
-        `${name} 로그인으로 이동 중입니다.`,
-        "확인하면 바로 누른 제공자로 이동 중임을 띄운다",
+        "로그인 중입니다.",
+        "동의 확인 후 계정 생성·인증을 완료하는 동안 표시한다",
       );
+      session = { user: { id: "pending-consent-save" } };
+      assert.ok(
+        hooks
+          .render(() => LoginScreen({ isRedirectedWhenSignedIn: true }))
+          .some((node) => node.type === "TermsConsentSheet" && node.props.visible),
+        "중간 인증 세션이 생겨도 필수 동의 저장 완료 전에 자동 이동하지 않는다",
+      );
+      session = null;
       await login;
       assert.equal(sheet().props.loadingMessage, undefined, "로그인 창을 취소하면 표시를 거둔다");
       assert.equal(
@@ -320,12 +343,11 @@ for (const os of ["ios", "android"]) {
         provider,
         "다시 누르지 않아도 고른 소셜 로그인으로 바로 이어진다",
       );
-      assert.equal(sheet().props.visible, true, "로그인을 취소하면 체크한 그대로 시트가 남는다");
-      sheet().props.onClose();
+      assert.equal(sheet().props.visible, false, "동의와 로그인이 끝나면 시트를 닫는다");
       assert.equal(signIns.length, index + 1);
     }
     assert.equal(alerts.length, 0);
-    hooks
+    const cancelledLogin = hooks
       .render(LoginScreen)
       .find((node) => node.type === "SocialLoginButton")
       .props.onPress();
@@ -333,10 +355,11 @@ for (const os of ["ios", "android"]) {
     assert.equal(routes.at(-1), "/policies/terms");
     assert.equal(sheet().props.visible, false, "약관 전문을 열면 시트를 닫는다");
     sheet().props.onClose();
+    await cancelledLogin;
     assert.equal(
       signIns.length,
-      expectedProviders.split(",").length,
-      "확인하지 않고 닫으면 로그인하지 않는다",
+      expectedProviders.split(",").length + 1,
+      "계정 선택 이후 약관을 닫으면 해당 로그인을 취소한다",
     );
     const consented = hooks.render(LoginScreen);
     consented
@@ -424,7 +447,7 @@ test("로그인 화면은 주소로 온 공유 링크를 받지 않고, 로그�
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
       "react": {
         useState: hooks.useState,
-        useRef: (current) => ({ current }),
+        useRef: hooks.useRef,
         useEffect: (effect) => {
           cleanup = effect();
         },
@@ -866,6 +889,18 @@ function loadSignIn({
   os = "ios",
   apple = {},
   invoked = [],
+  claimSignup = async () => true,
+  policyStatus = {
+    requires_consent: false,
+    is_new_user: true,
+    terms_policy_id: 1,
+    privacy_policy_id: 2,
+    terms_version: "1.1",
+    privacy_version: "1.1",
+  },
+  completeConsent = async () => ({ data: null, error: null }),
+  lookupError = null,
+  authCalls = [],
 }) {
   const storage = new Map();
   return load("screens/login/api/signIn.ts", {
@@ -906,18 +941,35 @@ function loadSignIn({
     },
     "@/lib/supabase": {
       supabase: {
+        rpc: async (name, args) => {
+          if (name === "complete_login_consent") return completeConsent(args);
+          assert.equal(name, "claim_signup_completion");
+          return { data: await claimSignup(), error: null };
+        },
         functions: {
           invoke: async (name, input) => {
             invoked.push([name, input.body]);
             if (name === "apple-token") return { data: null, error: new Error("offline") };
             assert.equal(name, "account-restriction");
+            if (input.body.operation === "login-consent")
+              return {
+                data: {
+                  policy_status: policyStatus,
+                  notice: authError?.code === "user_banned" ? restrictionNotice : null,
+                },
+                error: lookupError,
+              };
             assert.equal(input.body.provider, "google");
             assert.equal(input.body.id_token, "token");
             return { data: { notice: restrictionNotice }, error: null };
           },
         },
         auth: {
-          signInWithIdToken: async () => ({ error: authError }),
+          signInWithIdToken: async () => {
+            authCalls.push("authenticate");
+            return { error: authError };
+          },
+          signOut: async () => ({ error: null }),
           getUser: async () => ({ data: { user: getUser() }, error: null }),
         },
       },
@@ -925,9 +977,188 @@ function loadSignIn({
   });
 }
 
+test("소셜 계정 확인 뒤 신규·재동의 계정만 동의를 받고, 취소하면 계정을 생성하지 않는다", async () => {
+  const policyStatus = {
+    requires_consent: true,
+    is_new_user: true,
+    terms_policy_id: 1,
+    privacy_policy_id: 2,
+    terms_version: "1.1",
+    privacy_version: "1.1",
+  };
+  for (const provider of ["google", "kakao", "apple"]) {
+    const authCalls = [];
+    const saved = [];
+    const { signIn } = loadSignIn({
+      getUser: () => ({ id: "new-member" }),
+      policyStatus,
+      authCalls,
+      apple: { signInAsync: async () => ({ identityToken: "apple-id" }) },
+      completeConsent: async (args) => {
+        saved.push(args);
+        return { error: null };
+      },
+    });
+    let resolveConsent;
+    const pending = signIn(
+      provider,
+      () => {},
+      () =>
+        new Promise((resolve) => {
+          resolveConsent = resolve;
+        }),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(typeof resolveConsent, "function");
+    assert.deepEqual(authCalls, [], "동의 전에는 Supabase 인증·가입을 시작하지 않는다");
+    resolveConsent(null);
+    assert.equal((await pending).status, "cancelled");
+    assert.deepEqual(authCalls, []);
+    assert.deepEqual(saved, []);
+    assert.equal(
+      (
+        await signIn(
+          provider,
+          () => {},
+          async () => ALL_AGREED,
+        )
+      ).status,
+      "success",
+    );
+    assert.deepEqual(authCalls, ["authenticate"]);
+    assert.deepEqual(JSON.parse(JSON.stringify(saved)), [
+      { terms_policy_id: 1, privacy_policy_id: 2, age_confirmed: true },
+    ]);
+  }
+});
+
+test("동의 이력이 있는 계정은 시트 없이 로그인하며 신규 동의를 덧쓰지 않는다", async () => {
+  let completed;
+  const { signIn } = loadSignIn({
+    getUser: () => ({ id: "existing-member" }),
+    // 구버전 앱이 가입 완료 선점 RPC를 호출하지 않았더라도 기존 계정이다.
+    claimSignup: async () => true,
+    policyStatus: {
+      requires_consent: false,
+      is_new_user: false,
+      terms_policy_id: 1,
+      privacy_policy_id: 2,
+      terms_version: "1.1",
+      privacy_version: "1.1",
+    },
+    completeConsent: async (args) => {
+      completed = args;
+      return { error: null };
+    },
+  });
+  const result = await signIn(
+    "google",
+    () => {},
+    () => assert.fail("동의 시트를 표시하면 안 됨"),
+  );
+  assert.equal(result.isNewUser, false);
+  assert.equal(completed.age_confirmed, false, "새 동의를 만들어 저장하지 않는다");
+});
+
+test("구버전 가입 계정이 처음 필수 동의를 저장해도 신규 가입 안내를 재생하지 않는다", async () => {
+  const { signIn } = loadSignIn({
+    getUser: () => ({ id: "old-client-member" }),
+    claimSignup: async () => true,
+    policyStatus: {
+      requires_consent: true,
+      is_new_user: false,
+      terms_policy_id: 1,
+      privacy_policy_id: 2,
+      terms_version: "1.1",
+      privacy_version: "1.1",
+    },
+  });
+  const result = await signIn(
+    "google",
+    () => {},
+    async () => ALL_AGREED,
+  );
+  assert.equal(result.status, "success");
+  assert.equal(result.isNewUser, false);
+});
+
+test("동의 조회 실패·잘못된 응답·미지원 재동의 버전에서는 가입을 진행하지 않는다", async () => {
+  for (const options of [
+    { lookupError: new Error("offline") },
+    { policyStatus: {} },
+    {
+      policyStatus: {
+        requires_consent: true,
+        is_new_user: true,
+        terms_policy_id: 1,
+        privacy_policy_id: 2,
+        terms_version: "2.0",
+        privacy_version: "1.1",
+      },
+    },
+  ]) {
+    const authCalls = [];
+    const { signIn } = loadSignIn({ getUser: () => ({ id: "u" }), authCalls, ...options });
+    await assert.rejects(
+      signIn(
+        "google",
+        () => {},
+        () => assert.fail("확인할 수 없는 약관을 표시하면 안 됨"),
+      ),
+    );
+    assert.deepEqual(authCalls, []);
+  }
+});
+
+test("필수 동의를 빠뜨리면 가입하지 않고, 저장 중 버전 변경은 중간 세션을 정리한다", async () => {
+  const policyStatus = {
+    requires_consent: true,
+    is_new_user: true,
+    terms_policy_id: 1,
+    privacy_policy_id: 2,
+    terms_version: "1.1",
+    privacy_version: "1.1",
+  };
+  const authCalls = [];
+  const rolledBack = [];
+  let claims = 0;
+  const { signIn } = loadSignIn({
+    getUser: () => ({ id: "u" }),
+    policyStatus,
+    authCalls,
+    claimSignup: async () => {
+      claims++;
+      return true;
+    },
+    completeConsent: async () => ({ error: new Error("login_policies_changed") }),
+  });
+  await assert.rejects(
+    signIn(
+      "google",
+      () => {},
+      async () => ({ ...ALL_AGREED, age: false }),
+    ),
+    /login_consent_required/,
+  );
+  assert.deepEqual(authCalls, []);
+  await assert.rejects(
+    signIn(
+      "google",
+      () => {},
+      async () => ALL_AGREED,
+      async () => {
+        rolledBack.push(true);
+      },
+    ),
+    /login_policies_changed/,
+  );
+  assert.deepEqual(rolledBack, [true]);
+  assert.equal(claims, 0, "동의 저장에 실패하면 가입 안내를 선점하지 않는다");
+});
+
 test("가입 1분 안에 다시 로그인해도 가입 완료 안내는 사용자별로 한 번만 보여 준다", async () => {
   let user;
-  const { signIn } = loadSignIn({ getUser: () => user });
+  const { signIn } = loadSignIn({ getUser: () => user, claimSignup: async () => user.id !== "c" });
   const signedUpAt = "2026-10-16T00:00:00Z";
   user = { id: "a", created_at: signedUpAt, last_sign_in_at: signedUpAt };
   assert.equal((await signIn("google")).isNewUser, true);
@@ -939,6 +1170,52 @@ test("가입 1분 안에 다시 로그인해도 가입 완료 안내는 사용�
   assert.equal((await signIn("google")).isNewUser, false);
 });
 
+test("기기에 기록이 없는 기존 회원도 서버에서 가입 안내를 처리했다면 재노출하지 않는다", async () => {
+  for (const provider of ["google", "kakao", "apple"]) {
+    for (const lastSignInAt of ["2026-10-16T00:00:00Z", null, "invalid"]) {
+      const { signIn } = loadSignIn({
+        getUser: () => ({
+          id: "existing",
+          created_at: "2026-10-16T00:00:00Z",
+          last_sign_in_at: lastSignInAt,
+        }),
+        claimSignup: async () => false,
+        apple: { signInAsync: async () => ({ identityToken: "apple-token" }) },
+      });
+      assert.equal((await signIn(provider)).isNewUser, false, `${provider}/${lastSignInAt}`);
+    }
+  }
+});
+
+test("최초 가입 안내는 새 기기에서도 서버 선점 결과를 따르고 실패하면 기존 회원 경로로 진행한다", async () => {
+  const user = { id: "member" };
+  let pending = true;
+  const claimSignup = async () => {
+    const claimed = pending;
+    pending = false;
+    return claimed;
+  };
+  const first = loadSignIn({ getUser: () => user, claimSignup });
+  assert.equal((await first.signIn("google")).isNewUser, true);
+  const otherDevice = loadSignIn({ getUser: () => user, claimSignup });
+  assert.equal((await otherDevice.signIn("google")).isNewUser, false);
+  const unavailable = loadSignIn({
+    getUser: () => user,
+    claimSignup: async () => {
+      throw new Error("network_error");
+    },
+  });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const result = await unavailable.signIn("google");
+    assert.equal(result.status, "success");
+    assert.equal(result.isNewUser, false);
+  } finally {
+    console.warn = warn;
+  }
+});
+
 test("카카오 신규 가입만 카카오 프로필 사진을 복사하고, 실패해도 로그인은 이어 간다", async () => {
   const signedUpAt = "2026-10-16T00:00:00Z";
   let user = { id: "k1", created_at: signedUpAt, last_sign_in_at: signedUpAt };
@@ -946,6 +1223,7 @@ test("카카오 신규 가입만 카카오 프로필 사진을 복사하고, 실
   let photoUrl = "https://k.kakaocdn.net/photo.jpg";
   const { signIn } = loadSignIn({
     getUser: () => user,
+    claimSignup: async () => user.id !== "k2",
     kakao: { me: async () => ({ profileImageUrl: photoUrl }) },
     saveAvatar: async (uri) => {
       if (uri.includes("broken")) throw new Error("load_failed");
@@ -1032,7 +1310,7 @@ test("애플 로그인에 성공하면 인증 코드를 서버에 맡기고, 맡
   });
   const result = await signIn("apple", () => {});
   assert.equal(result.status, "success");
-  assert.deepEqual(JSON.parse(JSON.stringify(invoked)), [
+  assert.deepEqual(JSON.parse(JSON.stringify(invoked.filter(([name]) => name === "apple-token"))), [
     ["apple-token", { authorization_code: "apple-code" }],
   ]);
 });
@@ -1053,12 +1331,17 @@ test("로그인 필요 모달에서 온 로그인은 성공하면 원래 화면�
     const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
       "react": {
         useState: hooks.useState,
-        useRef: (current) => ({ current }),
+        useRef: hooks.useRef,
         useEffect: (effect) => {
           cleanup = effect();
         },
       },
-      "./api/signIn": { signIn: async () => result },
+      "./api/signIn": {
+        signIn: async (_provider, _authorized, requestConsent) => {
+          if (result.isNewUser && !(await requestConsent())) return { status: "cancelled" };
+          return result;
+        },
+      },
       "@/contexts/AuthContext": { useAuth: () => ({ session: null }) },
       "@/lib/pendingShareLink": { discardShareLink: () => {} },
       "expo-router": {
@@ -1135,7 +1418,7 @@ test("로그인 필요 모달에서 온 로그인은 성공하면 원래 화면�
 test("만 14세 미만으로 이용 중단된 계정이 로그인하면 이용 중단 안내를 띄운다", async () => {
   const hooks = stateHooks();
   const { LoginScreen } = load("screens/login/LoginScreen.tsx", {
-    "react": { useState: hooks.useState, useRef: (current) => ({ current }), useEffect: () => {} },
+    "react": { useState: hooks.useState, useRef: hooks.useRef, useEffect: () => {} },
     "./api/signIn": {
       signIn: async () => ({
         status: "suspended",
