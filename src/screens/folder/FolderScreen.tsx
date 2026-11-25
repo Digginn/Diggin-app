@@ -14,6 +14,8 @@ import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { ActionModal } from "@/components/modal";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
+import { whenNativeModalIdle } from "@/hooks/useNativeModalVisible";
+import { useToast } from "@/hooks/useToast";
 
 import { FolderCard, type FolderItem } from "./components/FolderCard";
 import { FolderMenu, type FolderMenuAnchor } from "./components/FolderMenu";
@@ -65,6 +67,7 @@ export function FolderScreen({
   requireLogin = (action) => action(),
 }: FolderScreenProps = {}) {
   const { height } = useWindowDimensions();
+  const showToast = useToast();
   const guide = useFirstVisitGuide("folder", !isError && !isLoading && !isGuest);
   useLinkDetectionPause(guide.isPending, true);
   const ownedGuideRef = useRef<View>(null);
@@ -108,6 +111,12 @@ export function FolderScreen({
     return () => clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    if (!toast || isError || isCreateModalOpen || editingFolder || deletingFolder) return;
+    // 탭 화면 높이에 맞춰 보정하지 않고 전역 영역의 하단 160px 기준을 사용한다.
+    return whenNativeModalIdle(() => showToast(toast.message, toast.variant));
+  }, [toast, isError, isCreateModalOpen, editingFolder, deletingFolder, showToast]);
+
   async function submitFolderName(name: string, folder?: FolderItem) {
     if (!folder && folders.filter((entry) => !entry.isOwnedItems).length >= MAX_CUSTOM_FOLDERS) {
       Keyboard.dismiss();
@@ -142,7 +151,7 @@ export function FolderScreen({
   }
 
   const modalToast = toast ? (
-    <View pointerEvents="none" className="absolute inset-x-0 bottom-40">
+    <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px]">
       <FolderToast message={toast.message} variant={toast.variant} />
     </View>
   ) : undefined;
@@ -308,11 +317,6 @@ export function FolderScreen({
           onClose={() => setEditingFolder(null)}
           onSubmit={onRenameFolder ? (name) => submitFolderName(name, editingFolder) : undefined}
         />
-      )}
-      {!isError && !isCreateModalOpen && !editingFolder && !deletingFolder && toast && (
-        <View pointerEvents="none" className="absolute inset-x-0 bottom-20 z-30">
-          <FolderToast message={toast.message} variant={toast.variant} />
-        </View>
       )}
       {!isError && selectedFolderMenu && (
         <FolderMenu

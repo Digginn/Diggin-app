@@ -91,7 +91,7 @@ export function Comment({
       ref={rootRef}
       className={clsx(
         "w-full items-start",
-        isHighlighted || isReportMenuOpen || isReply ? "bg-gray-50" : "bg-gray-0",
+        isHighlighted ? "bg-gray-200" : isReportMenuOpen || isReply ? "bg-gray-50" : "bg-gray-0",
       )}
     >
       {isReply ? (

@@ -286,35 +286,41 @@ export type Database = {
       };
       profiles: {
         Row: {
+          age_confirmed_at: string | null;
           avatar_path: string | null;
           community_policy_agreed_at: string | null;
           created_at: string;
           id: string;
           nickname: string;
           restricted_until: string | null;
+          signup_completed_at: string | null;
           status: Database["public"]["Enums"]["account_status"];
           suspended_at: string | null;
           updated_at: string;
         };
         ComputedFields: never;
         Insert: {
+          age_confirmed_at?: string | null;
           avatar_path?: string | null;
           community_policy_agreed_at?: string | null;
           created_at?: string;
           id: string;
           nickname: string;
           restricted_until?: string | null;
+          signup_completed_at?: string | null;
           status?: Database["public"]["Enums"]["account_status"];
           suspended_at?: string | null;
           updated_at?: string;
         };
         Update: {
+          age_confirmed_at?: string | null;
           avatar_path?: string | null;
           community_policy_agreed_at?: string | null;
           created_at?: string;
           id?: string;
           nickname?: string;
           restricted_until?: string | null;
+          signup_completed_at?: string | null;
           status?: Database["public"]["Enums"]["account_status"];
           suspended_at?: string | null;
           updated_at?: string;
@@ -465,7 +471,12 @@ export type Database = {
       };
       claim_amplitude_deletions: { Args: Record<PropertyKey, never>; Returns: Json };
       claim_notification_pushes: { Args: { receipts?: boolean }; Returns: Json };
+      claim_signup_completion: { Args: Record<PropertyKey, never>; Returns: boolean };
       claim_underage_deletion: { Args: { target: string }; Returns: boolean };
+      complete_login_consent: {
+        Args: { age_confirmed: boolean; privacy_policy_id: number; terms_policy_id: number };
+        Returns: undefined;
+      };
       create_comment: {
         Args: {
           comment_content: string;
@@ -559,6 +570,10 @@ export type Database = {
       has_unread_notices: { Args: Record<PropertyKey, never>; Returns: boolean };
       has_unread_notifications: { Args: Record<PropertyKey, never>; Returns: boolean };
       import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
+      lookup_login_policy_status: {
+        Args: { identity_provider: string; identity_subject: string };
+        Returns: Json;
+      };
       lookup_suspended_identity: {
         Args: { identity_provider: string; identity_subject: string };
         Returns: Json;

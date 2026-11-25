@@ -1,6 +1,8 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
+-- 이 파일에서 등록하는 정책으로만 재동의 조건을 검증한다. 전환 마이그레이션의 정책은 격리한다.
+update public.legal_policies set effective_at = now() + interval '100 years';
 
 select plan(40);
 
@@ -56,7 +58,7 @@ values ('privacy', '2', now() - interval '1 day', 'https://example.com/privacy/2
 
 set local role anon;
 select throws_ok($$ select * from public.get_pending_policies() $$, '42501', null, '비회원은 재동의 목록을 부를 수 없다');
-select is((select count(*) from public.legal_policies), 1::bigint, '비회원도 약관 문서는 볼 수 있다');
+select is((select count(*) from public.legal_policies where version = '2'), 1::bigint, '비회원도 약관 문서는 볼 수 있다');
 reset role;
 
 -- 사용자 A로 접속
@@ -97,7 +99,7 @@ select is(
 select lives_ok($$ select public.register_push_token('token-1', 'ios') $$, 'push 토큰을 등록할 수 있다');
 
 select is((select count(*) from public.get_pending_policies()), 1::bigint, '재동의가 필요한 약관이 보인다');
-select public.accept_policy((select id from public.legal_policies where kind = 'privacy'));
+select public.accept_policy((select id from public.legal_policies where kind = 'privacy' and version = '2'));
 select is((select count(*) from public.get_pending_policies()), 0::bigint, '동의하면 목록에서 빠진다');
 
 -- 사용자 B로 접속
