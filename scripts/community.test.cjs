@@ -1072,6 +1072,73 @@ test("투표 블록은 본문 컨테이너의 좌우 여백을 그대로 사용�
   assert.equal(tree.props.className.includes("px-margin"), false);
 });
 
+test("게시글·투표·댓글·답글 삭제 모달은 왼쪽 삭제하기·오른쪽 취소이며 각 버튼이 올바른 동작을 실행한다", async () => {
+  const { ActionModal } = load("src/components/modal/ActionModal.tsx", {
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+    "nativewind": { cssInterop: (icon) => icon },
+    "./Modal": { Modal: "Modal" },
+    "./ModalButton": { ModalButton: "ModalButton" },
+  });
+  const buttons = (modal) =>
+    nodes(ActionModal(modal.props), "ModalButton").map((node) => node.props.action);
+  for (const type of ["post", "vote"]) {
+    const post = await api({ ...MEMBER, type, is_mine: true }).fetchCommunityPost("12");
+    const state = screenMocks({ post });
+    let deleted = 0;
+    state.mocks["./api/communityWrite"].deleteCommunityPost = async () => {
+      deleted++;
+    };
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const modal = nodes(
+      PostDetailScreen({ type: type === "vote" ? "vote" : "all" }),
+      "ActionModal",
+    ).find((node) => node.props.description === "댓글도 함께 삭제되며 복구할 수 없습니다.");
+    const actions = buttons(modal);
+    assert.deepEqual(
+      actions.map((action) => action.label),
+      ["삭제하기", "취소"],
+    );
+    actions[1].onPress();
+    assert.equal(deleted, 0, "오른쪽 취소는 게시글을 삭제하지 않는다");
+    actions[0].onPress();
+    await new Promise(setImmediate);
+    assert.equal(deleted, 1, "왼쪽 삭제하기만 게시글 삭제를 실행한다");
+  }
+  for (const parentId of [null, "88"]) {
+    const post = await api(MEMBER).fetchCommunityPost("12");
+    const state = screenMocks({ post });
+    let cancelled = 0;
+    let deleted = 0;
+    state.mocks["./hooks/useCommentActions"].useCommentActions = () => ({
+      changes: {},
+      body: "",
+      deleteTarget: { id: "90", parentId },
+      isSending: false,
+      isDeleting: false,
+      cancelDelete: () => {
+        cancelled++;
+      },
+      remove: async () => {
+        deleted++;
+      },
+    });
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const modal = nodes(PostDetailScreen({ type: "all" }), "ActionModal").find(
+      (node) => node.props.title === "댓글을 삭제하시겠습니까?",
+    );
+    const actions = buttons(modal);
+    assert.deepEqual(
+      actions.map((action) => action.label),
+      ["삭제하기", "취소"],
+    );
+    actions[1].onPress();
+    assert.equal(cancelled, 1);
+    assert.equal(deleted, 0, "오른쪽 취소는 댓글·답글을 삭제하지 않는다");
+    actions[0].onPress();
+    assert.equal(deleted, 1, "왼쪽 삭제하기만 댓글·답글 삭제를 실행한다");
+  }
+});
+
 test("삭제 성공은 진입 목록과 탭으로 복귀하며 일반 DIGGLE 진입은 기존 경로를 유지한다", async () => {
   for (const [returnTo, type, pathname, tab] of [
     ["my-posts", "post", "/my-posts", "posts"],
@@ -1089,8 +1156,8 @@ test("삭제 성공은 진입 목록과 탭으로 복귀하며 일반 DIGGLE 진
     const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
     const tree = PostDetailScreen({ type: type === "vote" ? "vote" : "all" });
     await nodes(tree, "ActionModal")
-      .find((node) => node.props.primaryAction?.label === "삭제")
-      .props.primaryAction.onPress();
+      .find((node) => node.props.secondaryAction?.label === "삭제하기")
+      .props.secondaryAction.onPress();
     await new Promise(setImmediate);
     const target = state.destination();
     assert.equal(typeof target === "string" ? target : target.pathname, pathname);
@@ -1108,8 +1175,8 @@ test("삭제 실패는 원래 상세에 남고 잘못된 글 종류를 교정해
   const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
   const tree = PostDetailScreen({ type: "vote" });
   await nodes(tree, "ActionModal")
-    .find((node) => node.props.primaryAction?.label === "삭제")
-    .props.primaryAction.onPress();
+    .find((node) => node.props.secondaryAction?.label === "삭제하기")
+    .props.secondaryAction.onPress();
   await new Promise(setImmediate);
   assert.equal(state.destination(), undefined);
   state.mocks.react.useEffect = (effect) => effect();

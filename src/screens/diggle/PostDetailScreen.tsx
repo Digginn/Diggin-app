@@ -596,14 +596,14 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
         title={post?.type === "vote" ? "투표글을 삭제하시겠습니까?" : "게시글을 삭제하시겠습니까?"}
         description="댓글도 함께 삭제되며 복구할 수 없습니다."
         primaryAction={{
-          label: isDeleting ? "삭제 중…" : "삭제",
-          onPress: () => void removePost(),
-        }}
-        secondaryAction={{
           label: "취소",
           onPress: () => {
             if (!deleting.current) setDeleteOpen(false);
           },
+        }}
+        secondaryAction={{
+          label: isDeleting ? "삭제 중…" : "삭제하기",
+          onPress: () => void removePost(),
         }}
         onRequestClose={() => {
           if (!deleting.current) setDeleteOpen(false);
@@ -620,11 +620,12 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
         visible={actions.deleteTarget !== null}
         type="2Btn"
         title="댓글을 삭제하시겠습니까?"
-        primaryAction={{
-          label: actions.isDeleting ? "삭제 중…" : "삭제",
+        description="삭제한 댓글은 복구할 수 없습니다."
+        primaryAction={{ label: "취소", onPress: actions.cancelDelete }}
+        secondaryAction={{
+          label: actions.isDeleting ? "삭제 중…" : "삭제하기",
           onPress: () => void actions.remove(),
         }}
-        secondaryAction={{ label: "취소", onPress: actions.cancelDelete }}
         onRequestClose={actions.cancelDelete}
         overlay={
           actions.deleteError ? (
