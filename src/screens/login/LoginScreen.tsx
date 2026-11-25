@@ -86,6 +86,8 @@ export function LoginScreen({
   const [isStartingLogin, setIsStartingLogin] = useState(false);
   // 약관 전문을 보고 돌아오면 체크한 그대로 시트를 다시 연다.
   const isReturningToSheet = useRef(false);
+  // BUG-145 전문을 보러 가고 돌아오는 동안은 시트를 움직이지 않고 그 자리에 둔다.
+  const [isSheetStill, setIsSheetStill] = useState(false);
   const hasSignedIn = useRef(false);
   const isSigningIn = useRef(false);
   const [hasAttemptedLogin, setHasAttemptedLogin] = useState(false);
@@ -125,6 +127,9 @@ export function LoginScreen({
       if (!isReturningToSheet.current) return;
       isReturningToSheet.current = false;
       setIsConsentSheetOpen(true);
+      // 제자리로 다시 띄운 다음 프레임부터는 닫을 때 평소처럼 내려간다.
+      const frame = requestAnimationFrame(() => setIsSheetStill(false));
+      return () => cancelAnimationFrame(frame);
     }, []),
   );
 
@@ -294,8 +299,10 @@ export function LoginScreen({
         visible={isConsentSheetOpen}
         consent={consent}
         onChange={setConsent}
+        isAnimated={!isSheetStill}
         onOpenDocument={(document) => {
           isReturningToSheet.current = true;
+          setIsSheetStill(true);
           setIsConsentSheetOpen(false);
           router.push(`/policies/${document}` as Href);
         }}

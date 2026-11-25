@@ -503,9 +503,15 @@ for (const os of ["ios", "android"]) {
       .find((node) => node.type === "SocialLoginButton")
       .props.onPress();
     await new Promise(setImmediate);
+    assert.equal(sheet().props.isAnimated, true, "평소에는 시트가 올라오고 내려간다");
     sheet().props.onOpenDocument("terms");
     assert.equal(routes.at(-1), "/policies/terms");
     assert.equal(sheet().props.visible, false, "약관 전문을 열면 시트를 닫는다");
+    assert.equal(
+      sheet().props.isAnimated,
+      false,
+      "BUG-145 전문을 오갈 때는 시트를 움직이지 않는다",
+    );
     sheet().props.onClose();
     await cancelledLogin;
     assert.equal(

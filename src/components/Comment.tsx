@@ -30,7 +30,7 @@ type CommentProps = {
   hasLike?: boolean;
   onPressLike?: () => void;
   onPressReply?: () => void;
-  /** 케밥의 창 기준 좌표를 같이 넘김 */
+  /** 댓글 전체의 창 기준 좌표를 같이 넘김. 메뉴를 댓글 세로 가운데에 띄운다(BUG-151). */
   onPressMenu?: (anchor: MenuAnchor) => void;
   onPressReport?: () => void;
   onPressBlock?: () => void;
@@ -76,18 +76,19 @@ export function Comment({
   onPressBlock,
   onOpenLink,
 }: CommentProps) {
-  const kebabRef = useRef<View>(null);
+  const rootRef = useRef<View>(null);
   const [isReportMenuOpen, setReportMenuOpen] = useState(false);
   const badge = isDeleted ? null : isOperator ? "운영자" : voteChoice?.toUpperCase();
 
   function handlePressMenu() {
-    kebabRef.current?.measureInWindow((x, y, width, height) =>
+    rootRef.current?.measureInWindow((x, y, width, height) =>
       onPressMenu?.({ x, y, width, height }),
     );
   }
 
   return (
     <View
+      ref={rootRef}
       className={clsx(
         "w-full items-start",
         isHighlighted ? "bg-gray-200" : isReportMenuOpen || isReply ? "bg-gray-50" : "bg-gray-0",
@@ -119,15 +120,15 @@ export function Comment({
             {badge ? (
               <View
                 className={clsx(
-                  "shrink-0 items-center justify-center rounded-sm px-1.5 py-0.5",
-                  badge === "NOT" ? "bg-gray-vote-not" : "h-5 bg-gray-800",
+                  "shrink-0 items-center justify-center rounded-sm px-1.5",
+                  // BUG-143 높이 20 라벨에 위아래 여백까지 주면 글자가 아래로 밀린다(공지 상세 라벨과 같게).
+                  badge === "NOT" ? "bg-gray-vote-not py-0.5" : "h-5 bg-gray-800",
                 )}
               >
                 <Text
                   className={clsx(
                     "font-label-12-semibold",
                     badge === "NOT" ? "text-gray-800" : "text-gray-0",
-                    isOperator && "!leading-[18px]",
                   )}
                 >
                   {badge}
@@ -150,7 +151,6 @@ export function Comment({
           )}
           {isDeleted || !onPressMenu ? null : (
             <Pressable
-              ref={kebabRef}
               accessibilityLabel="댓글 메뉴"
               accessibilityRole="button"
               className="size-12 items-center justify-center active:opacity-75"
@@ -173,7 +173,8 @@ export function Comment({
         </View>
       </View>
       <View className={clsx("h-12 w-full pr-margin", isReply ? "pl-10" : "pl-margin")}>
-        <View className="mt-0.5 h-11 justify-center border-b border-gray-200">
+        {/* BUG-144 구분선을 댓글 맨 아래에 붙여 다음 답글 배경이 구분선에서 바로 시작하게 한다. */}
+        <View className="h-12 justify-center border-b border-gray-200">
           <Text className="text-gray-500 font-label-12-regular">{timeLabel}</Text>
         </View>
         {!isDeleted && (

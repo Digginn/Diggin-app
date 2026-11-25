@@ -57,6 +57,8 @@ type BottomSheetProps = {
   onToastDismiss?: () => void;
   /** 공유 확장은 iOS가 띄운 카드 안에서 돌아 모달을 또 올리지 않고 카드 안에 위부터 그린다. */
   isInline?: boolean;
+  /** 끄면 올라오고 내려가는 움직임 없이 제자리에 바로 띄우고 감춘다. 다른 화면을 보고 돌아올 때 쓴다. */
+  isAnimated?: boolean;
 };
 
 export function BottomSheet({
@@ -79,6 +81,7 @@ export function BottomSheet({
   toastVariant = "default",
   onToastDismiss,
   isInline = false,
+  isAnimated = true,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
   const isNativeVisible = useNativeModalVisible(visible && !isInline);
@@ -111,7 +114,13 @@ export function BottomSheet({
   const [openness] = useState(() => new Animated.Value(0));
   const [isModalKept, setModalKept] = useState(false);
   if (isNativeVisible && !isModalKept) setModalKept(true);
+  if (!isAnimated && !isNativeVisible && isModalKept) setModalKept(false);
   useEffect(() => {
+    if (!isAnimated) {
+      openness.stopAnimation();
+      openness.setValue(isNativeVisible ? 1 : 0);
+      return;
+    }
     if (isNativeVisible) {
       Animated.timing(openness, { toValue: 1, duration: 300, useNativeDriver: false }).start();
       return;
@@ -121,7 +130,7 @@ export function BottomSheet({
         if (finished) setModalKept(false);
       },
     );
-  }, [isNativeVisible, openness]);
+  }, [isNativeVisible, isAnimated, openness]);
 
   // 끌어내린 위치는 열 때만 되돌린다. 닫을 때 되돌리면 모달이 슬라이드로 사라지는 동안
   // 시트가 제자리로 튀어 올라왔다가 닫히는 것처럼 보인다.
