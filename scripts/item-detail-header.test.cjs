@@ -32,7 +32,7 @@ function nodes(node) {
   return [node, ...React.Children.toArray(node.props.children).flatMap(nodes)];
 }
 
-function setup(params = { id: "1" }) {
+function setup(params = { id: "1" }, bottomInset = 0) {
   const moreSvg = (props) => React.createElement("MoreSvg", props);
   const state = { thumbnailUrl: "https://shop.test/dark.jpg", backDark: true, moreDark: true };
   const sampled = [];
@@ -60,7 +60,9 @@ function setup(params = { id: "1" }) {
     "expo-image": { Image: "Image" },
     "expo-linear-gradient": { LinearGradient: "LinearGradient" },
     "expo-router": { useLocalSearchParams: () => params, useRouter: () => ({}) },
-    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 59 }) },
+    "react-native-safe-area-context": {
+      useSafeAreaInsets: () => ({ top: 59, bottom: bottomInset }),
+    },
     "nativewind": {
       cssInterop: (Icon, config) => {
         if (!config.className.nativeStyleToProp?.color) return Icon;
@@ -154,4 +156,20 @@ test("상품 상세는 다시 조회가 실패했다가 성공해도 같은 화�
   product.isSuccess = true;
   ItemDetailScreen();
   assert.equal(events.length, 1);
+});
+
+test("상품 상세 하단 두 버튼은 시스템 안전 영역을 피하고 기본 40px 여백을 유지한다", () => {
+  for (const bottomInset of [0, 24, 34, 48, 72]) {
+    const { ItemDetailScreen } = setup({ id: "1" }, bottomInset);
+    const footer = nodes(ItemDetailScreen()).find((node) =>
+      node.props.className?.includes("flex-row gap-gutter border-t"),
+    );
+    const classPadding = footer.props.className.includes("pb-10") ? 40 : 0;
+    const padding = footer.props.style?.paddingBottom ?? classPadding;
+    assert.ok(padding >= 40, "시안의 기본 여백을 유지한다");
+    assert.ok(padding >= bottomInset, `시스템 영역 ${bottomInset}px가 버튼을 가리지 않는다`);
+    if (bottomInset <= 40) assert.equal(padding, 40);
+    assert.ok(nodes(footer).some((node) => node.props.children === "웹사이트 이동"));
+    assert.ok(nodes(footer).some((node) => node.type === "FolderManageButton"));
+  }
 });
