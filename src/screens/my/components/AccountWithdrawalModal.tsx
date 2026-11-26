@@ -95,13 +95,13 @@ export function AccountWithdrawalModal({
       <View className="w-full items-center gap-1">
         <View className="h-[26px] w-full items-center justify-center">
           <Text className="text-center text-gray-900 font-label-16-semibold">
-            {isCompletionOpen ? "회원 탈퇴가 완료되었습니다." : "회원 탈퇴하시겠습니까?"}
+            {isCompletionOpen ? "회원 탈퇴가 완료되었습니다." : "회원 탈퇴를 진행하시겠습니까?"}
           </Text>
         </View>
         <Text className="text-center text-gray-700 font-b3">
           {isCompletionOpen
             ? "지금까지 Diggin을 이용해 주셔서 감사합니다."
-            : "탈퇴 후 모든 정보는 복구가 불가능합니다."}
+            : "탈퇴하면 저장한 아이템과 게시글이\n모두 삭제되며 복구할 수 없습니다."}
         </Text>
       </View>
       {isCompletionOpen ? (
@@ -113,13 +113,18 @@ export function AccountWithdrawalModal({
       ) : (
         <View className="w-full flex-row gap-modal-action">
           <View className="flex-1">
-            <Button isDisabled={isWithdrawing} onPress={handleClose}>
-              취소
+            <Button variant="secondary" isDisabled={isWithdrawing} onPress={handleAgree}>
+              <Text
+                numberOfLines={1}
+                className={`text-center font-label-16-medium ${isWithdrawing ? "text-gray-500" : "text-semantic-error"}`}
+              >
+                탈퇴하기
+              </Text>
             </Button>
           </View>
           <View className="flex-1">
-            <Button variant="secondary" isDisabled={isWithdrawing} onPress={handleAgree}>
-              탈퇴하기
+            <Button isDisabled={isWithdrawing} onPress={handleClose}>
+              취소
             </Button>
           </View>
         </View>
