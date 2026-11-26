@@ -625,7 +625,13 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
         visible={actions.deleteTarget !== null}
         type="2Btn"
         title="댓글을 삭제하시겠습니까?"
-        description="삭제한 댓글은 복구할 수 없습니다."
+        description={
+          actions.deleteTarget?.parentId === null &&
+          commentRows.some((row) => row.parentId === actions.deleteTarget?.id)
+            ? "삭제한 댓글은 복구할 수 없으며,\n댓글에 달린 답글도 함께 삭제됩니다."
+            : "삭제한 댓글은 복구할 수 없습니다."
+        }
+        scrimOpacity={0.36}
         primaryAction={{ label: "취소", onPress: actions.cancelDelete }}
         secondaryAction={{
           label: actions.isDeleting ? "삭제 중…" : "삭제하기",
