@@ -726,12 +726,14 @@ test("탈퇴 확인 → 설문 제출 성공 후에만 완료를 표시하고 �
     };
     const tree = () => Screen(props);
     const buttons = () => descendants(tree()).filter((node) => node.type === "Button");
-    assert.deepEqual(
-      buttons().map((node) => node.props.children),
-      ["취소", "탈퇴하기"],
+    assert.ok(
+      descendants(tree()).some((node) => node.props.children === "회원 탈퇴를 진행하시겠습니까?"),
     );
-    assert.equal(buttons()[1].props.variant, "secondary");
-    buttons()[1].props.onPress();
+    assert.equal(buttons()[0].props.variant, "secondary");
+    assert.equal(buttons()[0].props.children.props.children, "탈퇴하기");
+    assert.match(buttons()[0].props.children.props.className, /text-semantic-error/);
+    assert.equal(buttons()[1].props.children, "취소");
+    buttons()[0].props.onPress();
     assert.equal(calls, 0);
     assert.equal(tree().type, "AccountWithdrawalSurvey");
     await tree().props.onSubmit({ reasons: ["자주 사용하지 않아요."], detail: "" });
@@ -771,7 +773,7 @@ test("미연결 탈퇴는 성공 처리하지 않고, 설문 취소·요청 연�
   const props = { isVisible: true, onClose: () => closes++ };
   const tree = () => Screen(props);
   const buttons = () => descendants(tree()).filter((node) => node.type === "Button");
-  buttons()[1].props.onPress();
+  buttons()[0].props.onPress();
   const survey = { reasons: ["자주 사용하지 않아요."], detail: "" };
   await tree().props.onSubmit(survey);
   assert.equal(tree().props.toastMessage, "회원탈퇴 기능은 준비 중입니다.");
@@ -786,7 +788,7 @@ test("미연결 탈퇴는 성공 처리하지 않고, 설문 취소·요청 연�
   tree().props.onClose();
   assert.equal(closes, 1);
   assert.equal(calls, 0);
-  buttons()[1].props.onPress();
+  buttons()[0].props.onPress();
   const pending = tree().props.onSubmit(survey);
   assert.equal(tree().props.isSubmitting, true);
   tree().props.onClose();

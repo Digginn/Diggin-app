@@ -87,6 +87,7 @@ export function Modal({
       navigationBarTranslucent={isFullScreen}
     >
       {/* 키보드를 피해 줄어든 영역 밖까지 덮어 iOS 키보드 둥근 모서리 뒤가 하얗게 보이지 않게 한다(BUG-101). */}
+      {backdropClassName && <View className={`absolute inset-0 ${backdropClassName}`} />}
       <View className="absolute inset-0 bg-gray-1000" style={{ opacity: scrimOpacity }} />
       <KeyboardAvoidingView
         enabled={isKeyboardAvoiding}
@@ -94,7 +95,7 @@ export function Modal({
         style={{ flex: 1 }}
       >
         <View
-          className={`flex-1 items-center px-margin ${isAboveKeyboard ? "justify-end" : "justify-center"} ${backdropClassName ?? ""}`}
+          className={`flex-1 items-center px-margin ${isAboveKeyboard ? "justify-end" : "justify-center"}`}
           style={isAboveKeyboard ? { paddingBottom: keyboardGap } : undefined}
         >
           {/* 카드 바깥을 누르면 키보드만 닫는다. 모달은 닫지 않는다. */}

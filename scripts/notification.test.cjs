@@ -415,9 +415,14 @@ test("기기 알림 배너는 공용 설정 버튼과 닫기 동작을 제공한
   findAll(tree, "Pressable")[0].props.onPress();
   assert.deepEqual(events, ["settings", "close"]);
   assert.equal(findAll(tree, "CloseIcon").length, 1);
+  assert.deepEqual(
+    findAll(tree, "Text")
+      .slice(0, 2)
+      .map((node) => node.props.children),
+    ["기기 알림이 꺼져 있습니다.", "알림을 받으려면 기기 설정에서 알림을 허용해 주세요."],
+    "알림함 배너도 MSG-AUTH-006 문구를 쓴다(BUG-160)",
+  );
   const settingsBanner = PushOffBanner({
-    title: "기기 알림이 꺼져 있습니다.",
-    description: "알림을 받으려면 기기 설정에서 알림을 허용해 주세요.",
     onOpenSettings: () => events.push("settings"),
   });
   assert.equal(findAll(settingsBanner, "CloseIcon").length, 0);

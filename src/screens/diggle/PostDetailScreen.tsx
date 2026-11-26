@@ -399,15 +399,9 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
                     : undefined
                 }
               />
-              <View
-                className={
-                  post.notice
-                    ? areCommentsClosed
-                      ? "mx-margin h-2 bg-gray-100"
-                      : "h-2 bg-gray-100"
-                    : "h-3 bg-gray-100"
-                }
-              />
+              {!areCommentsClosed && (
+                <View className={post.notice ? "h-2 bg-gray-100" : "h-3 bg-gray-100"} />
+              )}
             </>
           }
           renderItem={({ item: comment }) => (
@@ -445,6 +439,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
               }
               isReply={comment.parentId !== null}
               {...commentLikes.likeOf(comment)}
+              // Figma CMT-01·CMT-08처럼 본인 댓글·답글에는 좋아요를 두지 않는다(BUG-154).
+              hasLike={!comment.isMine}
               onPressLike={
                 !comment.isMine && !comment.isWithdrawn
                   ? () => void commentLikes.toggle(comment)
@@ -473,8 +469,17 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
               }
             />
           )}
+          // 댓글을 닫은 공지는 좋아요 줄 아래를 화면 끝까지 Gray100으로 채운다(BUG-155).
+          contentContainerStyle={areCommentsClosed ? { flexGrow: 1 } : undefined}
+          ListFooterComponentStyle={areCommentsClosed ? { flexGrow: 1 } : undefined}
           ListFooterComponent={
             <>
+              {areCommentsClosed && (
+                <View
+                  className="min-h-2 flex-1 bg-gray-100"
+                  style={{ paddingBottom: insets.bottom }}
+                />
+              )}
               {!areCommentsClosed && (comments.isPending || comments.isFetchingNextPage) && (
                 <View className="items-center py-4">
                   <Spinner />

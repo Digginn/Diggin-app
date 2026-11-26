@@ -75,11 +75,7 @@ export function NotificationSettingsScreen({
       <AppBar title="알림 설정" />
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         {isDevicePushEnabled === false && (
-          <PushOffBanner
-            title="기기 알림이 꺼져 있습니다."
-            description="알림을 받으려면 기기 설정에서 알림을 허용해 주세요."
-            onOpenSettings={onOpenNotificationSettings}
-          />
+          <PushOffBanner onOpenSettings={onOpenNotificationSettings} />
         )}
         <View className="px-margin pt-6">
           <View className="flex-row items-center border-b border-gray-300 px-2">
