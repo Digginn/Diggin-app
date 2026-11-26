@@ -3,7 +3,7 @@
     "name": "Diggin",
     "owner": "diggin",
     "slug": "Diggin",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -15,7 +15,7 @@
     "scheme": "diggin",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "buildNumber": "5",
+      "buildNumber": "15",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "ITSAppUsesNonExemptEncryption": false
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.diggin.app",
-      "versionCode": 2,
+      "versionCode": 7,
       "icon": "./assets/images/icon-app-android.png",
       "adaptiveIcon": {
         "backgroundColor": "#1E1E1E",
