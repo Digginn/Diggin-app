@@ -102,8 +102,24 @@ select throws_ok($$select public.delete_community_post(current_setting('test.pos
 select lives_ok($$select private.assert_can_report_community()$$,'기간 제한 중 신고·차단 허용');
 select lives_ok($$select public.get_community_feed()$$,'기간 제한 중 조회 허용');
 select ok(public.get_account_access()->>'notice_seen_at' is null,'새 제한 건의 최초 안내는 이전 경고 확인과 별개');
+select is((select count(*)::int from private.user_sanctions where user_id='11400000-0000-0000-0000-000000000002' and released_at is not null),0,
+  '새 제재는 이전 경고를 해제하지 않는다');
+select set_config('test.restriction',(public.get_account_access()->>'sanction_id'),true);
+select set_config('test.restricted_until',(select restricted_until::text from public.profiles where id='11400000-0000-0000-0000-000000000002'),true);
+-- 7일 제한 중 경고는 기록만 남기고 제한을 풀지 않는다.
+select lives_ok($$select pg_temp.apply_sanction('warning','11400000-0000-0000-0003-000000000005')$$,'제한 중 경고 적용');
+select is((select status::text || ' ' || restricted_until::text from public.profiles where id='11400000-0000-0000-0000-000000000002'),
+  'community_restricted ' || current_setting('test.restricted_until'),'제한 중 경고는 계정 제한과 종료일을 유지');
+select throws_ok($$select public.delete_community_post(current_setting('test.post')::bigint)$$,'42501','community_restricted','제한 중 경고 뒤에도 쓰기 차단');
+select is((select kind::text from private.user_sanctions where user_id='11400000-0000-0000-0000-000000000002' order by id desc limit 1),'warning',
+  '제한 중 준 경고도 경고로 기록');
+select is(public.get_account_access()->>'status','community_restricted','앱에는 계속 제한 상태');
+select is(public.get_account_access()->>'sanction_id',current_setting('test.restriction'),'제한 중에는 제한 건의 안내 정보');
 update public.profiles set restricted_until=now()-interval '1 second' where id='11400000-0000-0000-0000-000000000002';
+update private.user_sanctions set restricted_until=now()-interval '1 second' where id=current_setting('test.restriction')::bigint;
 select lives_ok($$select private.assert_can_write_community()$$,'제한 만료 즉시 쓰기 허용');
+select is(public.get_account_access()->>'status','warning','제한 중 받은 경고는 제한이 끝난 뒤 안내');
+select public.acknowledge_sanction_notice((public.get_account_access()->>'sanction_id')::bigint);
 select is(public.get_account_access()->>'status','active','만료 제재는 앱에도 active 반환');
 select lives_ok($$select pg_temp.apply_sanction('suspended','11400000-0000-0000-0003-000000000003')$$,'영구 제한과 Auth ban 원자적 확정');
 select is((select count(*)::int from auth.sessions where user_id='11400000-0000-0000-0000-000000000002'),0,'영구 제한 시 모든 세션 삭제');
@@ -122,6 +138,9 @@ select throws_ok($$delete from private.admin_actions$$,'42501','audit_is_append_
 select throws_ok($$truncate private.admin_actions cascade$$,'42501','audit_is_append_only','감사 truncate 불가');
 select lives_ok($$select pg_temp.apply_sanction('release','11400000-0000-0000-0003-000000000004')$$,'운영자 영구 제한 해제');
 select is((select status::text from public.profiles where id='11400000-0000-0000-0000-000000000002'),'active','해제 후 active');
+select is((select released_at is null from private.user_sanctions where id=current_setting('test.restriction')::bigint),true,'이미 끝난 7일 제한은 해제로 기록하지 않음');
+select is((select count(*)::int from private.user_sanctions where user_id='11400000-0000-0000-0000-000000000002' and kind<>'community_restricted' and released_at is null),0,
+  '직접 해제는 남은 경고·영구 제한을 해제로 기록');
 select is((select banned_until from auth.users where id='11400000-0000-0000-0000-000000000002'),null::timestamptz,'해제 후 Auth ban 해제');
 select throws_ok($$select private.assert_account_access()$$,'42501','not_authorized','해제해도 종료된 이전 세션은 다시 사용할 수 없음');
 select throws_ok($$select public.report_community_content('post',current_setting('test.post')::bigint,'spam')$$,'42501','not_authorized','제한 해제 후에도 종료된 세션으로 신고 불가');

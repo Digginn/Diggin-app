@@ -26,7 +26,7 @@ function ProfileEditContent() {
       .catch(() => {
         if (!isActive) return;
         setHasError(true);
-        showToast(TOAST_MESSAGES.SYS_002);
+        showToast(TOAST_MESSAGES.SYS_002, "error");
       });
     return () => {
       isActive = false;

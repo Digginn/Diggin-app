@@ -1,5 +1,81 @@
 import { createAdminHandler } from "./handler.ts";
 
+Deno.test("공지 작성은 큰 한글 본문과 노출 설정을 보존하고 운영자는 인증에서만 가져온다", async () => {
+  let called = false;
+  const content = "가".repeat(8000);
+  const handler = createAdminHandler({
+    authenticate: () => Promise.resolve(actor),
+    updateAuth: () => Promise.resolve(),
+    rpc: (name, args) => {
+      assert(name === "admin_notice");
+      assert(args.actor === actor.userId && args.actor_session === actor.sessionId);
+      assert(args.operation === "create" && args.request_id === requestId);
+      const payload = args.payload as Record<string, unknown>;
+      assert(
+        payload.body === content && payload.inbox_only === true &&
+          payload.comments_closed === false,
+      );
+      called = true;
+      return Promise.resolve({ id: "42" });
+    },
+  });
+  const payload = {
+    title: "공지",
+    body: content,
+    inbox_body: "",
+    inbox_only: true,
+    comments_closed: false,
+  };
+  assert(
+    (await handler(
+      request({ action: "notice", operation: "create", request_id: requestId, payload }),
+    )).status === 200,
+  );
+  assert(called);
+  called = false;
+  assert(
+    (await handler(
+      request({
+        action: "notice",
+        operation: "create",
+        request_id: requestId,
+        payload,
+        actor: userId,
+      }),
+    )).status === 400,
+  );
+  assert(!called);
+});
+
+Deno.test("공지 조회는 쓰기 UUID 없이 조회하고 수정 충돌은 409를 유지한다", async () => {
+  const handler = createAdminHandler({
+    authenticate: () => Promise.resolve(actor),
+    updateAuth: () => Promise.resolve(),
+    rpc: (_name, args) => {
+      if (args.operation === "list") {
+        assert(args.request_id === null);
+        return Promise.resolve({ rows: [], total: 0 });
+      }
+      return Promise.reject(new Error("notice_revision_conflict"));
+    },
+  });
+  assert(
+    (await handler(request({ action: "notice", operation: "list", payload: { page: 1 } })))
+      .status === 200,
+  );
+  assert(
+    (await handler(
+      request({
+        action: "notice",
+        operation: "update",
+        notice_id: "42",
+        request_id: requestId,
+        payload: {},
+      }),
+    )).status === 409,
+  );
+});
+
 function assert(value: unknown) {
   if (!value) throw new Error("assertion_failed");
 }
@@ -258,4 +334,33 @@ Deno.test("이용 기록 분석 동의 철회는 검증한 운영자와 이메�
   );
   assert(conflict.status === 409);
   assert((await handler(request({ action: "withdraw_analytics_consent" }))).status === 400);
+  const selected = await handler(
+    request({
+      action: "withdraw_analytics_consent",
+      email: "user@test.invalid",
+      usage_analysis: false,
+      overseas_transfer: true,
+    }),
+  );
+  assert(selected.status === 200);
+  assert(
+    JSON.stringify(calls.at(-1)) === JSON.stringify([
+      "admin_withdraw_analytics_consent",
+      {
+        target_email: "user@test.invalid",
+        withdraw_usage_analysis: false,
+        withdraw_overseas_transfer: true,
+        actor: actor.userId,
+        actor_session: actor.sessionId,
+      },
+    ]),
+  );
+  const partial = await handler(
+    request({
+      action: "withdraw_analytics_consent",
+      email: "user@test.invalid",
+      usage_analysis: true,
+    }),
+  );
+  assert(partial.status === 400);
 });

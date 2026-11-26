@@ -77,12 +77,14 @@ test("상단 알림 버튼은 알림 화면으로 이동한다", () => {
     "./components/SelectModeBar": { SelectModeBar: "SelectModeBar" },
     "./components/SortLabel": { SortLabel: "SortLabel" },
     "@/screens/all/components/SortLabel": { SortLabel: "SortLabel" },
+    "@/screens/all/constants": { WISH_LEVEL_HINT: "hint" },
     "@/hooks/useProductList": { useProductList: () => ({ isPending: false, data: undefined }) },
     "@/hooks/useProductCounts": { useProductCounts: () => ({ data: undefined }) },
     "./mutations/useDeleteProducts": { useDeleteProducts: () => ({ mutate: () => {} }) },
     "./components/RecentSearches": { RecentSearches: "RecentSearches" },
     "./useRecentSearches": { useRecentSearches: () => ({ keywords: [] }) },
-    "./constants": { MAX_SEARCH_LENGTH: 100 },
+    // ALL과 검색이 이 mock을 함께 쓴다.
+    "./constants": { MAX_SEARCH_LENGTH: 100, WISH_LEVEL_HINT: "hint" },
     "@/screens/folder/FolderScreen": { FolderScreen: "FolderScreen" },
     "@/hooks/useFolders": { useFolders: () => ({ data: [], isError: false }) },
     "@/hooks/useCreateFolder": { useCreateFolder: () => ({}) },
@@ -413,9 +415,14 @@ test("기기 알림 배너는 공용 설정 버튼과 닫기 동작을 제공한
   findAll(tree, "Pressable")[0].props.onPress();
   assert.deepEqual(events, ["settings", "close"]);
   assert.equal(findAll(tree, "CloseIcon").length, 1);
+  assert.deepEqual(
+    findAll(tree, "Text")
+      .slice(0, 2)
+      .map((node) => node.props.children),
+    ["기기 알림이 꺼져 있습니다.", "알림을 받으려면 기기 설정에서 알림을 허용해 주세요."],
+    "알림함 배너도 MSG-AUTH-006 문구를 쓴다(BUG-160)",
+  );
   const settingsBanner = PushOffBanner({
-    title: "기기 알림이 꺼져 있습니다.",
-    description: "알림을 받으려면 기기 설정에서 알림을 허용해 주세요.",
     onOpenSettings: () => events.push("settings"),
   });
   assert.equal(findAll(settingsBanner, "CloseIcon").length, 0);
@@ -612,4 +619,42 @@ test("종 아이콘은 지난 확인 뒤 새 알림이 있으면 빨간 점 아�
     assert.equal(button.props.accessibilityLabel, hasUnread ? "알림, 새 알림 있음" : "알림");
     assert.equal(button.props.onPress, onPress);
   }
+});
+
+test("공지 알림과 일반 알림은 새 RPC의 문자열 커서를 보존하고 미확인 공지도 확인한다", async () => {
+  const calls = [];
+  const { fetchNotifications, fetchHasUnreadNotifications } = load(
+    "../src/screens/notification/api/notifications.ts",
+    {
+      "@/lib/supabase": {
+        supabase: {
+          rpc: async (name, args) => {
+            calls.push([name, args]);
+            if (name === "has_unread_notifications") return { data: false };
+            if (name === "has_unread_notices") return { data: true };
+            return {
+              data: [
+                {
+                  id: "notice:42",
+                  title: "공지 제목",
+                  body: "공지 요약",
+                  created_at: "2026-11-22T10:00:00Z",
+                  post_id: "42",
+                  post_type: "notice",
+                  is_post_available: true,
+                },
+              ],
+            };
+          },
+        },
+      },
+    },
+  );
+  const page = await fetchNotifications(null);
+  assert.equal(page[0].postType, "notice");
+  assert.equal(page[0].postId, "42");
+  await fetchNotifications(page[0]);
+  assert.equal(calls[1][0], "get_app_notifications");
+  assert.equal(calls[1][1].after_key, "notice:42");
+  assert.equal(await fetchHasUnreadNotifications(), true);
 });

@@ -42,6 +42,7 @@ function findAll(node, type) {
 
 test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자는 BUY/NOT, 탈퇴자는 라벨을 숨긴다", () => {
   const { Comment } = load("../src/components/Comment.tsx", {
+    "@/components/CommentLikeButton": { CommentLikeButton: "CommentLikeButton" },
     "react": { useRef: () => ({ current: null }), useState: () => [false, () => {}] },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
     "@/assets/images/icon-kebab.svg": { __esModule: true, default: "KebabSvg" },
@@ -64,8 +65,8 @@ test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자�
   assert.deepEqual(labels({ isOperator: true, voteChoice: "buy" }), [
     "느긋한디기12 (나)",
     "운영자",
-    "·",
     "방금 전",
+    "답글",
   ]);
   assert.ok(labels({ voteChoice: "buy" }).includes("BUY"));
   assert.ok(labels({ voteChoice: "not" }).includes("NOT"));
@@ -73,6 +74,37 @@ test("댓글은 운영자 라벨을 우선 표시하고 일반 투표 참여자�
   const withdrawn = labels({ isOperator: true, voteChoice: "buy", isDeleted: true });
   assert.equal(withdrawn.includes("운영자"), false);
   assert.equal(withdrawn.includes("BUY"), false);
+});
+
+test("댓글 하트에 서버 좋아요 값을 넘기고 답글 줄에는 답글 버튼을 숨긴다", () => {
+  const { Comment } = load("../src/components/Comment.tsx", {
+    "@/components/CommentLikeButton": { CommentLikeButton: "CommentLikeButton" },
+    "react": { useRef: () => ({ current: null }), useState: () => [false, () => {}] },
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+    "@/assets/images/icon-kebab.svg": { __esModule: true, default: "KebabSvg" },
+    "@/components/ReportBlockMenu": { ReportBlockMenu: "ReportBlockMenu" },
+    "@/theme": { colors: { gray: { 500: "gray" } } },
+    "@/utils/httpLinks": { httpLinkParts: (body) => [{ text: body }] },
+  });
+  const onPressLike = () => {};
+  const base = { author: "느긋한디기12", body: "댓글", timeLabel: "방금 전", onPressReply() {} };
+  const heart = findAll(
+    Comment({ ...base, likeCount: 3, isLiked: true, onPressLike }),
+    "CommentLikeButton",
+  )[0];
+  assert.equal(heart.props.isLiked, true);
+  assert.equal(heart.props.likeCount, 3);
+  assert.equal(heart.props.onPress, onPressLike);
+  const replyButtons = (props) =>
+    findAll(Comment(props), "Pressable").filter(
+      (node) => node.props.accessibilityLabel === "댓글 답글",
+    );
+  assert.equal(replyButtons(base).length, 1);
+  assert.equal(replyButtons({ ...base, isReply: true }).length, 0);
+  assert.equal(
+    findAll(Comment({ ...base, isReply: true, onPressLike }), "CommentLikeButton").length,
+    1,
+  );
 });
 
 test("댓글 150자 초과는 오류를 표시하고 줄이면 전송 가능한 상태로 복귀한다", () => {
@@ -174,6 +206,7 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
         View: "View",
         Text: "Text",
         FlatList: "FlatList",
+        RefreshControl: "RefreshControl",
         KeyboardAvoidingView: "KeyboardAvoidingView",
         Platform: { OS: os },
         Keyboard: {
@@ -196,6 +229,7 @@ test("투표 아이템은 하나만 선택하며 다른 아이템을 누르면 �
       },
       "@/components/app-bar": { AppBar: "AppBar" },
       "@/components/Loading": { Spinner: "Spinner" },
+      "@/components/RefreshArea": { RefreshArea: "RefreshArea", REFRESH_TINT: undefined },
       "@/contexts/AuthContext": { useAuth: () => ({ session: { user: { id: "viewer" } } }) },
       "@/hooks/useProductCounts": { useProductCounts: () => ({ data: { total: 9 } }) },
       "@/hooks/useProductList": {

@@ -30,9 +30,8 @@ const PREVIEW_NOTIFICATIONS: NotificationItem[] = [
   },
   {
     id: "like-read",
-    title: "내 게시글에 좋아요가 달렸어요",
-    message:
-      "'그레이랑 블랙 둘 다 너무 예쁜데 데일리로 입기엔 어떤 색이 더 나을까요?' 게시글을 누군가 좋아해요.",
+    title: "내 게시글에 10개 이상의 좋아요가 달렸어요.",
+    message: "'둘 다 너무 예뻐서 고민 중이에요...' 게시글에 달린 좋아요를 확인해 보세요.",
     timeLabel: "3시간 전",
     isRead: true,
   },
@@ -100,6 +99,7 @@ function NotificationsContent() {
           : items.map((notification) => ({
               id: notification.id,
               title: notification.title,
+              isNotice: notification.postType === "notice",
               message: notification.body,
               timeLabel: formatCommunityTime(notification.createdAt),
               // 확인 처리에 실패하면 점이 남아 있으니 목록은 모두 읽은 모양으로 둔다.
@@ -121,7 +121,12 @@ function NotificationsContent() {
           return;
         }
         router.push({
-          pathname: notification.postType === "vote" ? "/votes/[id]" : "/posts/[id]",
+          pathname:
+            notification.postType === "notice"
+              ? "/notices/[id]"
+              : notification.postType === "vote"
+                ? "/votes/[id]"
+                : "/posts/[id]",
           params: { id: notification.postId },
         });
       }}

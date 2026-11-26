@@ -4,12 +4,18 @@ import { normalizeText } from "@/utils/text";
 
 import { databaseId, parseCommunityComment } from "./community";
 
-export async function createComment(postId: string, body: string, requestId: string) {
+export async function createComment(
+  postId: string,
+  body: string,
+  requestId: string,
+  parentId?: string,
+) {
   const accessToken = await ensureCommunityWriteAllowed();
   const request = supabase.rpc("create_comment", {
     target_post_id: databaseId(postId),
     comment_content: normalizeText(body),
     request_id: requestId,
+    ...(parentId ? { parent_comment_id: databaseId(parentId) } : {}),
   });
   if (accessToken) request.setHeader("Authorization", `Bearer ${accessToken}`);
   const { data, error } = await request;
@@ -46,10 +52,28 @@ export async function setCommunityLike(id: string, isLiked: boolean) {
   if (accessToken) request.setHeader("Authorization", `Bearer ${accessToken}`);
   const { data, error } = await request;
   if (error) throw error;
+  return parseLike(data);
+}
+
+export async function setCommentLike(id: string, isLiked: boolean) {
+  const accessToken = await ensureCommunityWriteAllowed();
+  const request = supabase.rpc("set_comment_like", {
+    target_comment_id: databaseId(id),
+    is_liked: isLiked,
+  });
+  if (accessToken) request.setHeader("Authorization", `Bearer ${accessToken}`);
+  const { data, error } = await request;
+  if (error) throw error;
+  return parseLike(data);
+}
+
+function parseLike(data: unknown) {
   if (
     !data ||
     typeof data !== "object" ||
     Array.isArray(data) ||
+    !("is_liked" in data) ||
+    !("like_count" in data) ||
     typeof data.is_liked !== "boolean" ||
     typeof data.like_count !== "number" ||
     !Number.isSafeInteger(data.like_count) ||

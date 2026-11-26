@@ -286,35 +286,41 @@ export type Database = {
       };
       profiles: {
         Row: {
+          age_confirmed_at: string | null;
           avatar_path: string | null;
           community_policy_agreed_at: string | null;
           created_at: string;
           id: string;
           nickname: string;
           restricted_until: string | null;
+          signup_completed_at: string | null;
           status: Database["public"]["Enums"]["account_status"];
           suspended_at: string | null;
           updated_at: string;
         };
         ComputedFields: never;
         Insert: {
+          age_confirmed_at?: string | null;
           avatar_path?: string | null;
           community_policy_agreed_at?: string | null;
           created_at?: string;
           id: string;
           nickname: string;
           restricted_until?: string | null;
+          signup_completed_at?: string | null;
           status?: Database["public"]["Enums"]["account_status"];
           suspended_at?: string | null;
           updated_at?: string;
         };
         Update: {
+          age_confirmed_at?: string | null;
           avatar_path?: string | null;
           community_policy_agreed_at?: string | null;
           created_at?: string;
           id?: string;
           nickname?: string;
           restricted_until?: string | null;
+          signup_completed_at?: string | null;
           status?: Database["public"]["Enums"]["account_status"];
           suspended_at?: string | null;
           updated_at?: string;
@@ -390,6 +396,17 @@ export type Database = {
         };
         Returns: string;
       };
+      admin_notice: {
+        Args: {
+          actor: string;
+          actor_session: string;
+          operation: string;
+          payload?: Json;
+          request_id?: string;
+          target_id?: number;
+        };
+        Returns: Json;
+      };
       admin_prepare_sanction: {
         Args: {
           actor: string;
@@ -438,7 +455,13 @@ export type Database = {
         Returns: boolean;
       };
       admin_withdraw_analytics_consent: {
-        Args: { actor: string; actor_session: string; target_email: string };
+        Args: {
+          actor: string;
+          actor_session: string;
+          target_email: string;
+          withdraw_overseas_transfer?: boolean;
+          withdraw_usage_analysis?: boolean;
+        };
         Returns: Json;
       };
       agree_community_policy: { Args: Record<PropertyKey, never>; Returns: string };
@@ -448,9 +471,19 @@ export type Database = {
       };
       claim_amplitude_deletions: { Args: Record<PropertyKey, never>; Returns: Json };
       claim_notification_pushes: { Args: { receipts?: boolean }; Returns: Json };
+      claim_signup_completion: { Args: Record<PropertyKey, never>; Returns: boolean };
       claim_underage_deletion: { Args: { target: string }; Returns: boolean };
+      complete_login_consent: {
+        Args: { age_confirmed: boolean; privacy_policy_id: number; terms_policy_id: number };
+        Returns: undefined;
+      };
       create_comment: {
-        Args: { comment_content: string; request_id: string; target_post_id: number };
+        Args: {
+          comment_content: string;
+          parent_comment_id?: number;
+          request_id: string;
+          target_post_id: number;
+        };
         Returns: Json;
       };
       create_post: {
@@ -495,6 +528,10 @@ export type Database = {
       };
       get_account_access: { Args: Record<PropertyKey, never>; Returns: Json };
       get_analytics_consent: { Args: Record<PropertyKey, never>; Returns: Json };
+      get_app_notifications: {
+        Args: { after_created_at?: string; after_key?: string };
+        Returns: Json;
+      };
       get_community_comments: {
         Args: { after_created_at?: string; after_id?: number; target_post_id: number };
         Returns: Json;
@@ -504,6 +541,7 @@ export type Database = {
         Returns: Json;
       };
       get_community_post: { Args: { target_post_id: number }; Returns: Json };
+      get_featured_notice: { Args: Record<PropertyKey, never>; Returns: Json };
       get_first_visit_guides: { Args: { target_user_id: string }; Returns: string[] };
       get_my_community_activity: {
         Args: { activity_type: string; after_activity_at?: string; after_id?: number };
@@ -529,8 +567,13 @@ export type Database = {
         };
       };
       get_push_enabled: { Args: Record<PropertyKey, never>; Returns: boolean };
+      has_unread_notices: { Args: Record<PropertyKey, never>; Returns: boolean };
       has_unread_notifications: { Args: Record<PropertyKey, never>; Returns: boolean };
       import_csv: { Args: { import_plan: Json; request_id: string }; Returns: Json };
+      lookup_login_policy_status: {
+        Args: { identity_provider: string; identity_subject: string };
+        Returns: Json;
+      };
       lookup_suspended_identity: {
         Args: { identity_provider: string; identity_subject: string };
         Returns: Json;
@@ -574,6 +617,7 @@ export type Database = {
         Returns: Json;
       };
       set_avatar: { Args: { new_path: string }; Returns: undefined };
+      set_comment_like: { Args: { is_liked: boolean; target_comment_id: number }; Returns: Json };
       set_community_like: { Args: { is_liked: boolean; target_post_id: number }; Returns: Json };
       set_community_vote: { Args: { target_post_id: number; vote_option: string }; Returns: Json };
       set_owned: {

@@ -14,6 +14,8 @@ import { FirstVisitGuide } from "@/components/FirstVisitGuide";
 import { ActionModal } from "@/components/modal";
 import { useFirstVisitGuide } from "@/hooks/useFirstVisitGuide";
 import { useLinkDetectionPause } from "@/hooks/useLinkDetectionPause";
+import { whenNativeModalIdle } from "@/hooks/useNativeModalVisible";
+import { useToast } from "@/hooks/useToast";
 
 import { FolderCard, type FolderItem } from "./components/FolderCard";
 import { FolderMenu, type FolderMenuAnchor } from "./components/FolderMenu";
@@ -26,6 +28,7 @@ const INITIAL_FOLDERS: FolderItem[] = [
   { id: "owned", name: "나의 소장템", itemCount: 0, isOwnedItems: true },
 ];
 const TOAST_DURATION_MS = 2000;
+const ERROR_TOAST_DURATION_MS = 4000;
 const MAX_CUSTOM_FOLDERS = 50;
 
 type FolderScreenProps = {
@@ -64,12 +67,15 @@ export function FolderScreen({
   requireLogin = (action) => action(),
 }: FolderScreenProps = {}) {
   const { height } = useWindowDimensions();
+  const showToast = useToast();
   const guide = useFirstVisitGuide("folder", !isError && !isLoading && !isGuest);
   useLinkDetectionPause(guide.isPending, true);
   const ownedGuideRef = useRef<View>(null);
   const fabGuideRef = useRef<View>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [toast, setToast] = useState<{ message: string } | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(
+    null,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
   const isDeletingRef = useRef(false);
   const [editingFolder, setEditingFolder] = useState<FolderItem | null>(null);
@@ -98,20 +104,32 @@ export function FolderScreen({
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), TOAST_DURATION_MS);
+    const timer = setTimeout(
+      () => setToast(null),
+      toast.variant === "error" ? ERROR_TOAST_DURATION_MS : TOAST_DURATION_MS,
+    );
     return () => clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!toast || isError || isCreateModalOpen || editingFolder || deletingFolder) return;
+    // 탭 화면 높이에 맞춰 보정하지 않고 전역 영역의 하단 160px 기준을 사용한다.
+    return whenNativeModalIdle(() => showToast(toast.message, toast.variant));
+  }, [toast, isError, isCreateModalOpen, editingFolder, deletingFolder, showToast]);
 
   async function submitFolderName(name: string, folder?: FolderItem) {
     if (!folder && folders.filter((entry) => !entry.isOwnedItems).length >= MAX_CUSTOM_FOLDERS) {
       Keyboard.dismiss();
-      setToast({ message: FOLDER_MESSAGES.createLimit });
+      setToast({ message: FOLDER_MESSAGES.createLimit, variant: "error" });
       return false;
     }
     try {
       if (folder) await onRenameFolder?.(folder, name);
       else await onCreateFolder?.(name);
-      setToast({ message: folder ? FOLDER_MESSAGES.renameSuccess : FOLDER_MESSAGES.createSuccess });
+      setToast({
+        message: folder ? FOLDER_MESSAGES.renameSuccess : FOLDER_MESSAGES.createSuccess,
+        variant: "success",
+      });
       return true;
     } catch (error) {
       const reason =
@@ -126,14 +144,15 @@ export function FolderScreen({
           : isLimitError
             ? FOLDER_MESSAGES.createLimit
             : FOLDER_MESSAGES.createError,
+        variant: "error",
       });
       return false;
     }
   }
 
   const modalToast = toast ? (
-    <View pointerEvents="none" className="absolute inset-x-0 bottom-40">
-      <FolderToast message={toast.message} />
+    <View pointerEvents="none" className="absolute inset-x-0 bottom-[160px]">
+      <FolderToast message={toast.message} variant={toast.variant} />
     </View>
   ) : undefined;
 
@@ -299,11 +318,6 @@ export function FolderScreen({
           onSubmit={onRenameFolder ? (name) => submitFolderName(name, editingFolder) : undefined}
         />
       )}
-      {!isError && !isCreateModalOpen && !editingFolder && !deletingFolder && toast && (
-        <View pointerEvents="none" className="absolute inset-x-0 bottom-20 z-30">
-          <FolderToast message={toast.message} />
-        </View>
-      )}
       {!isError && selectedFolderMenu && (
         <FolderMenu
           anchor={selectedFolderMenu.anchor}
@@ -338,9 +352,9 @@ export function FolderScreen({
               try {
                 await onDeleteFolder(deletingFolder);
                 setDeletingFolder(null);
-                setToast({ message: FOLDER_MESSAGES.deleteSuccess });
+                setToast({ message: FOLDER_MESSAGES.deleteSuccess, variant: "success" });
               } catch {
-                setToast({ message: FOLDER_MESSAGES.deleteError });
+                setToast({ message: FOLDER_MESSAGES.deleteError, variant: "error" });
               } finally {
                 isDeletingRef.current = false;
                 setIsDeleting(false);

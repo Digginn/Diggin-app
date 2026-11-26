@@ -37,3 +37,7 @@ runs:
     - name: Validate direct-block-first profanity migration recovery
       shell: bash
       run: python3 scripts/validate_csv_migration_recovery.py --profanity
+
+    - name: Validate admin-console-first notice migration recovery
+      shell: bash
+      run: python3 scripts/validate_csv_migration_recovery.py --notices

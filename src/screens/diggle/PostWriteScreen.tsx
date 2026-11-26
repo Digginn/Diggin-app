@@ -13,6 +13,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { restrictionMessage } from "@/api/accountAccess";
 import { AppBar } from "@/components/app-bar";
@@ -64,6 +65,7 @@ export function PostWriteScreen({ type = "all" }: { type?: "all" | "vote" }) {
 
 function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const showToast = useToast();
   const { items, setItems, reset } = usePostDraft();
@@ -159,7 +161,7 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
       trackEvent(isVote ? "vote_create" : "post_create", { post_id: postId });
       void queryClient.invalidateQueries({ queryKey: communityKeys.all });
       setLeaving(true);
-      showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글을 등록했습니다.");
+      showToast(isVote ? DIGGLE_TOAST_MESSAGES.VOTE_009 : "게시글이 등록되었습니다.", "success");
     } catch (error) {
       busy.current = false;
       if (mounted.current) {
@@ -247,7 +249,7 @@ function WriteEditor({ viewer, isVote }: { viewer: string; isVote: boolean }) {
         </View>
       )}
       {canEdit ? (
-        <View className="px-margin pb-10">
+        <View className="px-margin" style={{ paddingBottom: Math.max(40, insets.bottom) }}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="커뮤니티 이용정책 보기"

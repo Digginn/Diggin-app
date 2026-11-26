@@ -230,8 +230,23 @@ export function LiveReportDetailScreen({
                       <p>{data.post?.content ?? "삭제된 게시글"}</p>
                     </div>
                   )}
+                  {data.parent_comment && (
+                    <div className="detail-parent">
+                      <p>
+                        원 댓글 #{data.parent_comment.id}
+                        {data.parent_comment.deleted_at
+                          ? " · 삭제됨"
+                          : data.parent_comment.hidden_at
+                            ? " · 숨김 처리됨"
+                            : ""}
+                      </p>
+                      <p>{data.parent_comment.content ?? "삭제된 댓글"}</p>
+                    </div>
+                  )}
                   <div className="detail-content">
-                    {data.report.target_type === "comment" && <h3>현재 댓글</h3>}
+                    {data.report.target_type === "comment" && (
+                      <h3>{data.parent_comment ? "현재 답글" : "현재 댓글"}</h3>
+                    )}
                     <p>
                       {target?.content ??
                         data.report.reported_content ??

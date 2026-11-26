@@ -15,6 +15,15 @@ import { GoogleSignin } from "@/lib/googleSignIn";
 import { supabase } from "@/lib/supabase";
 
 import type { LoginProvider } from "../components/SocialLoginButton";
+import type { TermsConsent } from "../components/TermsConsentSheet";
+
+// 앱에 포함된 약관 전문의 버전. 재동의 대상 버전이 다르면 구버전 문서로 동의시키지 않는다.
+const LOGIN_POLICY_VERSION = "1.1";
+type LoginFlow = {
+  onAuthorized: () => void;
+  requestConsent: () => Promise<TermsConsent | null>;
+  rollbackSession: () => Promise<void>;
+};
 
 export type SignInResult =
   | { status: "cancelled" }
@@ -34,9 +43,37 @@ function isBanned(error: unknown) {
 async function signInWithIdentity(
   provider: "google" | "kakao" | "apple",
   token: string,
-  onAuthorized: () => void,
+  flow: LoginFlow,
 ): Promise<SignInResult> {
-  onAuthorized();
+  flow.onAuthorized();
+  // 아직 Supabase 인증·가입은 하지 않는다. 서버가 제공자 토큰의 서명과 대상 앱을 검증한다.
+  const lookup = await supabase.functions.invoke("account-restriction", {
+    body: { provider, id_token: token, operation: "login-consent" },
+  });
+  if (lookup.error) throw lookup.error;
+  if (lookup.data?.notice)
+    return { status: "suspended", access: parseAccountAccess(lookup.data.notice) };
+  const policies = lookup.data?.policy_status;
+  if (
+    typeof policies?.requires_consent !== "boolean" ||
+    typeof policies.is_new_user !== "boolean" ||
+    !Number.isSafeInteger(policies.terms_policy_id) ||
+    policies.terms_policy_id <= 0 ||
+    !Number.isSafeInteger(policies.privacy_policy_id) ||
+    policies.privacy_policy_id <= 0
+  )
+    throw new Error("invalid_login_policy_status");
+  let agreed: TermsConsent | null = null;
+  if (policies.requires_consent) {
+    if (
+      policies.terms_version !== LOGIN_POLICY_VERSION ||
+      policies.privacy_version !== LOGIN_POLICY_VERSION
+    )
+      throw new Error("login_policy_update_required");
+    agreed = await flow.requestConsent();
+    if (!agreed) return { status: "cancelled" };
+    if (!agreed.age || !agreed.terms || !agreed.privacy) throw new Error("login_consent_required");
+  }
   const { error } = await supabase.auth.signInWithIdToken({ provider, token });
   if (error) {
     if (!isBanned(error)) throw error;
@@ -47,19 +84,28 @@ async function signInWithIdentity(
       return { status: "suspended", access: UNKNOWN_SUSPENSION };
     return { status: "suspended", access: parseAccountAccess(result.data.notice) };
   }
-  return finishSignIn();
+  try {
+    const saved = await supabase.rpc("complete_login_consent", {
+      terms_policy_id: policies.terms_policy_id,
+      privacy_policy_id: policies.privacy_policy_id,
+      age_confirmed: agreed?.age === true,
+    });
+    if (saved.error) throw saved.error;
+  } catch (error) {
+    // 버전 변경·저장 실패 시 중간 세션으로 로그인 완료 화면에 진입하지 않는다.
+    await flow.rollbackSession();
+    throw error;
+  }
+  return finishSignIn(policies.is_new_user);
 }
 
-const NEW_USER_WINDOW_MS = 60_000;
 const SIGNUP_COMPLETE_SHOWN_KEY = "signup-complete-shown";
 
 const kakaoNativeAppKey = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY;
 if (kakaoNativeAppKey) void initializeKakaoSDK(kakaoNativeAppKey);
 
-// Supabase는 신규 가입 여부를 따로 알려주지 않는다. 첫 로그인은 가입 시각과 마지막 로그인 시각이 같다.
-// 가입 1분 안에 다시 로그인해도 가입 완료 안내는 이 기기에서 한 번만 보여 준다.
-// shortcut: 시각 차이와 기기 기록으로 판단한다. 서버에 가입 완료 안내 노출 여부를 저장하게 되면 그 값으로 바꾼다.
-async function finishSignIn(): Promise<SignInResult> {
+// 최초 가입 안내는 서버에서 한 번만 선점한다. 재설치·다른 기기의 로그인도 재노출하지 않는다.
+async function finishSignIn(isNewIdentity: boolean): Promise<SignInResult> {
   const access = await fetchAccountAccess();
   if (access.status === "suspended") {
     await supabase.auth.signOut({ scope: "local" });
@@ -67,27 +113,38 @@ async function finishSignIn(): Promise<SignInResult> {
   }
   const { data, error } = await supabase.auth.getUser();
   if (error) throw error;
-  const createdAt = Date.parse(data.user.created_at);
-  const lastSignInAt = Date.parse(data.user.last_sign_in_at ?? data.user.created_at);
-  if (lastSignInAt - createdAt >= NEW_USER_WINDOW_MS)
-    return { status: "success", isNewUser: false };
-
   const shownKey = `${SIGNUP_COMPLETE_SHOWN_KEY}:${data.user.id}`;
+  let wasShown = false;
   try {
-    if (await AsyncStorage.getItem(shownKey)) return { status: "success", isNewUser: false };
+    wasShown = !!(await AsyncStorage.getItem(shownKey));
+  } catch {
+    // 기기 기록은 이전 버전 안내와의 호환용이다. 서버 기록을 기준으로 판단한다.
+  }
+  const completion = await Promise.resolve(supabase.rpc("claim_signup_completion")).catch(() => ({
+    data: null,
+    error: new Error("signup_completion_unavailable"),
+  }));
+  if (completion.error) {
+    // 서버 미배포·조회 실패를 신규 가입으로 추측하지 않고 로그인은 계속한다.
+    console.warn("가입 완료 안내 상태를 확인하지 못했습니다.");
+    return { status: "success", isNewUser: false };
+  }
+  if (completion.data !== true || wasShown || !isNewIdentity)
+    return { status: "success", isNewUser: false };
+  try {
     await AsyncStorage.setItem(shownKey, "1");
   } catch {
-    // 기록을 못 읽어도 로그인은 이어 간다. 안내가 한 번 더 뜨는 편이 막히는 것보다 낫다.
+    // 서버 선점은 완료됐으므로 기기 저장 실패가 재노출로 이어지지 않는다.
   }
   return { status: "success", isNewUser: true };
 }
 
 // MY-010 최소 수집: 닉네임은 랜덤으로 만들어 이름·이메일을 요청하지 않는다.
-async function signInWithAppleNative(onAuthorized: () => void): Promise<SignInResult> {
+async function signInWithAppleNative(flow: LoginFlow): Promise<SignInResult> {
   try {
     const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
     if (!credential.identityToken) throw new Error("apple_identity_token_missing");
-    const result = await signInWithIdentity("apple", credential.identityToken, onAuthorized);
+    const result = await signInWithIdentity("apple", credential.identityToken, flow);
     // 자동 삭제 때 재인증 없이 애플 연결을 끊으려고 맡긴다. 실패해도 로그인은 이어 간다.
     if (result.status === "success" && credential.authorizationCode)
       void supabase.functions
@@ -102,13 +159,13 @@ async function signInWithAppleNative(onAuthorized: () => void): Promise<SignInRe
   }
 }
 
-async function signInWithGoogle(onAuthorized: () => void): Promise<SignInResult> {
+async function signInWithGoogle(flow: LoginFlow): Promise<SignInResult> {
   try {
     await GoogleSignin.hasPlayServices();
     const response = await GoogleSignin.signIn();
     if (isCancelledResponse(response)) return { status: "cancelled" };
     if (!response.data.idToken) throw new Error("google_id_token_missing");
-    return signInWithIdentity("google", response.data.idToken, onAuthorized);
+    return signInWithIdentity("google", response.data.idToken, flow);
   } catch (error) {
     if (isErrorWithCode(error) && error.code === statusCodes.IN_PROGRESS) {
       return { status: "cancelled" };
@@ -131,12 +188,12 @@ async function importKakaoAvatar() {
 // AUTH-004 카카오 SDK로 로그인한다. 카카오톡이 있으면 카카오톡으로, 없으면 카카오 계정 화면으로 연다.
 // Supabase 브라우저 로그인은 이메일 동의항목을 항상 요청해 비즈 앱이 아니면 KOE205로 막힌다.
 // ID 토큰 방식은 요청 항목을 카카오 동의항목 설정대로 받는다(MY-010 이메일 미수집).
-async function signInWithKakao(onAuthorized: () => void): Promise<SignInResult> {
+async function signInWithKakao(flow: LoginFlow): Promise<SignInResult> {
   try {
     const token = await loginWithKakao();
     // 카카오 콘솔에서 OpenID Connect를 켜야 idToken이 온다.
     if (!token.idToken) throw new Error("kakao_id_token_missing");
-    const result = await signInWithIdentity("kakao", token.idToken, onAuthorized);
+    const result = await signInWithIdentity("kakao", token.idToken, flow);
     if (result.status === "success" && result.isNewUser) await importKakaoAvatar();
     return result;
   } catch (error) {
@@ -151,9 +208,15 @@ async function signInWithKakao(onAuthorized: () => void): Promise<SignInResult> 
 export function signIn(
   provider: LoginProvider,
   onAuthorized: () => void = () => {},
+  requestConsent: () => Promise<TermsConsent | null> = async () => null,
+  rollbackSession: () => Promise<void> = async () => {
+    const { error } = await supabase.auth.signOut({ scope: "local" });
+    if (error) throw error;
+  },
 ): Promise<SignInResult> {
-  if (provider === "google") return signInWithGoogle(onAuthorized);
-  if (provider === "kakao") return signInWithKakao(onAuthorized);
+  const flow = { onAuthorized, requestConsent, rollbackSession };
+  if (provider === "google") return signInWithGoogle(flow);
+  if (provider === "kakao") return signInWithKakao(flow);
   if (Platform.OS !== "ios") return Promise.reject(new Error("apple_login_not_supported"));
-  return signInWithAppleNative(onAuthorized);
+  return signInWithAppleNative(flow);
 }

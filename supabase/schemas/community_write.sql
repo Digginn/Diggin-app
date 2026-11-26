@@ -89,6 +89,7 @@ begin
   -- RPT-006: 기간 제한 중에는 본인 게시글 삭제도 차단한다.
   select * into target from private.posts where id = target_post_id and author_id = viewer_id for update;
   if not found then raise exception 'post_not_found' using errcode = '42501'; end if;
+  if target.notice_title is not null then raise exception 'admin_required' using errcode='42501'; end if;
   if target.deleted_at is not null then return; end if;
   update private.posts set deleted_at = now() where id = target.id;
   update private.comments set deleted_at = now() where post_id = target.id and deleted_at is null;

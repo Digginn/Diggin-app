@@ -14,8 +14,8 @@
 | 계정·MY        | profiles, nickname_banned_words, nickname_allowed_words, withdrawal_surveys, legal_policies, user_policy_consents, push_tokens | 구현 (#71)                                                                  |
 | 폴더           | folders                                                                                                                        | 구현 (#71). 가입 시 나의 소장템을 만들어야 해서 먼저 넣었다                 |
 | 아이템·CSV     | products, product_folders, import_jobs, import_failures                                                                        | products, product_folders 구현 (#78). import_*와 CSV 저장 구현 (#69)        |
-| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, post_anon_numbers                                                  | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)               |
-| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 생성·목록 (#104), Push 발송 (#131) |
+| 커뮤니티       | posts, post_products, vote_responses, post_likes, comments, comment_likes, post_anon_numbers                                   | DB·조회 (#94), 작성·삭제 (#95), 투표 (#96), 댓글·좋아요 (#97)               |
+| 신고·알림·운영 | reports, user_blocks, notifications, like_notification_log, post_like_notifications, admin_users, admin_actions, user_sanctions, moderation_requests    | 신고·차단 (#112), 운영·제재 (#114), 알림 생성·목록 (#104), Push 발송 (#131) |
 
 ## 2. 스키마를 public과 private으로 나눈 이유
 
@@ -97,11 +97,13 @@ report_reason의 앞 4개는 `src/components/modal/ReportModal.tsx`의 사유 �
 자세한 정의는 `supabase/schemas/`를 본다.
 
 - 가입 트리거 `private.handle_new_user()`: auth.users insert 시 profiles(랜덤 닉네임)와 나의 소장템 폴더를 만든다.
+- ONB-004(#249): `profiles.signup_completed_at`과 `claim_signup_completion()`으로 가입 완료 안내를 계정별 한 번만 선점한다. 인증·현재 세션·계정 상태를 확인한 뒤 본인 프로필의 null 값만 현재 시각으로 바꾸고 최초 호출만 true를 반환한다. 재로그인·재설치·다른 기기에서는 false이며 앱의 직접 변경은 금지한다. 전환 마이그레이션은 기존 회원을 처리 완료로 보정해 재노출을 막는다. 앱은 서버 미배포·통신 실패를 신규 가입으로 간주하지 않는다. 이 시각은 안내 선점 시각이며 필수 약관 동의 증빙이나 실제 화면 열람 완료 기록은 아니다. `is_new_user` 사전 조회도 함께 확인해, 구버전 앱에서 가입해 선점 기록이 없는 기존 계정도 신규로 안내하지 않는다.
 - 랜덤 닉네임 `private.generate_nickname()`: 형용사 + 디기 + 숫자(예: 느긋한디기12). 형용사 40개(2~4자), 숫자 1~9999라 2~10자 안에 들어간다. 직접 변경과 같은 검사를 통과한 후보만 쓴다(AUTH-005).
 - 닉네임 검사 `private.nickname_error()`: 글자 수 → 공백 → 특수문자·이모지 → 금칙어 → 사칭 → 중복(AUTH-008). 사칭 규칙은 명세 문구대로 함수에 있고, 금칙어는 `private.nickname_banned_words`, 오탐 보정은 `nickname_allowed_words`다. 둘 다 korcen(MIT) 목록 중 닉네임에 쓸 수 있는 형태(한글 완성형·영문 소문자·숫자)만 마이그레이션으로 넣었다(#120). 금칙어 단계는 커뮤니티 본문과 같은 `private.contains_community_profanity()`를 쓴다(#182). 사칭·중복 검사는 그대로 닉네임 전용이다.
 - profiles: 앱은 본인 행 select만. 닉네임은 `update_nickname`, 이미지는 `set_avatar`, 제재 상태는 운영 API만 바꾼다.
 - folders: 사용자별 이름 중복 금지, 일반 폴더 최대 50개(프로필 행을 잠근 뒤 센다), 나의 소장템은 만들기·고치기·지우기 불가. `last_added_at`은 상품을 담을 때 트리거로 갱신한다(#78).
 - legal_policies(public, 비회원도 조회) / user_policy_consents(private): `get_pending_policies()`, `accept_policy(policy_id)`.
+- 로그인 약관(#249): `account-restriction`의 `operation: login-consent`는 소셜 ID token 서명·issuer·audience·만료 검증 후 서비스 전용 `lookup_login_policy_status(provider, subject)`로 현재 시행 약관과 동의 필요 여부만 반환한다. 클라이언트가 준 UUID·이메일로 조회하지 않는다. 소셜 계정 선택 → 동의 필요 시에만 시트 → 필수 3개 확인 → Supabase 가입·인증 → 본인 전용 `complete_login_consent(terms_policy_id, privacy_policy_id, age_confirmed)` 순서다. 이 RPC는 현재 버전 ID를 재검사하고 프로필 행 잠금 안에서 필수 두 약관 이력과 `profiles.age_confirmed_at`을 저장한다. 기존 동의자는 이력을 덧쓰지 않고 확인만 한다. 재동의가 필요한 버전 변경·만 14세 이상 확인 누락·저장 실패를 건너뛰지 않는다. 동의 중 버전이 바뀌거나 저장이 실패하면 중간 세션을 로그아웃한다. 기존 계정의 동의를 추정하여 보정하지 않으므로 기록이 없던 회원은 한 번 동의해야 한다. 앱 전문과 일치하는 v1.1(2026.11.25) 정책을 등록하며 `document_url`은 해당 원문이 있는 불변 Git 커밋을 가리킨다. 재동의가 불필요한 새 버전은 과거 같은 종류의 동의를 인정하고, 재동의 대상인데 앱에 해당 전문이 없으면 업데이트를 안내한다.
 - push_tokens: 등록은 `register_push_token(token, platform)`만(같은 토큰은 마지막 로그인 계정으로 옮김), 앱은 본인 토큰 select·delete.
 - withdrawal_surveys(private, user_id 없음): 탈퇴 Edge Function이 service_role 전용 `record_withdrawal_survey(reasons, custom_text)`로만 쓴다. 직접 작성은 앱 화면처럼 조합 이모지를 1자로 세(`private.char_count`, Edge는 grapheme) 100자까지 받는다.
 - Storage avatars 버킷: 비공개, WebP, 512KB 이하, 경로 `{user_id}/파일명`, 본인 폴더만 select·insert·update·delete.
@@ -196,7 +198,8 @@ import_failures
 - `get_community_feed(feed_type = 'all', after_created_at?, after_id?)`: 일반글·투표글 통합 또는 투표글만 최신순 20개를 반환한다. `(created_at, id)` 커서로 같은 시각의 글·앞쪽 신규 삽입에도 중복 페이지를 방지한다. 비회원은 첫 줄 본문과 Snapshot 이미지만 받으며 상품명·브랜드·가격·원본 링크·집계·본인 여부는 받지 않는다. 페이지 경계용 id/type/created_at은 포함한다.
 - `get_community_post(target_post_id)`: 회원만 상세 Snapshot과 개수를 조회한다. 삭제·숨김·없는 글·차단한 작성자의 글 또는 내가 신고한 해당 글은 null이다. 회원 피드·상세·내 활동은 공통 `community_post_json`에서 작성자 UUID 대신 `author_nickname`과 `is_mine`을 반환한다. 비회원 미리보기에는 닉네임을 반환하지 않는다.
 - `get_community_comments(target_post_id, after_created_at?, after_id?)`: 동일한 게시글 접근 조건을 확인한 뒤 오래된 순 20개를 반환한다. 댓글도 삭제·숨김·작성자 차단과 해당 댓글 신고를 제외한다. UUID 없이 `author_nickname`과 글쓴이/본인/탈퇴 여부를 반환한다. 탈퇴 사용자 본문·닉네임은 항상 null이다. `anon_number`는 구버전 앱 호환용으로만 유지한다.
-- 댓글 조회·등록·수정 JSON은 활성 `private.admin_users`에 등록된 작성자 여부를 `is_operator`로 반환하고, 투표글에서는 해당 댓글 작성자의 현재 투표 선택을 `vote_choice`(`buy`/`not`/null)로 반환한다(#227). 관리자 UUID·이메일·역할이나 전체 투표자 명단은 공개하지 않는다. 관리자 비활성화·투표 변경은 다음 댓글 조회에 반영되며, 탈퇴한 작성자는 false/null이다. 앱은 운영자 라벨을 우선 표시하고, 나머지 댓글에는 투표 선택이 있을 때 BUY/NOT을 표시한다. 기존 `(나)`·`(글쓴이)` 구분은 유지한다. 집계 공개 조건은 바꾸지 않는다.
+- 답글(CMT-09, #237): 원 댓글만 20개씩 페이지로 자르고, 각 원 댓글의 `replies`에 보이는 답글을 오래된 순으로 모두 넣는다. 커서는 원 댓글 기준이고 이전 앱은 `replies`를 무시한다. 원 댓글이 삭제·숨김되거나 작성자 차단·신고로 빠지면 그 답글도 목록과 `comment_count`에서 빠진다(`community_comment_listed`). `comment_count`는 보이는 원 댓글과 답글을 모두 센다. 답글은 게시글 작성자가 아니라 원 댓글 작성자에게만 "내 댓글에 답글이 달렸어요." 알림을 보낸다(아래 알림 참고).
+- 댓글 조회·등록·수정 JSON은 활성 `private.admin_users`에 등록된 작성자 여부를 `is_operator`로 반환하고, 투표글에서는 해당 댓글 작성자의 현재 투표 선택을 `vote_choice`(`buy`/`not`/null)로 반환한다(#227). 관리자 UUID·이메일·역할이나 전체 투표자 명단은 공개하지 않는다. 관리자 비활성화·투표 변경은 다음 댓글 조회에 반영되며, 탈퇴한 작성자는 false/null이다. 앱은 운영자 라벨을 우선 표시하고, 나머지 댓글에는 투표 선택이 있을 때 BUY/NOT을 표시한다. 활성 운영자의 댓글에는 신고·차단 메뉴를 숨기고 본인 댓글의 수정·삭제 메뉴는 유지한다(#229). 기존 `(나)`·`(글쓴이)` 구분은 유지한다. 집계 공개 조건은 바꾸지 않는다.
 - 투표 집계는 참여자·작성자에게 공개하고, 마감 후에는 미참여 회원에게도 공개한다(2026-10-20 사용자 확정). 진행 중 미참여 회원의 집계는 null이다. 비회원에게는 항상 집계를 반환하지 않는다. `server_now`와 `ends_at`을 내려 기기 시각으로 마감을 판정하지 않는다.
 - 정지 계정과 유효하지 않은 JWT 사용자 접근을 차단한다. 커뮤니티 제한 계정은 조회 가능하다. 내부 `assert_can_write_community()`는 인증·제재 만료를 검사하며 후속 쓰기 RPC가 재사용한다. 앱에는 직접 실행 권한을 주지 않는다.
 - definer 구현은 private, invoker 래퍼는 public이다. 비회원 피드 래퍼에 필요한 private 스키마 usage와 피드 함수 execute만 anon에 허용하고 원본·내부 helper·상세·댓글 권한은 주지 않는다.
@@ -228,12 +231,13 @@ import_failures
 
 #### #97 댓글·익명번호·좋아요
 
-- `create_comment(target_post_id, comment_content, request_id)` / `update_comment(target_comment_id, comment_content)`는 작성자 UUID 없이 조회와 같은 댓글 JSON을 반환한다. `delete_comment(target_comment_id)`는 본인 댓글을 soft delete한다. 수정은 같은 본문도 허용하며 `updated_at`만 갱신하고 정렬용 `created_at`은 보존한다.
+- `create_comment(target_post_id, comment_content, request_id, parent_comment_id?)` / `update_comment(target_comment_id, comment_content)`는 작성자 UUID 없이 조회와 같은 댓글 JSON(`parent_id` 포함)을 반환한다. `parent_comment_id`를 주면 답글이며, 같은 글의 보이는 원 댓글에만 달 수 있다(아니면 `comment_not_found`). 답글에 답글은 `invalid_reply_target`으로 거부한다. 같은 `request_id`를 다른 원 댓글이나 원 댓글 작성에 재사용하면 `invalid_request_id`다. 답글 수정·삭제·신고·차단은 댓글 RPC를 그대로 쓴다. `delete_comment(target_comment_id)`는 본인 댓글을 soft delete한다. 수정은 같은 본문도 허용하며 `updated_at`만 갱신하고 정렬용 `created_at`은 보존한다.
 - 댓글 본문은 NFC·CRLF/CR → LF 정규화 후 사용자 인식 문자 1~150자다(#227). 공백·줄바꿈도 세며 공백만 있는 본문은 거부한다. 앱은 초과 입력을 유지하되 전송을 막는다. 등록된 댓글을 표시할 때는 연속된 줄바꿈·공백을 한 칸으로 합치고 앞뒤 공백을 제거하며, 저장·수정용 원문은 유지한다. HTTP(S)로 해석 가능한 URL만 외부 링크로 만든다. 작성·수정은 같은 제한을 사용한다. 서버 마이그레이션을 먼저 반영한 뒤 앱을 배포하며, 기존 30자 제한 앱은 계속 사용할 수 있다.
 - 모든 댓글·좋아요 쓰기는 `private.lock_community_post_for_write()`로 인증·제재를 확인하고 부모 글 행을 잠근 뒤 변경한다. 글 삭제도 같은 행을 먼저 잠그므로 삭제 후 댓글이나 좋아요가 추가되는 경합을 막는다. 삭제·숨김·차단/신고로 접근할 수 없는 글은 쓰기도 허용하지 않는다. 댓글 수정·삭제는 글쓴이에게도 타인 댓글 권한을 주지 않는다.
 - `post_anon_numbers`는 구버전 앱 호환을 위해 최초 댓글 때 할당하고 같은 글에서 유지한다. 부모 글 잠금 안에서 `next_anon_number`를 올리므로 동시 참여에도 중복 번호가 없다. 글쓴이는 번호를 소비하지 않는다. 새 앱은 이 번호 대신 프로필 닉네임을 표시하며 본인·글쓴이·탈퇴 라벨과 본문 비공개는 조회 계약을 따른다.
 - `comments.creation_request_id`와 `(author_id, creation_request_id)` unique로 응답 유실·동시 재시도에 같은 댓글을 반환한다. 다른 게시글로 키를 재사용하면 거부한다. 앱은 성공한 댓글을 서버 페이지와 중복 없이 합치며 서버 커서를 바꾸지 않는다. 등록 후 새 댓글까지 남은 페이지를 읽고 이동하고, 실패한 조회는 댓글 영역에서 재시도한다.
 - `set_community_like(target_post_id, is_liked)`는 일반글에만 적용하고 `{is_liked, like_count}`를 반환한다. 본인 글 좋아요 등록은 `own_post_like`(42501)로 거부하고, 취소는 예전에 눌러 둔 좋아요를 지울 수 있게 허용한다(BUG-074). 계정당 한 행이며 원하는 상태를 지정하므로 재시도해도 토글되지 않는다. 댓글 작성과 독립적으로 실행하며 앱의 낙관적 아이콘·개수는 실패 시 원상 복구한다.
+- `set_comment_like(target_comment_id, is_liked)`(LIKE-004, #237)는 일반글·투표글·공지의 댓글과 답글에 적용하고 `{is_liked, like_count}`를 반환한다. 목록에 보이는 댓글에만 누를 수 있고(`comment_not_found`), 본인 댓글은 `own_comment_like`(42501), 댓글을 닫은 공지는 `notice_comments_closed`로 거부한다. 취소는 안 보이게 된 댓글에서도 허용한다. 기간 제한 중에는 글 좋아요처럼 막는다. 알림은 보내지 않는다. 댓글 JSON에 `like_count`, `is_liked`를 담는다.
 - 등록·수정·삭제·좋아요 성공은 `community` 캐시를 갱신한다. 후속 내 활동도 같은 키 아래에 두어 함께 갱신한다. 계정이 바뀌거나 화면을 떠난 후 도착한 응답으로 새 계정의 초안·캐시를 변경하지 않는다.
 - 알림 연동 계약: 댓글 등록 성공 트랜잭션에서 `comment:{comment_id}`를 이벤트 키로 사용하고 본인 댓글은 알리지 않는다. 수정·삭제·재시도는 새 등록 이벤트가 아니다. 좋아요 알림은 `(post_id, actor_id)`를 `like_notification_log`에 최초 한 번 기록하는 계약이며 취소·재등록으로 다시 발송하지 않는다. 수신자는 서버가 글에서 결정하고 UUID를 앱에 반환하지 않는다. 알림 테이블·실제 이벤트 저장·Push 발송은 알림 작업에서 이 RPC에 연결한다.
 - 로컬 검증: 전체 pgTAP, DB lint·Advisors와 `scripts/check_community_concurrency.py --container supabase_db_diggin-97`로 실제 동시 요청을 확인한다. 테스트 데이터만 사용하는 임시 DB에서 실행한다.
@@ -263,7 +267,8 @@ posts
 post_products   (post_id, position 1~4) PK, name, brand, price integer, url, image_url
 vote_responses  id, post_id, user_id null(탈퇴 후), choice, created_at, updated_at, unique (post_id, user_id)
 post_likes      id, post_id, user_id null(탈퇴 후), created_at, unique (post_id, user_id)
-comments        id, post_id, author_id null(탈퇴 후), content 1~150자(줄바꿈 1자) 탈퇴 후 null,
+comment_likes   id, comment_id FK cascade, user_id null(탈퇴 후), created_at, unique (comment_id, user_id) (#237)
+comments        id, post_id, parent_id null(답글이면 원 댓글, #237), author_id null(탈퇴 후), content 1~150자(줄바꿈 1자) 탈퇴 후 null,
                 deleted_at, hidden_at, hidden_by, created_at, updated_at,
                 creation_request_id uuid not null, unique (author_id, creation_request_id)
 post_anon_numbers  (post_id, user_id) PK, number, unique (post_id, number)
@@ -298,9 +303,10 @@ user_blocks  (blocker_id, blocked_id) PK, created_at, check blocker_id <> blocke
 
 #### #112 신고·단방향 차단 (RPT-001~004)
 
-- `report_community_content(target_type, target_id, report_reason, report_detail?)`는 `post`(일반글·투표글) 또는 `comment` ID와 사유만 받는다. 서버가 작성자를 결정하고 신고 ID만 반환한다. 클라이언트는 실제 사용자 UUID와 원문 테이블을 조회하지 않는다.
+- `report_community_content(target_type, target_id, report_reason, report_detail?)`는 `post`(일반글·투표글) 또는 `comment` ID와 사유만 받는다. 서버가 작성자를 결정하고 신고 ID만 반환한다. 클라이언트는 실제 사용자 UUID와 원문 테이블을 조회하지 않는다. 댓글은 목록에 보이는 것만 신고할 수 있어 원 댓글이 빠진 답글은 신고할 수 없다(`community_comment_listed`, #237).
 - 인증·정지·본인·삭제·숨김·차단한 작성자·신고한 해당 콘텐츠를 검증한다. 커뮤니티 작성 제한 중 신고·차단은 허용한다. 사유는 abuse/spam/inappropriate/other 중 하나이며 other만 NFC 정규화한 0~50자 상세를 허용한다. 앱과 DB 모두 사용자 인식 문자 기준이다.
 - 신고자는 같은 콘텐츠를 1건만 신고한다. 계정·종류·대상별 트랜잭션 잠금과 기존 unique 제약으로 동시 재시도를 보호하고 최초 사유·상태·Snapshot을 보존한다. 댓글은 부모 글 → 댓글 행 잠금 안에서 접수 시점 본문을 복사한다. 수정 불가 글은 별도 Snapshot을 만들지 않는다.
+- 활성 운영자의 글·댓글은 신고·작성자 차단 RPC에서 `operator_content_protected`로 거부한다(#229). 과거 신고 이력과 차단 관계가 있어도 활성 운영자의 콘텐츠는 숨기지 않는다. 마이그레이션은 활성 운영자를 대상으로 한 기존 차단만 정리하고 신고 이력은 보존한다. 운영자 비활성화 후에는 일반 신고·차단 규칙을 적용한다.
 - `block_community_author(target_type, target_id)`는 기존 신고가 있으면 신고에 기록된 작성자를, 없으면 삭제·관리자 숨김이 아닌 글·댓글의 작성자를 서버에서 결정해 단방향 관계를 저장한다(#186). 댓글의 부모 글도 확인하며 본인이 신고해 보이지 않는 부모 글이나 차단한 부모 작성자를 통한 새 댓글 작성자 차단은 허용하지 않는다. 이미 차단한 대상은 재시도할 수 있다. 본인·비회원·정지 계정·없는 대상은 거부하며 차단만으로 신고를 만들지 않는다. 신고로 이미 숨겨진 대상의 차단은 이전 앱과 호환된다. 계정 ID를 임의 입력해 차단하거나 다른 계정의 신고를 사용할 수 없다.
 - 신고만 하면 해당 게시글·투표글·댓글만 신고자의 조회에서 제외한다. 같은 작성자의 다른 콘텐츠는 유지한다. 차단하기를 선택했을 때만 해당 작성자의 기존·신규 피드/상세/댓글/활동 전체를 제외한다. `community_content_visible`은 대상별 신고, `community_author_visible`은 단방향 차단을 검사하며 댓글 수와 쓰기 가드에도 같은 기준을 적용한다. 차단당한 사용자에게는 반대 방향 필터를 만들지 않는다.
 - 앱의 피드·상세·댓글·좋아요 목록에서 공통 ReportFlow를 사용한다. 본인·탈퇴 댓글에는 신고 버튼이 없고, 한 NativeModal에서 사유 입력 → 차단 여부 확인을 전환한다. 실패 시 입력·단계를 유지하고 모달 위 Toast를 표시한다. 요청 중 입력·연타·닫기를 막는다.
@@ -316,6 +322,7 @@ private.notifications
   actor_id FK profiles set null, title, body, event_key text unique, created_at, push_sent_at null
 
 private.like_notification_log  (post_id, actor_id) PK, created_at
+private.post_like_notifications  post_id PK, created_at  — NOTI-005 좋아요 10개 알림 발송 이력
 private.notification_checks    user_id PK FK profiles cascade, checked_at
 private.notification_settings  user_id PK FK profiles cascade, push_enabled default true, updated_at
 ```
@@ -324,11 +331,12 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 - 알림은 쓰기 RPC를 고치지 않고 트리거로 만든다. 댓글은 `comments` insert, 좋아요는 `post_likes` insert 때 돈다. 댓글 재시도는 기존 댓글을 돌려줘 insert가 없고, 좋아요는 on conflict do nothing이라 이미 누른 상태면 트리거가 돌지 않는다.
 - 일반 게시글만 알린다(NOTI-004·005). 본인 댓글·본인 좋아요, 받는 사람이 차단·신고한 사용자의 행동, 지워지거나 숨겨진 글은 알리지 않는다.
+- 답글(NOTI-010, #237)은 원 댓글 작성자에게 같은 `post_commented` 유형으로 "내 댓글에 답글이 달렸어요."를 보낸다. 본문은 댓글 알림과 같은 `{닉네임}: {내용}`이고 Push 조건도 댓글 알림과 같다. 게시글 작성자에게 가는 댓글 알림(NOTI-004)은 원 댓글에만 보내고, 다른 사람 댓글에 달린 답글은 글쓴이에게 알리지 않는다(2026-11-24 확정). 답글 알림은 투표글에도 보낸다. 자기 댓글에 단 답글은 알리지 않는다. 새 enum 값을 만들지 않아 앱과 Push 제목 처리는 그대로다.
 - 알림을 받은 뒤 그 사람을 차단·신고하면 목록과 새 알림 점에서 뺀다. 커뮤니티 조회는 신고한 콘텐츠만 빼지만(#112), 알림은 신고한 사람의 알림을 모두 뺀다. 그래서 댓글·좋아요 알림에 행동한 사람(actor_id)을 남긴다. 투표 마감은 행동한 사람이 없어 항상 보인다. 명세(RPT-004)는 Feed·상세만 정하고 있어 알림함도 같은 기준으로 맞췄다.
-- 좋아요는 같은 사람·같은 글에 최초 1회. like_notification_log에 on conflict do nothing으로 넣고 들어갔을 때만 알림을 만든다. 취소하거나 알림이 30일 지나 지워져도 기록은 남겨 다시 보내지 않는다.
+- 좋아요는 한 건씩 알리지 않고 일반 게시글의 좋아요가 처음 10개가 될 때 "내 게시글에 10개 이상의 좋아요가 달렸어요."를 한 번 보낸다(2026-11-24 확정, #237). 행동한 사람은 남기지 않는다. 본문은 `'{글 앞 20자}' 게시글에 달린 좋아요를 확인해 보세요.`이고 20자를 넘으면 `...`을 붙인다(NOTI-05·NOTI-07 시안). 잘린 끝에 이모지가 걸리면 그 이모지부터 뺀다. Push도 같은 본문을 쓴다. 보낸 글은 `post_like_notifications`에 남겨, 취소 후 다시 10개가 되거나 알림이 30일 뒤 지워져도 다시 보내지 않는다(게시글당 1회). `like_notification_log`는 더 이상 쓰지 않는다.
 - 투표 마감은 pg_cron `notifications-vote-ended`가 1분마다 `ends_at`이 지난 투표를 찾아 작성자에게 만든다(NOTI-003). 알림을 만들 때 지워졌거나 숨겨진 투표는 건너뛴다(NOTI-003). 삭제 시 투표 응답도 지워져(VOTE-012) 보여 줄 결과가 없다. 알림을 받은 뒤 지워지면 누를 때 NOTI-006 안내를 띄운다. 작업이 밀려도 놓치지 않게 시각 범위가 아니라 event_key로 중복을 막는다.
-- event_key는 `comment:{comment_id}`, `like:{post_id}:{actor_id}`, `vote_ended:{post_id}`. 앱에는 주지 않는다.
-- 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 글자 수는 자르지 않는다(Push 줄 수는 OS에 맡긴다).
+- event_key는 `comment:{comment_id}`, `reply:{comment_id}`(원 댓글 작성자에게 가는 답글 알림), `like10:{post_id}`(이전 `like:{post_id}:{actor_id}`), `vote_ended:{post_id}`. Push는 두 댓글 키 모두 댓글이 지워지지 않았을 때만 보낸다. 앱에는 주지 않는다.
+- 제목·본문은 만들 때 정해 저장한다. 줄바꿈은 공백으로 바꾸고 좋아요 알림의 글 인용(20자)만 자른다(`private.notification_excerpt`). 답글 Push는 발송할 때 `{닉네임}: ` 뒤 본문을 42자로 줄인다(NOTI-010). 댓글 Push는 명세(NOTI-004)대로 자르지 않고 OS에 맡긴다. 댓글·답글 Push는 보내기 직전에 그 댓글과 원 댓글이 지워지거나 숨겨졌는지 다시 확인한다. 댓글 좋아요는 알리지 않는다(2026-11-24 확정).
 - 목록은 최근 30일, 최신순 20개씩. 알림은 항상 받는 사람 자신의 글이라 `is_post_available`은 삭제·숨김만 본다.
 - 읽음은 알림마다 두지 않고 알림함을 마지막으로 연 시각(notification_checks) 하나로 본다. 명세(NOTI-007)는 개발 검토로 남겨 뒀고, 시안의 종 아이콘 점(Dot=On), 목록 주석 "읽지 않은 알림은 배경(Gray50)으로 구분", 개인정보처리방침의 "알림함 마지막 확인 시각"에 맞췄다.
   - `has_unread_notifications()`: 확인 시각 뒤에 온 최근 30일 알림이 있으면 true. 종 아이콘 점.
@@ -351,7 +359,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 - `admin_users`: Supabase Auth UUID, 이메일, operator/super_admin 역할, 비활성화 시각. 실제 Auth 세션과 ban·프로필 상태를 매 요청에서 검사한다.
 - `admin_actions`: 운영자·request_id(unique)·조치·대상·신고·위반 유형·필수 상세 사유·전후 상태·시각. UPDATE·DELETE·TRUNCATE를 거부하는 감사 기록이다.
-- `user_sanctions`: 제재 건별 유형·종료일·위반 유형·최초 확인 시각·해제 시각. 새 제재는 이전 확인 여부를 공유하지 않는다.
+- `user_sanctions`: 제재 건별 유형·종료일·위반 유형·최초 확인 시각·해제 시각. 새 제재는 이전 확인 여부를 공유하지 않는다. 해제 시각은 운영자가 직접 해제(release)할 때만 남긴다. 새 제재를 줘도 이전 제재는 해제하지 않고, 이미 끝난 7일 제한은 직접 해제해도 해제로 기록하지 않는다(#235).
 - `moderation_requests`: 제재 준비와 Auth 적용 결과(pending/applied/failed), 요청자·대상·사유·감사 ID. 대상별 진행 중 요청은 하나만 허용한다.
 - 모두 RLS를 켜고 service_role을 포함해 직접 테이블 접근을 회수한다. 관리자 API는 `service_role` 전용 public invoker/private definer RPC를 호출하며 검증한 관리자 UUID와 실제 세션을 전달한다. 일반 앱 RPC의 auth.uid() 검사와 구분한다.
 - 신고는 콘텐츠별 그룹·상세·50건 커서 조회를 제공한다. 상태는 received → reviewing → resolved/rejected이며 자동 숨김·자동 제재는 없다. 운영자가 숨긴 콘텐츠만 복구하고 작성자 삭제는 복구하지 않는다.
@@ -363,16 +371,27 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - 개발 관리자 등록 데이터는 `20261121031503_register_development_admin_accounts.sql`로 관리한다. 사용자 확인을 받은 개발 Auth UUID·이메일 2쌍, 이메일 확인·비밀번호 설정 완료를 대조한 계정만 operator로 등록한다. 기존 등록·비활성화 상태는 보존하며 운영 계정 UUID나 스키마는 바꾸지 않는다. 데이터 마이그레이션이므로 선언형 스키마와 생성 타입에는 변경이 없다. 검증은 `development_admin_registration.test.sql`에 포함한다.
 
 - `supabase/schemas/admin_console.sql`의 `admin_console`은 관리자 세션 확인·신고 그룹/상세·회원·전체 제재 목록을 제공한다. public 래퍼와 private 구현은 모두 service_role 전용이며 기존 `assert_moderator(actor,actor_session)`로 매번 권한과 실제 세션을 검사한다. 브라우저에는 publishable key와 관리자 세션만 사용한다.
-- 목록은 서버에서 문자 그대로 검색·상태/유형 필터·20건 페이지를 적용한다. 신고 그룹은 received가 있으면 received, 아니면 reviewing → resolved → rejected 순으로 상태를 결정한다. 상단 건수는 전체 콘텐츠 그룹 기준이다. 보관된 제재 수와 실효 계정 상태(7일 제한 만료 반영)를 표시하며 Auth 이메일·메타데이터는 회원 목록에 반환하지 않는다.
+- 목록은 서버에서 문자 그대로 검색·상태/유형 필터를 적용하며, 신고 목록은 20건·회원 및 제재 목록은 8건씩 페이지를 나눈다. 신고 그룹은 received가 있으면 received, 아니면 reviewing → resolved → rejected 순으로 상태를 결정한다. 상단 건수는 전체 콘텐츠 그룹 기준이다. 보관된 제재 수와 실효 계정 상태(7일 제한 만료 반영)를 표시하며 Auth 이메일·메타데이터는 회원 목록에 반환하지 않는다.
 - `admin_report_group_status`는 콘텐츠별 미완료 신고를 행 ID 순서로 잠그고 하나의 트랜잭션에서 상태·감사 기록을 변경한다. 접수 → 검토 중 → 완료/반려만 허용하고 기존 완료 신고는 보존한다. request_id로 결과를 재사용하고 본문이 달라지면 거부한다. Auth 제재는 기존 준비/확정 경로를 그대로 재사용하며 웹이 단계별 성공과 요청 UUID를 보존한다.
 - `private.admin_console_access_logs(id bigint identity, admin_id FK admin_users, resource, session_ip inet null, subject_ids uuid[], created_at)`는 신고·회원·제재 목록의 개인정보 조회 기록이다. 실제 반환 페이지에 포함된 회원 UUID만 저장한다. 상세의 기존 `admin_access_logs`에도 같은 열을 추가하고 반환된 작성자·신고자 UUID를 기록한다. `session_ip`는 actor/session 재검증을 거친 `auth.sessions.ip`의 **로그인 당시 IP**이며 현재 요청 IP로 간주하지 않는다. 과거 기록이나 IP 없는 세션은 null/빈 배열을 유지한다. RLS·직접 권한 회수·관리자/시간 인덱스와 1년 보관은 유지하며 검색어·비밀번호·토큰은 저장하지 않는다. 요청 당시 IP의 신뢰 가능한 수집 경로와 최종 접속기록 기준은 별도 확정이 필요하다.
 - `private.reject_public_email_signup(jsonb)`는 Auth의 before-user-created 전용 invoker 훅이다. 실행 권한은 `supabase_auth_admin`에만 부여한다. Auth가 설정한 `app_metadata.provider`가 email이거나 없으면 공개 가입을 거부하고 사용자 수정 가능한 metadata는 신뢰하지 않는다. 소셜 가입·기존 이메일 로그인·Admin API 발급을 유지한다. 로컬 비밀번호 정책은 12자·대소문자·숫자·특수문자다. 원격은 승인 배포 후 `scripts/configure_auth_security.py`가 해당 설정과 훅만 선택 반영하고 재조회 검증한다. 유출 비밀번호 차단도 시도하되 플랜·권한 제한은 경고와 미완료 상태로 남기며 유료 업그레이드는 하지 않는다. 기존 관리자 비밀번호의 원문은 조회하지 않으며 기존 계정의 정책 충족/재설정과 MFA는 별도 점검한다.
 - 기존 신고 상세는 같은 콘텐츠의 다른 신고에서 수행한 콘텐츠 조치도 반환한다. pgTAP `admin_console.test.sql`, Edge handler 테스트와 로컬 Auth/DB 통합 테스트로 권한 차단·검색/페이지·일괄 상태·중복 요청·실제 Auth 제재를 검증한다. 운영 반영과 Retool 호스팅 전환은 별도 승인 배포를 따른다.
 
+### 6-7. 관리자 공지 (#229)
+
+- 공지는 `private.posts.notice_title`이 있는 일반글(`type=post`)이며 상품 첨부 없이 작성한다. 제목 1~100자, 본문 1~10,000자, 선택 알림함 요약 0~200자는 NFC 정규화 후 `private.char_count` 기준이다. 일반글의 기존 5~50자·상품 첨부 규칙은 유지한다.
+- `notice_inbox_body`, `notice_inbox_only`, `notice_comments_closed`, `notice_revision`을 함께 저장한다. 최신 공개 공지 중 알림함 전용이 아닌 1건을 DIGGLE 두 탭의 상단에 고정한다. 게시글 목록·MY 활동 목록과는 분리한다.
+- `admin_notice(actor,actor_session,operation,target_id?,request_id?,payload?)`는 service_role 전용 public 래퍼/private definer RPC다. `assert_moderator`로 활성 관리자·실제 세션을 확인한다. 목록은 최신순 20건 페이지, 작성·수정·공개/숨김·삭제를 제공하며 `notice_revision`으로 오래된 화면의 덮어쓰기를 거부한다.
+- RLS를 켜고 직접 접근을 회수한 `private.notice_requests`에 관리자·요청 UUID·작업·요청 내용·결과를 저장한다. 동일 UUID를 직렬화해 응답 유실 후 최초 결과를 반환하고 내용 변경은 거부한다. 웹은 기존 관리자 요청 보관 기능으로 미확인 작성·수정을 같은 UUID로 복구한다.
+- 앱 상세는 기존 `get_community_post` 응답의 선택 `notice={title,comments_closed}`로 구분한다. 댓글 150자·운영자 라벨·좋아요·일반 회원 댓글 신고/차단·본인 댓글 수정/삭제는 기존 경로를 재사용한다. 댓글을 닫으면 기존 댓글과 입력창을 숨기며 작성·수정 RPC도 부모 글 잠금 후 거부한다. `notice_comments_closed`를 받은 앱은 전용 안내를 표시하고 상세·댓글을 다시 조회한다. 본인 댓글 삭제는 허용한다.
+- `get_featured_notice()`와 `get_app_notifications(after_created_at?,after_key?)`를 사용한다. 알림함은 개인 알림과 최근 30일 공개 공지를 합쳐 20건씩 반환한다. 공지 ID는 `notice:<게시글ID>`, 동률 순서는 시각·문자열 키(C collation)로 고정한다. 기존 `get_notifications` 계약은 유지한다. `has_unread_notices()`와 기존 확인 시각으로 빨간 점·읽음 상태를 처리한다.
+- 수정은 기존 알림 내용을 갱신하며 새 알림을 만들지 않는다. 숨김·삭제 후 다음 조회에서 피드·알림함·직접 상세 접근을 제외한다. 삭제는 복구 API가 없는 soft delete다. 공지 게시와 공지 댓글·좋아요는 휴대폰 푸시를 생성하지 않는다(사용자 확인).
+- DB·Edge Function을 기존 승인 경로로 먼저 배포한 뒤 새 앱/OTA와 관리자 웹을 배포한다. 최초 앱 기능 반영 후에는 공지 등록에 추가 앱 업데이트가 필요 없다.
+
 ## 7. 제재 (RPT-006)
 
 - warning: 기능 제한 없이 이력과 안내만.
-- community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 모든 쓰기 RPC(본인 게시글 삭제 포함)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. 프로필 행을 잠가 운영자 제재와 변경 요청의 경합을 보호한다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다.
+- community_restricted: restricted_until = 제재 시각 + 7×24시간(UTC). 커뮤니티 읽기 전용. 모든 쓰기 RPC(본인 게시글 삭제 포함)는 공통 가드 `private.assert_can_write_community()`를 먼저 부른다. 프로필 행을 잠가 운영자 제재와 변경 요청의 경합을 보호한다. 신고·차단·조회는 허용. 만료는 매 요청 시 확인하고 해제 배치는 없다. 제한 중에 경고를 주면 경고는 기록만 남기고 계정은 제한 상태와 종료일을 유지한다(#235).
 - suspended: profiles.status 변경과 함께 Supabase Auth 계정 정지(ban)와 전체 세션 무효화를 한다. status만으로는 상품·폴더 접근을 못 막기 때문이다. 해제할 때 둘 다 푼다.
 - 만 14세 미만(AUTH-002~004, #164): 운영자가 `underage` 사유로 suspended 처리한다. 앱은 MSG-AUTH-007 이용 중단 안내를 띄운다. 이용 중단일부터 30일 안에 해제(release)되지 않으면 pg_cron `underage-account-cleanup`(매일 03:30 KST)이 대상이 있을 때만 Vault의 `underage_cleanup_url`/`underage_cleanup_secret`으로 `underage-cleanup` Edge Function을 부른다. 함수는 `due_underage_deletions()`(service_role 전용, 50건씩)로 대상을 받아 MY-007 탈퇴와 같은 순서(애플 연결 해제 → 프로필 사진 → auth.users 삭제)로 지운다. 각 계정은 지우기 직전에 `claim_underage_deletion`으로 프로필 행을 잠그고 아직 대상인지, 진행 중인 제재·해제 요청이 없는지 다시 확인한다. 확인되면 `private.underage_deletion_claims`에 표시하고, 이후 한 시간 동안 운영자 해제(release)는 `account_deletion_in_progress`로 거부한다. 목록을 받은 뒤 복구된 계정은 건너뛴다. 애플 해제가 실패한 계정은 지우지 않고 다음 날 다시 시도한다. 저장된 애플 토큰이 없는 계정은 연결 해제 없이 지운다. 함수 secret `UNDERAGE_CLEANUP_SECRET`과 Vault 값이 없으면 호출하지 않는다.
 - 보관기간 경과 기록 삭제(#164, 개인정보 처리방침 제3조): pg_cron `expired-records-cleanup`(매일 03:20 KST)이 `private.delete_expired_records()`를 실행한다. 탈퇴 설문은 30일, 처리 완료(resolved·rejected, 이후 상태가 바뀌지 않아 updated_at이 완료 시각) 신고의 `reported_content` 사본은 30일, 제재 이력은 경고 적용일·7일 제한 종료일·영구 제한 해제일부터 6개월, 운영자 조치 기록(`admin_actions`)과 완료된 `moderation_requests`는 1년 뒤 지운다. 해제되지 않은 영구 제한과 그 조치 기록, `private.retention_holds`로 보관 유지 중인 신고·제재(운영 API `retention_hold`)는 남긴다. `admin_actions`는 append-only 트리거를 유지하고 이 함수의 트랜잭션 설정으로만 삭제를 허용한다. 운영자의 개인정보 "조회" 기록은 아직 따로 저장하지 않는다.
@@ -386,7 +405,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 1. Storage avatars/{user_id}/ 파일을 지운다. 실패하면 계정을 지우지 않는다.
 2. auth.users를 지운다. 세션·리프레시 토큰이 함께 지워지고, 나머지는 FK가 처리한다. 이미 발급된 access token은 만료 전까지 남지만 프로필이 없어 쓸 데이터가 없다.
    - cascade: profiles, products, folders, product_folders, import_*, posts(와 그 글의 하위 데이터), notifications, push_tokens, user_policy_consents, user_blocks, like_notification_log
-   - set null: comments.author_id, vote_responses.user_id, post_likes.user_id, reports.reporter_id
+   - set null: comments.author_id, vote_responses.user_id, post_likes.user_id, comment_likes.user_id, reports.reporter_id
    - profiles 삭제 전 트리거(`profiles_clear_withdrawn_comments`)가 같은 트랜잭션에서 사용자 글을 먼저 지우고(그 글의 댓글도 함께 지워짐), 남은 사용자 댓글 content를 null로 바꾼다. 글을 FK 연쇄에 맡기면 본인 글에 단 본인 댓글이 먼저 수정된 뒤 글이 지워져 comments_post_id_fkey 위반으로 탈퇴가 실패했다.
 3. 계정이 지워진 뒤 설문을 private.withdrawal_surveys에 저장한다(user_id 없음). 재시도로 중복되지 않게 마지막에 두고, 실패해도 탈퇴는 성공으로 본다. 설문은 선택 응답이라(#159) 사유와 직접 작성이 모두 비어 있으면 저장하지 않는다. 직접 작성만 고른 경우는 앱이 내용 입력 전까지 탈퇴하기를 막는다.
 
@@ -402,7 +421,7 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 - 가입·MY에서 받는 선택 동의 2개: 서비스 이용 기록 분석(`usage_analysis`), 이용 기록의 국외 이전(`overseas_transfer`). 두 항목 모두 동의한 회원만 앱이 Amplitude를 켠다. 비회원과 기존 회원(기록 없음)은 미동의다.
 - `private.analytics_consent_logs`: 동의·철회할 때마다 항목·값·출처(`signup`·`login`·`settings`·`operator`)·시각을 쌓는다. 기존 회원이 로그인 동의 화면에서 체크한 항목은 앱이 현재 상태와 합쳐(`login`) 보내 체크하지 않은 항목이 철회되지 않는다. 항목별 가장 최근 기록이 현재 상태이고, 상태 테이블은 따로 두지 않는다. 기록이 없는 항목과 값이 바뀐 항목만 쌓아 가입 때 체크하지 않은 항목도 미동의로 남는다. 운영자 처리 기록에는 `admin_id`를 남긴다. 탈퇴하면 프로필과 함께 지운다.
 - `get_analytics_consent()` → `{usage_analysis, overseas_transfer}`, `set_analytics_consent(usage_analysis, overseas_transfer, consent_source)`: 본인만. 앱은 `operator` 출처를 쓸 수 없다. 프로필 행을 잠가 동시 변경을 줄 세운다.
-- `admin_withdraw_analytics_consent(actor, actor_session, target_email)`: 이메일 철회 요청을 운영자가 처리한다(service_role 전용, `assert_moderator`). 요청 메일 주소로 회원을 찾고 같은 이메일 계정이 둘 이상이면 `user_email_conflict`로 거부한다. 회원 앱은 다음 실행 때 반영한다.
+- `admin_withdraw_analytics_consent(actor, actor_session, target_email, withdraw_usage_analysis default true, withdraw_overseas_transfer default true)`: 이메일 철회 요청을 운영자가 처리한다(service_role 전용, `assert_moderator`). 요청 메일 주소로 회원을 찾고 같은 이메일 계정이 둘 이상이면 `user_email_conflict`로 거부한다. 관리자 화면에서 고른 항목만 미동의로 바꾸고 고르지 않은 항목은 그대로 둔다(#233). 둘 다 false면 `invalid_analytics_consent`로 거부하고, 항목 인자를 생략한 이전 호출은 두 항목을 모두 철회한다. 회원 앱은 다음 실행 때 반영한다.
 - `private.amplitude_deletion_jobs`: 앱에서 두 항목 동의 상태를 철회하면(`consent_withdrawn`) Amplitude 삭제를 요청한다. 운영자 이메일 철회와 회원 삭제(`account_deleted`, 탈퇴·만 14세 미만 정리 공통 트리거)는 동의 이력 없이 수집한 이전 빌드 데이터도 지워야 해 이력과 관계없이 항상 요청한다. 수집된 적 없는 ID는 Amplitude가 무시한다(`ignore_invalid_id`). 탈퇴 후에도 처리해야 해서 profiles와 연결하지 않고, 회원별 대기 중 요청은 하나만 둔다.
 - `claim_amplitude_deletions()`·`finish_amplitude_deletions(claim_id, succeeded, error_code)`: service_role 전용. 100명씩 5분 lease로 가져가고, 실패하면 2분부터 두 배씩 최대 6시간 간격으로 계속 다시 시도한다. 지난 lease의 결과는 반영하지 않는다.
 - pg_cron `amplitude-deletion-dispatch`가 10분마다 처리할 요청이 있을 때만 Vault의 `amplitude_deletion_url`/`amplitude_deletion_secret`으로 Edge Function을 부른다. 설정 전에는 호출하지 않는다. `amplitude-deletion-cleanup`이 매일 03:40(KST)에 처리 끝난 지 35일(Amplitude 처리 기간) 지난 요청을 지운다.
@@ -413,7 +432,6 @@ private.notification_settings  user_id PK FK profiles cascade, push_enabled defa
 
 ## 10. 확인 필요 (PM·팀 결정 대기)
 
-- 가입 시 약관 동의 화면이 명세에 없다. 처음 동의 기록을 언제 만들지(MY-009)
 - 닉네임 "한글"에 자음·모음 단독(ㄱ, ㅏ)을 허용할지. 지금은 허용하지 않는다
 - 차단 해제 화면 없음. 차단 방향은 RPT-004 단방향으로 확정했으며, 앱 모달의 "서로의 게시글" 문구는 후속 작업에서 맞춘다.
 - 영구 제한 상태에서 JWT가 이미 만료된 경우의 안내 흐름은 사용자 확인으로 유지한다. [MODERATION_API.md](MODERATION_API.md)의 실기기 QA가 남아 있다.

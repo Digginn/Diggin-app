@@ -1,7 +1,15 @@
 import { type ImageSource } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { FlatList, Keyboard, Pressable, Text, View, useWindowDimensions } from "react-native";
+import {
+  FlatList,
+  Keyboard,
+  Pressable,
+  RefreshControl,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconKebab } from "@/assets/images/appbar";
@@ -11,6 +19,7 @@ import { AppBar, SearchBar } from "@/components/app-bar";
 import { Card } from "@/components/card";
 import { EmptyState } from "@/components/EmptyState";
 import { onVisibleItemsChanged } from "@/components/ProductImageFiller";
+import { REFRESH_TINT, RefreshArea } from "@/components/RefreshArea";
 import { WishLevel } from "@/components/WishLevel";
 import type { WishLevelKey } from "@/types/wish-item";
 
@@ -201,30 +210,39 @@ export function FolderDetailScreen({
               </Pressable>
             </View>
           </View>
-          <FlatList
-            className="flex-1"
-            numColumns={3}
-            data={rows}
-            keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
-            columnWrapperClassName="gap-3"
-            contentContainerClassName="gap-5 px-4 pb-6"
-            onEndReached={onEndReached}
-            onViewableItemsChanged={onVisibleItemsChanged}
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            renderItem={({ item }) =>
-              item ? (
-                <Card
-                  {...item}
-                  hasOwnedDim={!isOwnedFolder}
-                  className="h-40 flex-1"
-                  onPress={onOpenItem ? () => onOpenItem(item) : undefined}
-                />
-              ) : (
-                <View className="flex-1" />
-              )
-            }
-          />
+          <RefreshArea isRefreshing={isRefreshing}>
+            <FlatList
+              className="flex-1"
+              numColumns={3}
+              data={rows}
+              keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
+              columnWrapperClassName="gap-3"
+              contentContainerClassName="gap-5 px-4 pb-6"
+              onEndReached={onEndReached}
+              onViewableItemsChanged={onVisibleItemsChanged}
+              refreshControl={
+                onRefresh ? (
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={onRefresh}
+                    tintColor={REFRESH_TINT}
+                  />
+                ) : undefined
+              }
+              renderItem={({ item }) =>
+                item ? (
+                  <Card
+                    {...item}
+                    hasOwnedDim={!isOwnedFolder}
+                    className="flex-1"
+                    onPress={onOpenItem ? () => onOpenItem(item) : undefined}
+                  />
+                ) : (
+                  <View className="flex-1" />
+                )
+              }
+            />
+          </RefreshArea>
         </>
       )}
       {isMenuOpen && (

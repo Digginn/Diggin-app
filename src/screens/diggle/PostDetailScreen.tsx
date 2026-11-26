@@ -30,21 +30,26 @@ import { ActionModal, LoginRequiredModal } from "@/components/modal";
 import { ReportBlockMenu } from "@/components/ReportBlockMenu";
 import { ReportFlow, type ReportTarget } from "@/components/ReportFlow";
 import { ToastText } from "@/components/ToastText";
+import { COMMENT_MAX_LENGTH } from "@/constants/comments";
+import { TOAST_MESSAGES } from "@/constants/messages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
 import { trackEvent } from "@/lib/analytics";
 import { startLogin } from "@/lib/loginIntent";
+import { colors } from "@/theme";
 import { normalizeText } from "@/utils/text";
 
 import { COMMUNITY_PAGE_SIZE, communityKeys } from "./api/community";
 import { communityWriteError, deleteCommunityPost } from "./api/communityWrite";
 import { LikeCommentRow } from "./components/LikeCommentRow";
+import { NoticeHeader } from "./components/NoticeHeader";
 import { PostItemInfoSheet } from "./components/PostItemInfoSheet";
 import { ProductImgGrid } from "./components/ProductImgGrid";
 import { VoteBlock } from "./components/VoteBlock";
 import { mergeComments } from "./domain/comments";
 import { takeCommunityItemSaved } from "./domain/communitySave";
 import { useCommentActions } from "./hooks/useCommentActions";
+import { useCommentLikes } from "./hooks/useCommentLikes";
 import { useCommunityLike } from "./hooks/useCommunityLike";
 import { useCommunityVote } from "./hooks/useCommunityVote";
 import { useCommunityVoteTiming } from "./hooks/useCommunityVoteTiming";
@@ -53,7 +58,7 @@ import type { CommunityComment, CommunityItem } from "./types/community";
 import { formatCommunityAuthor } from "./utils/formatCommunityAuthor";
 import { communityErrorMessage, formatCommunityTime } from "./utils/formatCommunityTime";
 
-export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
+export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "notice" }) {
   const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
   const router = useRouter();
   const { session, isRestoring } = useAuth();
@@ -74,12 +79,18 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   }, [session?.user.id]);
   const result = useCommunityPost(id);
   const post = result.data;
-  const isWrongRoute = !!post && post.type !== (type === "vote" ? "vote" : "post");
+  const isWrongRoute =
+    !!post &&
+    (post.notice
+      ? type !== "notice"
+      : type === "notice" || post.type !== (type === "vote" ? "vote" : "post"));
+  const areCommentsClosed = post?.notice?.commentsClosed === true;
   const voteTiming = useCommunityVoteTiming(post, result.dataUpdatedAt);
   const vote = useCommunityVote(post, session?.user.id ?? null, voteTiming?.isClosed ?? false);
-  const comments = useCommunityComments(id, !!post && !isWrongRoute);
+  const comments = useCommunityComments(id, !!post && !isWrongRoute && !areCommentsClosed);
   const actions = useCommentActions(id, session?.user.id ?? null);
   const like = useCommunityLike(post, session?.user.id ?? null);
+  const commentLikes = useCommentLikes(id, session?.user.id ?? null);
   const viewedPostId = post && !isWrongRoute ? post.id : null;
   useEffect(() => {
     if (viewedPostId)
@@ -98,18 +109,20 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
   const [menu, setMenu] = useState<{ comment: CommunityComment; anchor: MenuAnchor } | null>(null);
   const isBusy = isDeleting || actions.isSending || actions.isDeleting;
   usePreventRemove(isBusy, () => {});
+  // 수정·답글 대상 댓글을 입력창 바로 위로 올린다.
+  const targetId = actions.editing?.id ?? actions.replyTarget?.id;
   const scrollEditing = useCallback(() => {
-    const index = commentRows.findIndex((row) => row.id === actions.editing?.id);
+    const index = commentRows.findIndex((row) => row.id === targetId);
     if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 1 });
-  }, [commentRows, actions.editing?.id]);
+  }, [commentRows, targetId]);
   useEffect(() => {
-    if (!actions.editing) return;
+    if (!targetId) return;
     const frame = requestAnimationFrame(() => {
       inputRef.current?.focus();
       scrollEditing();
     });
     return () => cancelAnimationFrame(frame);
-  }, [actions.editing, scrollEditing]);
+  }, [targetId, scrollEditing]);
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -167,7 +180,10 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           pathname: "/(tabs)/diggle",
           params: { tab: post.type === "vote" ? "vote" : "all" },
         });
-      showToast(post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.");
+      showToast(
+        post.type === "vote" ? "투표글이 삭제되었습니다." : "게시글이 삭제되었습니다.",
+        "success",
+      );
     } catch (error) {
       if (currentViewer.current === viewer) {
         setDeleteError(communityWriteError(error));
@@ -181,11 +197,12 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
 
   async function sendComment() {
     const viewer = session?.user.id ?? null;
-    const wasEditing = !!actions.editing;
+    const isInPlace = !!actions.editing || !!actions.replyTarget;
     const saved = await actions.send();
     if (!saved || currentViewer.current !== viewer) return;
     Keyboard.dismiss();
-    if (wasEditing) return;
+    // 답글은 이미 보이는 원 댓글 아래에 붙으므로 끝까지 내리지 않는다.
+    if (isInPlace) return;
     shouldRevealNewComment.current = true;
     // 새 댓글까지의 기존 페이지를 먼저 읽어 중간 대화가 생략되지 않게 한다.
     let data = queryClient.getQueryData<InfiniteData<CommunityComment[]>>(
@@ -215,13 +232,17 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
     if (!result.error || !post || comments.isFetching) return;
     if (toastedPostError.current === result.errorUpdatedAt) return;
     toastedPostError.current = result.errorUpdatedAt;
-    if (!comments.isError) showToast(communityErrorMessage(result.error));
+    if (!comments.isError) showToast(communityErrorMessage(result.error), "error");
   }, [result.error, result.errorUpdatedAt, post, comments.isFetching, comments.isError, showToast]);
 
   useEffect(() => {
     if (!isRestoring && session && post && isWrongRoute) {
       router.replace({
-        pathname: post.type === "vote" ? "/votes/[id]" : "/posts/[id]",
+        pathname: post.notice
+          ? "/notices/[id]"
+          : post.type === "vote"
+            ? "/votes/[id]"
+            : "/posts/[id]",
         params: { id: post.id, ...(returnTo ? { returnTo } : {}) },
       });
     }
@@ -252,8 +273,9 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         left="back"
         onBack={goBack}
         isDisabled={infoItem !== null || isBusy}
+        title={type === "notice" ? "공지" : undefined}
         right={
-          post?.isMine && !isWrongRoute ? (
+          post?.notice ? null : post?.isMine && !isWrongRoute ? (
             <AppBar.TextButton
               disabled={isBusy || infoItem !== null}
               onPress={() => {
@@ -297,7 +319,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         <FlatList
           ref={listRef}
           className="flex-1"
-          data={commentRows}
+          data={areCommentsClosed ? [] : commentRows}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={() => {
             shouldRevealNewComment.current = false;
@@ -307,7 +329,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             if (shouldRevealNewComment.current) listRef.current?.scrollToEnd({ animated: true });
           }}
           onLayout={() => {
-            if (actions.editing) scrollEditing();
+            if (targetId) scrollEditing();
             else if (shouldRevealNewComment.current)
               listRef.current?.scrollToEnd({ animated: true });
           }}
@@ -317,44 +339,59 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           keyExtractor={(comment) => comment.id}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
-            if (comments.hasNextPage && !comments.isFetching && !comments.isFetchNextPageError)
+            if (
+              !areCommentsClosed &&
+              comments.hasNextPage &&
+              !comments.isFetching &&
+              !comments.isFetchNextPageError
+            )
               void comments.fetchNextPage({ cancelRefetch: false });
           }}
           ListHeaderComponent={
             <>
-              <View className="gap-3 px-margin pb-4">
-                <Text className="text-gray-500 font-b4">
-                  {formatCommunityAuthor(post.authorNickname, post.isMine)} ·{" "}
-                  {formatCommunityTime(post.createdAt)}
-                </Text>
-                <Text className="text-gray-800 font-b3">{post.body}</Text>
-                <ProductImgGrid
-                  items={post.items}
-                  onPressInfo={(item) =>
-                    setInfoItem(post.items.find((snapshot) => snapshot.id === item.id) ?? null)
-                  }
+              {post.notice ? (
+                <NoticeHeader
+                  title={post.notice.title}
+                  body={post.body}
+                  createdAt={post.createdAt}
                 />
-                {post.type === "vote" && voteTiming && (
-                  <VoteBlock
-                    isReadOnly={vote.isPending}
-                    onChoose={(choice) => void vote.choose(choice)}
-                    isMyVote={post.isMine}
-                    hasResults={post.buyCount !== null && post.notCount !== null}
-                    vote={{
-                      buyCount: post.buyCount ?? 0,
-                      notCount: post.notCount ?? 0,
-                      myChoice:
-                        post.myChoice === "buy" ? "BUY" : post.myChoice === "not" ? "NOT" : null,
-                      ...voteTiming,
-                    }}
+              ) : (
+                <View className="gap-3 px-margin pb-4">
+                  <Text className="text-gray-500 font-b4">
+                    {formatCommunityAuthor(post.authorNickname, post.isMine)} ·{" "}
+                    {formatCommunityTime(post.createdAt)}
+                  </Text>
+                  <Text className="text-gray-800 font-b3">{post.body}</Text>
+                  <ProductImgGrid
+                    items={post.items}
+                    onPressInfo={(item) =>
+                      setInfoItem(post.items.find((snapshot) => snapshot.id === item.id) ?? null)
+                    }
                   />
-                )}
-              </View>
+                  {post.type === "vote" && voteTiming && (
+                    <VoteBlock
+                      isReadOnly={vote.isPending}
+                      onChoose={(choice) => void vote.choose(choice)}
+                      isMyVote={post.isMine}
+                      hasResults={post.buyCount !== null && post.notCount !== null}
+                      vote={{
+                        buyCount: post.buyCount ?? 0,
+                        notCount: post.notCount ?? 0,
+                        myChoice:
+                          post.myChoice === "buy" ? "BUY" : post.myChoice === "not" ? "NOT" : null,
+                        ...voteTiming,
+                      }}
+                    />
+                  )}
+                </View>
+              )}
               <LikeCommentRow
                 likeCount={like.likeCount}
                 commentCount={post.commentCount ?? 0}
                 isLiked={like.isLiked}
                 hasLike={post.type === "post"}
+                hasComment={!areCommentsClosed}
+                isNotice={!!post.notice}
                 // 본인 글은 좋아요를 누를 수 없다(BUG-074). 개수는 계속 보여 준다.
                 onPressLike={
                   post.type === "post" && !post.isMine && !like.isPending
@@ -362,7 +399,9 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                     : undefined
                 }
               />
-              <View className="h-3 bg-gray-100" />
+              {!areCommentsClosed && (
+                <View className={post.notice ? "h-2 bg-gray-100" : "h-3 bg-gray-100"} />
+              )}
             </>
           }
           renderItem={({ item: comment }) => (
@@ -386,7 +425,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
               isOperator={comment.isOperator}
               voteChoice={comment.voteChoice}
               onPressReport={
-                !comment.isMine && !comment.isWithdrawn && !isBusy
+                !comment.isOperator && !comment.isMine && !comment.isWithdrawn && !isBusy
                   ? () => {
                       Keyboard.dismiss();
                       setReportTarget({ type: "comment", id: comment.id });
@@ -394,11 +433,28 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                   : undefined
               }
               onPressBlock={
-                !comment.isMine && !comment.isWithdrawn && !isBusy
+                !comment.isOperator && !comment.isMine && !comment.isWithdrawn && !isBusy
                   ? () => setReportTarget({ type: "comment", id: comment.id, action: "block" })
                   : undefined
               }
-              isHighlighted={actions.editing?.id === comment.id}
+              isReply={comment.parentId !== null}
+              {...commentLikes.likeOf(comment)}
+              // Figma CMT-01·CMT-08처럼 본인 댓글·답글에는 좋아요를 두지 않는다(BUG-154).
+              hasLike={!comment.isMine}
+              onPressLike={
+                !comment.isMine && !comment.isWithdrawn
+                  ? () => void commentLikes.toggle(comment)
+                  : undefined
+              }
+              onPressReply={
+                comment.parentId === null && !comment.isWithdrawn && !isBusy
+                  ? () => {
+                      shouldRevealNewComment.current = false;
+                      actions.startReplying(comment);
+                    }
+                  : undefined
+              }
+              isHighlighted={targetId === comment.id}
               onPressMenu={
                 comment.isMine && !comment.isWithdrawn && !isBusy
                   ? (anchor) => {
@@ -409,20 +465,27 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
                   : undefined
               }
               onOpenLink={(url) =>
-                void Linking.openURL(url).catch(() =>
-                  showToast("링크를 열지 못했습니다. 다시 시도해 주세요.", "error"),
-                )
+                void Linking.openURL(url).catch(() => showToast(TOAST_MESSAGES.EXT_001, "error"))
               }
             />
           )}
+          // 댓글을 닫은 공지는 좋아요 줄 아래를 화면 끝까지 Gray100으로 채운다(BUG-155).
+          contentContainerStyle={areCommentsClosed ? { flexGrow: 1 } : undefined}
+          ListFooterComponentStyle={areCommentsClosed ? { flexGrow: 1 } : undefined}
           ListFooterComponent={
             <>
-              {(comments.isPending || comments.isFetchingNextPage) && (
+              {areCommentsClosed && (
+                <View
+                  className="min-h-2 flex-1 bg-gray-100"
+                  style={{ paddingBottom: insets.bottom }}
+                />
+              )}
+              {!areCommentsClosed && (comments.isPending || comments.isFetchingNextPage) && (
                 <View className="items-center py-4">
                   <Spinner />
                 </View>
               )}
-              {comments.isError && (
+              {!areCommentsClosed && comments.isError && (
                 <View className="items-center gap-3 px-margin py-4">
                   <Text className="text-center text-gray-500 font-b3">
                     댓글을 불러올 수 없습니다. 다시 시도해 주세요.
@@ -446,13 +509,32 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
           }
         />
       )}
-      {post && !isWrongRoute && !isRestoring && session && (
-        <View>
+      {post && !isWrongRoute && !isRestoring && session && !areCommentsClosed && (
+        <View
+          className="z-10 bg-gray-0"
+          style={{ boxShadow: `0px -4px 10px ${colors.gray[1000]}1A` }}
+        >
           {actions.editing && (
             <CommentEditBanner
               onCancel={() => {
                 if (!isBusy) {
                   actions.cancelEditing();
+                  Keyboard.dismiss();
+                }
+              }}
+            />
+          )}
+          {actions.replyTarget && (
+            <CommentEditBanner
+              replyTo={formatCommunityAuthor(
+                actions.replyTarget.authorNickname,
+                false,
+                false,
+                actions.replyTarget.isOperator,
+              )}
+              onCancel={() => {
+                if (!isBusy) {
+                  actions.cancelReplying();
                   Keyboard.dismiss();
                 }
               }}
@@ -465,6 +547,11 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             isDisabled={isBusy}
             bottomInset={isKeyboardVisible ? 12 : Math.max(insets.bottom, 12)}
             isEditing={!!actions.editing}
+            placeholder={
+              actions.replyTarget
+                ? `답글을 입력해 주세요. (최대 ${COMMENT_MAX_LENGTH}자)`
+                : undefined
+            }
             onSend={() => void sendComment()}
           />
         </View>
@@ -498,9 +585,7 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             product_id: infoItem.id,
             click_source: "community_product",
           });
-          void Linking.openURL(url).catch(() =>
-            showToast("아이템 페이지를 열지 못했습니다. 다시 시도해 주세요."),
-          );
+          void Linking.openURL(url).catch(() => showToast(TOAST_MESSAGES.EXT_001, "error"));
         }}
       />
       <ReportFlow
@@ -516,14 +601,14 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         title={post?.type === "vote" ? "투표글을 삭제하시겠습니까?" : "게시글을 삭제하시겠습니까?"}
         description="댓글도 함께 삭제되며 복구할 수 없습니다."
         primaryAction={{
-          label: isDeleting ? "삭제 중…" : "삭제",
-          onPress: () => void removePost(),
-        }}
-        secondaryAction={{
           label: "취소",
           onPress: () => {
             if (!deleting.current) setDeleteOpen(false);
           },
+        }}
+        secondaryAction={{
+          label: isDeleting ? "삭제 중…" : "삭제하기",
+          onPress: () => void removePost(),
         }}
         onRequestClose={() => {
           if (!deleting.current) setDeleteOpen(false);
@@ -540,11 +625,18 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
         visible={actions.deleteTarget !== null}
         type="2Btn"
         title="댓글을 삭제하시겠습니까?"
-        primaryAction={{
-          label: actions.isDeleting ? "삭제 중…" : "삭제",
+        description={
+          actions.deleteTarget?.parentId === null &&
+          commentRows.some((row) => row.parentId === actions.deleteTarget?.id)
+            ? "삭제한 댓글은 복구할 수 없으며,\n댓글에 달린 답글도 함께 삭제됩니다."
+            : "삭제한 댓글은 복구할 수 없습니다."
+        }
+        scrimOpacity={0.36}
+        primaryAction={{ label: "취소", onPress: actions.cancelDelete }}
+        secondaryAction={{
+          label: actions.isDeleting ? "삭제 중…" : "삭제하기",
           onPress: () => void actions.remove(),
         }}
-        secondaryAction={{ label: "취소", onPress: actions.cancelDelete }}
         onRequestClose={actions.cancelDelete}
         overlay={
           actions.deleteError ? (
@@ -570,7 +662,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" }) {
             style={{
               top: Math.max(
                 insets.top + 56,
-                Math.min(menu.anchor.y - 44, height - insets.bottom - 96),
+                // BUG-151 높이 96인 메뉴의 가운데를 댓글 가운데에 맞춘다.
+                Math.min(menu.anchor.y + menu.anchor.height / 2 - 48, height - insets.bottom - 96),
               ),
             }}
           >

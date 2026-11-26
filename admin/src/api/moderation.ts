@@ -59,6 +59,9 @@ export type SanctionRecord = {
   state: "record" | "active" | "expired" | "released";
   report_id: string | null;
   admin_id: string;
+  is_held: boolean;
+  /** 해제된 제재는 해제한 운영자, 그 밖에는 제재한 운영자의 이메일 */
+  handled_by: string;
 };
 export type IndividualReport = {
   id: string;
@@ -80,6 +83,8 @@ export type Content = {
   hidden_at: string | null;
   created_at: string;
   type?: "post" | "vote";
+  /** 댓글이 답글이면 원 댓글 ID */
+  parent_id?: string | null;
 };
 export type AuditAction = {
   id: string;
@@ -98,6 +103,7 @@ export type ReportDetail = {
   report_count: number;
   post: Content | null;
   comment: Content | null;
+  parent_comment: Content | null;
   author_name: string | null;
   author: { id: string; status: AccountStatus; restricted_until: string | null } | null;
   products: { name: string; brand: string | null; url: string; image_url: string | null }[];
@@ -139,4 +145,9 @@ export function reportRow(report: ReportGroup): ReportRowData {
     firstAt: formatDate(report.first_at),
     status: report.status,
   };
+}
+export type AnalyticsConsentItems = { usage_analysis: boolean; overseas_transfer: boolean };
+// true인 항목만 철회한다.
+export function withdrawAnalyticsConsent(email: string, items: AnalyticsConsentItems) {
+  return adminRequest<unknown>({ action: "withdraw_analytics_consent", email, ...items });
 }

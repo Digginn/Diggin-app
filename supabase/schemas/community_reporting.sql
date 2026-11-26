@@ -31,9 +31,14 @@ begin
   end if;
   -- 동일 신고 재시도는 원래 사유·Snapshot을 보존한다. 동시 요청도 한 건만 생성한다.
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(viewer::text || ':' || content_type || ':' || target_id::text, 0));
-  select r.id into saved_id from private.reports r where r.reporter_id = viewer
+  select r.id,r.reported_user_id into saved_id,author from private.reports r where r.reporter_id = viewer
     and ((content_type = 'post' and r.post_id = target_id) or (content_type = 'comment' and r.comment_id = target_id));
-  if saved_id is not null then return saved_id::text; end if;
+  if saved_id is not null then
+    if exists(select 1 from private.admin_users a where a.id=author and a.disabled_at is null) then
+      raise exception 'operator_content_protected' using errcode='42501';
+    end if;
+    return saved_id::text;
+  end if;
   if content_type = 'post' then parent_id := target_id;
   else
     select c.post_id into parent_id from private.comments c where c.id = target_id;
@@ -47,15 +52,17 @@ begin
   end if;
   if content_type = 'comment' then
     select * into comment from private.comments where id = target_id for update;
-    if not found or comment.deleted_at is not null or comment.hidden_at is not null or
-      comment.author_id is null or not private.community_author_visible(comment.author_id) or
-      not private.community_content_visible('comment', comment.id) then
+    -- 원 댓글이 빠져 목록에 안 보이는 답글도 신고할 수 없다.
+    if not found or comment.author_id is null or not private.community_comment_listed(comment.id) then
       raise exception 'report_target_not_found' using errcode = '42501';
     end if;
     author := comment.author_id;
   else author := parent.author_id;
   end if;
   if author = viewer then raise exception 'own_report' using errcode = '42501'; end if;
+  if exists(select 1 from private.admin_users a where a.id=author and a.disabled_at is null) then
+    raise exception 'operator_content_protected' using errcode='42501';
+  end if;
   insert into private.reports(reporter_id, target_type, post_id, comment_id, reported_user_id, reason, detail, reported_content)
   values (viewer, content_type::public.report_target,
     case when content_type = 'post' then target_id end,
@@ -96,6 +103,9 @@ begin
   end if;
   if author is null then raise exception 'report_target_not_found' using errcode = '42501'; end if;
   if author = viewer then raise exception 'own_block' using errcode = '42501'; end if;
+  if exists(select 1 from private.admin_users a where a.id=author and a.disabled_at is null) then
+    raise exception 'operator_content_protected' using errcode='42501';
+  end if;
   insert into private.user_blocks(blocker_id, blocked_id) values (viewer, author) on conflict do nothing;
 end;
 $$;

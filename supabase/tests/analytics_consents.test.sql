@@ -65,6 +65,20 @@ reset role;
 select is((select count(*)::int from private.analytics_consent_logs where user_id='15600000-0000-0000-0000-000000000002' and source='operator' and admin_id='15600000-0000-0000-0000-000000000001'),2,'운영자 처리 기록');
 select is((select count(*)::int from private.amplitude_deletion_jobs where user_id='15600000-0000-0000-0000-000000000002' and completed_at is null),1,'운영자 철회도 삭제 요청');
 
+-- 관리자 화면에서 고른 항목만 철회한다(#233).
+update private.amplitude_deletion_jobs set completed_at=now() where user_id='15600000-0000-0000-0000-000000000002';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"15600000-0000-0000-0000-000000000002","role":"authenticated"}';
+select lives_ok($$select public.set_analytics_consent(true,true,'settings')$$,'운영자 철회 뒤 다시 동의');
+reset role;
+set local role service_role;
+select throws_ok($$select public.admin_withdraw_analytics_consent('15600000-0000-0000-0000-000000000001','15600000-0000-0000-0001-000000000001','agree156@test.invalid',false,false)$$,'22023','invalid_analytics_consent','철회할 항목을 고르지 않으면 거부');
+select is(public.admin_withdraw_analytics_consent('15600000-0000-0000-0000-000000000001','15600000-0000-0000-0001-000000000001','agree156@test.invalid',false,true)
+  - 'user_id','{"usage_analysis":true,"overseas_transfer":false}'::jsonb,'고른 국외 이전만 철회하고 이용 분석은 유지');
+reset role;
+select is((select count(*)::int from private.analytics_consent_logs where user_id='15600000-0000-0000-0000-000000000002' and source='operator' and item='usage_analysis'),1,'고르지 않은 항목은 운영자 기록을 남기지 않음');
+select is((select count(*)::int from private.amplitude_deletion_jobs where user_id='15600000-0000-0000-0000-000000000002' and completed_at is null),1,'한 항목만 철회해도 삭제 요청');
+
 insert into auth.users(id,email) values ('15600000-0000-0000-0000-000000000006','legacy156@test.invalid');
 set local role service_role;
 select lives_ok($$select public.admin_withdraw_analytics_consent('15600000-0000-0000-0000-000000000001','15600000-0000-0000-0001-000000000001','legacy156@test.invalid')$$,'동의 이력이 없는 기존 회원의 이메일 철회');

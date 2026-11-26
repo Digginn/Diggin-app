@@ -50,6 +50,9 @@ export function ReportDialog({
   const viewer = session?.user.id ?? null;
   const [owner] = useState(viewer);
   const [phase, setPhase] = useState<"report" | "block">(initialPhase);
+  // 메뉴에서 바로 차단하면 확인 Modal 없이 차단한다(RPT-007, BUG-153).
+  const isDirectBlock = initialPhase === "block";
+  const hasStartedDirectBlock = useRef(false);
   const [isPending, setPending] = useState(false);
   const [error, setError] = useState("");
   const busy = useRef(false);
@@ -69,6 +72,11 @@ export function ReportDialog({
   const close = () => {
     if (!busy.current) onClose();
   };
+  useEffect(() => {
+    if (!isDirectBlock || hasStartedDirectBlock.current) return;
+    hasStartedDirectBlock.current = true;
+    void submit();
+  });
 
   async function submit(reason?: ReportReason, detail = "") {
     if (!viewer || viewer !== owner || busy.current) return;
@@ -90,7 +98,7 @@ export function ReportDialog({
       if (!current.active) return;
       if (phase === "report") setPhase("block");
       else {
-        showToast(DIGGLE_TOAST_MESSAGES.REPORT_004);
+        showToast(DIGGLE_TOAST_MESSAGES.REPORT_004, "success");
         onClose();
       }
     } catch (failure) {
@@ -112,10 +120,16 @@ export function ReportDialog({
           .catch((refreshError: unknown) => {
             if (current.active) showToast(communityWriteError(refreshError), "error");
           });
-      } else
-        setError(
-          communityWriteError(failure, phase === "block" ? REPORT_MESSAGES.blockFailed : undefined),
+      } else {
+        const message = communityWriteError(
+          failure,
+          phase === "block" ? REPORT_MESSAGES.blockFailed : undefined,
         );
+        if (isDirectBlock) {
+          onClose();
+          showToast(message, "error");
+        } else setError(message);
+      }
     } finally {
       if (current.active) {
         busy.current = false;
@@ -129,7 +143,7 @@ export function ReportDialog({
       // 직접 작성 입력칸이 키보드에 가려지지 않게 iOS도 키보드 위로 올린다(BUG-051).
       isKeyboardAvoiding={phase === "report"}
       keyboardGap={16}
-      visible={!!viewer && viewer === owner}
+      visible={!!viewer && viewer === owner && !isDirectBlock}
       // 차단 확인은 위 8·아래 16 여백이다(MSG-REPORT-001). 신고 사유는 기본 여백을 쓴다.
       className={phase === "block" ? "px-2.5 pb-4 pt-2" : undefined}
       onRequestClose={close}
@@ -148,12 +162,10 @@ export function ReportDialog({
           {/* RPT-03 MSG-REPORT-001: 제목과 본문은 4px 간격, 본문은 가운데 정렬 Gray700·B3(BUG-071). */}
           <View className="w-[295px] items-center gap-1 pt-2.5">
             <Text className="text-center text-gray-900 font-label-16-semibold">
-              {initialPhase === "block" ? REPORT_MESSAGES.directBlockTitle : REPORT_MESSAGES.title}
+              {REPORT_MESSAGES.title}
             </Text>
             <Text className="text-center text-gray-700 font-b3">
-              {initialPhase === "block"
-                ? REPORT_MESSAGES.directBlockDescription
-                : REPORT_MESSAGES.blockDescription}
+              {REPORT_MESSAGES.blockDescription}
             </Text>
           </View>
           <View className="w-[295px] flex-row gap-modal-action">
@@ -161,7 +173,7 @@ export function ReportDialog({
               <ModalButton
                 variant="secondary"
                 action={{
-                  label: initialPhase === "block" ? "취소" : "확인",
+                  label: "확인",
                   onPress: close,
                   isDisabled: isPending,
                 }}

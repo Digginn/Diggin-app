@@ -6,6 +6,8 @@ create table public.profiles (
   restricted_until timestamptz,
   suspended_at timestamptz,
   community_policy_agreed_at timestamptz,
+  signup_completed_at timestamptz,
+  age_confirmed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint profiles_nickname_format check (nickname ~ '^[가-힣A-Za-z0-9]{2,10}$'),
@@ -165,6 +167,40 @@ $$;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function private.handle_new_user();
+
+-- ONB-004: 최초 가입 안내를 계정별로 한 번만 선점한다.
+create or replace function private.claim_signup_completion()
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  viewer_id uuid := (select auth.uid());
+  claimed boolean := false;
+begin
+  perform private.assert_account_access();
+  update public.profiles
+  set signup_completed_at = now()
+  where id = viewer_id and signup_completed_at is null
+  returning true into claimed;
+  return coalesce(claimed, false);
+end;
+$$;
+
+create or replace function public.claim_signup_completion()
+returns boolean
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.claim_signup_completion();
+$$;
+
+revoke execute on function private.claim_signup_completion(), public.claim_signup_completion()
+  from public, anon;
+grant execute on function private.claim_signup_completion(), public.claim_signup_completion()
+  to authenticated;
 
 create or replace function private.update_nickname(new_nickname text)
 returns text

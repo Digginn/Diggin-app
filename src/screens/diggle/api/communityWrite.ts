@@ -63,6 +63,15 @@ export function isCommunityProfanityError(error: unknown) {
   );
 }
 
+export function isNoticeCommentsClosedError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    error.message === "notice_comments_closed"
+  );
+}
+
 export function communityWriteError(
   error: unknown,
   fallbackMessage = "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
@@ -76,9 +85,13 @@ export function communityWriteError(
   if (/community_policy_required/.test(message))
     return "커뮤니티 이용정책에 동의한 후 다시 시도해 주세요.";
   if (isCommunityProfanityError(error)) return "사용할 수 없는 표현이 포함되어 있습니다.";
+  if (isNoticeCommentsClosedError(error)) return "댓글이 닫힌 공지입니다.";
+  if (message === "operator_content_protected")
+    return "운영자의 글과 댓글은 신고하거나 차단할 수 없습니다.";
   if (/invalid_post_products/.test(message))
     return "첨부한 아이템을 확인해 주세요. 삭제된 아이템은 다시 선택해 주세요.";
   if (/invalid_post_content/.test(message)) return "본문을 공백 제외 5~50자로 입력해 주세요.";
-  if (/network|failed to fetch/i.test(message)) return "연결 상태를 확인한 후 다시 시도해 주세요.";
+  if (/network|failed to fetch|fetch failed/i.test(message))
+    return "연결 상태를 확인한 후 다시 시도해 주세요.";
   return fallbackMessage;
 }

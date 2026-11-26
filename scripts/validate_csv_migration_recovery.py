@@ -7,13 +7,15 @@ import subprocess
 import sys
 import tempfile
 
-from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, PROFANITY_BASELINE, PROFANITY_RECOVERY, deployment_plan, migration_files
+from deploy_shared_db import CSV_RECOVERY, RECOVERY_BASELINE, PROFANITY_BASELINE, PROFANITY_RECOVERY, NOTICE_BASELINE, NOTICE_RECOVERY, deployment_plan, migration_files
 
 
-def validate(profanity=False):
+def validate(profanity=False, notices=False):
     root = Path(__file__).resolve().parent.parent
     baseline = PROFANITY_BASELINE if profanity else RECOVERY_BASELINE
     recovery = PROFANITY_RECOVERY if profanity else CSV_RECOVERY
+    if notices:
+        baseline, recovery = NOTICE_BASELINE, NOTICE_RECOVERY
     with tempfile.TemporaryDirectory(prefix="diggin-csv-recovery-") as temporary:
         workdir = Path(temporary)
         project = workdir / "supabase"
@@ -72,5 +74,8 @@ def validate(profanity=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--profanity", action="store_true", help="Reproduce the direct-block-first history")
-    validate(parser.parse_args().profanity)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--profanity", action="store_true", help="Reproduce the direct-block-first history")
+    mode.add_argument("--notices", action="store_true", help="Reproduce the admin-console-first history")
+    args = parser.parse_args()
+    validate(args.profanity, args.notices)

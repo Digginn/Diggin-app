@@ -60,6 +60,50 @@ reset role;
 select is((select session_ip::text from private.admin_console_access_logs where resource='members' order by id desc limit 1),'203.0.113.24/32','검증한 Auth 세션의 로그인 IP 저장');
 select is((select subject_ids from private.admin_console_access_logs where resource='members' order by id desc limit 1),array['22400000-0000-0000-0000-000000000002'::uuid],'실제로 반환한 회원만 조회 기록에 저장');
 select ok((select subject_ids @> array['22400000-0000-0000-0000-000000000002'::uuid,'22400000-0000-0000-0000-000000000003'::uuid,'22400000-0000-0000-0000-000000000004'::uuid] from private.admin_access_logs order by id desc limit 1),'상세에서 반환한 작성자·신고자 기록');
+-- 제재 이력의 보관 열과 처리 열(#235). 해제한 운영자는 해제 조치 기록에서 찾는다.
+insert into auth.users(id,email) values ('22400000-0000-0000-0000-000000000005','releaser224@test.invalid');
+insert into private.admin_users(id,email,role) values ('22400000-0000-0000-0000-000000000005','releaser224@test.invalid','operator');
+with issued as (
+  insert into private.admin_actions(admin_id,request_id,action,target_type,target_id,reason_category,reason,before_state,after_state,created_at)
+  values ('22400000-0000-0000-0000-000000000001',gen_random_uuid(),'warning','user','22400000-0000-0000-0000-000000000002','abuse','경고','{}','{}',now()-interval '2 days')
+  returning id)
+insert into private.user_sanctions(user_id,action_id,kind,reason_category,released_at)
+  select '22400000-0000-0000-0000-000000000002',id,'warning','abuse',now()-interval '1 day' from issued;
+insert into private.admin_actions(admin_id,request_id,action,target_type,target_id,reason_category,reason,before_state,after_state,created_at)
+  values ('22400000-0000-0000-0000-000000000005',gen_random_uuid(),'release','user','22400000-0000-0000-0000-000000000002','abuse','해제','{}','{}',
+    (select released_at from private.user_sanctions where user_id='22400000-0000-0000-0000-000000000002'));
+with issued as (
+  insert into private.admin_actions(admin_id,request_id,action,target_type,target_id,reason_category,reason,before_state,after_state)
+  values ('22400000-0000-0000-0000-000000000001',gen_random_uuid(),'warning','user','22400000-0000-0000-0000-000000000004','spam','경고','{}','{}')
+  returning id)
+insert into private.user_sanctions(user_id,action_id,kind,reason_category)
+  select '22400000-0000-0000-0000-000000000004',id,'warning','spam' from issued;
+insert into private.retention_holds(target_type,target_id,admin_id)
+  select 'sanction',id,'22400000-0000-0000-0000-000000000001' from private.user_sanctions where user_id='22400000-0000-0000-0000-000000000004';
+set local role service_role;
+select set_config('test.admin235.rows',(public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','sanctions')->'rows')::text,true);
+reset role;
+select is((select row->>'handled_by' from jsonb_array_elements(current_setting('test.admin235.rows')::jsonb) row where row->>'user_id'='22400000-0000-0000-0000-000000000002'),
+  'releaser224@test.invalid','해제된 제재는 해제한 운영자를 표시');
+select is((select row->>'handled_by' from jsonb_array_elements(current_setting('test.admin235.rows')::jsonb) row where row->>'user_id'='22400000-0000-0000-0000-000000000004'),
+  'admin224@test.invalid','해제 전 제재는 제재한 운영자를 표시');
+select is((select (row->>'is_held')::boolean from jsonb_array_elements(current_setting('test.admin235.rows')::jsonb) row where row->>'user_id'='22400000-0000-0000-0000-000000000004'),
+  true,'보관 유지한 제재');
+select is((select (row->>'is_held')::boolean from jsonb_array_elements(current_setting('test.admin235.rows')::jsonb) row where row->>'user_id'='22400000-0000-0000-0000-000000000002'),
+  false,'보관 유지하지 않은 제재');
+-- 해제 뒤 회원이 탈퇴해 user_id가 비워져도 해제한 운영자를 찾는다.
+select set_config('test.admin235.withdrawn',(select action_id::text from private.user_sanctions where user_id='22400000-0000-0000-0000-000000000002'),true);
+update private.user_sanctions set user_id=null where user_id='22400000-0000-0000-0000-000000000002';
+set local role service_role;
+select is((select row->>'handled_by' from jsonb_array_elements(public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','sanctions')->'rows') row
+  where row->>'action_id'=current_setting('test.admin235.withdrawn')),'releaser224@test.invalid','탈퇴한 회원의 제재도 해제한 운영자를 표시');
+reset role;
+update private.user_sanctions set user_id='22400000-0000-0000-0000-000000000002' where action_id=current_setting('test.admin235.withdrawn')::bigint;
+-- 회원 관리·제재 이력은 한 페이지에 8개(#235).
+insert into auth.users(id,email) select ('22400000-0000-0000-0000-0000000001' || lpad(n::text,2,'0'))::uuid, 'page' || n || '@test.invalid' from generate_series(1,6) n;
+set local role service_role;
+select is(jsonb_array_length(public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','members')->'rows'),8,'회원 목록은 한 페이지에 8개');
+reset role;
 update private.admin_users set disabled_at=now() where id='22400000-0000-0000-0000-000000000001';
 set local role service_role;
 select throws_ok($$select public.admin_console('22400000-0000-0000-0000-000000000001','22400000-0000-0000-0001-000000000001','reports')$$,'42501','admin_required','비활성 운영자는 기존 세션으로도 조회 불가');

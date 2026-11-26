@@ -211,6 +211,13 @@ test("SYS-009 시간 경계와 네트워크/일반 실패 문구를 구분한다
   ])
     assert.equal(formatCommunityTime(at(seconds), now), expected);
   assert.match(communityErrorMessage(new Error("Network request failed")), /연결 상태/);
+  // iOS 전역 fetch(expo/fetch)는 오프라인을 "fetch failed: …"로 알린다(BUG-130).
+  assert.match(
+    communityErrorMessage({
+      message: "Error: fetch failed: The Internet connection appears to be offline.",
+    }),
+    /연결 상태/,
+  );
   assert.match(communityErrorMessage({ message: "HTTP 500" }), /게시글/);
 });
 
@@ -480,6 +487,7 @@ function screenMocks({
       View: "View",
       Text: "Text",
       FlatList: "FlatList",
+      RefreshControl: "RefreshControl",
       ScrollView: "ScrollView",
       KeyboardAvoidingView: "KeyboardAvoidingView",
       Pressable: "Pressable",
@@ -516,6 +524,8 @@ function screenMocks({
     "@/components/ReportFlow": { ReportFlow: "ReportFlow" },
     "@/components/CommentInput": { CommentInput: "CommentInput" },
     "@/components/CommentEditBanner": { CommentEditBanner: "CommentEditBanner" },
+    "@/theme": load("src/theme/colors.ts"),
+    "@/constants/comments": { COMMENT_MAX_LENGTH: 150 },
     "@/components/FloatingToolbar": { FloatingToolbar: "FloatingToolbar" },
     "./domain/comments": load("src/screens/diggle/domain/comments.ts"),
     "./domain/communitySave": communitySaveDomain,
@@ -527,6 +537,12 @@ function screenMocks({
         deleteTarget: null,
         isSending: false,
         isDeleting: false,
+      }),
+    },
+    "./hooks/useCommentLikes": {
+      useCommentLikes: () => ({
+        likeOf: (row) => ({ isLiked: row.isLiked ?? false, likeCount: row.likeCount ?? 0 }),
+        toggle() {},
       }),
     },
     "./hooks/useCommunityLike": {
@@ -550,6 +566,7 @@ function screenMocks({
     "@/components/ErrorState": { ErrorState: "ErrorState" },
     "@/components/Fab": { Fab: "Fab" },
     "@/components/Loading": { Spinner: "Spinner" },
+    "@/components/RefreshArea": { RefreshArea: "RefreshArea", REFRESH_TINT: undefined },
     "@/components/modal": { LoginRequiredModal: "LoginRequiredModal", ActionModal: "ActionModal" },
     "@/components/ToastText": { ToastText: "ToastText" },
     "@tanstack/react-query": { useQueryClient: () => ({ invalidateQueries: () => {} }) },
@@ -574,7 +591,10 @@ function screenMocks({
     "./queries/useCommunity": {
       useCommunityFeed: () => feed,
       useCommunityPost: () => ({ data: post, ...postResult }),
-      useCommunityComments: () => ({ data: { pages: [comments] }, ...commentsResult }),
+      useCommunityComments: () => ({
+        data: { pages: [comments.map((row) => ({ parentId: null, replies: [], ...row }))] },
+        ...commentsResult,
+      }),
     },
     "./utils/formatCommunityTime": {
       formatCommunityTime: () => "방금 전",
@@ -582,6 +602,8 @@ function screenMocks({
         .communityErrorMessage,
     },
     "./utils/formatCommunityAuthor": load("src/screens/diggle/utils/formatCommunityAuthor.ts"),
+    "./components/FeaturedNotice": { FeaturedNotice: "FeaturedNotice" },
+    "./components/NoticeHeader": { NoticeHeader: "NoticeHeader" },
     "./components/LikeCommentRow": { LikeCommentRow: "LikeCommentRow" },
     "./components/PostItemInfoSheet": { PostItemInfoSheet: "PostItemInfoSheet" },
     "./components/ProductImgGrid": { ProductImgGrid: "ProductImgGrid" },
@@ -632,6 +654,10 @@ test("오프라인 첫 진입과 FAB 재시도는 스켈레톤·권한 요청 �
 test("작성 권한 확인 도중 끊긴 연결과 서버 오류는 서로 다른 Toast를 표시한다", async () => {
   for (const [message, expected] of [
     ["TypeError: Network request failed", "연결 상태를 확인한 후 다시 시도해 주세요."],
+    [
+      "Error: fetch failed: The Internet connection appears to be offline.",
+      "연결 상태를 확인한 후 다시 시도해 주세요.",
+    ],
     ["HTTP 500", "요청을 처리하지 못했습니다. 다시 시도해 주세요."],
   ]) {
     const state = screenMocks();
@@ -1046,6 +1072,103 @@ test("투표 블록은 본문 컨테이너의 좌우 여백을 그대로 사용�
   assert.equal(tree.props.className.includes("px-margin"), false);
 });
 
+test("게시글·투표·댓글·답글 삭제 모달은 왼쪽 삭제하기·오른쪽 취소이며 각 버튼이 올바른 동작을 실행한다", async () => {
+  const { ActionModal } = load("src/components/modal/ActionModal.tsx", {
+    "react-native": { View: "View", Text: "Text", Pressable: "Pressable" },
+    "nativewind": { cssInterop: (icon) => icon },
+    "./Modal": { Modal: "Modal" },
+    "./ModalButton": { ModalButton: "ModalButton" },
+  });
+  const buttons = (modal) =>
+    nodes(ActionModal(modal.props), "ModalButton").map((node) => node.props.action);
+  for (const type of ["post", "vote"]) {
+    const post = await api({ ...MEMBER, type, is_mine: true }).fetchCommunityPost("12");
+    const state = screenMocks({ post });
+    let deleted = 0;
+    state.mocks["./api/communityWrite"].deleteCommunityPost = async () => {
+      deleted++;
+    };
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const modal = nodes(
+      PostDetailScreen({ type: type === "vote" ? "vote" : "all" }),
+      "ActionModal",
+    ).find((node) => node.props.description === "댓글도 함께 삭제되며 복구할 수 없습니다.");
+    const actions = buttons(modal);
+    assert.deepEqual(
+      actions.map((action) => action.label),
+      ["삭제하기", "취소"],
+    );
+    actions[1].onPress();
+    assert.equal(deleted, 0, "오른쪽 취소는 게시글을 삭제하지 않는다");
+    actions[0].onPress();
+    await new Promise(setImmediate);
+    assert.equal(deleted, 1, "왼쪽 삭제하기만 게시글 삭제를 실행한다");
+  }
+  for (const parentId of [null, "88"]) {
+    const post = await api(MEMBER).fetchCommunityPost("12");
+    const state = screenMocks({ post });
+    let cancelled = 0;
+    let deleted = 0;
+    state.mocks["./hooks/useCommentActions"].useCommentActions = () => ({
+      changes: {},
+      body: "",
+      deleteTarget: { id: "90", parentId },
+      isSending: false,
+      isDeleting: false,
+      cancelDelete: () => {
+        cancelled++;
+      },
+      remove: async () => {
+        deleted++;
+      },
+    });
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const modal = nodes(PostDetailScreen({ type: "all" }), "ActionModal").find(
+      (node) => node.props.title === "댓글을 삭제하시겠습니까?",
+    );
+    const actions = buttons(modal);
+    assert.deepEqual(
+      actions.map((action) => action.label),
+      ["삭제하기", "취소"],
+    );
+    actions[1].onPress();
+    assert.equal(cancelled, 1);
+    assert.equal(deleted, 0, "오른쪽 취소는 댓글·답글을 삭제하지 않는다");
+    actions[0].onPress();
+    assert.equal(deleted, 1, "왼쪽 삭제하기만 댓글·답글 삭제를 실행한다");
+  }
+});
+
+test("답글이 있는 원댓글만 함께 삭제 안내를 표시하고 삭제 모달은 시안의 36% 배경을 사용한다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const reply = { id: "90", parentId: "88", replies: [], createdAt: "2026-11-26T00:00:01Z" };
+  const parent = { id: "88", parentId: null, replies: [], createdAt: "2026-11-26T00:00:00Z" };
+  for (const [target, comments, expected] of [
+    [parent, [parent], "삭제한 댓글은 복구할 수 없습니다."],
+    [
+      parent,
+      [{ ...parent, replies: [reply] }],
+      "삭제한 댓글은 복구할 수 없으며,\n댓글에 달린 답글도 함께 삭제됩니다.",
+    ],
+    [reply, [{ ...parent, replies: [reply] }], "삭제한 댓글은 복구할 수 없습니다."],
+  ]) {
+    const state = screenMocks({ post, comments });
+    state.mocks["./hooks/useCommentActions"].useCommentActions = () => ({
+      changes: {},
+      body: "",
+      deleteTarget: target,
+      isSending: false,
+      isDeleting: false,
+    });
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const modal = nodes(PostDetailScreen({ type: "all" }), "ActionModal").find(
+      (node) => node.props.title === "댓글을 삭제하시겠습니까?",
+    );
+    assert.equal(modal.props.description, expected);
+    assert.equal(modal.props.scrimOpacity, 0.36);
+  }
+});
+
 test("삭제 성공은 진입 목록과 탭으로 복귀하며 일반 DIGGLE 진입은 기존 경로를 유지한다", async () => {
   for (const [returnTo, type, pathname, tab] of [
     ["my-posts", "post", "/my-posts", "posts"],
@@ -1063,8 +1186,8 @@ test("삭제 성공은 진입 목록과 탭으로 복귀하며 일반 DIGGLE 진
     const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
     const tree = PostDetailScreen({ type: type === "vote" ? "vote" : "all" });
     await nodes(tree, "ActionModal")
-      .find((node) => node.props.primaryAction?.label === "삭제")
-      .props.primaryAction.onPress();
+      .find((node) => node.props.secondaryAction?.label === "삭제하기")
+      .props.secondaryAction.onPress();
     await new Promise(setImmediate);
     const target = state.destination();
     assert.equal(typeof target === "string" ? target : target.pathname, pathname);
@@ -1082,8 +1205,8 @@ test("삭제 실패는 원래 상세에 남고 잘못된 글 종류를 교정해
   const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
   const tree = PostDetailScreen({ type: "vote" });
   await nodes(tree, "ActionModal")
-    .find((node) => node.props.primaryAction?.label === "삭제")
-    .props.primaryAction.onPress();
+    .find((node) => node.props.secondaryAction?.label === "삭제하기")
+    .props.secondaryAction.onPress();
   await new Promise(setImmediate);
   assert.equal(state.destination(), undefined);
   state.mocks.react.useEffect = (effect) => effect();
@@ -1172,4 +1295,178 @@ test("본인 글 상세에서는 좋아요를 누를 수 없다(BUG-074)", async
   const row = nodes(PostDetailScreen({}), "LikeCommentRow")[0];
   assert.equal(row.props.onPressLike, undefined);
   assert.equal(row.props.hasLike, true, "좋아요 수는 계속 보여 준다");
+});
+
+test("공지 상세는 운영자 헤더를 사용하고 댓글 닫기 상태에서는 댓글과 입력창을 숨긴다", async () => {
+  const original = await api(MEMBER).fetchCommunityPost("12");
+  for (const commentsClosed of [false, true]) {
+    const post = { ...original, notice: { title: "운영 공지", commentsClosed } };
+    const state = screenMocks({ post });
+    const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+    const screen = PostDetailScreen({ type: "notice" });
+    const list = nodes(screen, "FlatList")[0];
+    assert.equal(nodes(list.props.ListHeaderComponent, "NoticeHeader")[0].props.title, "운영 공지");
+    assert.equal(nodes(list.props.ListHeaderComponent, "ProductImgGrid").length, 0);
+    assert.equal(
+      nodes(list.props.ListHeaderComponent, "LikeCommentRow")[0].props.hasComment,
+      !commentsClosed,
+    );
+    assert.equal(nodes(screen, "CommentInput").length, commentsClosed ? 0 : 1);
+    assert.equal(
+      nodes(list.props.ListFooterComponent, "View").some((node) =>
+        /flex-1 bg-gray-100/.test(node.props.className),
+      ),
+      commentsClosed,
+      "댓글을 닫으면 본문 아래를 화면 끝까지 Gray100으로 채운다",
+    );
+    assert.equal(list.props.contentContainerStyle?.flexGrow, commentsClosed ? 1 : undefined);
+    assert.equal(
+      nodes(screen, "ReportBlockMenu").length,
+      0,
+      "공지 헤더는 일반 글 신고·삭제 메뉴를 노출하지 않는다",
+    );
+  }
+});
+
+test("운영자 댓글은 신고·차단을 숨기고 본인 댓글 수정·삭제 메뉴는 유지한다", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({
+    post,
+    comments: [
+      { id: "1", isOperator: true, body: "운영자 안내", createdAt: PREVIEW.created_at },
+      {
+        id: "2",
+        isOperator: true,
+        isMine: true,
+        body: "내 운영자 댓글",
+        createdAt: PREVIEW.created_at,
+      },
+    ],
+  });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const comments = nodes(PostDetailScreen({}), "Comment");
+  for (const comment of comments) {
+    assert.equal(comment.props.onPressReport, undefined);
+    assert.equal(comment.props.onPressBlock, undefined);
+  }
+  assert.equal(typeof comments[1].props.onPressMenu, "function");
+});
+
+test("댓글·답글 좋아요는 남의 댓글에만 보이고 본인 댓글에는 표시하지 않는다(BUG-154)", async () => {
+  const post = await api(MEMBER).fetchCommunityPost("12");
+  const state = screenMocks({
+    post,
+    comments: [
+      { id: "1", body: "남의 댓글", likeCount: 2, isLiked: true, createdAt: PREVIEW.created_at },
+      { id: "2", isMine: true, body: "내 댓글", likeCount: 1, createdAt: PREVIEW.created_at },
+      { id: "3", isWithdrawn: true, body: null, createdAt: PREVIEW.created_at },
+    ],
+  });
+  const { PostDetailScreen } = load("src/screens/diggle/PostDetailScreen.tsx", state.mocks);
+  const comments = nodes(PostDetailScreen({}), "Comment");
+  assert.equal(typeof comments[0].props.onPressLike, "function");
+  assert.equal(comments[0].props.likeCount, 2);
+  assert.equal(comments[0].props.isLiked, true);
+  assert.equal(comments[1].props.onPressLike, undefined);
+  assert.equal(comments[1].props.hasLike, false, "Figma처럼 본인 댓글에는 하트를 두지 않는다");
+  assert.equal(comments[2].props.onPressLike, undefined);
+});
+
+test("DIGGLE 새로고침 표시는 직접 당겼을 때만 켜고, 좋아요·투표 등으로 다시 불러올 때는 켜지 않는다", async () => {
+  let resolveRefetch;
+  const state = screenMocks({
+    feed: {
+      isSuccess: true,
+      isRefetching: true,
+      data: { pages: [[]] },
+      refetch: () => new Promise((resolve) => (resolveRefetch = resolve)),
+    },
+  });
+  state.mocks["react-native"].Platform = { OS: "ios" };
+  const values = [];
+  let cursor = 0;
+  state.mocks.react.useState = (initial) => {
+    const index = cursor++;
+    if (!(index in values)) values[index] = initial;
+    return [
+      values[index],
+      (next) => (values[index] = typeof next === "function" ? next(values[index]) : next),
+    ];
+  };
+  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const render = () => {
+    cursor = 0;
+    return DiggleScreen();
+  };
+  const control = () => nodes(render(), "FlatList")[0].props.refreshControl;
+  assert.equal(
+    control().props.refreshing,
+    false,
+    "다른 화면 동작으로 다시 불러오는 중에는 표시하지 않는다",
+  );
+  const area = () => nodes(render(), "RefreshArea")[0];
+  assert.equal(area().props.isRefreshing, false);
+  control().props.onRefresh();
+  assert.equal(control().props.refreshing, true);
+  assert.equal(area().props.isRefreshing, true, "새로고침 중 공통 Spinner를 그린다");
+  resolveRefetch();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(control().props.refreshing, false, "다시 불러오면 표시를 끈다");
+});
+
+test("DIGGLE 새로고침 표시는 당긴 탭에만 나오고, 이전 탭의 완료가 새 탭의 새로고침을 끄지 않는다", async () => {
+  const resolvers = [];
+  const params = { tab: "all" };
+  const state = screenMocks({
+    params,
+    feed: {
+      isSuccess: true,
+      data: { pages: [[]] },
+      refetch: () => new Promise((resolve) => resolvers.push(resolve)),
+    },
+  });
+  const values = [];
+  let cursor = 0;
+  state.mocks.react.useState = (initial) => {
+    const index = cursor++;
+    if (!(index in values)) values[index] = initial;
+    return [
+      values[index],
+      (next) => (values[index] = typeof next === "function" ? next(values[index]) : next),
+    ];
+  };
+  const { DiggleScreen } = load("src/screens/diggle/DiggleScreen.tsx", state.mocks);
+  const control = () => {
+    cursor = 0;
+    return nodes(DiggleScreen(), "FlatList")[0].props.refreshControl;
+  };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  control().props.onRefresh();
+  params.tab = "vote";
+  assert.equal(
+    control().props.refreshing,
+    false,
+    "전체 게시글을 당기는 중 투표 탭에는 표시하지 않는다",
+  );
+  control().props.onRefresh();
+  assert.equal(control().props.refreshing, true);
+  params.tab = "all";
+  assert.equal(
+    control().props.refreshing,
+    true,
+    "투표 탭을 당긴 뒤 돌아와도 진행 중인 전체 게시글 표시는 유지한다",
+  );
+  resolvers[0]();
+  await flush();
+  assert.equal(control().props.refreshing, false, "전체 게시글 완료는 전체 탭 표시만 끈다");
+  params.tab = "vote";
+  assert.equal(
+    control().props.refreshing,
+    true,
+    "전체 게시글 완료가 투표 탭의 새로고침을 끄지 않는다",
+  );
+  resolvers[1]();
+  await flush();
+  assert.equal(control().props.refreshing, false);
 });

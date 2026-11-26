@@ -25,7 +25,7 @@ set local role service_role;
 select set_config('test.jobs',public.claim_notification_pushes(false)::text,true);
 select is(jsonb_array_length(current_setting('test.jobs')::jsonb),2,'두 기기를 선점');
 select is(jsonb_array_length(public.claim_notification_pushes(false)),0,'다른 실행은 lease 중 작업을 받지 못한다');
-select is(current_setting('test.jobs')::jsonb->0->>'body','알림 발송 테스트 일반글','좋아요 Push는 게시글 원문');
+select is(current_setting('test.jobs')::jsonb->0->>'body','목록 본문','좋아요 Push 본문은 목록 본문과 같다');
 select ok(not public.finish_notification_push((current_setting('test.jobs')::jsonb->0->>'id')::bigint,
  gen_random_uuid(),'delivered'),'다른 lease로 결과 갱신 불가');
 select ok(public.finish_notification_push((current_setting('test.jobs')::jsonb->0->>'id')::bigint,

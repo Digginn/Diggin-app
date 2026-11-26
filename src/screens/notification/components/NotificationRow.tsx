@@ -7,6 +7,7 @@ export type NotificationItem = {
   message: string;
   timeLabel: string;
   isRead: boolean;
+  isNotice?: boolean;
 };
 
 type NotificationRowProps = {
@@ -29,10 +30,24 @@ export function NotificationRow({ notification, onPress }: NotificationRowProps)
       )}
     >
       <View className="flex-row items-center justify-between gap-2">
-        <Text className="min-w-0 flex-1 text-gray-900 font-label-14">{notification.title}</Text>
+        <View className="min-w-0 flex-1 flex-row items-center gap-1.5">
+          {notification.isNotice && (
+            <View className="h-5 justify-center rounded-sm bg-gray-800 px-1.5">
+              <Text className="text-gray-0 font-label-12-semibold">공지</Text>
+            </View>
+          )}
+          <Text
+            numberOfLines={notification.isNotice ? 1 : undefined}
+            className="min-w-0 flex-1 text-gray-900 font-label-14"
+          >
+            {notification.title}
+          </Text>
+        </View>
         <Text className="shrink-0 text-gray-500 font-meta">{notification.timeLabel}</Text>
       </View>
-      <Text className="text-gray-700 font-b4">{notification.message}</Text>
+      <Text numberOfLines={notification.isNotice ? 2 : undefined} className="text-gray-700 font-b4">
+        {notification.message}
+      </Text>
     </Pressable>
   );
 }

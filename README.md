@@ -43,6 +43,8 @@ This command will move the starter code to the **app-example** directory and cre
 
 ## 모바일 OTA 업데이트
 
+관리자 웹과 앱을 개발 DB에서 함께 QA한 뒤 운영으로 배포하는 순서는 [개발 QA와 운영 배포](docs/QA_RELEASE.md)를 참고합니다.
+
 EAS Update의 최초 빌드, preview/production 환경과 채널, 배포·검증·복구 방법은 [EAS Update 운영 안내](docs/EAS_UPDATE.md)를 참고합니다. 기존 스토어 앱은 설정이 포함된 새 빌드를 설치한 이후부터 OTA를 받을 수 있습니다.
 
 ## Learn more

@@ -9,8 +9,8 @@ import type { ItemSaveValues } from "@/types/wish-item";
 
 export const ITEM_INFO_DESCRIPTION = {
   loaded: "불러온 정보를 확인하고 저장해 주세요.",
-  failed:
-    "아이템 정보를 불러오지 못했습니다.\n아이템 링크는 유지했어요. 정보를 직접 입력해 저장할 수 있어요.",
+  // MSG-SAVE-017(BUG-100)
+  failed: "아이템 정보를 불러오지 못했습니다.\n링크는 저장되며, 아이템 정보는 직접 입력해 주세요.",
 } as const;
 
 type ItemEditSheetProps = {

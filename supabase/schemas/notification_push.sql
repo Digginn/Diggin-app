@@ -33,8 +33,10 @@ returns boolean language sql stable security definer set search_path = '' as $$
       and p.deleted_at is null and p.hidden_at is null
       and (n.type <> 'post_commented' or exists (
         select 1 from private.comments c
-        where c.post_id = n.post_id and n.event_key = 'comment:' || c.id
-          and c.deleted_at is null
+        left join private.comments parent on parent.id = c.parent_id
+        where c.post_id = n.post_id and n.event_key in ('comment:' || c.id, 'reply:' || c.id)
+          and c.deleted_at is null and c.hidden_at is null
+          and (c.parent_id is null or (parent.deleted_at is null and parent.hidden_at is null))
       ))
       and (n.actor_id is null or private.notification_actor_visible(n.recipient_id, n.actor_id))
   );
@@ -78,8 +80,12 @@ begin
     'expired', n.created_at <= now() - interval '24 hours',
     'token', t.token, 'recipient_id', n.recipient_id, 'post_id', p.id::text, 'post_type', p.type,
     'title', case when n.type = 'vote_ended' then '투표가 종료됐어요.' else n.title end,
+    -- NOTI-010 답글 Push는 '{닉네임}: ' 뒤 답글 본문을 42자까지 보여 준다. 댓글 Push(NOTI-004)는 자르지 않는다.
     'body', case when n.type = 'vote_ended' then '내 투표 결과를 확인해 보세요.'
-      when n.type = 'post_liked' then private.notification_text(p.content) else n.body end
+      when n.event_key like 'reply:%' and position(': ' in n.body) > 0
+        then left(n.body, position(': ' in n.body) + 1) ||
+          private.notification_excerpt(substr(n.body, position(': ' in n.body) + 2), 42)
+      else n.body end
   ) order by d.id), '[]'::jsonb) into jobs
   from claimed d join private.notifications n on n.id = d.notification_id
   join private.posts p on p.id = n.post_id join public.push_tokens t on t.id = d.token_id;

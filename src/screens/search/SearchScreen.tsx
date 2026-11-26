@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProductCounts } from "@/hooks/useProductCounts";
 import { useProductList } from "@/hooks/useProductList";
 import { SortLabel, type SortOrder } from "@/screens/all/components/SortLabel";
+import { WISH_LEVEL_HINT } from "@/screens/all/constants";
 import type { WishLevelCounts, WishLevelKey } from "@/types/wish-item";
 
 import { RecentSearches } from "./components/RecentSearches";
@@ -126,7 +127,7 @@ export function SearchScreen() {
                   <WishLevel
                     hasScrim
                     levels={counts.data?.levels ?? EMPTY_LEVELS}
-                    hint="아이템 상세 화면에서 얼마나 사고 싶은지를 3단계로 기록해두어 구매 고민을 빠르게 마칠 수 있습니다."
+                    hint={WISH_LEVEL_HINT}
                     selected={wishLevel}
                     onSelect={(level) => setWishLevel((prev) => (prev === level ? null : level))}
                   />
