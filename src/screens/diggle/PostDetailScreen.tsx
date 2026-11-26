@@ -439,6 +439,8 @@ export function PostDetailScreen({ type = "all" }: { type?: "all" | "vote" | "no
               }
               isReply={comment.parentId !== null}
               {...commentLikes.likeOf(comment)}
+              // Figma CMT-01·CMT-08처럼 본인 댓글·답글에는 좋아요를 두지 않는다(BUG-154).
+              hasLike={!comment.isMine}
               onPressLike={
                 !comment.isMine && !comment.isWithdrawn
                   ? () => void commentLikes.toggle(comment)
