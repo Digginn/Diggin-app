@@ -233,6 +233,7 @@ function editor({ isVote = false, agreed = true, save, agree } = {}) {
     },
   };
   const { PostWriteScreen } = load("src/screens/diggle/PostWriteScreen.tsx", {
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     "react": {
       useState: useSlot,
       useRef: (initial) => useSlot({ current: initial })[0],

@@ -42,7 +42,7 @@ test("소장 카드는 썸네일만 흰색 40%로 덮고 배지·선택 체크·
   const props = { name: "코트", price: 10, onPress: () => presses++, select: "selected" };
   const tree = Card({ ...props, isOwned: true });
   const dim = nodes(tree, "View").find((node) => node.props.className.includes("bg-gray-0/40"));
-  assert.ok(dim.props.className.includes("h-[106px]"));
+  assert.ok(dim.props.className.includes("aspect-square"));
   assert.equal(dim.props.pointerEvents, "none");
   assert.equal(nodes(tree, "@/assets/images/icon-basket-check-white.svg")[0].props.width, 12);
   assert.equal(nodes(tree, "@/assets/images/icon-select-check-on.svg").length, 1);

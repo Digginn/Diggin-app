@@ -95,6 +95,7 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 - 영구 제한은 어느 화면에서든 안내·로컬 세션 종료·비회원 로그인 화면 전환을 처리한다. 화면 이동·앱 복귀 시 상태 재확인과 SDK 세션 종료 이벤트를 사용하며, 주기 조회는 하지 않는다. 재조회 중에도 기존 경고·7일 제한 안내를 유지하고 확인 완료·제한 해제 응답에 따라 닫는다. 이전 JWT가 유효한 동안에는 본인 안내만 조회할 수 있다.
 - Auth가 로그인을 거부하면 Google·Kakao·네이티브 Apple의 제공자 ID token을 `account-restriction`에 보내 기본 위반 유형만 확인한다. 서버는 서명·issuer·앱 audience·만료를 검증하고 해당 identity에만 응답한다. 이메일이나 UUID로 조회하는 공개 API는 없다.
 - Apple 로그인은 iOS에서만 제공하며 Android에서는 버튼과 인증 실행을 차단한다.
+- 로그인 전 동의 확인(#249)은 같은 함수에 `operation: "login-consent"`를 보낸다. 서명을 검증한 소셜 identity로 제재 안내 또는 `policy_status`(`is_new_user`, 현재 약관 ID·버전·동의 필요 여부)만 돌려준다. 이메일·사용자 UUID는 반환하지 않는다. 신규 회원은 필수 동의 전 Auth 계정을 생성하지 않으며 기존 동의자는 시트를 생략한다. DB 마이그레이션과 이 Edge Function을 앱보다 먼저 배포해야 한다. 기존 OIDC audience 설정을 사용한다.
 - **사유 조회 실패** 시 유형을 추측하지 않고 `1:1 문의로 확인해 주세요.`를 표시한다. JWT가 이미 만료된 채 세션이 종료되어 본인 상태를 조회할 수 없으면 기존 인증 만료 안내를 사용하며, 로그인 시도 시 영구 제한을 안내한다. 이 안내 흐름은 2026-10-21 사용자 확인으로 유지하며, 실제 기기 QA가 남아 있다.
 
 ## 배포 전 설정
@@ -122,7 +123,7 @@ ID(bigint)는 문자열로 보낸다. 변경 요청의 `request_id`는 새 UUID�
 - `npm run test:community`, `npm run test:moderation`, 타입·린트 검사
 - `supabase db reset --local --no-seed`, `supabase test db --local`, DB lint·Advisors, public 타입 재생성
 - #115 등록 데이터 검증: 전체 마이그레이션을 적용한 **별도 로컬 임시 DB**에서 `pg_prove --dbname "$LOCAL_TEST_DB_URL" scripts/check_retool_operator.sql`을 실행한다. 실제 등록 마이그레이션을 읽어 계정 누락·이메일 미확인·정상 등록·타 계정 제외·재실행을 검사하고 롤백한다. 이 검사는 공유/운영 DB에서 실행하지 않는다.
-- `deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts`
+- `deno test --allow-net --config supabase/functions/deno.json supabase/functions/admin-moderation/handler_test.ts supabase/functions/account-restriction/identity_test.ts supabase/functions/account-restriction/handler_test.ts`
 - `scripts/check_moderation_auth.cjs`: **project_id diggin-114, API 55481 / DB 55482** 전용 임시 환경에서만 실행. `MODERATION_TEST_WORKDIR`, `DENO_BIN`을 지정한다. Deno 테스트 서버가 기본 포트 8000을 쓰므로 다른 서비스가 없는지 확인한다. 실제 Auth API·동시 요청·강제 롤백·ban·갱신 차단·미만료 JWT·해제를 검증한다. 테스트 계정과 변경 불가 감사 기록을 생성하며 검증 후 해당 임시 DB만 reset/stop으로 제거한다.
 
 공식 참고: [Supabase Auth 세션](https://supabase.com/docs/guides/auth/sessions), [Admin 사용자 변경](https://supabase.com/docs/reference/javascript/auth-admin-updateuserbyid), [토큰 권한](https://supabase.com/docs/guides/platform/personal-access-tokens), [Google OIDC](https://developers.google.com/identity/openid-connect/openid-connect), [Kakao OIDC](https://developers.kakao.com/docs/ko/kakaologin/utilize), [Apple 검증](https://developer.apple.com/documentation/signinwithapple/verifying-a-user).

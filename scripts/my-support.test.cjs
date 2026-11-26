@@ -178,7 +178,12 @@ function setup(
         if (name === "./constants/supportChannel")
           return { SUPPORT_CHANNEL_URL: CHANNEL_URL, SUPPORT_EMAIL };
         if (name === "@/constants/messages")
-          return { TOAST_MESSAGES: { SYS_002: "요청을 처리하지 못했습니다. 다시 시도해 주세요." } };
+          return {
+            TOAST_MESSAGES: {
+              SYS_002: "요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+              EXT_001: "외부 페이지를 열지 못했습니다.",
+            },
+          };
         if (name === "@/constants/policyDocuments.json")
           return require("../src/constants/policyDocuments.json");
         if (name === "@/components/PolicyDocumentContent") {
@@ -586,6 +591,37 @@ test("이용약관·개인정보 처리방침 하단 v1.0 링크는 이전 버�
   assert.ok(!text("terms-v1.0").includes("이전 버전 확인하기"));
 });
 
+test("두 선택 동의 전문의 이메일은 회원·비회원 모두 메일 작성 링크로 열린다", async () => {
+  const context = setup("PolicyDocumentScreen");
+  for (const session of [{ user: { id: "viewer" } }, null]) {
+    context.auth.session = session;
+    for (const document of ["usage-analysis", "overseas-transfer"]) {
+      const links = expand(context.Screen({ document })).filter(
+        (node) => node.props.accessibilityRole === "link",
+      );
+      assert.equal(links.length, 1);
+      assert.equal(links[0].props.children, SUPPORT_EMAIL);
+      assert.match(links[0].props.className, /text-semantic-link/);
+      assert.match(links[0].props.className, /underline/);
+      await links[0].props.onPress();
+    }
+  }
+  assert.deepEqual(context.opened, Array(4).fill(`mailto:${SUPPORT_EMAIL}`));
+  assert.deepEqual(context.routes, [], "메일 주소를 앱 내부 경로로 열지 않는다");
+});
+
+test("약관 이메일을 열지 못하면 오류를 안내하고 내부 경로로 이동하지 않는다", async () => {
+  const context = setup("PolicyDocumentScreen");
+  context.failLink();
+  const link = expand(context.Screen({ document: "overseas-transfer" })).find(
+    (node) => node.props.accessibilityRole === "link",
+  );
+  assert.ok(link);
+  await link.props.onPress();
+  assert.deepEqual(context.toasts, ["외부 페이지를 열지 못했습니다."]);
+  assert.deepEqual(context.routes, []);
+});
+
 test("약관 상세 체크박스는 회원에게만 하단에 띄우고, 필수 약관은 누를 수 없는 회색으로 둔다", () => {
   const context = setup("PolicyDocumentScreen");
   const bar = (document) =>
@@ -615,11 +651,15 @@ test("커뮤니티 이용정책 마지막 두 문단은 바텀시트에서만 �
       require: (name) =>
         name === "expo-router"
           ? { useRouter: () => ({ push() {} }) }
-          : name === "react-native"
-            ? { View: "View", Text: "Text" }
-            : name === "@/constants/policyDocuments.json"
-              ? require("../src/constants/policyDocuments.json")
-              : require(name),
+          : name === "@/hooks/useToast"
+            ? { useToast: () => () => {} }
+            : name === "@/constants/messages"
+              ? { TOAST_MESSAGES: {} }
+              : name === "react-native"
+                ? { View: "View", Text: "Text" }
+                : name === "@/constants/policyDocuments.json"
+                  ? require("../src/constants/policyDocuments.json")
+                  : require(name),
     },
   );
   const lastGroup = (isSheet) => {

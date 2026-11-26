@@ -10,7 +10,7 @@ import { FallbackImg } from "@/components/FallbackImg";
 
 const StyledImage = cssInterop(Image, { className: "style" });
 
-export const CARD_IMAGE_FRAME = "h-[106px] w-full rounded-lg bg-gray-100";
+export const CARD_IMAGE_FRAME = "aspect-square w-full rounded-lg bg-gray-100";
 
 /** none: 일반 목록, unselected/selected: 선택 모드 */
 export type CardSelectState = "none" | "unselected" | "selected";
@@ -74,7 +74,7 @@ export function Card({
         <View
           pointerEvents="none"
           className={clsx(
-            "absolute inset-x-0 top-0 h-[106px] rounded-lg",
+            "absolute inset-x-0 top-0 aspect-square rounded-lg",
             hasOwnedDim && "bg-gray-0/40",
           )}
         >
@@ -126,7 +126,7 @@ export function Card({
 
       {isSelected ? (
         <>
-          <View className="absolute inset-x-0 top-0 h-[106px] rounded-lg bg-gray-1000/15" />
+          <View className="absolute inset-x-0 top-0 aspect-square rounded-lg bg-gray-1000/15" />
           <View className="absolute right-1.5 top-1.5 size-6 items-center justify-center">
             <SelectCheckOnSvg width={CHECK_ICON_SIZE} height={CHECK_ICON_SIZE} />
           </View>
