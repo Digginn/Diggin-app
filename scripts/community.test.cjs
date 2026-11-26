@@ -1215,6 +1215,14 @@ test("공지 상세는 운영자 헤더를 사용하고 댓글 닫기 상태에�
     );
     assert.equal(nodes(screen, "CommentInput").length, commentsClosed ? 0 : 1);
     assert.equal(
+      nodes(list.props.ListFooterComponent, "View").some((node) =>
+        /flex-1 bg-gray-100/.test(node.props.className),
+      ),
+      commentsClosed,
+      "댓글을 닫으면 본문 아래를 화면 끝까지 Gray100으로 채운다",
+    );
+    assert.equal(list.props.contentContainerStyle?.flexGrow, commentsClosed ? 1 : undefined);
+    assert.equal(
       nodes(screen, "ReportBlockMenu").length,
       0,
       "공지 헤더는 일반 글 신고·삭제 메뉴를 노출하지 않는다",
