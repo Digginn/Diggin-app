@@ -100,7 +100,7 @@ export function CommentLikeButton({ isLiked, likeCount, onPress }: CommentLikeBu
       aria-selected={isLiked}
       aria-valuetext={`${likeCount}개`}
       disabled={!onPress}
-      className="h-12 min-w-12 flex-row items-center gap-0.5 px-2.5 active:opacity-75"
+      className="h-12 flex-row items-center gap-0.5 px-2.5 active:opacity-75"
       onPress={onPress}
     >
       <View pointerEvents="none" className="absolute left-0 top-0 h-12 w-12">
@@ -120,9 +120,12 @@ export function CommentLikeButton({ isLiked, likeCount, onPress }: CommentLikeBu
           </View>
         </Animated.View>
       </View>
-      <Text className="!leading-[14px] !tracking-normal text-gray-500 font-label-12-semibold">
-        {likeCount}
-      </Text>
+      {/* Figma ShowCount=False: 0개면 숫자 없이 하트만 가운데 둔다(BUG-154). */}
+      {likeCount > 0 && (
+        <Text className="!leading-[14px] !tracking-normal text-gray-500 font-label-12-semibold">
+          {likeCount}
+        </Text>
+      )}
       <View pointerEvents="none" className="absolute left-[3.6px] top-[9.6px]">
         <Animated.View style={floatingStyle}>
           <FloatingHeartSvg />
