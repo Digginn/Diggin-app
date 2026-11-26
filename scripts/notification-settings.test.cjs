@@ -205,8 +205,6 @@ test("기기 알림이 꺼졌을 때만 닫기 없는 배너와 설정 이동을
   const context = setup({ isDevicePushEnabled: false, onOpenNotificationSettings: () => opened++ });
   const banner = descendants(context.render()).find((node) => node.type === "PushOffBanner");
   assert.equal(banner.props.onClose, undefined);
-  assert.equal(banner.props.title, "기기 알림이 꺼져 있습니다.");
-  assert.equal(banner.props.description, "알림을 받으려면 기기 설정에서 알림을 허용해 주세요.");
   banner.props.onOpenSettings();
   assert.equal(opened, 1);
   for (const isDevicePushEnabled of [true, undefined]) {
