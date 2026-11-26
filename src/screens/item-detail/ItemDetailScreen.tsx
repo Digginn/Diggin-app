@@ -379,7 +379,10 @@ export function ItemDetailScreen() {
           <VotePrompt onPress={() => router.push("/diggle")} />
         </View>
 
-        <View className="flex-row gap-gutter border-t border-gray-200 bg-gray-0 px-margin pb-10 pt-3">
+        <View
+          className="flex-row gap-gutter border-t border-gray-200 bg-gray-0 px-margin pt-3"
+          style={{ paddingBottom: Math.max(40, insets.bottom) }}
+        >
           <View className="flex-1">
             <Button
               variant="secondary"
